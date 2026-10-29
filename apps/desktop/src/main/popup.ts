@@ -3,6 +3,7 @@ import { BrowserWindow, ipcMain, screen, type Rectangle } from 'electron';
 import {
   Channels,
   epochNow,
+  type AttachmentChip,
   type PopupFocused,
   type PopupNoticeAction,
   type PopupShown,
@@ -41,6 +42,8 @@ export interface PopupEvents {
   /** What the popup shows when it opens: the saved draft and any follow-up notice (CAP-08, D-26). */
   readonly state: () => Omit<PopupShown, 'hotkeyAt'>;
   readonly onDraft: (text: string) => void;
+  readonly onAttach: (bytes: Uint8Array, type: string) => Promise<AttachmentChip | null>;
+  readonly onDetach: (id: string) => void;
   readonly onNoticeAction: (action: PopupNoticeAction) => void;
 }
 
@@ -133,6 +136,16 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
 
   ipcMain.on(Channels.popupDraft, (event, text: unknown) => {
     if (event.sender === window.webContents && typeof text === 'string') events.onDraft(text);
+  });
+
+  ipcMain.handle(Channels.popupAttach, (event, bytes: unknown, type: unknown) => {
+    if (event.sender !== window.webContents) return null;
+    if (!(bytes instanceof Uint8Array) || typeof type !== 'string') return null;
+    return events.onAttach(bytes, type);
+  });
+
+  ipcMain.on(Channels.popupDetach, (event, id: unknown) => {
+    if (event.sender === window.webContents && typeof id === 'string') events.onDetach(id);
   });
 
   ipcMain.on(Channels.popupResize, (event, height: unknown) => {

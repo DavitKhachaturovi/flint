@@ -1,4 +1,4 @@
-import { readFile, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   addTask,
@@ -25,6 +25,14 @@ export interface CaptureRequest {
   readonly text: string;
   /** Tab on the close-match card: create the typed list instead (D-25). */
   readonly chooseNewList: boolean;
+  /** Pasted images waiting in app data (CAP-06), saved into `attachments/` with the task. */
+  readonly attachments?: readonly { readonly file: string; readonly extension: string }[];
+}
+
+/** `2026-10-29-153012`: attachment names sort by time (docs/04 §5). */
+function stamp(now: Date): string {
+  const two = (value: number): string => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
 }
 
 /** A list created by a capture, so `Created list <name> · Undo` can undo it (CAP-05). */
@@ -176,8 +184,10 @@ export class Workspace {
 
   private async save(request: CaptureRequest, now: Date): Promise<CaptureOutcome> {
     const parsed = this.parse(request, now);
-    // CAP-06 (paste) gives a title to body-only captures; until then they need a title.
-    if (parsed.title.trim() === '') return { kind: 'empty' };
+    const attachments = request.attachments ?? [];
+    if (parsed.title.trim() === '' && attachments.length === 0) return { kind: 'empty' };
+    // Proposed (CAP-06): a capture that is only a pasted image is called "Screenshot".
+    const title = parsed.title.trim() === '' ? 'Screenshot' : parsed.title;
 
     let target: Loaded;
     let createdList: CreatedList | null = null;
@@ -192,10 +202,24 @@ export class Workspace {
       target = this.inbox;
     }
 
+    // MEDIA-02: images go to `attachments/` and are linked relatively, so the folder can move.
+    const links: string[] = [];
+    if (attachments.length > 0) {
+      await mkdir(join(this.folder, 'attachments'), { recursive: true });
+      for (const [index, attachment] of attachments.entries()) {
+        const name = `${stamp(now)}-${id}${index > 0 ? `-${index + 1}` : ''}.${attachment.extension}`;
+        await copyFile(attachment.file, join(this.folder, 'attachments', name));
+        links.push(`![](attachments/${name})`);
+      }
+    }
+    const body = [parsed.body.trim() !== '' ? parsed.body : '', ...links]
+      .filter((part) => part !== '')
+      .join('\n');
+
     const op = addTask(target.file.document, target.file.path, {
       id,
-      title: parsed.title,
-      ...(parsed.body.trim() !== '' ? { body: parsed.body } : {}),
+      title,
+      ...(body !== '' ? { body } : {}),
       priority: parsed.priority,
       reminder: parsed.reminder,
     });

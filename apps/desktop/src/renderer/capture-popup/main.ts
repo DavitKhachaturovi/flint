@@ -1,4 +1,5 @@
 import {
+  capturePaste,
   listToken,
   listTokenAt,
   parseCapture,
@@ -8,7 +9,7 @@ import {
   type Token,
 } from '@flint/core/shorthand';
 import flintIcon from '../../../../../assets/icon/flint-icon-16.svg';
-import { epochNow, type PopupNotice } from '../../shared/ipc.js';
+import { epochNow, type AttachmentChip, type PopupNotice } from '../../shared/ipc.js';
 import { renderChips, renderChoice, renderSuggestions, targetName } from './view.js';
 
 /**
@@ -35,6 +36,10 @@ const noticeClose = required<HTMLButtonElement>('.notice-close');
 required<HTMLImageElement>('.target-icon').src = flintIcon;
 
 let lists: readonly ListInfo[] = [];
+/** Pasted images on this capture (CAP-06); the main process keeps them with the draft. */
+let attachments: readonly AttachmentChip[] = [];
+/** An image still on its way to the main process; Enter waits for it. */
+let attaching: Promise<unknown> = Promise.resolve();
 let notice: PopupNotice | null = null;
 /** The `##` name the user pressed Tab on: create it instead of the close match (D-25). */
 let chooseNewFor: string | null = null;
@@ -61,7 +66,7 @@ function update(): void {
     chooseNewFor = null;
   }
   parsed = next;
-  renderChips(chipsBox, parsed, removeToken);
+  renderChips(chipsBox, parsed, removeToken, attachments, detach);
   renderChoice(choiceBox, parsed, flippedFrom);
   targetLabel.textContent = targetName(parsed);
 
@@ -106,6 +111,13 @@ function insertToken(token: string): void {
   input.focus();
 }
 
+function detach(attachment: AttachmentChip): void {
+  window.flintPopup.detach(attachment.id);
+  attachments = attachments.filter((item) => item.id !== attachment.id);
+  update();
+  input.focus();
+}
+
 function changed(): void {
   grow();
   update();
@@ -144,17 +156,20 @@ function submit(): void {
   const keyAt = epochNow();
   const text = input.value;
   const chooseNewList = chooseNewFor !== null && parsed.target.kind === 'new';
-  void window.flintPopup.submit({ text, keyAt, chooseNewList }).then((ack) => {
-    // D-27: the box empties once the main process has the capture; the saved draft is cleared
-    // only after the write is confirmed.
-    if (ack.accepted) {
-      input.value = '';
-      chooseNewFor = null;
-      grow();
-      update();
-      showNotice(null);
-    }
-  });
+  void attaching
+    .then(() => window.flintPopup.submit({ text, keyAt, chooseNewList }))
+    .then((ack) => {
+      // D-27: the box empties once the main process has the capture; the saved draft is cleared
+      // only after the write is confirmed.
+      if (ack.accepted) {
+        input.value = '';
+        attachments = [];
+        chooseNewFor = null;
+        grow();
+        update();
+        showNotice(null);
+      }
+    });
 }
 
 function undo(): void {
@@ -162,33 +177,68 @@ function undo(): void {
   showNotice(null);
 }
 
-window.flintPopup.onShown(({ hotkeyAt, draft, notice: next, lists: current }) => {
-  lists = current;
-  // The saved draft only fills an empty box (after a restart, or a failed save, D-27): what is in
-  // the box is newer than the copy the main process keeps, which trails typing by a moment.
-  if (input.value === '' && draft !== '') {
-    input.value = draft;
-    grow();
-  }
-  update();
-  showNotice(next);
-  input.focus();
-  const focusedAt = epochNow();
-  // Two animation frames: the first frame with the focused input has been produced (R-1).
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      window.flintPopup.reportFocused({
-        hotkeyAt,
-        focusedAt,
-        frameAt: epochNow(),
-        documentFocused: document.hasFocus(),
-        inputFocused: document.activeElement === input,
-      });
-    }),
-  );
-});
+window.flintPopup.onShown(
+  ({ hotkeyAt, draft, attachments: staged, notice: next, lists: current }) => {
+    lists = current;
+    attachments = staged;
+    // The saved draft only fills an empty box (after a restart, or a failed save, D-27): what is in
+    // the box is newer than the copy the main process keeps, which trails typing by a moment.
+    if (input.value === '' && draft !== '') {
+      input.value = draft;
+      grow();
+    }
+    update();
+    showNotice(next);
+    input.focus();
+    const focusedAt = epochNow();
+    // Two animation frames: the first frame with the focused input has been produced (R-1).
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        window.flintPopup.reportFocused({
+          hotkeyAt,
+          focusedAt,
+          frameAt: epochNow(),
+          documentFocused: document.hasFocus(),
+          inputFocused: document.activeElement === input,
+        });
+      }),
+    );
+  },
+);
 
 input.addEventListener('input', changed);
+
+// CAP-06: a pasted image becomes an attachment; a pasted stack trace, JSON or code goes into the
+// body as a fenced block, with the typed text (or the paste's first meaningful line) as the title.
+input.addEventListener('paste', (event) => {
+  const data = event.clipboardData;
+  if (!data) return;
+  const image = [...data.items].find(
+    (item) => item.kind === 'file' && item.type.startsWith('image/'),
+  );
+  const file = image?.getAsFile();
+  if (file) {
+    event.preventDefault();
+    attaching = file
+      .arrayBuffer()
+      .then((bytes) => window.flintPopup.attach(new Uint8Array(bytes), file.type))
+      .then((chip) => {
+        if (chip) {
+          attachments = [...attachments, chip];
+          update();
+        }
+      });
+    return;
+  }
+  const next = capturePaste(input.value, data.getData('text/plain'));
+  if (next === null) return;
+  event.preventDefault();
+  input.value = next;
+  // The caret goes to the end of the title, ready to add shorthand.
+  const titleEnd = next.search(/\r\n|\r|\n/);
+  input.setSelectionRange(titleEnd, titleEnd);
+  changed();
+});
 // The caret moving in or out of a `##` token opens or closes the menu.
 document.addEventListener('selectionchange', () => {
   if (document.activeElement === input) update();

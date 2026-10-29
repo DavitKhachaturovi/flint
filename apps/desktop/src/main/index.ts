@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   globalShortcut,
   ipcMain,
+  nativeImage,
   Notification,
   protocol as schemes,
   session,
@@ -257,8 +258,10 @@ async function start(): Promise<void> {
   let notice: { readonly popup: PopupNotice; readonly undo: CreatedList | null } | null = null;
 
   const saveCapture = async (capture: PopupSubmit): Promise<void> => {
+    // The images on the draft when Enter was pressed go with this capture (CAP-06).
+    const attachments = [...drafts.attachments];
     try {
-      const outcome = await workspace.capture(capture, new Date());
+      const outcome = await workspace.capture({ ...capture, attachments }, new Date());
       if (outcome.kind === 'saved') {
         log(
           `capture saved to ${outcome.listName}; Enter → durably on disk ${(epochNow() - capture.keyAt).toFixed(1)} ms`,
@@ -270,7 +273,7 @@ async function start(): Promise<void> {
             }
           : null;
       }
-      await drafts.clearIf(capture.text);
+      await drafts.clearIf(capture.text, attachments);
       e2eHooks()?.captured.push(capture.text);
     } catch (error) {
       // D-27: the text comes back as the draft, with `Couldn't save your last capture · Retry`.
@@ -300,11 +303,29 @@ async function start(): Promise<void> {
     },
     state: () => ({
       draft: drafts.text,
+      attachments: drafts.attachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        thumbnail: thumbnail(nativeImage.createFromPath(attachment.file)),
+      })),
       notice: notice?.popup ?? null,
       lists: workspace.listInfos(),
     }),
     onDraft: (text) => {
       drafts.set(text).catch((error: unknown) => log(`draft not saved: ${String(error)}`));
+    },
+    onAttach: async (bytes, type) => {
+      const attachment = await drafts.attach(bytes, type);
+      return attachment
+        ? {
+            id: attachment.id,
+            name: attachment.name,
+            thumbnail: thumbnail(nativeImage.createFromBuffer(Buffer.from(bytes))),
+          }
+        : null;
+    },
+    onDetach: (id) => {
+      drafts.detach(id).catch((error: unknown) => log(`attachment not removed: ${String(error)}`));
     },
     onNoticeAction: (action) => {
       const undo = action === 'undo' ? notice?.undo : null;
@@ -424,6 +445,11 @@ async function start(): Promise<void> {
 
   const testToast = devEnv('FLINT_TEST_TOAST') as ToastKind | undefined;
   if (testToast) setTimeout(() => sendTestToast(testToast), 1500);
+}
+
+/** A chip-sized thumbnail of a pasted image (CAP-06). */
+function thumbnail(image: Electron.NativeImage): string {
+  return image.isEmpty() ? '' : image.resize({ height: 28 }).toDataURL();
 }
 
 function waitFor<T>(waiters: ((value: T) => void)[], timeout: number): Promise<T | null> {

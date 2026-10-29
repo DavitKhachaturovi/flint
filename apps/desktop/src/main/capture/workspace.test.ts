@@ -175,4 +175,37 @@ describe('drafts (CAP-08)', () => {
     await drafts.clearIf('half a thought');
     expect(await new DraftFile(path).load()).toBe('');
   });
+
+  it('keep pasted images until they are saved with the capture (CAP-06)', async () => {
+    const path = join(base, 'drafts.json');
+    const drafts = new DraftFile(path);
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+    expect(await drafts.attach(png, 'application/zip')).toBeNull();
+    const first = await drafts.attach(png, 'image/png');
+    const second = await drafts.attach(png, 'image/jpeg');
+    if (!first || !second) throw new Error('not attached');
+    expect(first.name).toBe('screenshot.png');
+    await drafts.detach(second.id);
+    await expect(readFile(second.file)).rejects.toThrow();
+
+    const restored = new DraftFile(path);
+    await restored.load();
+    expect(restored.attachments.map((item) => item.id)).toEqual([first.id]);
+
+    const workspace = await open();
+    const outcome = await workspace.capture(
+      { text: '', chooseNewList: false, attachments: restored.attachments },
+      now,
+    );
+    if (outcome.kind !== 'saved') throw new Error('not saved');
+    const name = `2026-10-29-143000-${outcome.taskId}.png`;
+    expect(await inbox()).toContain(
+      `- [ ] Screenshot [id:: ${outcome.taskId}]\n    ![](attachments/${name})\n`,
+    );
+    expect(new Uint8Array(await readFile(join(folder, 'attachments', name)))).toEqual(png);
+
+    await restored.clearIf('', restored.attachments);
+    expect(restored.attachments).toEqual([]);
+    await expect(readFile(first.file)).rejects.toThrow();
+  });
 });

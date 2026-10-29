@@ -18,6 +18,8 @@ export const Channels = {
   popupDraft: 'popup:draft',
   popupNoticeAction: 'popup:notice-action',
   popupResize: 'popup:resize',
+  popupAttach: 'popup:attach',
+  popupDetach: 'popup:detach',
   devEvent: 'dev:event',
   devSendToast: 'dev:send-toast',
 } as const;
@@ -31,11 +33,20 @@ export type PopupNotice =
 
 export type PopupNoticeAction = 'undo' | 'dismiss';
 
+/** A pasted image on the capture (CAP-06), as its chip shows it. */
+export interface AttachmentChip {
+  readonly id: string;
+  readonly name: string;
+  /** A small PNG data URL for the chip. */
+  readonly thumbnail: string;
+}
+
 /** Main → popup: the popup was just shown by the hotkey at `hotkeyAt`. */
 export interface PopupShown {
   readonly hotkeyAt: number;
   /** The saved draft (CAP-08); replaces the input only when the popup's text differs. */
   readonly draft: string;
+  readonly attachments: readonly AttachmentChip[];
   readonly notice: PopupNotice | null;
   /** The lists for `##` chips, autocomplete and the new-list card (CAP-04, CAP-05). */
   readonly lists: readonly ListInfo[];

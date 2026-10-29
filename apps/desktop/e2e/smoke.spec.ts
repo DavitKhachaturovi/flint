@@ -255,6 +255,51 @@ test('shorthand chips, the ## menu and the close-match card (CAP-04, CAP-05, D-2
     .toMatch(/- \[ \] fix token refresh \[reminder:: \d{4}-\d\d-\d\dT10:00\] \[priority:: high\]/);
 });
 
+test('paste-to-capture: stack trace into the body, screenshot into attachments (CAP-06)', async () => {
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  const box = popup.locator('#capture');
+  const trace =
+    'System.NullReferenceException: Object reference not set\n   at A.B() in C:\\a.cs:line 1\n   at C.D() in C:\\c.cs:line 2';
+  // A 1x1 PNG.
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await box.fill('');
+  await popup.evaluate(
+    ([text, image]) => {
+      const area = document.querySelector('#capture');
+      const paste = (data: DataTransfer): void => {
+        area?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+      };
+      const textData = new DataTransfer();
+      textData.setData('text/plain', text);
+      paste(textData);
+      const bytes = Uint8Array.from(atob(image), (char) => char.charCodeAt(0));
+      const imageData = new DataTransfer();
+      imageData.items.add(new File([bytes], 'clip.png', { type: 'image/png' }));
+      paste(imageData);
+    },
+    [trace, png] as const,
+  );
+  await expect(box).toHaveValue(
+    `System.NullReferenceException: Object reference not set\n\`\`\`\n${trace}\n\`\`\``,
+  );
+  await expect(popup.locator('.chip')).toHaveText(['screenshot.png']);
+  await box.press('Enter');
+  const inbox = (): Promise<string> => readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8');
+  await expect
+    .poll(inbox)
+    .toContain('- [ ] System.NullReferenceException: Object reference not set [id:: ');
+  const text = await inbox();
+  expect(text).toContain('    ```\n    System.NullReferenceException');
+  const link = /!\[\]\((attachments\/[\w-]+\.png)\)/.exec(text)?.[1];
+  if (!link) throw new Error(`no attachment link in:\n${text}`);
+  expect((await readFile(join(dataDirectory, 'Flint', link))).length).toBeGreaterThan(60);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

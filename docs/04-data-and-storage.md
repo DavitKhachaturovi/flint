@@ -38,6 +38,7 @@ App data (not in the Flint folder):
   window-state.json             ← window sizes/positions per monitor setup (APP-05)
   ui-state.json                 ← collapsed sections, last opened list, sidebar state
   drafts.json                   ← capture popup draft (CAP-08)
+  draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
 %LOCALAPPDATA%\Flint\
   snapshots\                    ← local snapshots (DATA-04)

@@ -1,4 +1,5 @@
 import type { CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
+import type { AttachmentChip } from '../../shared/ipc.js';
 
 /**
  * What the popup shows for the parsed text (CAP-04, CAP-05, D-25, D-29): chips, the `##` menu, the
@@ -57,38 +58,50 @@ export function renderChips(
   box: HTMLElement,
   parsed: CaptureParse,
   remove: (token: Token) => void,
+  attachments: readonly AttachmentChip[],
+  detach: (attachment: AttachmentChip) => void,
 ): void {
   const chips: HTMLElement[] = [];
   const winner = (kind: TokenKind): Token | undefined =>
     parsed.tokens.find((token) => token.kind === kind && token.role === 'winner');
-  const chip = (lead: HTMLElement | null, label: string, token?: Token): void => {
+  const chip = (lead: HTMLElement | null, label: string, onRemove?: () => void): void => {
     const node = element('span', 'chip');
     if (lead) node.append(lead);
     node.append(label);
-    if (token) {
+    if (onRemove) {
       const button = element('button', 'x');
       button.type = 'button';
       button.setAttribute('aria-label', `Remove ${label}`);
       button.innerHTML = ICONS.x;
       button.addEventListener('mousedown', (event) => event.preventDefault());
-      button.addEventListener('click', () => remove(token));
+      button.addEventListener('click', onRemove);
       node.append(button);
     }
     chips.push(node);
   };
+  const removing = (token: Token | undefined): (() => void) | undefined =>
+    token ? () => remove(token) : undefined;
 
   if (parsed.priority) {
     const stripe = element('span', 'stripe');
     const [color, width] = PRIORITY_STRIPE[parsed.priority];
     stripe.style.setProperty('--color', `var(${color})`);
     stripe.style.setProperty('--width', `var(${width})`);
-    chip(stripe, counted(parsed, 'priority', PRIORITY_LABEL[parsed.priority]), winner('priority'));
+    chip(
+      stripe,
+      counted(parsed, 'priority', PRIORITY_LABEL[parsed.priority]),
+      removing(winner('priority')),
+    );
   }
   if (parsed.target.kind !== 'inbox') {
-    chip(icon(ICONS.hash), counted(parsed, 'list', targetName(parsed)), winner('list'));
+    chip(icon(ICONS.hash), counted(parsed, 'list', targetName(parsed)), removing(winner('list')));
   }
   if (parsed.reminderLabel) {
-    chip(icon(ICONS.bell), counted(parsed, 'reminder', parsed.reminderLabel), winner('reminder'));
+    chip(
+      icon(ICONS.bell),
+      counted(parsed, 'reminder', parsed.reminderLabel),
+      removing(winner('reminder')),
+    );
   }
   for (const ignored of parsed.ignoredLists) {
     const note =
@@ -101,6 +114,12 @@ export function renderChips(
       const node = element('span', 'chip note', note);
       chips.push(node);
     }
+  }
+  for (const attachment of attachments) {
+    const thumb = element('img', 'thumb');
+    thumb.src = attachment.thumbnail;
+    thumb.alt = '';
+    chip(thumb, attachment.name, () => detach(attachment));
   }
   box.replaceChildren(...chips);
 }

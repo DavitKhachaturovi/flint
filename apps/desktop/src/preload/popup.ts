@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   Channels,
+  type AttachmentChip,
   type PopupFocused,
   type PopupNoticeAction,
   type PopupShown,
@@ -29,6 +30,13 @@ const popup = {
   /** The popup window follows the card's height, so no invisible area blocks clicks. */
   resize(height: number): void {
     ipcRenderer.send(Channels.popupResize, height);
+  },
+  /** CAP-06: a pasted image, kept with the draft until the capture is saved. */
+  attach(bytes: Uint8Array, type: string): Promise<AttachmentChip | null> {
+    return ipcRenderer.invoke(Channels.popupAttach, bytes, type) as Promise<AttachmentChip | null>;
+  },
+  detach(id: string): void {
+    ipcRenderer.send(Channels.popupDetach, id);
   },
   noticeAction(action: PopupNoticeAction): void {
     ipcRenderer.send(Channels.popupNoticeAction, action);

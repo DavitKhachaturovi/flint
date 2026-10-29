@@ -31,7 +31,8 @@ function code(error: unknown): string | undefined {
 
 export async function writeFileAtomic(
   path: string,
-  text: string,
+  /** Text is written as UTF-8; bytes (pasted images, CAP-06) as they are. */
+  text: string | Uint8Array,
   options: AtomicWriteOptions,
 ): Promise<void> {
   const renameFile = options.renameFile ?? rename;
@@ -43,7 +44,7 @@ export async function writeFileAtomic(
   );
   const handle = await open(temp, 'w');
   try {
-    await handle.writeFile(text, 'utf8');
+    await (typeof text === 'string' ? handle.writeFile(text, 'utf8') : handle.writeFile(text));
     await handle.sync();
   } finally {
     await handle.close();

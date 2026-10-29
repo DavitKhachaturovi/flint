@@ -55,6 +55,14 @@ body {
   padding-right: 9px;
 }
 
+.thumb {
+  height: 18px;
+  max-width: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  display: block;
+}
+
 .stripe {
   width: var(--width);
   height: 12px;
