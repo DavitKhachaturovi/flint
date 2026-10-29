@@ -147,7 +147,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-05 — Expandable task body (v1)
 - Any one-line task can be expanded into a **markdown body** (for a stack trace, notes, screenshots).
 - Collapsed, the row shows only a **small indicator** that a body exists. The list stays clean without forcing a separate note.
-- The body supports the same editor features as note mode (live preview, code blocks, media).
+- The body supports the same editor features as note mode (live preview, code blocks, media). **D-49:** in M4 the body is shown rendered (markdown, highlighted code blocks, images) and edited in a plain monospace field; M5 replaces the field with the note editor.
 - A checklist line (`- [ ]`) in a top-level task's body is a subtask (04 §3, D-29): typing `- [ ]` in a body visibly turns that line into a subtask.
 
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
@@ -184,6 +184,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
+- **D-50:** from M4 a deleted task is moved to the Flint folder's `trash/` with its deletion time, so nothing is destroyed; the Trash screen for browsing and restoring comes with DATA-02 in M7.
 
 ### TASK-15 — Non-task content shown read-only (v1, D-22)
 - A task-list file can contain content that isn't a task: headings, paragraphs and plain bullets added in Obsidian or VS Code, or kept from a note → task-list conversion (LIST-04).

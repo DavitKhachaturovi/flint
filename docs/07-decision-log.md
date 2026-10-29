@@ -310,3 +310,15 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 ### D-47 — The popup can be dragged by its card
 - **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
 - **Decision:** Dragging the card's background (not text fields, buttons, chips or code) moves the popup. The position is not remembered: every open starts centered on the active monitor (CAP-09). Implementation: the main process moves the window with the cursor until the left button is up, rather than CSS drag regions, which swallow mouse events on Windows and would break the click-through margin (D-42).
+
+### D-48 — M4 order: a daily-use build first
+- **Date:** 30 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** M4 starts with what makes Flint usable every day: the main window (sidebar, list views, rows with priority stripes, untitled tasks as collapsed code rows, non-task content read-only), completion with an undo toast and the Completed section, then the Navigate/Edit model and keymap (add, edit, priority, reorder, subtasks). As soon as that works, Davit gets an installable build; the rest of M4 (bodies, drag, multi-select, move, delete, temporary sort, multi-line paste, smart link titles, auto-archive offer) lands as updates installed over it.
+
+### D-49 — Task bodies in M4: rendered, with plain editing
+- **Date:** 30 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** TASK-05's editor is the note editor (CodeMirror live preview, M5). Until then a body is shown rendered (markdown, highlighted code blocks, images) and edited in a plain monospace field; M5 replaces the field with the note editor for notes and bodies alike. The rendering is kept.
+
+### D-50 — Delete to trash/ from M4; the Trash screen in M7
+- **Date:** 30 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** Deleting a task (TASK-12) from M4 moves it to the Flint folder's `trash/` with its deletion time and shows an Undo toast, so nothing is destroyed. Browsing, restoring and the 30-day expiry come with the Trash screen (DATA-02, M7).
