@@ -1,0 +1,9 @@
+import { defineConfig } from '@playwright/test';
+
+/** End-to-end tests against the built Electron app (docs/05 §6). Run `npm run build` first. */
+export default defineConfig({
+  testDir: 'e2e',
+  timeout: 60_000,
+  workers: 1,
+  reporter: [['list']],
+});

@@ -10,7 +10,8 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "install-electron": "install-electron",
-    "check:electron-node": "node scripts/check-electron-node.mjs"
+    "check:electron-node": "node scripts/check-electron-node.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@flint/core": "0.0.0",

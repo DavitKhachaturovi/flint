@@ -1,5 +1,7 @@
+import dns from 'node:dns';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import net from 'node:net';
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
 import { writeFileAtomic } from './storage/atomic.js';
 import {
@@ -24,9 +26,82 @@ import {
 export function configureAppPaths(): void {
   const name = app.isPackaged ? 'Flint' : 'Flint (development)';
   app.setName(name);
+  const testData = testDataDirectory();
+  if (testData) {
+    app.setPath('userData', join(testData, 'appdata'));
+    app.setAppLogsPath(join(testData, 'logs'));
+    return;
+  }
   app.setPath('userData', join(app.getPath('appData'), name));
   const local = process.env.LOCALAPPDATA ?? app.getPath('appData');
   app.setAppLogsPath(join(local, name, 'logs'));
+}
+
+/**
+ * End-to-end tests run a development build against a throwaway folder (`FLINT_DATA_DIR`): app data,
+ * logs and the Flint folder all live there. Ignored by installed builds.
+ */
+export function testDataDirectory(): string | undefined {
+  return !app.isPackaged ? process.env.FLINT_DATA_DIR || undefined : undefined;
+}
+
+/** Test-mode hooks for the end-to-end smoke test (FLINT_E2E=1, development builds only). */
+export interface E2EHooks {
+  /** Every non-local request the app attempted (all blocked): must stay empty (APP-09). */
+  readonly blockedRequests: string[];
+  readonly captured: string[];
+  showPopup?: () => void;
+}
+
+export function e2eHooks(): E2EHooks | undefined {
+  if (app.isPackaged || process.env.FLINT_E2E !== '1') return undefined;
+  const global = globalThis as { __flintE2E?: E2EHooks };
+  global.__flintE2E ??= { blockedRequests: [], captured: [] };
+  return global.__flintE2E;
+}
+
+/**
+ * Test mode: records and refuses every outgoing connection and DNS lookup made from Node in the main
+ * process. Node's fetch, http, https, tls and any library all go through `net` and `dns`, which a
+ * polling check would miss for short-lived connections (APP-09). Call before anything else runs.
+ */
+export function guardNodeNetworkForTests(): void {
+  const hooks = e2eHooks();
+  if (!hooks) return;
+  const record = (what: string): void => {
+    hooks.blockedRequests.push(what);
+  };
+  const original: unknown = Object.getOwnPropertyDescriptor(net.Socket.prototype, 'connect')?.value;
+  net.Socket.prototype.connect = function guardedConnect(this: net.Socket, ...args: unknown[]) {
+    // `net.connect()` passes its arguments normalized as one `[options, callback]` array.
+    const [first, second] = Array.isArray(args[0]) ? (args[0] as unknown[]) : args;
+    // Local pipes (Electron's own IPC) are not network.
+    if (typeof first === 'object' && first !== null && 'path' in first) {
+      return Reflect.apply(original as (...a: unknown[]) => net.Socket, this, args);
+    }
+    const options =
+      typeof first === 'object' && first !== null ? (first as net.TcpNetConnectOpts) : undefined;
+    const host = options?.host ?? (typeof second === 'string' ? second : 'localhost');
+    const port =
+      options?.port ?? (typeof first === 'number' || typeof first === 'string' ? first : '?');
+    record(`node connect ${host}:${port}`);
+    this.destroy(new Error('network disabled in Flint (APP-09)'));
+    return this;
+  };
+  (dns as { lookup: unknown }).lookup = (hostname: string, ...rest: unknown[]) => {
+    record(`node dns ${hostname}`);
+    const callback = rest.at(-1);
+    if (typeof callback === 'function') {
+      process.nextTick(() =>
+        (callback as (error: Error) => void)(new Error('DNS disabled in Flint (APP-09)')),
+      );
+    }
+  };
+  const promises = dns.promises as { lookup: unknown };
+  promises.lookup = (hostname: string) => {
+    record(`node dns ${hostname}`);
+    return Promise.reject(new Error('DNS disabled in Flint (APP-09)'));
+  };
 }
 
 /** Launched by Windows at login (APP-01): start in the tray without showing a window. */

@@ -388,6 +388,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-09 — No telemetry, stated plainly (v1)
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
 - The only network access is checking for and downloading updates (APP-06), and that is Later: **v1 makes no network requests at all.**
+- **Enforced (D-31):** an end-to-end test fails on any network request the app attempts. A future network feature allowlists exactly its own endpoint there; the check is never loosened.
 
 ### APP-10 — Teaching Inbox onboarding (v1)
 - On first launch, Inbox contains sample tasks that each teach one shortcut (e.g. "Press Space to complete me", "Press 3 to make me high priority", "Press your capture hotkey from any app").

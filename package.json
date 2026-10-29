@@ -21,7 +21,8 @@
     "measure": "npm run build && node packages/core/bench/measure.mjs",
     "audit": "npm audit --audit-level=high",
     "check:electron-node": "npm run install-electron -w @flint/desktop && npm run check:electron-node -w @flint/desktop",
-    "dev": "npm run dev -w @flint/desktop"
+    "dev": "npm run dev -w @flint/desktop",
+    "e2e": "npm run build && npm run test:e2e -w @flint/desktop"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -4,3 +4,5 @@ coverage/
 *.tsbuildinfo
 .vitest-cache/
 out/
+test-results/
+playwright-report/

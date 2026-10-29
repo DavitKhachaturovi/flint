@@ -30,9 +30,12 @@ import {
   applyStartWithWindows,
   configureAppPaths,
   createTray,
+  e2eHooks,
+  guardNodeNetworkForTests,
   recoverFromCrashes,
   rememberWindowState,
   STARTED_AT_LOGIN,
+  testDataDirectory,
 } from './shell.js';
 import { VirtualKey } from './win32.js';
 
@@ -78,6 +81,7 @@ const rendererFile = (name: string): string =>
   join(import.meta.dirname, `../renderer/${name}/index.html`);
 
 configureAppPaths();
+guardNodeNetworkForTests();
 
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
 if (!app.requestSingleInstanceLock()) {
@@ -107,9 +111,8 @@ function log(message: string): void {
 /** Defense in depth for "no network requests at all in v1" (APP-09): only local content loads. */
 function blockNetwork(): void {
   const devServer = rendererUrl ? new URL(rendererUrl).origin : null;
-  session.defaultSession.webRequest.onBeforeRequest(
-    { urls: ['<all_urls>'] },
-    (details, respond) => {
+  const guard = (target: Electron.Session): void => {
+    target.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, respond) => {
       const url = new URL(details.url);
       const local = ['file:', 'devtools:', 'data:', 'blob:'].includes(url.protocol);
       const dev =
@@ -117,9 +120,13 @@ function blockNetwork(): void {
         (url.origin === devServer || url.origin === devServer.replace(/^http/, 'ws'));
       if (local || dev) return respond({});
       log(`blocked network request: ${details.url}`);
+      e2eHooks()?.blockedRequests.push(details.url);
       respond({ cancel: true });
-    },
-  );
+    });
+  };
+  guard(session.defaultSession);
+  // Any other session (a partition, a future webview) gets the same guard.
+  app.on('session-created', guard);
 }
 
 function registerProtocol(): void {
@@ -138,7 +145,10 @@ async function start(): Promise<void> {
     join(app.getPath('userData'), 'settings.json'),
     !app.isPackaged,
   ).load();
-  const folder = await prepareFlintFolder(settings.flintFolder);
+  const testData = testDataDirectory();
+  const folder = await prepareFlintFolder(
+    testData ? join(testData, 'Flint') : settings.flintFolder,
+  );
   log(
     `Flint folder ${folder.folder}: ${folder.lists.length} lists, Inbox ${folder.inbox}${folder.inboxCreated ? ' (created)' : ''}`,
   );
@@ -203,8 +213,11 @@ async function start(): Promise<void> {
         `captured "${capture.text}"; Enter → hidden and focus returned ${(capture.returnedAt - capture.keyAt).toFixed(1)} ms`,
       );
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
+      e2eHooks()?.captured.push(capture.text);
     },
   });
+  const hooks = e2eHooks();
+  if (hooks) hooks.showPopup = () => popup.show(epochNow());
 
   recoverFromCrashes(popup.window, 'capture popup', log);
 

@@ -10,5 +10,5 @@
       "@flint/core/*": ["../../packages/core/src/*/index.ts"]
     }
   },
-  "include": ["src", "electron.vite.config.ts"]
+  "include": ["src", "electron.vite.config.ts", "playwright.config.ts", "e2e"]
 }

@@ -173,7 +173,7 @@ flint/
 - **Distribution (v1):** internal tool; the `.exe` is handed to coworkers manually (D-19).
 - **Code signing: not in v1 (D-19).** Azure Artifact Signing (formerly Trusted Signing) only issues public-trust certificates to organizations in a fixed list of regions that does not include Georgia, so the alternative is an OV certificate from a commercial CA: organization validation by the CA (documents and verification, typically days), a private key that must live on a hardware token or cloud HSM, and a yearly fee. Even signed, a new certificate has to build SmartScreen reputation. For an internal tool this is not worth it yet.
 - **What unsigned means for users:** on first run of a downloaded installer, Windows SmartScreen shows "Windows protected your PC"; the user clicks **More info → Run anyway**. Mention this in the hand-out message. Toast notifications still work unsigned (they depend on the AppUserModelID and the Start Menu shortcut the installer creates, not on a signature).
-- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → lint → typecheck → unit tests (core) → e2e smoke tests → build → publish the installer as a pipeline artifact. Signing and an update feed slot in later.
+- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → npm audit and release-age check (D-30) → embedded-Node check → lint → typecheck → unit tests → build → e2e smoke test (app starts, capture reaches the main process, zero network requests: D-31) → publish the installer as a pipeline artifact. Signing and an update feed slot in later.
 - **Logs** stay local (`%LOCALAPPDATA%\Flint\logs`); nothing is uploaded (APP-09).
 
 ---
