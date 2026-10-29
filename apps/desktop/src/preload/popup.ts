@@ -45,6 +45,10 @@ const popup = {
     > | null>;
   },
   /** D-42: clicks reach the popup only over the card; the margin around it lets them through. */
+  /** D-47: the card's background drags the popup until the mouse button is released. */
+  dragStart(): void {
+    ipcRenderer.send(Channels.popupDrag);
+  },
   setInteractive(interactive: boolean): void {
     ipcRenderer.send(Channels.popupInteractive, interactive);
   },

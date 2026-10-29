@@ -20,6 +20,7 @@ body {
 }
 
 .card {
+  position: relative;
   background: var(--fl-ground-float);
   border-radius: var(--fl-radius-popup);
   box-shadow: var(--fl-shadow-float);
@@ -31,7 +32,8 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 4px 4px 0;
+  /* Room for the close × in the top right. */
+  padding: 4px 32px 0 4px;
 }
 
 .chips:empty {
@@ -119,7 +121,7 @@ button:focus-visible {
   width: 100%;
   box-sizing: border-box;
   height: 56px;
-  padding: 0 8px;
+  padding: 0 32px 0 8px;
   background: transparent;
   border: 0;
   outline: none;
@@ -298,6 +300,10 @@ button:focus-visible {
   background: var(--fl-ground-hover);
 }
 
+.tile svg {
+  display: block;
+}
+
 .tile {
   width: 26px;
   height: 26px;
@@ -354,8 +360,31 @@ button:focus-visible {
   gap: 2px;
 }
 
-.tool-group + .tool-group {
-  gap: 10px;
+/* The target list and the save button (the hint sits between the two groups). */
+.tool-group:last-child {
+  gap: 14px;
+}
+
+/* The × in the top right: closes like Esc, the draft is kept (D-46). */
+.card-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.card-close:hover {
+  background: var(--fl-edge-float);
+  color: var(--fl-text-primary);
 }
 
 .tool {
@@ -382,6 +411,7 @@ button:focus-visible {
 }
 
 .target {
+  padding-right: 2px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -448,7 +478,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 4px 8px 8px;
+  padding: 2px 32px 8px 8px;
   font-size: var(--fl-size-meta);
   color: var(--fl-text-secondary);
 }

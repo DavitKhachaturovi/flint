@@ -257,3 +257,33 @@ describe('structure: details', () => {
     expect(childText(document.blocks[0] as TaskNode)).toBe('    ```\n');
   });
 });
+
+describe('untitled tasks: an empty task line with a body (D-45, docs/04 §3)', () => {
+  const file = [
+    '---',
+    'flint: 1',
+    'id: inbox',
+    'mode: tasks',
+    '---',
+    '- [ ] [priority:: high] [id:: k3f9]',
+    '    ```json',
+    '    {',
+    '      "died_at": "2026-09-10T07:55:31Z"',
+    '    }',
+    '    ```',
+    '- [x] [completion:: 2026-10-29T15:00] [id:: m2p7]',
+    '    ![](attachments/2026-10-29-150000-m2p7.png)',
+    '- [ ]',
+    '',
+  ].join('\n');
+
+  it('round-trips byte-for-byte and keeps the body with its task', () => {
+    const document = parseDocument(file);
+    expect(serializeDocument(document)).toBe(file);
+    const tasks = [...allTasks(document)].map(({ task }) => task);
+    expect(tasks.map((task) => task.line.title)).toEqual(['', '', '']);
+    expect(tasks.map((task) => task.line.fields.id?.value)).toEqual(['k3f9', 'm2p7', undefined]);
+    expect(tasks[0] ? childText(tasks[0]) : '').toContain('"died_at"');
+    expect(tasks[1] ? childText(tasks[1]) : '').toContain('![](attachments/');
+  });
+});

@@ -122,6 +122,7 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 - Stored as the `id` field (not Obsidian's `^block` syntax, so there is one convention for all metadata).
 
 ### Body and subtasks
+- **Untitled tasks (D-45):** a task line may be empty apart from its checkbox and fields (`- [ ] [priority:: high] [id:: k3f9]`) when its body says what the task is, e.g. a captured stack trace or JSON (fenced) or only a screenshot. This is valid and round-trips byte-for-byte; Flint never writes a generated title. Where a short label is needed (reminder toasts, Today reminder cards, search results) it is made when shown (`taskLabel`: `JSON · died_at`, `Stack trace · TypeError: …`, `Screenshot`). Lists show such a task as a collapsed code row (kind, line count and a one-line peek), expandable.
 - A **task body** (TASK-05) is the indented, non-list-item content directly under a task (standard markdown list-item continuation), including fenced code blocks and media links.
 - A **subtask** (TASK-04) is an indented `- [ ]` item directly under a top-level task. Only one level is valid; content indented under a subtask, including deeper list items, is that subtask's body (**Proposed**).
 - **Indentation (D-29):** read as tabs, 2 spaces or 4 spaces. Flint writes 4 spaces, or tabs if the file already indents with tabs.

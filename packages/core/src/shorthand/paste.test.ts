@@ -4,9 +4,9 @@ import {
   blockFor,
   classifyPaste,
   composeCapture,
-  fallbackTitle,
   fencedBlock,
   isCodeBlock,
+  taskLabel,
   titleFromPaste,
 } from './paste.js';
 
@@ -80,12 +80,9 @@ describe('paste-to-capture (CAP-06)', () => {
     expect(fencedBlock('plain\n\n')).toBe('```\nplain\n```');
   });
 
-  it('puts code in the body and keeps the typed title', () => {
+  it('puts code in the body and keeps the typed task line', () => {
     expect(composeCapture('fix token refresh !h', [blockFor(json)])).toBe(
       `fix token refresh !h\n\`\`\`json\n${json}\n\`\`\``,
-    );
-    expect(composeCapture('', [blockFor(node)])).toBe(
-      `TypeError: Cannot read properties of undefined (reading 'id')\n\`\`\`\n${node}\n\`\`\``,
     );
     expect(composeCapture('title', [{ kind: 'note', text: 'note line\n' }, blockFor(code)])).toBe(
       `title\nnote line\n\`\`\`\n${code}\n\`\`\``,
@@ -101,7 +98,7 @@ describe('paste-to-capture (CAP-06)', () => {
   });
 });
 
-describe('the selection area (D-38, CAP-07)', () => {
+describe('the selection is the task (D-45)', () => {
   it('classifies selections into blocks', () => {
     expect(blockFor('  ping Alex about the tenant cache  ')).toEqual({
       kind: 'text',
@@ -112,33 +109,36 @@ describe('the selection area (D-38, CAP-07)', () => {
     expect(isCodeBlock('note')).toBe(false);
   });
 
-  it('titles an empty title line from the first block, without repeating a lone line', () => {
-    expect(fallbackTitle([blockFor(json)])).toBe('error: token expired');
-    expect(fallbackTitle([{ kind: 'text', text: '42' }])).toBe('42');
-    expect(fallbackTitle([])).toBe('');
+  it('code with nothing typed: an empty task line and the code as the body', () => {
+    expect(composeCapture('', [blockFor(node)])).toBe(`\n\`\`\`\n${node}\n\`\`\``);
+    const parsed = parseCapture(composeCapture('!h', [blockFor(json)]), {
+      now: new Date(2026, 9, 29, 10),
+      lists: [],
+    });
+    expect(parsed.title).toBe('');
+    expect(parsed.priority).toBe('high');
+    expect(parsed.body).toBe(`\`\`\`json\n${json}\n\`\`\``);
+  });
+
+  it('plain text with nothing typed: its first line is the task line, the rest the body', () => {
     expect(composeCapture('', [blockFor('the line from Teams')])).toBe('the line from Teams');
-    // A multi-line text keeps all its lines in the body; its first line is the title.
-    expect(composeCapture('', [blockFor('two lines\nfrom Teams')])).toBe(
-      'two lines\ntwo lines\nfrom Teams',
+    expect(composeCapture('', [blockFor('two lines\nfrom Teams')])).toBe('two lines\nfrom Teams');
+    expect(composeCapture('', [{ kind: 'note', text: 'first\nsecond' }, blockFor(json)])).toBe(
+      `first\nsecond\n\`\`\`json\n${json}\n\`\`\``,
     );
     expect(composeCapture('follow up', [blockFor('the line from Teams')])).toBe(
       'follow up\nthe line from Teams',
     );
   });
 
-  it('a title of only shorthand gets the fallback title in front', () => {
-    const text = composeCapture('!h', [blockFor(node)], false);
-    const parsed = parseCapture(text, { now: new Date(2026, 9, 29, 10), lists: [] });
-    expect(parsed.title).toBe("TypeError: Cannot read properties of undefined (reading 'id')");
-    expect(parsed.priority).toBe('high');
-  });
-
-  it('shorthand in a selection never applies: only the title line is read', () => {
-    const text = composeCapture('', [blockFor('release @fri ##infra !h')]);
-    const parsed = parseCapture(text, { now: new Date(2026, 9, 29, 10), lists: [] });
-    expect(parsed.title).toBe('release @fri ##infra !h');
-    expect(parsed.reminder).toBeNull();
-    expect(parsed.priority).toBeNull();
-    expect(parsed.target).toEqual({ kind: 'inbox' });
+  it('labels an untitled task when it is shown, never in the file', () => {
+    expect(taskLabel('fix token refresh', '')).toBe('fix token refresh');
+    expect(taskLabel('', fencedBlock(json, 'json'))).toBe('JSON · error');
+    expect(taskLabel('', fencedBlock(node))).toBe(
+      'Stack trace · TypeError: Cannot read properties…',
+    );
+    expect(taskLabel('', fencedBlock(code))).toBe('Code · function retry(fn)');
+    expect(taskLabel('', '![](attachments/2026-10-29-153012-k3f9.png)')).toBe('Screenshot');
+    expect(taskLabel('', '')).toBe('Untitled task');
   });
 });

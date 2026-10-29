@@ -12,7 +12,14 @@ import {
   type PopupSubmit,
   type PopupSubmitAck,
 } from '../shared/ipc.js';
-import { bringToForeground, forceForeground, foregroundWindow, handleValue } from './win32.js';
+import {
+  bringToForeground,
+  forceForeground,
+  foregroundWindow,
+  handleValue,
+  isKeyDown,
+  VirtualKey,
+} from './win32.js';
 
 /**
  * The capture popup (CAP-01, CAP-09, CAP-10): created once at startup, kept rendered while hidden,
@@ -174,6 +181,24 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   ipcMain.handle(Channels.popupPrevious, (event, action: unknown) => {
     if (event.sender !== window.webContents) return null;
     return action === 'restore' || action === 'dismiss' ? events.onPrevious(action) : null;
+  });
+
+  // D-47: dragging by the card's background. The window follows the cursor until the left button
+  // is up; where it was dragged isn't remembered (the next open is centered again, CAP-09).
+  let dragging: NodeJS.Timeout | undefined;
+  ipcMain.on(Channels.popupDrag, (event) => {
+    if (event.sender !== window.webContents || dragging) return;
+    const start = screen.getCursorScreenPoint();
+    const [x = 0, y = 0] = window.getPosition();
+    dragging = setInterval(() => {
+      if (!isKeyDown(VirtualKey.leftButton)) {
+        clearInterval(dragging);
+        dragging = undefined;
+        return;
+      }
+      const at = screen.getCursorScreenPoint();
+      window.setPosition(x + at.x - start.x, y + at.y - start.y);
+    }, 8);
   });
 
   ipcMain.on(Channels.popupInteractive, (event, interactive: unknown) => {

@@ -101,41 +101,57 @@ export function blockFor(text: string): CaptureBlock {
 }
 
 /**
- * The title used when the title line is left empty: the first meaningful line of the first block
- * (an exception message, a JSON text field), shown as the title line's placeholder.
+ * The capture text to save (D-45: the selection itself is the task; no title is ever generated):
+ * - what was typed is the task line, and every block is the body;
+ * - with nothing typed, a plain text block (or note) gives its first line as the task line and the
+ *   rest as body; a code block leaves the task line empty and is the body, fenced and verbatim.
  */
-export function fallbackTitle(blocks: readonly CaptureBlock[], maxLength = 80): string {
-  const first = blocks.find((block) => block.text.trim() !== '');
-  if (!first) return '';
-  const title = titleFromPaste(first.text, maxLength);
-  if (title !== '') return title;
-  const line = first.text.trim().split(/\r\n|\r|\n/)[0] ?? '';
-  return escapeShorthand(line.length > maxLength ? `${line.slice(0, maxLength - 1)}…` : line);
-}
-
-/**
- * The capture text to save: the title (or the fallback title) on the first line, the blocks below
- * it as the body, code fenced. A single one-line text block that became the title isn't repeated.
- * `titleHasWords`: whether the title says anything besides shorthand; a title of only `!h ##infra`
- * gets the fallback title in front, so the tokens still apply.
- */
-export function composeCapture(
-  title: string,
-  blocks: readonly CaptureBlock[],
-  titleHasWords = title.trim() !== '',
-): string {
+export function composeCapture(title: string, blocks: readonly CaptureBlock[]): string {
   const usable = blocks.filter((block) => block.text.trim() !== '');
-  let head = title.trim();
-  let body = usable;
-  if (!titleHasWords) {
-    head = [fallbackTitle(usable), head].filter((part) => part !== '').join(' ');
-    const only = usable[0];
-    if (usable.length === 1 && only?.kind === 'text' && !/[\r\n]/.test(only.text.trim())) body = [];
+  const typed = title.trim();
+  let head = typed;
+  let rest = usable;
+  const first = usable[0];
+  if (typed === '' && first && !isCodeBlock(first.kind)) {
+    const [line = '', ...more] = first.text.trim().split(/\r\n|\r|\n/);
+    head = line.trim();
+    const remainder = more.join('\n').trim();
+    rest = remainder === '' ? usable.slice(1) : [{ ...first, text: remainder }, ...usable.slice(1)];
   }
-  const parts = body.map((block) =>
+  const parts = rest.map((block) =>
     isCodeBlock(block.kind)
       ? fencedBlock(block.text.trim(), block.kind === 'json' ? 'json' : '')
       : block.text.replace(/\s+$/, ''),
   );
   return [head, ...parts].join('\n');
+}
+
+const KIND_LABEL = { json: 'JSON', 'stack-trace': 'Stack trace', code: 'Code' } as const;
+
+/**
+ * A short label for a task, made when it is shown and never written to the file (D-45): its title,
+ * or for an untitled task the kind of its body and a peek (`JSON · died_at…`), for reminder toasts,
+ * Today's reminder cards and search results.
+ */
+export function taskLabel(title: string, body: string, maxLength = 48): string {
+  const short = (text: string): string =>
+    text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
+  if (title.trim() !== '') return short(title.trim());
+  const fence = /^(`{3,}|~{3,})(\w*)\s*\n([\s\S]*?)\n\1\s*$/m.exec(body.trim());
+  if (fence) {
+    const content = fence[3] ?? '';
+    const kind = fence[2] === 'json' ? 'json' : classifyPaste(content);
+    const label = kind === 'text' ? KIND_LABEL.code : KIND_LABEL[kind];
+    const peek =
+      kind === 'json'
+        ? (/"([^"]+)"\s*:/.exec(content)?.[1] ?? '')
+        : titleFromPaste(content).replace(/\\(##|!|@)/g, '$1');
+    return short(peek === '' ? label : `${label} · ${peek}`);
+  }
+  if (/!\[[^\]]*\]\([^)]*\)/.test(body)) return 'Screenshot';
+  const line = body
+    .split(/\r\n|\r|\n/)
+    .map((text) => text.trim())
+    .find((text) => text !== '');
+  return short(line ?? 'Untitled task');
 }

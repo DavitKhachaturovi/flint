@@ -241,6 +241,26 @@ test('shorthand chips, the ## menu and the close-match card (CAP-04, CAP-05, D-2
   await expect(popup.locator('.suggestion').first()).toBeVisible();
   await box.press('ArrowDown');
   await expect(box).toHaveValue(/^x ##(Inbox|Unicorn)$/);
+  // A click takes a suggestion like Enter does: the menu closes.
+  await box.fill('x ##uni');
+  await popup.locator('.suggestion', { hasText: 'Unicorn' }).click();
+  await expect(box).toHaveValue('x ##Unicorn');
+  await expect(popup.locator('#suggestions')).toBeHidden();
+  // Esc works anywhere in the popup, e.g. after clicking the card's background (D-46).
+  await popup.locator('.card').click({ position: { x: 300, y: 8 } });
+  await popup.keyboard.press('Escape');
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((window) => window.getTitle() === 'Flint capture')
+          ?.isVisible(),
+      ),
+    )
+    .toBe(false);
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
 
   await box.fill('fix token refresh !h ##unis @tomorrow 10');
   await expect(popup.locator('.chip')).toHaveText(['High', 'Unicorn', 'Tomorrow 10:00']);
@@ -288,12 +308,9 @@ test('paste-to-capture: stack trace to the selection area, screenshot to attachm
     },
     [trace, png] as const,
   );
-  // D-38: the title line stays empty and single-line; the trace is a compact block below it.
+  // D-38, D-45: the task line stays empty; the trace is a compact block below it.
   await expect(box).toHaveValue('');
-  await expect(box).toHaveAttribute(
-    'placeholder',
-    'System.NullReferenceException: Object reference not set',
-  );
+  await expect(box).toHaveAttribute('placeholder', 'Capture a task…');
   await expect(popup.locator('.block-label')).toHaveText(['Stack trace · 3 lines']);
   await expect(popup.locator('.chip')).toHaveText(['screenshot.png']);
   // Shorthand still works in the title with code in the selection area (the R-2 JSON finding).
@@ -303,11 +320,10 @@ test('paste-to-capture: stack trace to the selection area, screenshot to attachm
   const inbox = (): Promise<string> => readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8');
   await expect
     .poll(inbox)
-    .toContain(
-      '- [ ] System.NullReferenceException: Object reference not set [priority:: high] [id:: ',
+    .toMatch(
+      /- \[ \] \[priority:: high\] \[id:: \w+\]\n {4}```\n {4}System\.NullReferenceException/,
     );
   const text = await inbox();
-  expect(text).toContain('    ```\n    System.NullReferenceException');
   const link = /!\[\]\((attachments\/[\w-]+\.png)\)/.exec(text)?.[1];
   if (!link) throw new Error(`no attachment link in:\n${text}`);
   expect((await readFile(join(dataDirectory, 'Flint', link))).length).toBeGreaterThan(60);

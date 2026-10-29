@@ -83,6 +83,7 @@ const INPUT_KEYBOARD = 1;
 const KEYEVENTF_KEYUP = 0x0002;
 
 export const VirtualKey = {
+  leftButton: 0x01,
   control: 0x11,
   alt: 0x12,
   shift: 0x10,

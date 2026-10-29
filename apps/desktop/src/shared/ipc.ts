@@ -20,6 +20,7 @@ export const Channels = {
   popupDiscard: 'popup:discard',
   popupPrevious: 'popup:previous',
   popupInteractive: 'popup:interactive',
+  popupDrag: 'popup:drag',
   popupNoticeAction: 'popup:notice-action',
   popupResize: 'popup:resize',
   popupAttach: 'popup:attach',

@@ -2,7 +2,7 @@ import {
   blockFor,
   classifyPaste,
   composeCapture,
-  fallbackTitle,
+  isCodeBlock,
   listToken,
   listTokenAt,
   parseCapture,
@@ -54,8 +54,6 @@ const noticeAction = required<HTMLButtonElement>('.notice-action');
 const noticeClose = required<HTMLButtonElement>('.notice-close');
 const previousBox = required<HTMLElement>('.previous');
 required<HTMLImageElement>('.target-icon').src = flintIcon;
-
-const PLACEHOLDER = 'Capture a task…';
 
 let lists: readonly ListInfo[] = [];
 /** The selection area (D-38). */
@@ -121,8 +119,6 @@ function update(): void {
   renderChoice(choiceBox, parsed, flippedFrom);
   if (cardAccepted) choiceBox.hidden = true;
   targetLabel.textContent = targetName(parsed);
-  // The title a capture gets when the title line is left empty (D-38), shown without escapes.
-  input.placeholder = fallbackTitle(blocks).replace(/\\(##|!|@)/g, '$1') || PLACEHOLDER;
 
   const token = tokenAtCaret();
   if (token && token.text !== menuAcceptedFor) menuAcceptedFor = null;
@@ -132,7 +128,10 @@ function update(): void {
     selected = -1;
   }
   suggestions = next5;
-  renderSuggestions(suggestionsBox, suggestions, selected, chooseList);
+  renderSuggestions(suggestionsBox, suggestions, selected, (list) => {
+    acceptSuggestion(list);
+    input.focus();
+  });
 }
 
 function changed(): void {
@@ -149,9 +148,12 @@ function chooseList(list: ListInfo): void {
   changed();
 }
 
-/** D-40: Enter on the menu takes the highlighted list (the first one if none is). */
-function acceptSuggestion(): void {
-  const list = suggestions[selected < 0 ? 0 : selected];
+/**
+ * D-40: Enter on the menu takes the highlighted list (the first one if none is); a click takes the
+ * clicked one. Either way the menu closes.
+ */
+function acceptSuggestion(clicked?: ListInfo): void {
+  const list = clicked ?? suggestions[selected < 0 ? 0 : selected];
   if (!list) return;
   chooseList(list);
   menuAcceptedFor = tokenAtCaret()?.text ?? null;
@@ -237,6 +239,27 @@ function addBlock(block: CaptureBlock): void {
   changed();
 }
 
+/**
+ * Pasted or selected text (D-45: the selection itself is the task). Plain text with nothing typed
+ * fills the task line with its first line, the rest becomes body; shorthand typed so far stays
+ * after it. Once something is typed, and for code, it goes to the selection area as body.
+ */
+function addContent(text: string): void {
+  const block = blockFor(text);
+  if (block.text === '') return;
+  if (!isCodeBlock(block.kind) && parsed.title.trim() === '') {
+    const [line = '', ...more] = block.text.split(/\r\n|\r|\n/);
+    input.value = [line.trim(), input.value.trim()].filter((part) => part !== '').join(' ');
+    input.setSelectionRange(input.value.length, input.value.length);
+    const rest = more.join('\n').trim();
+    if (rest !== '') blocks = [...blocks, { kind: 'text', text: rest }];
+    renderSelection();
+    changed();
+    return;
+  }
+  addBlock(block);
+}
+
 /** Shift+Enter (D-38): a note in the selection area; the cursor moves there. */
 function focusNote(): void {
   if (blocks.at(-1)?.kind !== 'note') addBlock({ kind: 'note', text: '' });
@@ -303,8 +326,7 @@ function submit(): void {
   window.clearTimeout(draftTimer);
   const keyAt = epochNow();
   const current = draft();
-  // A title of only shorthand still gets the fallback title (D-38).
-  const text = composeCapture(current.title, current.blocks, parsed.title.trim() !== '');
+  const text = composeCapture(current.title, current.blocks);
   const chooseNewList = chooseNewFor !== null && parsed.target.kind === 'new';
   void attaching
     .then(() => window.flintPopup.submit({ text, keyAt, chooseNewList, draft: current }))
@@ -337,11 +359,7 @@ function undo(): void {
 
 /** Keys in a text or note block (D-38). */
 function blockKey(event: KeyboardEvent, index: number, field: HTMLTextAreaElement): void {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    if (event.shiftKey) discard();
-    else close();
-  } else if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === 'Enter' && !event.shiftKey) {
     // Proposed: Enter saves from a note too; Shift+Enter is a new line there.
     event.preventDefault();
     submit();
@@ -364,8 +382,8 @@ function blockKey(event: KeyboardEvent, index: number, field: HTMLTextAreaElemen
 window.flintPopup.onShown((shown) => {
   apply(shown, shown.replaceDraft === true);
   if (shown.prefill !== undefined) {
-    // CAP-07, D-39: the selection joins the selection area (D-38).
-    blocks = [...blocks, blockFor(shown.prefill)];
+    // CAP-07, D-39, D-45: the selection is the task, or its body once something is typed.
+    addContent(shown.prefill);
     saveDraft(true);
   }
   renderSelection();
@@ -420,15 +438,21 @@ input.addEventListener('paste', (event) => {
   const text = data.getData('text/plain');
   if (!/[\r\n]/.test(text.trim()) && classifyPaste(text) === 'text') return;
   event.preventDefault();
-  addBlock(blockFor(text));
+  addContent(text);
+});
+
+// Esc closes and keeps the draft, Shift+Esc discards it, wherever the focus is in the popup (also
+// after clicking the card's background). Only while the popup has the focus: Esc is never a
+// global hotkey, so it keeps working in other apps while the popup stays open (D-46).
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  if (event.shiftKey) discard();
+  else close();
 });
 
 input.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    if (event.shiftKey) discard();
-    else close();
-  } else if (event.key === 'Enter' && event.shiftKey) {
+  if (event.key === 'Enter' && event.shiftKey) {
     event.preventDefault();
     focusNote();
   } else if (event.key === 'Enter') {
@@ -519,6 +543,18 @@ required<HTMLButtonElement>('.previous-close').addEventListener('click', () => {
   void window.flintPopup.previous('dismiss');
   previousBox.hidden = true;
   input.focus();
+});
+
+required<HTMLButtonElement>('.card-close').addEventListener('click', close);
+
+// D-47: the card's background drags the popup; text fields, buttons, chips and code don't.
+required<HTMLElement>('.card').addEventListener('mousedown', (event) => {
+  if (event.button !== 0 || !(event.target instanceof Element)) return;
+  if (event.target.closest('input, textarea, button, a, .chip, .suggestion, .option, .block-code'))
+    return;
+  // Keeps the cursor where it was, too.
+  event.preventDefault();
+  window.flintPopup.dragStart();
 });
 
 // D-42: clicks reach the popup only over the card; around it they go through to the app below.

@@ -47,6 +47,9 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Save task and close | Enter | Decided |
 | Close (draft kept) | Esc | Decided |
 | Discard the draft and close | Shift+Esc | Decided (D-39) |
+| Esc / Shift+Esc anywhere in the popup (also after clicking the card's background) | Esc, Shift+Esc while the popup has the focus; never a global hotkey, so Esc keeps working in other apps while the popup stays open | Decided (D-46) |
+| Close the popup from another window | Ctrl+Shift+Space (cursor back to the popup), then Esc; or the × on the card | Decided (D-46) |
+| Move the popup | Drag the card's background; not remembered | Decided (D-47) |
 | Accept the highlighted `##` suggestion, or the option on the close-match / new-list card | Enter: the first Enter only accepts, the next Enter saves | Decided (D-40) |
 | Save with an open card or menu straight away | The save button (D-25 rules apply to the `##` token) | Decided (D-40) |
 | Choose another suggested list | ↑ / ↓ while the `##` suggestion menu is open | Proposed |
@@ -150,10 +153,11 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 
 ### Capture popup look
 - Frameless, centered horizontally on the **active monitor**, in the upper third (Spotlight-like) (**Proposed** position).
-- **D-38:** a **single-line title** (the only place shorthand is read), the chip preview row, the autocomplete menu when typing `##`, the small list card (CAP-05, D-25), and below them the **selection area**: pasted and selected content as compact blocks (code, JSON and stack traces as a short highlighted preview such as `JSON · 8 lines`, expandable; plain text and notes editable). The title line's placeholder is the fallback title taken from the first block.
+- **D-38:** a **single-line title** (the only place shorthand is read), the chip preview row, the autocomplete menu when typing `##`, the small list card (CAP-05, D-25), and below them the **selection area**: pasted and selected content as compact blocks (code, JSON and stack traces as a short highlighted preview such as `JSON · 8 lines`, expandable; plain text and notes editable). The title line's placeholder is always "Capture a task…" (D-45: no fallback title; the selection itself is the task).
 - **D-39:** a "Previous draft · Restore" line when Ctrl+Shift+X set an earlier draft aside.
 - No after-save overlay: the popup hiding is the confirmation. A follow-up message (e.g. `Created list "unis" · Undo`) waits as one quiet line at the top of the popup the next time it opens, if no Flint window is visible (D-26).
 - **D-41:** clicking elsewhere closes an empty popup; one with content stays visible without the focus.
+- **D-46:** a small × in the card's top right closes it like Esc. **D-47:** the card's background drags the popup; the position is not remembered.
 - **D-42:** the key hint (`Enter saves · Esc keeps draft · Shift+Esc discards`) sits on the card, in the bottom toolbar between the tools and the target list, and gives way first when the toolbar is crowded. Around the card the window is fully transparent and lets clicks through, so nothing but the card and its shadow is ever visible.
 - Background color matches the theme so it never flashes white/blank when shown (05).
 

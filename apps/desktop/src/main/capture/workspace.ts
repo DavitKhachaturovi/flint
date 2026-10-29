@@ -185,9 +185,11 @@ export class Workspace {
   private async save(request: CaptureRequest, now: Date): Promise<CaptureOutcome> {
     const parsed = this.parse(request, now);
     const attachments = request.attachments ?? [];
-    if (parsed.title.trim() === '' && attachments.length === 0) return { kind: 'empty' };
-    // Proposed (CAP-06): a capture that is only a pasted image is called "Screenshot".
-    const title = parsed.title.trim() === '' ? 'Screenshot' : parsed.title;
+    if (parsed.title.trim() === '' && parsed.body.trim() === '' && attachments.length === 0)
+      return { kind: 'empty' };
+    // D-45: an untitled capture (code, or only an image) keeps an empty task line; nothing is
+    // generated for the file. Short labels are made when the task is shown (`taskLabel`).
+    const title = parsed.title;
 
     let target: Loaded;
     let createdList: CreatedList | null = null;

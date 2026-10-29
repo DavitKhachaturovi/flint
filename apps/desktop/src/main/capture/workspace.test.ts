@@ -234,7 +234,7 @@ describe('drafts (CAP-08)', () => {
     if (outcome.kind !== 'saved') throw new Error('not saved');
     const name = `2026-10-29-143000-${outcome.taskId}.png`;
     expect(await inbox()).toContain(
-      `- [ ] Screenshot [id:: ${outcome.taskId}]\n    ![](attachments/${name})\n`,
+      `- [ ] [id:: ${outcome.taskId}]\n    ![](attachments/${name})\n`,
     );
     expect(new Uint8Array(await readFile(join(folder, 'attachments', name)))).toEqual(png);
 
