@@ -329,6 +329,40 @@ test('paste-to-capture: stack trace to the selection area, screenshot to attachm
   expect((await readFile(join(dataDirectory, 'Flint', link))).length).toBeGreaterThan(60);
 });
 
+test('pasted or selected text is never shorthand; typed text is (D-45, CAP-03)', async () => {
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  const box = popup.locator('#capture');
+  await box.fill('');
+  const message = 'deploy hotfix @15:00, see ##infra !l';
+  await popup.evaluate((text) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    document
+      .querySelector('#capture')
+      ?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+  }, message);
+  await expect(box).toHaveValue(message);
+  await expect(popup.locator('.chip')).toHaveCount(0);
+  // Editing inside the pasted text keeps it plain text.
+  await box.press('Home');
+  for (let step = 0; step < 6; step++) await box.press('ArrowRight');
+  await box.pressSequentially(' the');
+  await expect(box).toHaveValue('deploy the hotfix @15:00, see ##infra !l');
+  await expect(popup.locator('.chip')).toHaveCount(0);
+  // Typed after it: live.
+  await box.press('End');
+  await box.pressSequentially(' !h');
+  await expect(popup.locator('.chip')).toHaveText(['High']);
+  await box.press('Enter');
+  await expect
+    .poll(() => readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8'))
+    .toContain('- [ ] deploy the hotfix @15:00, see ##infra !l [priority:: high] [id:: ');
+});
+
 test('rebinding a hotkey in the Hotkeys window (APP-08)', async () => {
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showHotkeys?: () => void } }).__flintE2E?.showHotkeys?.(),

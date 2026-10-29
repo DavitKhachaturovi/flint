@@ -2,14 +2,17 @@ import {
   blockFor,
   classifyPaste,
   composeCapture,
+  escapeInert,
   isCodeBlock,
   listToken,
   listTokenAt,
   parseCapture,
+  shiftRanges,
   suggestLists,
   type CaptureBlock,
   type CaptureParse,
   type ListInfo,
+  type TextRange,
   type Token,
 } from '@flint/core/shorthand';
 import flintIcon from '../../../../../assets/icon/flint-icon-16.svg';
@@ -72,9 +75,37 @@ let cardAcceptedFor: string | null = null;
 let suggestions: ListInfo[] = [];
 let selected = -1;
 let parsed: CaptureParse = parseCapture('', { now: new Date(), lists });
+/**
+ * D-45: stretches of the title that came from a selection or a paste. They are plain text: their
+ * `!`, `##` and `@` are never shorthand, also after editing inside them. Only typed text is live.
+ */
+let inert: TextRange[] = [];
+/** The title as it was at the last edit, to move the inert ranges along with each change. */
+let lastTitle = '';
+/** Maps a position in the parsed (escaped) title back to the title as shown. */
+let toShown = (index: number): number => index;
 
 function draft(): CaptureDraft {
-  return { title: input.value, blocks };
+  return { title: input.value, blocks, ...(inert.length > 0 ? { inert } : {}) };
+}
+
+/** The title as the parser reads it: inert stretches escaped (D-45). */
+function parsedTitle(): string {
+  return escapeInert(input.value, inert).text;
+}
+
+/** Follows an edit of the title. `live`: Flint inserted the text (a token, a list's spelling). */
+function syncTitle(live: boolean): void {
+  if (input.value === lastTitle) return;
+  inert = shiftRanges(inert, lastTitle, input.value, live);
+  lastTitle = input.value;
+}
+
+/** Sets text into the title from a selection or a paste, as plain text (D-45). */
+function insertInert(text: string, start: number, end: number): void {
+  input.setRangeText(text, start, end, 'end');
+  syncTitle(true);
+  if (text !== '') inert = [...inert, { start, end: start + text.length }];
 }
 
 function hasContent(): boolean {
@@ -96,17 +127,22 @@ function reportContent(): void {
 /** The `##` token the caret is in (CAP-05), with its text. */
 function tokenAtCaret(): { start: number; end: number; typed: string; text: string } | null {
   const token = listTokenAt(input.value, input.selectionStart ?? input.value.length);
-  return token ? { ...token, text: input.value.slice(token.start, token.end) } : null;
+  // A `##` from a selection or paste is plain text (D-45): no menu for it.
+  if (!token || inert.some((range) => token.start >= range.start && token.start < range.end))
+    return null;
+  return { ...token, text: input.value.slice(token.start, token.end) };
 }
 
 /** Re-parses the title and redraws what depends on it (CAP-04: the chips are the truth). */
 function update(): void {
   const now = new Date();
-  let next = parseCapture(input.value, { now, lists });
+  const escaped = escapeInert(input.value, inert);
+  toShown = escaped.toOriginal;
+  let next = parseCapture(escaped.text, { now, lists });
   let flippedFrom: ListInfo | null = null;
   if (chooseNewFor && next.target.kind === 'close-match' && next.target.name === chooseNewFor) {
     flippedFrom = next.target.list;
-    next = parseCapture(input.value, { now, lists, chooseNewList: true });
+    next = parseCapture(escaped.text, { now, lists, chooseNewList: true });
   } else {
     chooseNewFor = null;
   }
@@ -134,7 +170,9 @@ function update(): void {
   });
 }
 
-function changed(): void {
+/** `live`: the title edit was Flint's own (a token, a list's spelling), never inert (D-45). */
+function changed(live = false): void {
+  syncTitle(live);
   update();
   saveDraft();
   reportContent();
@@ -145,7 +183,7 @@ function chooseList(list: ListInfo): void {
   const token = tokenAtCaret();
   if (!token) return;
   input.setRangeText(`##${listToken(list.name)}`, token.start, token.end, 'end');
-  changed();
+  changed(true);
 }
 
 /**
@@ -166,10 +204,10 @@ function acceptChoice(): void {
   const token = parsed.tokens.find((item) => item.kind === 'list' && item.role === 'winner');
   if (target.kind === 'close-match' && token) {
     const spelled = `##${listToken(target.list.name)}`;
-    input.setRangeText(spelled, token.start, token.end, 'end');
+    input.setRangeText(spelled, toShown(token.start), toShown(token.end), 'end');
     // The cursor now sits on the token; its menu counts as answered too.
     menuAcceptedFor = spelled;
-    changed();
+    changed(true);
   } else if (target.kind === 'new') {
     cardAcceptedFor = target.name;
     update();
@@ -179,12 +217,12 @@ function acceptChoice(): void {
 /** A chip's × removes its token from the title, with one space around it. */
 function removeToken(token: Token): void {
   const text = input.value;
-  let start = token.start;
-  let end = token.end;
+  let start = toShown(token.start);
+  let end = toShown(token.end);
   if (text[end] === ' ') end++;
   else if (start > 0 && text[start - 1] === ' ') start--;
   input.setRangeText('', start, end, 'end');
-  changed();
+  changed(true);
   input.focus();
 }
 
@@ -194,7 +232,7 @@ function insertToken(token: string): void {
   const before = at > 0 && !/\s/.test(input.value[at - 1] ?? '') ? ' ' : '';
   input.setRangeText(`${before}${token}`, at, input.selectionEnd ?? at, 'end');
   input.focus();
-  changed();
+  changed(true);
 }
 
 function detach(attachment: AttachmentChip): void {
@@ -241,15 +279,18 @@ function addBlock(block: CaptureBlock): void {
 
 /**
  * Pasted or selected text (D-45: the selection itself is the task). Plain text with nothing typed
- * fills the task line with its first line, the rest becomes body; shorthand typed so far stays
- * after it. Once something is typed, and for code, it goes to the selection area as body.
+ * fills the task line with its first line, as plain text (its `!`, `##`, `@` are never shorthand);
+ * the rest becomes body; shorthand typed so far stays after it. Once something is typed, and for
+ * code, it goes to the selection area as body.
  */
 function addContent(text: string): void {
   const block = blockFor(text);
   if (block.text === '') return;
   if (!isCodeBlock(block.kind) && parsed.title.trim() === '') {
     const [line = '', ...more] = block.text.split(/\r\n|\r|\n/);
-    input.value = [line.trim(), input.value.trim()].filter((part) => part !== '').join(' ');
+    const first = line.trim();
+    syncTitle(false);
+    insertInert(input.value.trim() === '' ? first : `${first} `, 0, 0);
     input.setSelectionRange(input.value.length, input.value.length);
     const rest = more.join('\n').trim();
     if (rest !== '') blocks = [...blocks, { kind: 'text', text: rest }];
@@ -294,6 +335,8 @@ function apply(state: Omit<PopupShown, 'hotkeyAt'>, replace: boolean): void {
   // to replace it: what is in the popup is newer than the copy the main process keeps.
   if (replace || (input.value === '' && blocks.length === 0 && draftHas)) {
     input.value = state.draft.title;
+    inert = [...(state.draft.inert ?? [])];
+    lastTitle = input.value;
     blocks = [...state.draft.blocks];
     expanded.clear();
   }
@@ -311,6 +354,8 @@ function saveDraft(now = false): void {
 
 function clear(): void {
   input.value = '';
+  inert = [];
+  lastTitle = '';
   blocks = [];
   expanded.clear();
   attachments = [];
@@ -326,7 +371,8 @@ function submit(): void {
   window.clearTimeout(draftTimer);
   const keyAt = epochNow();
   const current = draft();
-  const text = composeCapture(current.title, current.blocks);
+  // The title as the parser must read it: selected and pasted text escaped (D-45).
+  const text = composeCapture(parsedTitle(), current.blocks);
   const chooseNewList = chooseNewFor !== null && parsed.target.kind === 'new';
   void attaching
     .then(() => window.flintPopup.submit({ text, keyAt, chooseNewList, draft: current }))
@@ -407,7 +453,8 @@ window.flintPopup.onShown((shown) => {
   );
 });
 
-input.addEventListener('input', changed);
+// Typing: inside a selected or pasted stretch it stays plain text, elsewhere it is live (D-45).
+input.addEventListener('input', () => changed());
 // The caret moving in or out of a `##` token opens or closes the menu.
 document.addEventListener('selectionchange', () => {
   if (document.activeElement === input) update();
@@ -436,8 +483,15 @@ input.addEventListener('paste', (event) => {
     return;
   }
   const text = data.getData('text/plain');
-  if (!/[\r\n]/.test(text.trim()) && classifyPaste(text) === 'text') return;
   event.preventDefault();
+  if (!/[\r\n]/.test(text.trim()) && classifyPaste(text) === 'text') {
+    // One plain line goes in at the cursor, as plain text: pasted, not typed (D-45).
+    syncTitle(false);
+    const start = input.selectionStart ?? input.value.length;
+    insertInert(text.replace(/[\r\n]+/g, ' '), start, input.selectionEnd ?? start);
+    changed();
+    return;
+  }
   addContent(text);
 });
 

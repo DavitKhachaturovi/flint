@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { CaptureBlock } from '@flint/core/shorthand';
+import type { CaptureBlock, TextRange } from '@flint/core/shorthand';
 import type { CaptureDraft } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 
@@ -44,9 +44,25 @@ function readDraft(value: unknown): CaptureDraft {
     const body = rest.join('\n').trim();
     return { title, blocks: body === '' ? [] : [{ kind: 'text', text: body }] };
   }
-  const { title, blocks } = (value ?? {}) as { title?: unknown; blocks?: unknown };
+  const { title, blocks, inert } = (value ?? {}) as {
+    title?: unknown;
+    blocks?: unknown;
+    inert?: unknown;
+  };
+  const text = typeof title === 'string' ? title : '';
+  const ranges = Array.isArray(inert)
+    ? inert.filter(
+        (range): range is TextRange =>
+          typeof (range as TextRange | null)?.start === 'number' &&
+          typeof (range as TextRange).end === 'number' &&
+          (range as TextRange).start >= 0 &&
+          (range as TextRange).end <= text.length &&
+          (range as TextRange).start < (range as TextRange).end,
+      )
+    : [];
   return {
-    title: typeof title === 'string' ? title : '',
+    title: text,
+    ...(ranges.length > 0 ? { inert: ranges } : {}),
     blocks: Array.isArray(blocks)
       ? blocks.filter(
           (block): block is CaptureBlock =>
