@@ -20,9 +20,10 @@ export interface Settings {
   readonly sound: boolean;
 }
 
-export function defaultSettings(): Settings {
+/** Development builds default to their own folder, so they never write into the real one. */
+export function defaultSettings(development = false): Settings {
   return {
-    flintFolder: join(homedir(), 'Flint'),
+    flintFolder: join(homedir(), development ? 'Flint (development)' : 'Flint'),
     captureHotkey: 'Control+Shift+Space',
     startWithWindows: true,
     notifications: true,
@@ -45,8 +46,8 @@ function pick<T>(
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
 
-export function readSettings(stored: Stored): Settings {
-  const defaults = defaultSettings();
+export function readSettings(stored: Stored, development = false): Settings {
+  const defaults = defaultSettings(development);
   return {
     flintFolder: pick(stored, 'flintFolder', isString, defaults.flintFolder),
     captureHotkey: pick(stored, 'captureHotkey', isString, defaults.captureHotkey),
@@ -58,11 +59,14 @@ export function readSettings(stored: Stored): Settings {
 
 export class SettingsFile {
   private stored: Stored = {};
-  current: Settings = defaultSettings();
+  current: Settings;
   readonly path: string;
+  private readonly development: boolean;
 
-  constructor(path: string) {
+  constructor(path: string, development = false) {
     this.path = path;
+    this.development = development;
+    this.current = defaultSettings(development);
   }
 
   async load(): Promise<Settings> {
@@ -72,13 +76,13 @@ export class SettingsFile {
     } catch {
       this.stored = {};
     }
-    this.current = readSettings(this.stored);
+    this.current = readSettings(this.stored, this.development);
     return this.current;
   }
 
   async update(changes: Partial<Settings>): Promise<Settings> {
     this.stored = { ...this.stored, ...changes, version: 1 };
-    this.current = readSettings(this.stored);
+    this.current = readSettings(this.stored, this.development);
     await writeFileAtomic(this.path, `${JSON.stringify(this.stored, null, 2)}\n`, {
       tempDirectory: join(dirname(this.path), 'tmp'),
     });

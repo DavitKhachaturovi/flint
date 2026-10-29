@@ -25,6 +25,7 @@ import {
 } from './notifications.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
+import { prepareFlintFolder } from './storage/flint-folder.js';
 import {
   applyStartWithWindows,
   configureAppPaths,
@@ -133,7 +134,21 @@ async function start(): Promise<void> {
   registerProtocol();
   await app.whenReady();
   blockNetwork();
-  const settings = await new SettingsFile(join(app.getPath('userData'), 'settings.json')).load();
+  const settings = await new SettingsFile(
+    join(app.getPath('userData'), 'settings.json'),
+    !app.isPackaged,
+  ).load();
+  const folder = await prepareFlintFolder(settings.flintFolder);
+  log(
+    `Flint folder ${folder.folder}: ${folder.lists.length} lists, Inbox ${folder.inbox}${folder.inboxCreated ? ' (created)' : ''}`,
+  );
+  // Shown in onboarding and settings in M8 (D-23, D-24); logged until then.
+  if (folder.insideOneDrive) {
+    log('warning: the Flint folder is inside OneDrive, which v1 does not support (D-24)');
+  }
+  if (folder.obsidianVaultRoot) {
+    log('note: the Flint folder is an Obsidian vault root; a Flint subfolder is suggested (D-23)');
+  }
   applyStartWithWindows(settings.startWithWindows);
   // Windows are hidden, never closed (APP-02); closing the last one must not quit Flint.
   app.on('window-all-closed', () => undefined);
