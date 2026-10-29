@@ -2,9 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   Channels,
   type AttachmentChip,
+  type CaptureDraft,
   type PopupFocused,
   type PopupNoticeAction,
   type PopupShown,
+  type PreviousDraftAction,
   type PopupSubmit,
   type PopupSubmitAck,
 } from '../shared/ipc.js';
@@ -24,8 +26,27 @@ const popup = {
     ipcRenderer.send(Channels.popupDismiss);
   },
   /** CAP-08: the main process keeps the draft in app data. */
-  saveDraft(text: string): void {
-    ipcRenderer.send(Channels.popupDraft, text);
+  saveDraft(draft: CaptureDraft): void {
+    ipcRenderer.send(Channels.popupDraft, draft);
+  },
+  /** D-41: whether the popup holds anything, so clicking elsewhere keeps it open. */
+  setContent(hasContent: boolean): void {
+    ipcRenderer.send(Channels.popupContent, hasContent);
+  },
+  /** Shift+Esc (D-39): drop the draft and close. */
+  discard(): void {
+    ipcRenderer.send(Channels.popupDiscard);
+  },
+  /** "Previous draft · Restore" (D-39); resolves to what the popup shows next. */
+  previous(action: PreviousDraftAction): Promise<Omit<PopupShown, 'hotkeyAt'> | null> {
+    return ipcRenderer.invoke(Channels.popupPrevious, action) as Promise<Omit<
+      PopupShown,
+      'hotkeyAt'
+    > | null>;
+  },
+  /** D-42: clicks reach the popup only over the card; the margin around it lets them through. */
+  setInteractive(interactive: boolean): void {
+    ipcRenderer.send(Channels.popupInteractive, interactive);
   },
   /** The popup window follows the card's height, so no invisible area blocks clicks. */
   resize(height: number): void {

@@ -23,6 +23,7 @@ describe('settings (APP-11)', () => {
     expect(defaultSettings()).toMatchObject({
       flintFolder: join(homedir(), 'Flint'),
       captureHotkey: 'Control+Shift+Space',
+      captureSelectionHotkey: 'Control+Shift+X',
       startWithWindows: true,
       hideNotificationText: false,
     });

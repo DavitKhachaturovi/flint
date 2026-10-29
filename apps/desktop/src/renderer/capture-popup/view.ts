@@ -1,4 +1,4 @@
-import type { CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
+import type { CaptureBlock, CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
 import type { AttachmentChip } from '../../shared/ipc.js';
 
 /**
@@ -175,4 +175,82 @@ export function renderSuggestions(
   });
   box.replaceChildren(...rows);
   box.hidden = rows.length === 0;
+}
+
+const KIND_LABEL = { json: 'JSON', 'stack-trace': 'Stack trace', code: 'Code' } as const;
+/** Lines a collapsed code block shows (D-38: a compact preview, expandable). */
+const PREVIEW_LINES = 4;
+const CHEVRON =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
+
+export interface BlockHandlers {
+  readonly remove: (index: number) => void;
+  readonly toggle: (index: number) => void;
+  readonly edit: (index: number, text: string) => void;
+  readonly key: (event: KeyboardEvent, index: number, field: HTMLTextAreaElement) => void;
+}
+
+/** The selection area (D-38): code as a compact, highlighted preview; text and notes editable. */
+export function renderBlocks(
+  box: HTMLElement,
+  blocks: readonly CaptureBlock[],
+  expanded: ReadonlySet<number>,
+  handlers: BlockHandlers,
+  highlight: (kind: CaptureBlock['kind'], lines: readonly string[]) => HTMLElement[],
+): void {
+  const removeButton = (index: number, label: string): HTMLButtonElement => {
+    const button = element('button', 'x');
+    button.type = 'button';
+    button.setAttribute('aria-label', `Remove ${label}`);
+    button.innerHTML = ICONS.x;
+    button.addEventListener('click', () => handlers.remove(index));
+    return button;
+  };
+  const sections = blocks.map((block, index) => {
+    if (block.kind === 'text' || block.kind === 'note') {
+      const section = element('section', `block ${block.kind}`);
+      const field = element('textarea', 'block-text');
+      field.rows = 1;
+      field.spellcheck = false;
+      field.value = block.text;
+      field.setAttribute('aria-label', block.kind === 'note' ? 'Note' : 'Selected text');
+      if (block.kind === 'note') field.placeholder = 'Add a note…';
+      field.addEventListener('input', () => {
+        handlers.edit(index, field.value);
+        fitHeight(field);
+      });
+      field.addEventListener('keydown', (event) => handlers.key(event, index, field));
+      section.append(field, removeButton(index, block.kind === 'note' ? 'note' : 'text'));
+      return section;
+    }
+    const lines = block.text.split(/\r\n|\r|\n/);
+    const open = expanded.has(index);
+    const section = element('section', 'block code');
+    const head = element('header', 'block-head');
+    const label = `${KIND_LABEL[block.kind]} · ${lines.length} ${lines.length === 1 ? 'line' : 'lines'}`;
+    head.append(element('span', 'block-label', label));
+    if (lines.length > PREVIEW_LINES) {
+      const toggle = element('button', open ? 'block-toggle open' : 'block-toggle');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? 'Show less' : 'Show all');
+      toggle.innerHTML = CHEVRON;
+      toggle.addEventListener('mousedown', (event) => event.preventDefault());
+      toggle.addEventListener('click', () => handlers.toggle(index));
+      head.append(toggle);
+    }
+    head.append(removeButton(index, label));
+    const code = element('pre', open ? 'block-code open' : 'block-code');
+    code.append(...highlight(block.kind, open ? lines : lines.slice(0, PREVIEW_LINES)));
+    section.append(head, code);
+    return section;
+  });
+  box.replaceChildren(...sections);
+  box.hidden = sections.length === 0;
+  for (const field of box.querySelectorAll('textarea')) fitHeight(field);
+}
+
+export function fitHeight(field: HTMLTextAreaElement): void {
+  field.style.height = 'auto';
+  field.style.height = `${field.scrollHeight}px`;
 }

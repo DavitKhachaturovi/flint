@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { parseCapture } from './parse.js';
-import { capturePaste, classifyPaste, fencedBlock, titleFromPaste } from './paste.js';
+import {
+  blockFor,
+  classifyPaste,
+  composeCapture,
+  fallbackTitle,
+  fencedBlock,
+  isCodeBlock,
+  titleFromPaste,
+} from './paste.js';
 
 const dotnet = `System.NullReferenceException: Object reference not set to an instance of an object.
    at Unicorn.Tenants.TenantResolver.Resolve(String host) in C:\\src\\Tenants\\TenantResolver.cs:line 42
@@ -72,24 +80,65 @@ describe('paste-to-capture (CAP-06)', () => {
     expect(fencedBlock('plain\n\n')).toBe('```\nplain\n```');
   });
 
-  it('puts code in the body and keeps what was typed as the title', () => {
-    expect(capturePaste('fix token refresh !h', json)).toBe(
+  it('puts code in the body and keeps the typed title', () => {
+    expect(composeCapture('fix token refresh !h', [blockFor(json)])).toBe(
       `fix token refresh !h\n\`\`\`json\n${json}\n\`\`\``,
     );
-    expect(capturePaste('', node)).toBe(
+    expect(composeCapture('', [blockFor(node)])).toBe(
       `TypeError: Cannot read properties of undefined (reading 'id')\n\`\`\`\n${node}\n\`\`\``,
     );
-    expect(capturePaste('title\nnote line', code)).toBe(
+    expect(composeCapture('title', [{ kind: 'note', text: 'note line\n' }, blockFor(code)])).toBe(
       `title\nnote line\n\`\`\`\n${code}\n\`\`\``,
     );
-    expect(capturePaste('title', 'just words')).toBeNull();
   });
 
   it('the pasted block survives parsing verbatim as the body', () => {
-    const text = capturePaste('deploy failed ##infra', python) ?? '';
+    const text = composeCapture('deploy failed ##infra', [blockFor(python)]);
     const parsed = parseCapture(text, { now: new Date(2026, 9, 29, 10), lists: [] });
     expect(parsed.title).toBe('deploy failed');
     expect(parsed.target).toEqual({ kind: 'new', name: 'infra' });
     expect(parsed.body).toBe(`\`\`\`\n${python}\n\`\`\``);
+  });
+});
+
+describe('the selection area (D-38, CAP-07)', () => {
+  it('classifies selections into blocks', () => {
+    expect(blockFor('  ping Alex about the tenant cache  ')).toEqual({
+      kind: 'text',
+      text: 'ping Alex about the tenant cache',
+    });
+    expect(blockFor(`\n${json}\n\n`)).toEqual({ kind: 'json', text: json });
+    expect(isCodeBlock('stack-trace')).toBe(true);
+    expect(isCodeBlock('note')).toBe(false);
+  });
+
+  it('titles an empty title line from the first block, without repeating a lone line', () => {
+    expect(fallbackTitle([blockFor(json)])).toBe('error: token expired');
+    expect(fallbackTitle([{ kind: 'text', text: '42' }])).toBe('42');
+    expect(fallbackTitle([])).toBe('');
+    expect(composeCapture('', [blockFor('the line from Teams')])).toBe('the line from Teams');
+    // A multi-line text keeps all its lines in the body; its first line is the title.
+    expect(composeCapture('', [blockFor('two lines\nfrom Teams')])).toBe(
+      'two lines\ntwo lines\nfrom Teams',
+    );
+    expect(composeCapture('follow up', [blockFor('the line from Teams')])).toBe(
+      'follow up\nthe line from Teams',
+    );
+  });
+
+  it('a title of only shorthand gets the fallback title in front', () => {
+    const text = composeCapture('!h', [blockFor(node)], false);
+    const parsed = parseCapture(text, { now: new Date(2026, 9, 29, 10), lists: [] });
+    expect(parsed.title).toBe("TypeError: Cannot read properties of undefined (reading 'id')");
+    expect(parsed.priority).toBe('high');
+  });
+
+  it('shorthand in a selection never applies: only the title line is read', () => {
+    const text = composeCapture('', [blockFor('release @fri ##infra !h')]);
+    const parsed = parseCapture(text, { now: new Date(2026, 9, 29, 10), lists: [] });
+    expect(parsed.title).toBe('release @fri ##infra !h');
+    expect(parsed.reminder).toBeNull();
+    expect(parsed.priority).toBeNull();
+    expect(parsed.target).toEqual({ kind: 'inbox' });
   });
 });

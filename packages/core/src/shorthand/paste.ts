@@ -79,16 +79,63 @@ export function titleFromPaste(text: string, maxLength = 80): string {
 }
 
 /**
- * What the capture box holds after a paste, or null when the paste should go in as typed text.
- * Code is appended to the body as a fenced block; the box's first line stays the title.
+ * The capture popup's selection area (D-38): pasted or selected content, kept apart from the title
+ * line so that only the title is read as shorthand. Code shows as a compact preview; text and notes
+ * (Shift+Enter) can be edited.
  */
-export function capturePaste(current: string, pasted: string): string | null {
-  const kind = classifyPaste(pasted);
-  if (kind === 'text') return null;
-  const lineBreak = /\r\n|\r|\n/.exec(current);
-  const typedTitle = (lineBreak ? current.slice(0, lineBreak.index) : current).trim();
-  const body = lineBreak ? current.slice(lineBreak.index + lineBreak[0].length) : '';
-  const title = typedTitle !== '' ? typedTitle : titleFromPaste(pasted);
-  const block = fencedBlock(pasted.trim(), kind === 'json' ? 'json' : '');
-  return `${title}\n${body.trim() !== '' ? `${body.replace(/\s+$/, '')}\n` : ''}${block}`;
+export type BlockKind = 'json' | 'stack-trace' | 'code' | 'text' | 'note';
+
+export interface CaptureBlock {
+  readonly kind: BlockKind;
+  readonly text: string;
+}
+
+export function isCodeBlock(kind: BlockKind): boolean {
+  return kind === 'json' || kind === 'stack-trace' || kind === 'code';
+}
+
+/** A pasted or selected piece of text as a block (CAP-06, CAP-07). */
+export function blockFor(text: string): CaptureBlock {
+  const kind = classifyPaste(text);
+  return { kind, text: kind === 'text' ? text.trim() : text.replace(/^\s*\n|\s+$/g, '') };
+}
+
+/**
+ * The title used when the title line is left empty: the first meaningful line of the first block
+ * (an exception message, a JSON text field), shown as the title line's placeholder.
+ */
+export function fallbackTitle(blocks: readonly CaptureBlock[], maxLength = 80): string {
+  const first = blocks.find((block) => block.text.trim() !== '');
+  if (!first) return '';
+  const title = titleFromPaste(first.text, maxLength);
+  if (title !== '') return title;
+  const line = first.text.trim().split(/\r\n|\r|\n/)[0] ?? '';
+  return escapeShorthand(line.length > maxLength ? `${line.slice(0, maxLength - 1)}…` : line);
+}
+
+/**
+ * The capture text to save: the title (or the fallback title) on the first line, the blocks below
+ * it as the body, code fenced. A single one-line text block that became the title isn't repeated.
+ * `titleHasWords`: whether the title says anything besides shorthand; a title of only `!h ##infra`
+ * gets the fallback title in front, so the tokens still apply.
+ */
+export function composeCapture(
+  title: string,
+  blocks: readonly CaptureBlock[],
+  titleHasWords = title.trim() !== '',
+): string {
+  const usable = blocks.filter((block) => block.text.trim() !== '');
+  let head = title.trim();
+  let body = usable;
+  if (!titleHasWords) {
+    head = [fallbackTitle(usable), head].filter((part) => part !== '').join(' ');
+    const only = usable[0];
+    if (usable.length === 1 && only?.kind === 'text' && !/[\r\n]/.test(only.text.trim())) body = [];
+  }
+  const parts = body.map((block) =>
+    isCodeBlock(block.kind)
+      ? fencedBlock(block.text.trim(), block.kind === 'json' ? 'json' : '')
+      : block.text.replace(/\s+$/, ''),
+  );
+  return [head, ...parts].join('\n');
 }

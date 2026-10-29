@@ -45,16 +45,20 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 |---|---|---|
 | Save task and close | Enter | Decided |
 | Close (draft kept) | Esc | Decided |
-| Save into the suggested list for a `##` token (exact or close match) | Enter (Enter is the only key that saves) | Decided (D-25) |
+| Discard the draft and close | Shift+Esc | Decided (D-39) |
+| Accept the highlighted `##` suggestion, or the option on the close-match / new-list card | Enter: the first Enter only accepts, the next Enter saves | Decided (D-40) |
+| Save with an open card or menu straight away | The save button (D-25 rules apply to the `##` token) | Decided (D-40) |
 | Choose another suggested list | ↑ / ↓ while the `##` suggestion menu is open | Proposed |
 | Create a new list instead of the close match | Tab (the card switches to `New list "<name>" · Enter`) | Decided (D-25) |
 | Go back to the close match after Tab | Tab again (the card offers `<list> · Tab`) | Proposed |
 | Remove a parsed token (priority, list, time) | Click the × on its chip; the token leaves the text | Proposed |
 | Type a token without remembering it | The flag, `#` and bell buttons under the box insert `!h`, `##` and `@` at the caret | Proposed |
-| New line in text | Shift+Enter | Proposed |
+| Add a note below the title (the title line is always one line) | Shift+Enter; in a note Shift+Enter is a new line, Enter saves, Up from its first line or Shift+Tab goes back to the title, Backspace on an empty note removes it | Decided (D-38); note keys Proposed |
+| Capture hotkey while the popup stays open without focus | Ctrl+Shift+Space brings the cursor back; pressed again while focused, it closes the popup (draft kept) | Decided (D-41) |
+| Add another selection while the popup is open | Ctrl+Shift+X in the other app: appended to the selection area | Decided (D-39) |
 | Paste screenshot / stack trace / JSON | Ctrl+V | Decided (behaviour in CAP-06) |
-| Undo `Created list <name>` from the notice line (D-26) | Ctrl+Z while the box is empty, or click Undo | Proposed |
-| Retry `Couldn't save your last capture` | Enter (the text is back in the box), or click Retry | Proposed |
+| Undo `Created list <name>` from the notice line (D-26) | Ctrl+Z while the title is empty, or click Undo | Proposed |
+| Retry `Couldn't save your last capture` | Enter (the capture is back in the popup), or click Retry | Proposed |
 
 ### Task list — Navigate state
 | Action | Key | Status |
@@ -145,8 +149,11 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 
 ### Capture popup look
 - Frameless, centered horizontally on the **active monitor**, in the upper third (Spotlight-like) (**Proposed** position).
-- One input line (grows for pasted content), the chip preview row, autocomplete menu when typing `##`, and the small list card for unknown or close-match lists (CAP-05, D-25).
+- **D-38:** a **single-line title** (the only place shorthand is read), the chip preview row, the autocomplete menu when typing `##`, the small list card (CAP-05, D-25), and below them the **selection area**: pasted and selected content as compact blocks (code, JSON and stack traces as a short highlighted preview such as `JSON · 8 lines`, expandable; plain text and notes editable). The title line's placeholder is the fallback title taken from the first block.
+- **D-39:** a "Previous draft · Restore" line when Ctrl+Shift+X set an earlier draft aside.
 - No after-save overlay: the popup hiding is the confirmation. A follow-up message (e.g. `Created list "unis" · Undo`) waits as one quiet line at the top of the popup the next time it opens, if no Flint window is visible (D-26).
+- **D-41:** clicking elsewhere closes an empty popup; one with content stays visible without the focus.
+- **D-42:** the key hint (`Enter saves · Esc keeps draft · Shift+Esc discards`) sits on the card, in the bottom toolbar between the tools and the target list, and gives way first when the toolbar is crowded. Around the card the window is fully transparent and lets clicks through, so nothing but the card and its shadow is ever visible.
 - Background color matches the theme so it never flashes white/blank when shown (05).
 
 ### Mini mode look

@@ -13,6 +13,8 @@ export interface Settings {
   readonly flintFolder: string;
   /** APP-08: rebindable in M3. No Alt in the default (Q-03). */
   readonly captureHotkey: string;
+  /** CAP-07, D-37; rebindable in APP-08. */
+  readonly captureSelectionHotkey: string;
   /** APP-01, default on. */
   readonly startWithWindows: boolean;
   /** REM-06. */
@@ -27,6 +29,7 @@ export function defaultSettings(development = false): Settings {
   return {
     flintFolder: join(homedir(), development ? 'Flint (development)' : 'Flint'),
     captureHotkey: 'Control+Shift+Space',
+    captureSelectionHotkey: 'Control+Shift+X',
     startWithWindows: true,
     notifications: true,
     sound: true,
@@ -54,6 +57,12 @@ export function readSettings(stored: Stored, development = false): Settings {
   return {
     flintFolder: pick(stored, 'flintFolder', isString, defaults.flintFolder),
     captureHotkey: pick(stored, 'captureHotkey', isString, defaults.captureHotkey),
+    captureSelectionHotkey: pick(
+      stored,
+      'captureSelectionHotkey',
+      isString,
+      defaults.captureSelectionHotkey,
+    ),
     startWithWindows: pick(stored, 'startWithWindows', isBoolean, defaults.startWithWindows),
     notifications: pick(stored, 'notifications', isBoolean, defaults.notifications),
     sound: pick(stored, 'sound', isBoolean, defaults.sound),

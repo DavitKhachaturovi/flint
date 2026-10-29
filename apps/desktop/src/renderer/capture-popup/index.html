@@ -16,18 +16,26 @@
         <button type="button" class="notice-action"></button>
         <button type="button" class="notice-close" aria-label="Dismiss">×</button>
       </div>
+      <div class="previous" hidden>
+        <span class="previous-text">Previous draft</span>
+        <button type="button" class="previous-restore">Restore</button>
+        <button type="button" class="previous-close" aria-label="Forget the previous draft">
+          ×
+        </button>
+      </div>
       <div class="chips" aria-live="polite"></div>
-      <label class="visually-hidden" for="capture">Capture a task</label>
-      <textarea
+      <label class="visually-hidden" for="capture">Task title</label>
+      <input
         id="capture"
-        rows="1"
+        type="text"
         autocomplete="off"
         spellcheck="false"
         placeholder="Capture a task…"
         aria-controls="suggestions"
-      ></textarea>
+      />
       <ul id="suggestions" class="suggestions" role="listbox" aria-label="Lists" hidden></ul>
       <div class="choice" aria-live="polite" hidden></div>
+      <div class="blocks" aria-label="Selection" hidden></div>
       <div class="tools">
         <div class="tool-group">
           <button
@@ -97,6 +105,7 @@
             </svg>
           </button>
         </div>
+        <span class="hint">Enter saves · Esc keeps draft · Shift+Esc discards</span>
         <div class="tool-group">
           <span class="target"
             ><img class="target-icon" alt="" /><span class="target-name">Inbox</span></span
@@ -119,7 +128,6 @@
         </div>
       </div>
     </main>
-    <p class="hint">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</p>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

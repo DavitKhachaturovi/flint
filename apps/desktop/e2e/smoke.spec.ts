@@ -249,13 +249,17 @@ test('shorthand chips, the ## menu and the close-match card (CAP-04, CAP-05, D-2
   await expect(popup.locator('.option')).toHaveText(['New list "unis"Enter', 'UnicornTab']);
   await expect(popup.locator('.target-name')).toHaveText('New list "unis"');
   await box.press('Tab');
+  // D-40: the first Enter accepts the close match (the token takes its spelling), the next saves.
+  await box.press('Enter');
+  await expect(box).toHaveValue('fix token refresh !h ##Unicorn @tomorrow 10');
+  await expect(popup.locator('.choice')).toBeHidden();
   await box.press('Enter');
   await expect
     .poll(() => readFile(join(dataDirectory, 'Flint', 'Unicorn.md'), 'utf8'))
     .toMatch(/- \[ \] fix token refresh \[reminder:: \d{4}-\d\d-\d\dT10:00\] \[priority:: high\]/);
 });
 
-test('paste-to-capture: stack trace into the body, screenshot into attachments (CAP-06)', async () => {
+test('paste-to-capture: stack trace to the selection area, screenshot to attachments (CAP-06, D-38)', async () => {
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
@@ -284,15 +288,24 @@ test('paste-to-capture: stack trace into the body, screenshot into attachments (
     },
     [trace, png] as const,
   );
-  await expect(box).toHaveValue(
-    `System.NullReferenceException: Object reference not set\n\`\`\`\n${trace}\n\`\`\``,
+  // D-38: the title line stays empty and single-line; the trace is a compact block below it.
+  await expect(box).toHaveValue('');
+  await expect(box).toHaveAttribute(
+    'placeholder',
+    'System.NullReferenceException: Object reference not set',
   );
+  await expect(popup.locator('.block-label')).toHaveText(['Stack trace · 3 lines']);
   await expect(popup.locator('.chip')).toHaveText(['screenshot.png']);
+  // Shorthand still works in the title with code in the selection area (the R-2 JSON finding).
+  await box.fill('!h');
+  await expect(popup.locator('.chip')).toHaveText(['High', 'screenshot.png']);
   await box.press('Enter');
   const inbox = (): Promise<string> => readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8');
   await expect
     .poll(inbox)
-    .toContain('- [ ] System.NullReferenceException: Object reference not set [id:: ');
+    .toContain(
+      '- [ ] System.NullReferenceException: Object reference not set [priority:: high] [id:: ',
+    );
   const text = await inbox();
   expect(text).toContain('    ```\n    System.NullReferenceException');
   const link = /!\[\]\((attachments\/[\w-]+\.png)\)/.exec(text)?.[1];

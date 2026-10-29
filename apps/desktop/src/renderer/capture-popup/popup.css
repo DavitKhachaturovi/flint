@@ -10,8 +10,13 @@ body {
   color: var(--fl-text-primary);
 }
 
+/*
+ * D-42: the window is larger than the card by a transparent margin that holds the card's whole
+ * shadow (no cut-off edge); clicks there go through to the apps below. Keep in step with MARGIN in
+ * src/main/popup.ts.
+ */
 body {
-  padding: 16px 20px 0;
+  padding: 36px 72px 108px;
 }
 
 .card {
@@ -108,17 +113,13 @@ button:focus-visible {
   color: var(--fl-text-primary);
 }
 
-textarea {
+/* D-38: the title line, always one line; the only place shorthand is read. */
+#capture {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  min-height: 56px;
-  /* Grows with Shift+Enter lines and pasted text, then scrolls (CAP-06). */
-  max-height: 144px;
-  padding: 14px 8px;
-  resize: none;
-  overflow-y: auto;
-  line-height: 28px;
+  height: 56px;
+  padding: 0 8px;
   background: transparent;
   border: 0;
   outline: none;
@@ -129,8 +130,140 @@ textarea {
   letter-spacing: -0.01em;
 }
 
-textarea::placeholder {
+#capture::placeholder {
   color: var(--fl-text-muted);
+}
+
+/* D-38: the selection area below the title line. */
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 4px 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.blocks[hidden],
+.previous[hidden] {
+  display: none;
+}
+
+.block {
+  position: relative;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 0 10px;
+}
+
+.block-label {
+  flex: 1;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-label);
+  color: var(--fl-text-faint);
+}
+
+.block-toggle {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-text-faint);
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.block-toggle.open {
+  transform: rotate(180deg);
+}
+
+.block-toggle:hover {
+  background: var(--fl-edge-float);
+  color: var(--fl-text-primary);
+}
+
+.block-code {
+  margin: 0;
+  padding: 4px 10px 8px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  line-height: 18px;
+  color: var(--fl-text-secondary);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.block-code.open {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.code-line {
+  display: block;
+}
+
+.tok-key {
+  color: var(--fl-text-heading-soft);
+}
+
+.tok-string {
+  color: var(--fl-text-primary);
+}
+
+.tok-number,
+.tok-literal {
+  color: var(--fl-text-highlight);
+}
+
+.tok-error {
+  color: var(--fl-text-highlight);
+}
+
+.tok-frame {
+  color: var(--fl-text-faint);
+}
+
+.tok-location {
+  color: var(--fl-text-secondary);
+}
+
+.block-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 32px 8px 10px;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--fl-text-body);
+  caret-color: var(--fl-accent);
+  font: inherit;
+  font-size: var(--fl-size-body);
+  line-height: 20px;
+}
+
+.block-text::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.block > .x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.block.code > .x {
+  position: static;
 }
 
 /* CAP-05: the `##` suggestions. */
@@ -286,11 +419,16 @@ textarea::placeholder {
   }
 }
 
+/* D-42: the key hint lives on the card, between the tools and the target; it gives way first. */
 .hint {
-  margin: 12px 0 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-align: center;
   font-size: var(--fl-size-meta);
-  color: var(--fl-text-muted);
+  color: var(--fl-text-faint);
 }
 
 .visually-hidden {
@@ -301,8 +439,12 @@ textarea::placeholder {
   clip-path: inset(50%);
 }
 
-/* D-26: one quiet line about the last capture, until dismissed or the next capture is saved. */
-.notice {
+/*
+ * D-26: one quiet line about the last capture, until dismissed or the next capture is saved; also
+ * one-off hints (CAP-07). D-39: "Previous draft · Restore" uses the same look.
+ */
+.notice,
+.previous {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -315,11 +457,13 @@ textarea::placeholder {
   display: none;
 }
 
-.notice-text {
+.notice-text,
+.previous-text {
   flex: 1;
 }
 
-.notice button {
+.notice button,
+.previous button {
   font: inherit;
   background: transparent;
   border: 0;
@@ -328,18 +472,22 @@ textarea::placeholder {
   cursor: pointer;
 }
 
-.notice-action {
+.notice-action,
+.previous-restore {
   color: var(--fl-text-highlight);
 }
 
-.notice-close {
+.notice-close,
+.previous-close {
   color: var(--fl-text-muted);
 }
 
-.notice button:hover {
+.notice button:hover,
+.previous button:hover {
   background: var(--fl-ground-tile);
 }
 
-.notice button:focus-visible {
+.notice button:focus-visible,
+.previous button:focus-visible {
   outline: 1px solid var(--fl-accent);
 }

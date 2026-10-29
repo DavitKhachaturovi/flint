@@ -1,4 +1,4 @@
-import type { ListInfo } from '@flint/core/shorthand';
+import type { CaptureBlock, ListInfo } from '@flint/core/shorthand';
 
 /**
  * IPC between the main process and renderers. Renderers only reach the OS through the typed
@@ -16,6 +16,10 @@ export const Channels = {
   popupSubmit: 'popup:submit',
   popupDismiss: 'popup:dismiss',
   popupDraft: 'popup:draft',
+  popupContent: 'popup:content',
+  popupDiscard: 'popup:discard',
+  popupPrevious: 'popup:previous',
+  popupInteractive: 'popup:interactive',
   popupNoticeAction: 'popup:notice-action',
   popupResize: 'popup:resize',
   popupAttach: 'popup:attach',
@@ -42,14 +46,31 @@ export interface AttachmentChip {
 }
 
 /** Main → popup: the popup was just shown by the hotkey at `hotkeyAt`. */
+/** What the capture popup holds (D-38): the title line and the selection area's blocks. */
+export interface CaptureDraft {
+  readonly title: string;
+  readonly blocks: readonly CaptureBlock[];
+}
+
+/** "Previous draft · Restore" (D-39): bring it back (the current one takes its place) or drop it. */
+export type PreviousDraftAction = 'restore' | 'dismiss';
+
 export interface PopupShown {
   readonly hotkeyAt: number;
-  /** The saved draft (CAP-08); replaces the input only when the popup's text differs. */
-  readonly draft: string;
+  /** The saved draft (CAP-08); it fills the popup only when the popup is empty or `replaceDraft`. */
+  readonly draft: CaptureDraft;
+  /** Ctrl+Shift+X on a closed popup starts fresh (D-39): the popup takes `draft` as it is. */
+  readonly replaceDraft?: boolean;
+  /** An earlier draft was set aside by Ctrl+Shift+X: show "Previous draft · Restore" (D-39). */
+  readonly previousDraft: boolean;
   readonly attachments: readonly AttachmentChip[];
   readonly notice: PopupNotice | null;
   /** The lists for `##` chips, autocomplete and the new-list card (CAP-04, CAP-05). */
   readonly lists: readonly ListInfo[];
+  /** Capture-selection (CAP-07): the selected text, added to the selection area (D-38). */
+  readonly prefill?: string;
+  /** A one-off line at the top of the popup, e.g. why no selection could be read (CAP-07). */
+  readonly hint?: string;
 }
 
 /** Popup → main: the input has focus and a frame with it has been produced (R-1). */
@@ -63,7 +84,10 @@ export interface PopupFocused {
 
 /** Popup → main on Enter (D-27): the capture changes hands before the popup hides. */
 export interface PopupSubmit {
+  /** The capture as text: title line, then the body (D-38, `composeCapture`). */
   readonly text: string;
+  /** The draft it came from, so exactly that draft is cleared once saved (D-27). */
+  readonly draft: CaptureDraft;
   readonly keyAt: number;
   /** Tab on the close-match card: create the typed list instead (D-25). */
   readonly chooseNewList: boolean;

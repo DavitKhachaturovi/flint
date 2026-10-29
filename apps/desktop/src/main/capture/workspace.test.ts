@@ -165,15 +165,49 @@ describe('changes made outside Flint (DATA-06)', () => {
 });
 
 describe('drafts (CAP-08)', () => {
-  it('survive a restart and are cleared only for the text that was saved', async () => {
+  const thought = { title: 'half a thought', blocks: [{ kind: 'note', text: 'more' }] } as const;
+  const empty = { title: '', blocks: [] };
+
+  it('survive a restart and are cleared only for the draft that was saved', async () => {
     const path = join(base, 'drafts.json');
     const drafts = new DraftFile(path);
-    await drafts.set('half a thought');
-    expect(await new DraftFile(path).load()).toBe('half a thought');
-    await drafts.clearIf('something else');
-    expect(await new DraftFile(path).load()).toBe('half a thought');
-    await drafts.clearIf('half a thought');
-    expect(await new DraftFile(path).load()).toBe('');
+    await drafts.set(thought);
+    expect(await new DraftFile(path).load()).toEqual(thought);
+    await drafts.clearIf({ title: 'something else', blocks: [] });
+    expect(await new DraftFile(path).load()).toEqual(thought);
+    await drafts.clearIf(thought);
+    expect(await new DraftFile(path).load()).toEqual(empty);
+  });
+
+  it('read a draft saved as plain text before D-38', async () => {
+    const path = join(base, 'drafts.json');
+    await writeFile(path, JSON.stringify({ capture: 'title line\nbody one\nbody two' }));
+    expect(await new DraftFile(path).load()).toEqual({
+      title: 'title line',
+      blocks: [{ kind: 'text', text: 'body one\nbody two' }],
+    });
+  });
+
+  it('set a draft aside for Ctrl+Shift+X, restore it, and discard with Shift+Esc (D-39)', async () => {
+    const path = join(base, 'drafts.json');
+    const drafts = new DraftFile(path);
+    await drafts.set(thought);
+    await drafts.setAside();
+    expect(drafts.draft).toEqual(empty);
+    expect(drafts.hasPrevious).toBe(true);
+    await drafts.set({ title: 'from Teams', blocks: [] });
+    const restarted = new DraftFile(path);
+    await restarted.load();
+    await restarted.restorePrevious();
+    // The two swap: nothing is lost.
+    expect(restarted.draft).toEqual(thought);
+    await restarted.restorePrevious();
+    expect(restarted.draft).toEqual({ title: 'from Teams', blocks: [] });
+    await restarted.dismissPrevious();
+    expect(restarted.hasPrevious).toBe(false);
+    await restarted.discard();
+    expect(restarted.hasContent).toBe(false);
+    expect(await new DraftFile(path).load()).toEqual(empty);
   });
 
   it('keep pasted images until they are saved with the capture (CAP-06)', async () => {
@@ -204,7 +238,7 @@ describe('drafts (CAP-08)', () => {
     );
     expect(new Uint8Array(await readFile(join(folder, 'attachments', name)))).toEqual(png);
 
-    await restored.clearIf('', restored.attachments);
+    await restored.clearIf(restored.draft, restored.attachments);
     expect(restored.attachments).toEqual([]);
     await expect(readFile(first.file)).rejects.toThrow();
   });

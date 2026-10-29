@@ -22,6 +22,8 @@ Also measure: keypress → screen (one frame), Enter → popup hidden and focus 
 
 R-1 numbers: `FLINT_BENCH=50` (apps/desktop, development builds only, D-33) presses the real hotkey through Windows (`SendInput`) over a full-screen stand-in window; key → first frame with the focused input; Electron 45.1.0, 29 Oct 2026. Windows sometimes refuses to hand over the foreground; the popup then takes it explicitly (attaching to the foreground thread), which this run never needed. The benchmark takes over the screen: run it only when the machine is free.
 
+**R-2 accepted (D-43, 29 Oct 2026):** selection captured from a browser / Notepad, a Teams chat and a normal terminal; an admin terminal shows the hint; the clipboard is restored; Ctrl+Shift+X is free in VS Code. The JSON finding from the run led to the popup's selection area (D-38).
+
 **R-1 accepted (D-36).** Davit accepted R-1 on the measurements above: about 28 ms on a standard work laptop leaves enough headroom under 50 ms. It is re-measured only if capture feels slow in daily use; the laptop benchmark below stays in the repo for that, and is not part of normal builds or the installer.
 
 **Laptop benchmark (only if R-1 is re-measured).** A separate build that measures the popup over a real full-screen Teams call and installs nothing.

@@ -7,6 +7,7 @@ import koffi from 'koffi';
 
 const user32 = koffi.load('user32.dll');
 const kernel32 = koffi.load('kernel32.dll');
+const advapi32 = koffi.load('advapi32.dll');
 
 type Handle = number | bigint;
 
@@ -27,6 +28,35 @@ const getWindowText = user32.func(
   'int GetWindowTextW(uintptr_t hWnd, _Out_ uint16_t *lpString, int nMaxCount)',
 ) as (hwnd: Handle, buffer: Uint16Array, max: number) => number;
 const getCurrentThreadId = kernel32.func('uint32 GetCurrentThreadId()') as () => number;
+const getClipboardSequenceNumber = user32.func(
+  'uint32 GetClipboardSequenceNumber()',
+) as () => number;
+const getAsyncKeyState = user32.func('int16 GetAsyncKeyState(int vKey)') as (key: number) => number;
+const getWindowProcessId = user32.func(
+  'uint32 GetWindowThreadProcessId(uintptr_t hWnd, _Out_ uint32_t *lpdwProcessId)',
+) as (hwnd: Handle, processId: Uint32Array) => number;
+const openProcess = kernel32.func(
+  'uintptr_t OpenProcess(uint32 dwDesiredAccess, bool bInheritHandle, uint32 dwProcessId)',
+) as (access: number, inherit: boolean, processId: number) => Handle;
+const closeHandle = kernel32.func('bool CloseHandle(uintptr_t hObject)') as (
+  handle: Handle,
+) => boolean;
+const openProcessToken = advapi32.func(
+  'bool OpenProcessToken(uintptr_t ProcessHandle, uint32 DesiredAccess, _Out_ uintptr_t *TokenHandle)',
+) as (process: Handle, access: number, token: BigUint64Array) => boolean;
+const getTokenInformation = advapi32.func(
+  'bool GetTokenInformation(uintptr_t TokenHandle, int TokenInformationClass, _Out_ uint32_t *TokenInformation, uint32 TokenInformationLength, _Out_ uint32_t *ReturnLength)',
+) as (
+  token: Handle,
+  kind: number,
+  info: Uint32Array,
+  length: number,
+  returned: Uint32Array,
+) => boolean;
+
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+const TOKEN_QUERY = 0x0008;
+const TOKEN_ELEVATION = 20;
 
 const KEYBDINPUT = koffi.struct('KEYBDINPUT', {
   wVk: 'uint16',
@@ -105,7 +135,8 @@ function key(virtualKey: number, up: boolean): KeyboardInput {
 
 /**
  * Presses and releases a key combination as if typed (modifiers down, key down, key up, modifiers up).
- * Used only by the R-1 benchmark. Returns whether Windows accepted every event.
+ * Used by capture-selection (Ctrl+C, CAP-07) and the R-1 benchmark. Returns whether Windows accepted
+ * every event.
  */
 export function pressKeys(modifiers: readonly number[], keyCode: number): boolean {
   const inputs = [
@@ -123,4 +154,53 @@ export function windowTitle(hwnd: bigint): string {
   const buffer = new Uint16Array(256);
   const length = getWindowText(hwnd, buffer, buffer.length);
   return String.fromCharCode(...buffer.subarray(0, Math.max(0, length)));
+}
+
+/** Releases keys (key-up events only), e.g. hotkey modifiers the user is still holding (CAP-07). */
+export function releaseKeys(keys: readonly number[]): boolean {
+  const inputs = keys.map((virtualKey) => key(virtualKey, true));
+  return (
+    inputs.length === 0 || sendInput(inputs.length, inputs, koffi.sizeof(INPUT)) === inputs.length
+  );
+}
+
+/** Whether a key is physically down right now. */
+export function isKeyDown(virtualKey: number): boolean {
+  return getAsyncKeyState(virtualKey) < 0;
+}
+
+/** Changes whenever anything is put on the clipboard: how capture-selection sees its Ctrl+C land. */
+export function clipboardSequence(): number {
+  return getClipboardSequenceNumber();
+}
+
+/**
+ * Whether a process runs elevated (as administrator). A process whose token Windows won't let Flint
+ * open counts as elevated: that is the case Windows also blocks Flint's keystrokes into (UIPI).
+ */
+export function isProcessElevated(processId: number): boolean {
+  const process = openProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+  if (BigInt(process) === 0n) return true;
+  try {
+    const token = new BigUint64Array(1);
+    if (!openProcessToken(process, TOKEN_QUERY, token)) return true;
+    try {
+      const elevation = new Uint32Array(1);
+      const returned = new Uint32Array(1);
+      if (!getTokenInformation(token[0] ?? 0n, TOKEN_ELEVATION, elevation, 4, returned))
+        return true;
+      return elevation[0] !== 0;
+    } finally {
+      closeHandle(token[0] ?? 0n);
+    }
+  } finally {
+    closeHandle(process);
+  }
+}
+
+/** The process that owns a window, or 0. */
+export function windowProcessId(hwnd: bigint): number {
+  const processId = new Uint32Array(1);
+  getWindowProcessId(hwnd, processId);
+  return processId[0] ?? 0;
 }

@@ -17,6 +17,7 @@ import {
   epochNow,
   type DevEvent,
   type PopupNotice,
+  type PopupShown,
   type PopupSubmit,
   type ToastKind,
 } from '../shared/ipc.js';
@@ -24,6 +25,8 @@ import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
 import { showReminderToast } from './notifications.js';
 import { DraftFile } from './capture/drafts.js';
+import { captureSelection } from './capture/selection.js';
+import { acceleratorKeys } from './hotkeys.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
@@ -256,10 +259,28 @@ async function start(): Promise<void> {
   await drafts.load();
   /** The follow-up message for the next popup open (D-26), and what its Undo reverts. */
   let notice: { readonly popup: PopupNotice; readonly undo: CreatedList | null } | null = null;
+  /** What the popup's renderer last reported: does it hold anything (D-41)? */
+  let popupHasContent = drafts.hasContent;
+
+  /** What the popup shows when it opens (CAP-08, D-26, D-38, D-39). */
+  const popupState = (): Omit<PopupShown, 'hotkeyAt'> => ({
+    draft: drafts.draft,
+    previousDraft: drafts.hasPrevious,
+    attachments: drafts.attachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      thumbnail: thumbnail(nativeImage.createFromPath(attachment.file)),
+    })),
+    notice: notice?.popup ?? null,
+    lists: workspace.listInfos(),
+  });
 
   const saveCapture = async (capture: PopupSubmit): Promise<void> => {
     // The images on the draft when Enter was pressed go with this capture (CAP-06).
     const attachments = [...drafts.attachments];
+    // What was submitted is the latest draft (the saved copy trails typing by a moment), so it is
+    // exactly this that is cleared once saved.
+    await drafts.set(capture.draft).catch(() => undefined);
     try {
       const outcome = await workspace.capture({ ...capture, attachments }, new Date());
       if (outcome.kind === 'saved') {
@@ -273,13 +294,13 @@ async function start(): Promise<void> {
             }
           : null;
       }
-      await drafts.clearIf(capture.text, attachments);
+      await drafts.clearIf(capture.draft, attachments);
       e2eHooks()?.captured.push(capture.text);
     } catch (error) {
       // D-27: the text comes back as the draft, with `Couldn't save your last capture · Retry`.
       log(`capture could not be saved: ${String(error)}`);
       notice = { popup: { kind: 'save-failed' }, undo: null };
-      await drafts.set(capture.text).catch(() => undefined);
+      await drafts.set(capture.draft).catch(() => undefined);
     }
   };
 
@@ -301,18 +322,22 @@ async function start(): Promise<void> {
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
       void saveCapture(capture);
     },
-    state: () => ({
-      draft: drafts.text,
-      attachments: drafts.attachments.map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        thumbnail: thumbnail(nativeImage.createFromPath(attachment.file)),
-      })),
-      notice: notice?.popup ?? null,
-      lists: workspace.listInfos(),
-    }),
-    onDraft: (text) => {
-      drafts.set(text).catch((error: unknown) => log(`draft not saved: ${String(error)}`));
+    state: popupState,
+    onDraft: (draft) => {
+      drafts.set(draft).catch((error: unknown) => log(`draft not saved: ${String(error)}`));
+    },
+    onContent: (hasContent) => {
+      popupHasContent = hasContent;
+    },
+    keepOpen: () => popupHasContent || drafts.attachments.length > 0,
+    onDiscard: () => {
+      popupHasContent = false;
+      drafts.discard().catch((error: unknown) => log(`draft not discarded: ${String(error)}`));
+    },
+    onPrevious: async (action) => {
+      if (action === 'restore') await drafts.restorePrevious();
+      else await drafts.dismissPrevious();
+      return popupState();
     },
     onAttach: async (bytes, type) => {
       const attachment = await drafts.attach(bytes, type);
@@ -344,11 +369,60 @@ async function start(): Promise<void> {
   recoverFromCrashes(popup.window, 'capture popup', log);
 
   const hotkey = settings.captureHotkey;
-  const registered = globalShortcut.register(hotkey, () => popup.show(epochNow()));
+  // D-41: the hotkey opens the popup, brings back the cursor to one that stayed open, and closes
+  // one that has it (the draft is kept, like Esc).
+  const registered = globalShortcut.register(hotkey, () => {
+    if (popup.isFocused()) popup.hide();
+    else popup.show(epochNow());
+  });
   log(
     registered
       ? `capture hotkey ${hotkey} registered`
       : `capture hotkey ${hotkey} is already used by another app`,
+  );
+
+  // CAP-07, R-2: copy what is selected in the app in front, then open the popup with it.
+  const selectionHotkey = settings.captureSelectionHotkey;
+  const selectionKeys = acceleratorKeys(selectionHotkey);
+  let selecting = false;
+  const selectionRegistered =
+    selectionKeys !== null &&
+    globalShortcut.register(selectionHotkey, () => {
+      if (selecting) return;
+      selecting = true;
+      const hotkeyAt = epochNow();
+      captureSelection(selectionKeys)
+        .then((selection) => {
+          log(`capture-selection: ${selection.kind}`);
+          if (selection.kind === 'text') {
+            // D-39: a closed popup starts fresh (its draft is set aside as the previous draft);
+            // an open one collects the selection below what it already has.
+            const fresh = !popup.window.isVisible();
+            const ready = fresh ? drafts.setAside() : Promise.resolve();
+            return ready.then(() => {
+              if (fresh) popupHasContent = false;
+              popup.show(hotkeyAt, { prefill: selection.text, replaceDraft: fresh });
+            });
+          }
+          if (selection.kind === 'elevated') {
+            popup.show(hotkeyAt, {
+              hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
+            });
+          } else popup.show(hotkeyAt, { hint: 'Nothing was selected; paste with Ctrl+V' });
+          return undefined;
+        })
+        .catch((error: unknown) => {
+          log(`capture-selection failed: ${String(error)}`);
+          popup.show(hotkeyAt, { hint: "Couldn't read the selection; paste with Ctrl+V" });
+        })
+        .finally(() => {
+          selecting = false;
+        });
+    });
+  log(
+    selectionRegistered
+      ? `capture-selection hotkey ${selectionHotkey} registered`
+      : `capture-selection hotkey ${selectionHotkey} is already used by another app`,
   );
 
   createTray({

@@ -35,12 +35,13 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### CAP-01 — Global hotkey quick-capture popup (v1)
 - A global hotkey opens a **Spotlight-style popup** over any app, **including a full-screen Teams call**, without switching to the main Flint window.
-- The user types and presses **Enter**: the task is saved and the popup disappears. **Esc** closes the popup (the draft is kept, CAP-08).
+- The user types and presses **Enter**: the task is saved and the popup disappears. **Esc** closes the popup (the draft is kept, CAP-08); **Shift+Esc** discards the draft and closes (D-39).
+- **D-41:** clicking elsewhere closes an empty popup; a popup with content stays visible without the focus, so the user can copy from other apps or add more with Ctrl+Shift+X. It closes on Enter, Esc, Shift+Esc or the capture hotkey; the capture hotkey first brings the cursor back to a popup that stayed open, and closes it when pressed while it has the focus.
 - Focus returns to whatever app the user was in before.
 - **No after-save overlay (D-26):** for a normal capture, the popup hiding is the confirmation. Messages that must follow a capture (e.g. `Created list "unis" · Undo`, CAP-05, or a failed save) appear as an in-app toast if the main window or mini mode is visible, otherwise as one quiet line at the top of the popup the next time it opens, until dismissed or until the next capture is saved. No system notification.
 - **Saving (D-27):** on Enter the popup hands the capture to the main process, waits only for the IPC acknowledgement, then hides. The main process owns the pending capture until the write is confirmed; if the write fails, the next-open notice says `Couldn't save your last capture · Retry` with the text restored.
 - The popup is pre-warmed and must appear in under 100 ms (target < 50 ms). See CAP-10 and 05.
-- Default hotkey: see open question Q-03. Hotkeys are rebindable (APP-08).
+- Default hotkey **Ctrl+Shift+Space** (D-37). Hotkeys are rebindable (APP-08).
 
 ### CAP-02 — Inbox as the default target (v1)
 - Capture requires **zero decisions**. Without any shorthand, every capture lands at the top of Inbox, so the newest capture is visible first. "Top" means just before the first task, not above a heading or paragraph the file starts with (D-22, resolves Q-14).
@@ -62,7 +63,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - Nothing inside inline code (backticks) is a token.
   - A backslash escapes a token: `\##infra` is stored literally as `##infra`.
   - A `##` token is made of Unicode letters and digits plus `-` `_` `.` (Georgian list names work); trailing punctuation is not part of it (`##infra,`).
-  - **D-29:** Shorthand is read on the **first line only** (the title). Further lines (Shift+Enter, pasted stack traces) are the body, kept verbatim, so `@`, `!` and `##` inside pasted code are never touched.
+  - **D-29, D-38:** Shorthand is read in the **title line only**, which is always one line. Notes (Shift+Enter), pastes and selections go to the selection area below it and become the body, kept verbatim, so `@`, `!` and `##` inside them are never touched.
   - **D-29:** `@` takes the longest valid time expression right after it, up to 6 words: `@tomorrow 10 deploy` reads `tomorrow 10`. A bare number after a day is read as its time (`@tomorrow 10 people` → 10:00); the chip shows it.
   - The live chip preview (CAP-04) is the source of truth for what was parsed.
 - The same shorthand parser is used by the capture popup, the in-list task input, and the CLI (CLI-01), from one shared package (05).
@@ -75,9 +76,9 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### CAP-05 — List autocomplete on `##`, new lists from capture (v1, D-25)
 - Typing `##` shows a fuzzy autocomplete of existing **task list** names.
 - An unknown list name must **never fail silently**. Before Enter, the popup shows a small card with what will happen:
-  - **Close match** (an existing task list whose name starts with the token, 2+ characters, or is within edit distance 2, or 1 for names of 4 characters or fewer): `Unicorn · Enter · New list "unis" · Tab`. **Enter** saves into the close match. **Tab** switches the choice to creating the new list (the card then reads `New list "unis" · Enter`). When several lists match the prefix, the most recently used one is offered; sidebar order only breaks exact ties.
+  - **Close match** (an existing task list whose name starts with the token, 2+ characters, or is within edit distance 2, or 1 for names of 4 characters or fewer): `Unicorn · Enter · New list "unis" · Tab`. **Enter** takes the close match (D-40: the first Enter accepts it, the token takes the list's spelling, and the next Enter saves). **Tab** switches the choice to creating the new list (the card then reads `New list "unis" · Enter`). When several lists match the prefix, the most recently used one is offered; sidebar order only breaks exact ties.
   - **No close match:** `New list "<name>" · Enter`.
-  - **Enter is the only key that saves.** The card visibly flips when Tab changes the choice, so the selected option is always obvious (D-29).
+  - **D-40 (replaces "Enter is the only key that saves"):** while the `##` menu or the card shows, the first Enter only accepts the highlighted suggestion or the card's selected option; the next Enter saves. Tab still flips between the existing list and "New list"; the card visibly flips (D-29). The save button saves straight away, and an unresolved `##` token then follows the close-match rules above.
 - An unmatched `##name` **creates a new task list**, named exactly as typed, when the capture is saved. Confirmation: `Created list <name> · Undo` (shown per CAP-01, D-26). Undo moves the task to Inbox and deletes the new list if it is still empty.
 - `##name` pointing at a **note**: the token stays as text, the task goes to Inbox, and the chip says `<name> is a note → Inbox`.
 - **Proposed:** a name Windows can't use as a file name (`##con`, illegal characters) stays as text, the task goes to Inbox and the chip explains why. "Most recently used" means the last capture or move target (kept in app data, `ui-state.json`).
@@ -86,20 +87,23 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### CAP-06 — Paste-to-capture (v1)
 - **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
 - **Pasting a stack trace or JSON** auto-wraps it in a fenced code block (with a language hint when detectable, e.g. `json`).
-- **Proposed:** pasted code goes into the task **body**; the task title is what the user typed, or, if nothing was typed, the first meaningful line of the paste (e.g. the exception message), truncated.
-- **Proposed (details, M3):** detected as code: valid JSON objects and arrays, stack traces (two or more frame lines in .NET, Java, JavaScript or Python style, or a Python traceback), and multi-line text where at least half the lines look like code (indented, or ending in `;` `{` `}` `)`). Other text pastes as typed. The title from a paste: the exception message (the last line of a Python traceback), for JSON its first text field (`error: token expired`), cut to 80 characters, with shorthand-looking text in it kept as text (`##`, `!`, `@`). The code fence is longer than any backtick run in the paste. A capture that is only an image is titled "Screenshot". Pasted images (PNG, JPEG, GIF, WebP) wait with the draft in app data until the capture is saved, then go to `attachments/<date-time>-<task id>.png` with a relative link in the body. The + button under the box points to Ctrl+V for now.
+- **D-38:** pasted multi-line text, code, JSON and stack traces go to the **selection area** below the title line, shown as a compact, highlighted preview (`JSON · 8 lines`, expandable; JSON and stack traces highlighted, other code plain monospace), never as raw fences in the input; one plain line pasted into the title is typed there as usual. On save they become the task **body**, code fenced. The title is what the user typed in the title line, or, if it is empty or only shorthand, the first meaningful line of the first block (e.g. the exception message), shown as the title line's placeholder.
+- **Proposed (details, M3):** detected as code: valid JSON objects and arrays, stack traces (two or more frame lines in .NET, Java, JavaScript or Python style, or a Python traceback), and multi-line text where at least half the lines look like code (indented, or ending in `;` `{` `}` `)`). Other text pastes as text. The title from a paste: the exception message (the last line of a Python traceback), for JSON its first text field (`error: token expired`), cut to 80 characters, with shorthand-looking text in it kept as text (`##`, `!`, `@`). The code fence is longer than any backtick run in the paste. A capture that is only an image is titled "Screenshot". Pasted images (PNG, JPEG, GIF, WebP) wait with the draft in app data until the capture is saved, then go to `attachments/<date-time>-<task id>.png` with a relative link in the body. The + button under the title points to Ctrl+V for now.
 - This is how bugs actually show up, so it is high-value for developers.
 
 ### CAP-07 — Capture-selection hotkey (v1)
-- A **second global hotkey** captures the currently selected text in any app (an error in a terminal, a line in a Teams chat) and opens the capture popup **prefilled** with it.
+- A **second global hotkey** (**Ctrl+Shift+X**, D-37) captures the currently selected text in any app (an error in a terminal, a line in a Teams chat) and opens the capture popup **prefilled** with it.
+- **D-39:** on a closed popup it starts fresh with the new selection; an earlier draft is set aside and shown as "Previous draft · Restore", so it is never lost (Restore swaps the two). On a popup that is open (also one left open without focus, D-41) the selection is appended to the selection area, to collect from several places.
+- **D-38:** the selection always goes to the selection area, a single line included; its first meaningful line is the title line's placeholder, and when the title stays empty that line becomes the title without being repeated in the body.
+- **D-43:** the clipboard is restored with every format Electron can read back (all items and types of the async clipboard API); verified with browser/Notepad, Teams chat, a normal terminal and an admin terminal (29 Oct 2026).
 - Implementation: simulates Ctrl+C in the foreground app and reads the clipboard (05). **The user's previous clipboard content must be restored afterwards.**
 - **Known limitation:** Windows blocks simulated input into elevated (administrator) windows, e.g. an admin PowerShell or terminal, when Flint is not elevated. When the copy fails, open the popup empty with a short hint ("Couldn't read selection from an admin window; paste with Ctrl+V") rather than failing silently.
-- The same paste rules as CAP-06 apply to the prefilled text (stack traces/JSON → code block).
+- The same rules as CAP-06 apply to the selection (stack traces/JSON → highlighted code block in the selection area).
 
 ### CAP-08 — Draft persistence (v1)
-- If the user presses Esc or the popup loses focus, the typed text (and any pasted attachment) is kept and restored the next time the popup opens.
+- If the user presses Esc or the popup loses focus, the title, the selection area and any pasted attachment are kept and restored the next time the popup opens.
 - Drafts survive app restarts (persisted in app data, see 04).
-- The draft is cleared only on successful capture (after the main process confirms the write, D-27) or by explicitly clearing it.
+- The draft is cleared only on successful capture (after the main process confirms the write, D-27) or by Shift+Esc (D-39). Ctrl+Shift+X on a closed popup sets it aside as the previous draft instead (D-39).
 
 ### CAP-09 — Open on the active monitor (v1)
 - The popup appears on the monitor the user is currently working on (the monitor with the cursor/foreground window), not the primary monitor.

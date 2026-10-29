@@ -267,3 +267,28 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
 - **Decision:** M3 starts by saving captures to Inbox (D-27), with drafts and the follow-up notice line, because an unsaved capture is what keeps Flint from daily use; R-2 (capture-selection) follows the shorthand and paste work in the same milestone instead of opening it. Q-03 resolved: capture **Ctrl+Shift+Space**, capture-selection **Ctrl+Shift+X**. Both are rebindable with conflict detection (APP-08); Ctrl+Shift+X takes the combination from VS Code (Extensions view) and Teams (expand compose box), rarely used by keyboard.
 - **Proposed details (docs/03 §3):** in the popup, Ctrl+Z with an empty box undoes `Created list <name>`; Retry of a failed save is Enter, since the text is back in the box.
+
+### D-38 — Capture popup: a single-line title and a selection area
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit, after the R-2 run: pasted JSON landed as raw fences in the input, took the first JSON line as the title and broke the shorthand)
+- **Decision:** The popup has a **title line**, always one line and focused, the only place shorthand is read; its placeholder shows the fallback title (the first meaningful line of the first block), used when the title is left empty or holds only shorthand (`!h ##infra` then gets the fallback title in front). Below it, the **selection area** holds multi-line content, code, JSON and stack traces as compact blocks (`JSON · 8 lines`, first four lines, expandable) and plain text and notes as editable blocks. The priority / list / reminder buttons always act on the title. Davit's answers: **Shift+Enter** adds a note block (multi-line, Enter saves from it); highlighting is **built in for JSON and stack traces** only (keeps the popup tiny, CAP-10), other code plain monospace; a **single-line selection** also goes to the selection area, becoming the title without repetition when the title stays empty. One plain line pasted into the title is typed there. Implementation: `composeCapture` in `@flint/core/shorthand` turns title and blocks into the saved text.
+
+### D-39 — Ctrl+Shift+X starts fresh or collects; Shift+Esc discards
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** Ctrl+Shift+X on a **closed** popup starts fresh with the new selection; an earlier draft is set aside and shown as "Previous draft · Restore" (Restore swaps the two, × forgets it), so a draft is never lost. On an **open** popup the selection is appended to the selection area. Esc closes and keeps the draft; **Shift+Esc** discards the draft (and its images) and closes. Both drafts survive restarts (`drafts.json`).
+
+### D-40 — Enter first accepts the `##` menu or the list card
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit); replaces "Enter is the only key that saves" from D-25 / D-29
+- **Decision:** While the `##` suggestion menu or the close-match / new-list card is visible, the first Enter only accepts the highlighted option (a list's own spelling replaces the token; a new list is confirmed) without saving; the next Enter saves. Tab still flips between the existing list and "New list". The save button saves straight away, and an unresolved `##` token then follows the close-match rules of D-25 and Q-07.
+
+### D-41 — A popup with content stays open on click-away
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** Clicking elsewhere closes an empty popup, as before; a popup with content stays visible without stealing focus, so the user can copy from other apps or add more with Ctrl+Shift+X. It closes on Enter, Esc, Shift+Esc or the capture hotkey; Davit's answer: the capture hotkey brings the cursor back to a popup that stayed open, and closes it when pressed while the popup has the focus (draft kept). Focus return after Enter and Esc is unchanged.
+
+### D-42 — Popup visuals: the hint on the card, no visible window edge
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit asked for both fixes; the approach is Proposed)
+- **Decision:** The key hint moves into the card's bottom toolbar (`Enter saves · Esc keeps draft · Shift+Esc discards`, giving way first when crowded). The light-grey rectangle was the card's float shadow cut off by the window edge (16–20 px margin against a shadow reaching ~96 px); the window now keeps a fully transparent margin that holds the whole shadow (72 px sides, 36 px top, 108 px bottom) and lets clicks through it (`setIgnoreMouseEvents` with forwarding; the renderer turns clicks on over the card). This keeps the design's 22 px corners and soft shadow, which a native window frame (8 px corners) would not, and leaves the pre-warmed show path unchanged.
+- **Verified (29 Oct 2026):** screenshots of the composited screen on a white background, a dark background and over text show no edge and a readable hint; the popup's hotkey-callback → focused frame stayed at 12–35 ms after the first show.
+
+### D-43 — R-2 (capture-selection) accepted
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit's run)
+- **Decision:** R-2 passes: the selection is captured from a browser / Notepad, a Teams chat and a normal terminal; an admin terminal gives "Couldn't read selection from an admin window; paste with Ctrl+V"; the clipboard afterwards still holds what the user had copied; Ctrl+Shift+X doesn't conflict in VS Code. The JSON finding from the same run led to D-38. Implementation notes: the copy waits for the hotkey's keys to be released, Ctrl+C is detected by the clipboard sequence number, the elevated case by the foreground process's token, and the clipboard is restored with Electron 45's async API (every item and type it can read).
