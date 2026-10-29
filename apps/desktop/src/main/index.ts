@@ -14,6 +14,7 @@ import {
 import {
   Channels,
   epochNow,
+  type ListChange,
   type PopupNotice,
   type PopupShown,
   type PopupSubmit,
@@ -274,10 +275,29 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  ipcMain.handle(Channels.mainChange, (event, id: unknown, change: unknown) =>
+    owns(event.sender) && typeof id === 'string' && typeof change === 'object' && change !== null
+      ? workspace.change(id, change as ListChange, new Date()).catch((error: unknown) => {
+          log(`could not change the list: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  ipcMain.handle(Channels.mainReserveId, (event) =>
+    owns(event.sender) ? workspace.reserveId() : null,
+  );
   ipcMain.handle(Channels.mainUndo, (event) =>
     owns(event.sender)
       ? workspace.undoLast(new Date()).catch((error: unknown) => {
           log(`undo failed: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  ipcMain.handle(Channels.mainRedo, (event) =>
+    owns(event.sender)
+      ? workspace.redoLast(new Date()).catch((error: unknown) => {
+          log(`redo failed: ${String(error)}`);
           return null;
         })
       : null,

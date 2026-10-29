@@ -32,6 +32,9 @@ export const Channels = {
   mainView: 'main:view',
   mainToggle: 'main:toggle',
   mainUndo: 'main:undo',
+  mainRedo: 'main:redo',
+  mainChange: 'main:change',
+  mainReserveId: 'main:reserve-id',
   mainChanged: 'main:changed',
 } as const;
 
@@ -167,4 +170,36 @@ export interface ListView {
   readonly readOnly: string | null;
   /** A note's text (LIST-01), shown read-only until the note editor (M5). */
   readonly noteText: string | null;
+}
+
+/**
+ * M4 main window → main: one change from the Navigate/Edit keys or the composer (docs/03 §2).
+ * `text` is what was typed, with selected or pasted stretches escaped so they stay text (D-45).
+ */
+export type ListChange =
+  | {
+      readonly kind: 'add';
+      readonly text: string;
+      /** The composer adds at the top; Edit-state Enter below the task being edited. */
+      readonly where: 'top' | { readonly after: string };
+      /** From `reserveId`: a new row's task ID, known before the save finishes. */
+      readonly id?: string;
+    }
+  | { readonly kind: 'edit'; readonly key: string; readonly text: string }
+  | {
+      readonly kind: 'priority';
+      readonly key: string;
+      readonly priority: 'high' | 'medium' | 'low' | null;
+    }
+  | { readonly kind: 'move'; readonly key: string; readonly direction: 'up' | 'down' }
+  | { readonly kind: 'indent' | 'outdent'; readonly key: string };
+
+export interface ChangeOutcome {
+  /** For the toast and undo: `Added`, `Added to Infra`, `Priority high`. */
+  readonly label: string;
+  /** The task changed or added. */
+  readonly key: string | null;
+  /** Where it is now (an `add` with `##list` lands in another list). */
+  readonly listId: string;
+  readonly listName: string;
 }

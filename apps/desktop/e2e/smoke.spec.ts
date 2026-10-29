@@ -416,6 +416,79 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   await expect.poll(() => readFile(file, 'utf8')).toBe(original);
 });
 
+test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo (TASK-02..04, docs/03 §2)', async () => {
+  const file = join(dataDirectory, 'Flint', 'Errands.md');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const titles = main.locator('.tasks .row .title');
+
+  // Ctrl+N: the composer; typed shorthand shows as a chip and applies.
+  await main.keyboard.press('Control+n');
+  await expect(main.locator('.composer-input')).toBeFocused();
+  await main.keyboard.type('Water the plants !h');
+  await expect(main.locator('.composer-chips .chip')).toHaveText(['High']);
+  await main.keyboard.press('Enter');
+  await expect(main.locator('h1')).toHaveText('Errands · 3 open');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(
+      /---\n- \[ \] Water the plants \[priority:: high\] \[id:: [a-z0-9]{4,6}\]\n- \[ \] Renew/,
+    );
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.row.sel .title')).toHaveText('Water the plants');
+
+  // Navigate: 1 sets low priority.
+  await main.keyboard.press('1');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('Water the plants [priority:: low]');
+
+  // Enter edits; Enter again saves and opens a new row below; Esc on an empty row leaves it.
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.title-input')).toHaveValue('Water the plants');
+  await main.keyboard.press('End');
+  await main.keyboard.type(' twice');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.title-input')).toHaveAttribute('placeholder', 'New task');
+  await main.keyboard.type('Buy soil');
+  await main.keyboard.press('Enter');
+  await expect(titles).toHaveText([
+    'Water the plants twice',
+    'Buy soil',
+    'Renew the parking permit',
+    'Book the dentist',
+  ]);
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.title-input')).toHaveCount(0);
+  await expect(main.locator('.row.sel .title')).toHaveText('Buy soil');
+
+  // Tab nests it under the task above; undo and redo.
+  await main.keyboard.press('Tab');
+  await expect(main.locator('.row.subtask .title')).toHaveText(['Buy soil']);
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(/Water the plants twice \[priority:: low\] \[id:: \w+\]\n +- \[ \] Buy soil/);
+  await main.keyboard.press('Control+z');
+  await expect(main.locator('.row.subtask')).toHaveCount(0);
+  await main.keyboard.press('Control+Shift+z');
+  await expect(main.locator('.row.subtask .title')).toHaveText(['Buy soil']);
+
+  // Typing straight on after Enter, faster than the saves: nothing is lost, the order holds.
+  await main.locator('.row', { hasText: 'Book the dentist' }).click();
+  await main.keyboard.press('Enter');
+  await main.keyboard.press('End');
+  await main.keyboard.type('\nRake the leaves\nMow the lawn\nFix the gate\n', { delay: 0 });
+  await main.keyboard.press('Escape');
+  await expect(titles).toHaveText([
+    'Water the plants twice',
+    'Buy soil',
+    'Renew the parking permit',
+    'Book the dentist',
+    'Rake the leaves',
+    'Mow the lawn',
+    'Fix the gate',
+  ]);
+  await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

@@ -90,6 +90,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Back to Navigate | Esc | Decided |
 | Indent / outdent | Tab / Shift+Tab | Decided |
 
+Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, D-51): the composer adds to the top of its list with the capture shorthand (`##list` sends the task elsewhere, with Undo); Edit-state Enter keeps one new row open for task after task, and nothing typed straight on is lost; Esc and leaving a field save; the existing title is inert while editing, so only typed shorthand applies (D-45); Tab on a new row sets its level; completing moves the selection to the next open task; double-click edits.
+
 ### Everywhere in the main window
 | Action | Key | Status |
 |---|---|---|

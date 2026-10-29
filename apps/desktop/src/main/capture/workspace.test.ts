@@ -280,3 +280,109 @@ describe('the main window: complete, undo, views (M4, TASK-06)', () => {
     ).toEqual(['one', 'two', 'three']);
   });
 });
+
+describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04, docs/03 §2)', () => {
+  const header = '---\nflint: 1\nid: inbox\nmode: tasks\n---\n';
+  const titles = (workspace: Workspace): string[] =>
+    workspace
+      .view('inbox', now)
+      ?.items.flatMap((item) =>
+        item.kind === 'task'
+          ? [item.task.title, ...item.task.subtasks.map((task) => `  ${task.title}`)]
+          : [],
+      ) ?? [];
+
+  it('the composer adds to the top with shorthand; Edit-state Enter adds below', async () => {
+    await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] one [id:: aaa1]\n`);
+    const workspace = await open();
+    const added = await workspace.change(
+      'inbox',
+      { kind: 'add', text: 'ship it !h @15:00', where: 'top' },
+      now,
+    );
+    expect(added).toMatchObject({ label: 'Added', listId: 'inbox', listName: 'Inbox' });
+    expect(await inbox()).toMatch(
+      /^- \[ \] ship it \[reminder:: 2026-10-29T15:00\] \[priority:: high\] \[id:: [a-z0-9]{4,6}\]\n- \[ \] one/m,
+    );
+    await workspace.change(
+      'inbox',
+      { kind: 'add', text: 'after one', where: { after: 'aaa1' } },
+      now,
+    );
+    expect(titles(workspace)).toEqual(['ship it', 'one', 'after one']);
+    expect(
+      await workspace.change('inbox', { kind: 'add', text: '  ', where: 'top' }, now),
+    ).toBeNull();
+  });
+
+  it('a ##list in the composer sends the task to that list; undo removes a list it created', async () => {
+    const workspace = await open();
+    const outcome = await workspace.change(
+      'inbox',
+      { kind: 'add', text: 'rotate keys ##Infra', where: 'top' },
+      now,
+    );
+    expect(outcome).toMatchObject({ label: 'Added to Infra', listName: 'Infra' });
+    expect(await readFile(join(folder, 'Infra.md'), 'utf8')).toContain('- [ ] rotate keys');
+    expect(await workspace.undoLast(now)).toBe('Added to Infra');
+    await expect(readFile(join(folder, 'Infra.md'), 'utf8')).rejects.toThrow();
+    expect(workspace.summaries(now).map((list) => list.name)).toEqual(['Inbox']);
+    // Its list is gone, so there is nothing to redo into.
+    expect(await workspace.redoLast(now)).toBeNull();
+  });
+
+  it('edits keep escaped (selected or pasted) shorthand as text and apply typed tokens', async () => {
+    await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] deploy [id:: aaa1]\n`);
+    const workspace = await open();
+    const outcome = await workspace.change(
+      'inbox',
+      { kind: 'edit', key: 'aaa1', text: 'deploy hotfix \\@15:00 !m' },
+      now,
+    );
+    expect(outcome?.label).toBe('Edited');
+    expect(await inbox()).toBe(
+      `${header}- [ ] deploy hotfix @15:00 [priority:: medium] [id:: aaa1]\n`,
+    );
+    // The existing title is inert when edited again: unchanged, it changes nothing; nor does
+    // emptying the title of a task without a body.
+    expect(
+      await workspace.change(
+        'inbox',
+        { kind: 'edit', key: 'aaa1', text: 'deploy hotfix \\@15:00' },
+        now,
+      ),
+    ).toBeNull();
+    expect(
+      await workspace.change('inbox', { kind: 'edit', key: 'aaa1', text: '' }, now),
+    ).toBeNull();
+  });
+
+  it('priority, reorder, indent and outdent are undoable and redoable', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n- [ ] three [id:: ccc3]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    await workspace.change('inbox', { kind: 'priority', key: 'bbb2', priority: 'high' }, now);
+    expect(workspace.view('inbox', now)?.items[1]).toMatchObject({
+      task: { title: 'two', priority: 'high' },
+    });
+    expect(
+      await workspace.change('inbox', { kind: 'move', key: 'aaa1', direction: 'up' }, now),
+    ).toBeNull();
+    await workspace.change('inbox', { kind: 'move', key: 'ccc3', direction: 'up' }, now);
+    expect(titles(workspace)).toEqual(['one', 'three', 'two']);
+    await workspace.change('inbox', { kind: 'indent', key: 'ccc3' }, now);
+    expect(titles(workspace)).toEqual(['one', '  three', 'two']);
+    await workspace.change('inbox', { kind: 'outdent', key: 'ccc3' }, now);
+    expect(titles(workspace)).toEqual(['one', 'three', 'two']);
+
+    for (const label of ['Outdented', 'Indented', 'Moved', 'Priority high'])
+      expect(await workspace.undoLast(now)).toBe(label);
+    expect(await inbox()).toBe(original);
+    expect(await workspace.redoLast(now)).toBe('Priority high');
+    expect(await workspace.redoLast(now)).toBe('Moved');
+    expect(titles(workspace)).toEqual(['one', 'three', 'two']);
+    // A new change clears what could be redone.
+    await workspace.change('inbox', { kind: 'priority', key: 'aaa1', priority: null }, now);
+    expect(await workspace.redoLast(now)).toBeNull();
+  });
+});

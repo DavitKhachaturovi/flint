@@ -3,18 +3,28 @@ import { join } from 'node:path';
 import {
   addTask,
   allTasks,
+  bulk,
   completeTask,
   deleteTask,
+  editTitle,
   findTask,
   generateId,
+  getBody,
+  indentTask,
+  moveDown,
+  moveUp,
+  outdentTask,
   serializeDocument,
+  setPriority,
+  setReminder,
   uncompleteTask,
   type Applied,
   type Op,
+  type Where,
 } from '@flint/core';
 import { parseCapture, type CaptureParse, type ListInfo } from '@flint/core/shorthand';
 import { fromDate } from '@flint/core/time';
-import type { ListSummary, ListView } from '../../shared/ipc.js';
+import type { ChangeOutcome, ListChange, ListSummary, ListView } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import { listView } from '../views.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
@@ -60,6 +70,14 @@ interface Loaded {
   /** Re-read when the file changes outside Flint (its name, id or mode can change). */
   entry: ListEntry;
   readonly file: ListFile;
+}
+
+interface UndoEntry {
+  readonly label: string;
+  /** The list file the change was made in. */
+  readonly list: string;
+  readonly inverse: Op;
+  readonly createdList: boolean;
 }
 
 const NEW_LIST_HEADER = (id: string): string => `---\nflint: 1\nid: ${id}\nmode: tasks\n---\n`;
@@ -161,16 +179,134 @@ export class Workspace {
     );
   }
 
-  /** Undo for the main window (DATA-03): the last change made there, newest first. */
-  private readonly undoStack: { label: string; list: string; inverse: Op }[] = [];
+  /**
+   * Undo and redo for the main window (DATA-03): its own changes, newest first. Applying an entry's
+   * inverse yields the inverse that goes on the other stack, so undo and redo are the same step.
+   * `createdList`: the change created that list, which goes again when undoing leaves it empty.
+   */
+  private readonly undoStack: UndoEntry[] = [];
+  private readonly redoStack: UndoEntry[] = [];
   /** TASK-06: where a completed task stood, to put it back on un-check (`completedAfter`). */
   private readonly completedAfter = new Map<string, string | null>();
 
-  private async record(list: Loaded, op: Op, label: string, now: Date): Promise<string> {
+  private async record(
+    list: Loaded,
+    op: Op,
+    label: string,
+    now: Date,
+    createdList = false,
+  ): Promise<string> {
     const applied = await this.applyAndSave(list, op, now);
-    this.undoStack.push({ label, list: list.entry.path, inverse: applied.inverse });
+    this.undoStack.push({ label, list: list.entry.path, inverse: applied.inverse, createdList });
     if (this.undoStack.length > 100) this.undoStack.shift();
+    this.redoStack.length = 0;
     return label;
+  }
+
+  /**
+   * The Navigate/Edit keys and the composer (M4, TASK-02, TASK-03, TASK-04, docs/03 §2): one change
+   * to list `id`, undoable. Null when it changes nothing (Alt+↑ on the first task, an unchanged
+   * title). Text arrives with selected or pasted stretches already escaped (D-45).
+   */
+  change(id: string, change: ListChange, now: Date): Promise<ChangeOutcome | null> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list || list.entry.mode === 'note') return null;
+      const document = list.file.document;
+      const path = list.file.path;
+      const outcome = (label: string, key: string | null, target = list): ChangeOutcome => ({
+        label,
+        key,
+        listId: this.listId(target.entry),
+        listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
+      });
+      switch (change.kind) {
+        case 'add':
+          return this.add(list, change, now);
+        case 'edit': {
+          const found = findTask(document, change.key);
+          if (!found) return null;
+          const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
+          const ops: Op[] = [];
+          // D-45: an empty task line is fine with a body; without one, emptying it changes nothing.
+          const title = parsed.title.trim();
+          const hasBody = getBody(found.task).trim() !== '';
+          if (title !== found.task.line.title.trim() && (title !== '' || hasBody))
+            ops.push(editTitle(path, change.key, parsed.title));
+          if (parsed.priority) ops.push(setPriority(path, change.key, parsed.priority));
+          if (parsed.reminder) ops.push(setReminder(path, change.key, parsed.reminder));
+          const op = bulk(ops);
+          return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
+        }
+        case 'priority': {
+          const op = setPriority(path, change.key, change.priority);
+          const label = change.priority ? `Priority ${change.priority}` : 'No priority';
+          return outcome(await this.record(list, op, label, now), change.key);
+        }
+        case 'move': {
+          const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
+          return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
+        }
+        case 'indent':
+        case 'outdent': {
+          const op = (change.kind === 'indent' ? indentTask : outdentTask)(
+            document,
+            path,
+            change.key,
+          );
+          const label = change.kind === 'indent' ? 'Indented' : 'Outdented';
+          return op ? outcome(await this.record(list, op, label, now), change.key) : null;
+        }
+      }
+    });
+  }
+
+  /**
+   * The composer adds to the top of the list it sits in, Edit-state Enter below the task being
+   * edited (docs/03 §2); `##list` sends the task elsewhere, to the top, like a capture (D-25).
+   */
+  private async add(
+    list: Loaded,
+    change: Extract<ListChange, { kind: 'add' }>,
+    now: Date,
+  ): Promise<ChangeOutcome | null> {
+    const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
+    if (parsed.title.trim() === '') return null;
+    let target = list;
+    let created = false;
+    if (parsed.target.kind === 'new') {
+      target = await this.createList(parsed.target.name);
+      created = true;
+    } else if (parsed.target.kind === 'existing' || parsed.target.kind === 'close-match') {
+      target = this.find(parsed.target.list.id) ?? list;
+    }
+    // Below the task being edited; at the top if it has gone meanwhile (moved by `##`, deleted).
+    const where: Where =
+      target === list &&
+      change.where !== 'top' &&
+      findTask(list.file.document, change.where.after) !== undefined
+        ? { at: 'after', key: change.where.after }
+        : { at: 'top' };
+    // A reserved ID is used once; anything else gets a fresh one.
+    const id =
+      change.id !== undefined && this.reserved.delete(change.id) && !this.isTaken(change.id)
+        ? change.id
+        : generateId(this.isTaken);
+    const op = addTask(
+      target.file.document,
+      target.file.path,
+      { id, title: parsed.title, priority: parsed.priority, reminder: parsed.reminder },
+      where,
+    );
+    const label = target === list ? 'Added' : `Added to ${target.entry.name}`;
+    await this.record(target, op, label, now, created);
+    if (target !== list) await this.markRecent(this.listId(target.entry));
+    return {
+      label,
+      key: id,
+      listId: this.listId(target.entry),
+      listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
+    };
   }
 
   /** Space or the checkbox (TASK-06): completes an open task, reopens a completed one. */
@@ -200,15 +336,28 @@ export class Workspace {
 
   /** Undoes the newest change made in the main window; resolves to what was undone. */
   undoLast(now: Date): Promise<string | null> {
-    return this.serial(async () => {
-      const entry = this.undoStack.pop();
-      const list = entry
-        ? this.lists.find(({ entry: item }) => item.path === entry.list)
-        : undefined;
-      if (!entry || !list) return null;
-      await this.applyAndSave(list, entry.inverse, now);
-      return entry.label;
-    });
+    return this.serial(() => this.step(this.undoStack, this.redoStack, now, true));
+  }
+
+  /** Ctrl+Shift+Z / Ctrl+Y: redoes the newest undone change. */
+  redoLast(now: Date): Promise<string | null> {
+    return this.serial(() => this.step(this.redoStack, this.undoStack, now, false));
+  }
+
+  private async step(
+    from: UndoEntry[],
+    to: UndoEntry[],
+    now: Date,
+    undoing: boolean,
+  ): Promise<string | null> {
+    const entry = from.pop();
+    // A list deleted since (an undone new list, or by another program) can't be redone into.
+    const list = entry ? this.lists.find(({ entry: item }) => item.path === entry.list) : undefined;
+    if (!entry || !list) return null;
+    const applied = await this.applyAndSave(list, entry.inverse, now);
+    to.push({ ...entry, inverse: applied.inverse });
+    if (undoing && entry.createdList) await this.dropIfEmpty(list);
+    return entry.label;
   }
 
   private async refresh(path: string): Promise<void> {
@@ -251,8 +400,21 @@ export class Workspace {
     return infos.sort((a, b) => Number(b.id === INBOX_ID) - Number(a.id === INBOX_ID));
   }
 
+  /**
+   * IDs handed out ahead for the main window's new rows: the row knows its task's ID when Enter is
+   * pressed, so the next row can go below it before the save has finished (docs/03 §2).
+   */
+  private readonly reserved = new Set<string>();
+
+  reserveId(): string {
+    const id = generateId(this.isTaken);
+    this.reserved.add(id);
+    return id;
+  }
+
   /** IDs are unique in the whole Flint folder (D-21, D-29): tasks and lists. */
   isTaken = (id: string): boolean =>
+    this.reserved.has(id) ||
     this.lists.some(
       ({ entry, file }) =>
         entry.id === id ||
@@ -351,7 +513,11 @@ export class Workspace {
       now,
     );
     await this.applyAndSave(list, deleteTask(list.file.path, created.taskId), now);
-    // Only a list that is exactly what the capture created is removed; anything added since stays.
+    await this.dropIfEmpty(list);
+  }
+
+  /** Only a list that is exactly what a capture created is removed; anything added since stays. */
+  private async dropIfEmpty(list: Loaded): Promise<void> {
     const id = list.entry.id ?? '';
     if (serializeDocument(list.file.document) === NEW_LIST_HEADER(id)) {
       await unlink(list.file.path);

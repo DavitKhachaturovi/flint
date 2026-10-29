@@ -322,3 +322,14 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 ### D-50 — Delete to trash/ from M4; the Trash screen in M7
 - **Date:** 30 Oct 2026 · **Status:** Decided (Davit)
 - **Decision:** Deleting a task (TASK-12) from M4 moves it to the Flint folder's `trash/` with its deletion time and shows an Undo toast, so nothing is destroyed. Browsing, restoring and the 30-day expiry come with the Trash screen (DATA-02, M7).
+
+### D-51 — Main-window editing details (M4 step 2)
+- **Date:** 30 Oct 2026 · **Status:** Proposed (gap-fills, Claude; Q-08 implemented as its proposed default)
+- **Decision:**
+  - **Composer** (mockup 01): adds to the top of the list it sits in, with the capture shorthand. `##list` sends the task to the top of that list with `Added to <list> · Undo`; an unknown name creates the list (Undo removes it again if still empty). There is no `##` menu or close-match card in the composer yet: a close match goes to the existing list, and the chips show where the task will go before Enter. The paperclip tool comes with attachments in the main window (M5).
+  - **Edit state:** Enter saves and opens a new row below; the row stays one text field while Enter adds task after task, and its task IDs are fetched ahead, so typing straight on after Enter never loses keys or reorders tasks. Esc and leaving the field also save (typing is never discarded); Enter or Esc on an empty new row closes it. Emptying the title of a task without a body changes nothing (D-45 allows an empty title only with a body).
+  - **Shorthand while editing:** the existing title is inert, like selected text (D-45); typed `!` and `@` tokens apply. A typed `##list` stays text while editing until moving between lists arrives later in M4.
+  - **Tab / Shift+Tab** while editing a task move it at once (TASK-04); on a new row they set the level the next task is added at.
+  - **Navigate:** completing a task moves the selection to the next open task; double-click edits a task; Esc clears the selection.
+  - **Undo / redo** in the main window covers its own changes this session, newest first; redo (Ctrl+Shift+Z, Ctrl+Y) as proposed in 03 §2. Global undo across captures and structural changes stays M7 (DATA-03).
+- **Why:** these fill gaps docs/03 §2 leaves open, in line with "never lose typed content" (01) and D-45; none changes the file format.
