@@ -66,6 +66,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | File watcher (CLI / Claude writes picked up live) | DATA-06, 04 §6 |
 | Rebindable global hotkeys with conflict detection | APP-08 |
 | The selection itself is the task: no generated titles, untitled tasks valid in the file (round-trip tests), labels made when shown; popup × close, window-level Esc (never global), drag by the card | D-45, D-46, D-47, docs/04 §3, `packages/core/src/shorthand/paste.ts` (`taskLabel`) |
+| Shorthand only from typed text: selected and pasted text in the task line stays plain, also after editing inside it | D-45, CAP-03, CAP-06, CAP-07, `packages/core/src/shorthand/inert.ts` |
 | `?` cheat sheet | NAV-02 |
 | Teaching Inbox onboarding | APP-10 |
 | Respect OS reduce-motion | APP-12, 03 §5 |

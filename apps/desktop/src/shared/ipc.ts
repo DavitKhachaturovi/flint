@@ -1,4 +1,4 @@
-import type { CaptureBlock, ListInfo } from '@flint/core/shorthand';
+import type { CaptureBlock, ListInfo, TextRange } from '@flint/core/shorthand';
 
 /**
  * IPC between the main process and renderers. Renderers only reach the OS through the typed
@@ -54,6 +54,8 @@ export interface AttachmentChip {
 export interface CaptureDraft {
   readonly title: string;
   readonly blocks: readonly CaptureBlock[];
+  /** Stretches of the title that came from a selection or paste: plain text, never shorthand (D-45). */
+  readonly inert?: readonly TextRange[];
 }
 
 /** "Previous draft · Restore" (D-39): bring it back (the current one takes its place) or drop it. */
