@@ -76,8 +76,9 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 ## Brand
 
 - **Name:** Flint. (Trademark not yet formally cleared; see open questions.)
-- **Palette direction:** cool colors only: black, grays, blues, white, purple. **No warm colors and no greens** in the brand/UI palette. (This affects priority colors; see 03, "Priority styling", and open question Q-01.)
-- **Logo direction:** a centered knapped-flint leaf shape, alone on a dark tile, in a light blue-gray palette with irregular flint shading.
+- **Palette direction:** cool colors only: black, grays, blues, white, purple. **No warm colors and no greens** in the brand/UI palette.
+- **v1 UI palette (decided):** dark mode only, grayscale with one cool-gray accent `#9AA0AB` and white for emphasis. No purple in the UI. See [09](09-visual-design.md).
+- **Logo direction:** a centered knapped-flint leaf shape, alone on a dark tile, in a light blue-gray palette with irregular flint shading. **Final file:** `assets/icon/flint-icon-512.svg`.
   - No sparkles, glows, or gradients (an earlier "spark" idea was dropped).
   - A carved-groove idea was dropped as unreadable at small sizes.
   - Must not resemble Obsidian's logo.

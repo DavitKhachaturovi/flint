@@ -1,0 +1,38 @@
+# CLAUDE.md — Flint
+
+Flint is a minimalist, keyboard-first quick-capture notes and task app for developers (Electron + React + TypeScript, Windows x64 first).
+
+## Source of truth
+
+- **`docs/` is the spec.** Read `docs/README.md` first, then the document relevant to the task. If code and docs disagree, the docs win until they are deliberately changed.
+- **Any change to scope, behaviour, format, or architecture updates the docs in the same change**, including `docs/07-decision-log.md` (new decision entry) and `docs/08-coverage-checklist.md` when items are added.
+- Feature IDs (e.g. `CAP-07`, `TASK-06`) are stable. Reference them in commit messages, PR titles, and test names.
+- Items marked **Proposed** in the docs are the default to implement. If an open question in `docs/06-roadmap-and-open-questions.md` is still undecided, implement its proposed default and do not invent a different one.
+- Never build anything listed as a non-goal or "considered and not selected" in `docs/01-vision-and-principles.md` without a new decision.
+
+## Questions and disagreements
+
+- The docs were written before any code existed, so they can be wrong, incomplete, or contradict each other. **If something is unclear, missing, contradictory, or you think a decision is wrong, stop and ask Davit** instead of guessing or silently working around it. Double-check against the docs before and after each milestone.
+- Disagreeing is welcome. Explain the problem and the alternative; once Davit decides, record it in `docs/07-decision-log.md` and update the affected docs.
+- Small gaps with an obvious answer that fits the principles in `docs/01`: implement the obvious answer, mark it **Proposed** in the relevant doc, and mention it in your summary.
+
+## Where to start
+
+1. **M1, `packages/core`** (`docs/06` §2): the file format (Dataview inline fields, `docs/04` §3, decided in D-20) with round-trip and fuzz tests first.
+2. **M2/M3 start with the risky pieces** (`docs/06` §1): R-1 popup latency, R-3 actionable toast, R-2 capture-selection, built as production code with their acceptance checks. Record the measured numbers in `docs/06`. There is no throwaway spike (D-18).
+3. Then the remaining milestones in order.
+
+## Non-negotiables
+
+- **Architecture** (`docs/05`): `packages/core` is pure TypeScript with no Electron imports; the UI reaches the OS only through the typed Platform interface in the preload; `contextIsolation` on, `nodeIntegration` off, sandboxed renderers.
+- **Performance budgets** (`docs/05` §4): hotkey → focused popup < 50 ms (hard limit 100 ms); keypress → screen one frame; Enter → saved and hidden < 100 ms. Pre-warmed, tiny capture popup; windows are hidden, never destroyed.
+- **Data** (`docs/04`): plain markdown, task metadata as `[key:: value]` fields with a stable `id`, tolerant reader and canonical writer, atomic writes, never destroy content the parser doesn't understand. Round-trip and fuzz tests for the format are mandatory.
+- **Privacy:** no telemetry and **no network requests at all in v1** (no auto-update yet). Fonts (Geist, Geist Mono) are bundled locally, never loaded from Google Fonts.
+- **Visual design** (`docs/09`): use `docs/design/tokens.css` variables only, no raw hex values in components. Match `docs/design/screenshots/` and `docs/design/mockups/`. Dark mode only in v1. No emoji in the UI. Motion ≤ 150 ms and off under reduce-motion.
+
+## Working conventions
+
+- TypeScript strict mode everywhere. Vitest for `packages/core`, Playwright for Electron end-to-end tests.
+- Before a non-trivial change, stress-test the plan with the **grill-me** routine. Note: grill-me's company-specific conventions do not apply to Flint; Flint's conventions are the ones in `docs/05` and this file.
+- Keep commits small and scoped to one feature ID or milestone step.
+- The repo lives in Azure DevOps (`DavitKhachaturovi/flint`). v1 is an internal tool: an unsigned NSIS installer built by the pipeline and handed out manually; no code signing or auto-update yet (`docs/05` §6, D-19).

@@ -39,7 +39,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Undo toast; collapsible "Completed · N"; completion timestamp; auto-archive after N days | TASK-06 |
 | Convert between modes | LIST-04 |
 | Today view (references), end-of-day rollover prompt | TODAY-01, TODAY-02 |
-| Priority stripe, second cue, color-blind palette, "no priority" default neutral | TASK-03, 03 §4 |
+| Priority stripe, second cue, color-blind palette, "no priority" default neutral | TASK-03, 03 §4, 09 §4 (color-blind palette superseded by grayscale priority, D-17) |
 | Slash commands + right-click menu | NOTE-02, NOTE-03 |
 | Obsidian-style live preview | NOTE-01 |
 | Syntax-highlighted code, monospace toggle, configurable auto-linking (`AB#1234`) | NOTE-04, NOTE-06, NOTE-07 |
@@ -78,11 +78,11 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Orphaned-attachment cleanup | MEDIA-04 |
 | Single instance | APP-04 |
 | Remembered window positions per monitor setup | APP-05 |
-| Auto-update | APP-06 |
+| Auto-update | APP-06 (moved to Later by D-19) |
 | No telemetry, stated plainly | APP-09, D-16 |
 | Never destroy windows; only hide | APP-02, 05 §3 |
 | Never quit by accident (X hides, Quit in tray) | APP-03 |
-| Apply updates on quit or idle, never mid-session | APP-06, 05 §5 |
+| Apply updates on quit or idle, never mid-session | APP-06, 05 §5 (applies once auto-update is added) |
 | Silent crash recovery | APP-07, 05 §3 |
 | Keep the popup tiny | CAP-10, 05 §4 |
 
@@ -91,7 +91,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Item | Where |
 |---|---|
 | Navigate vs Edit keyboard states (Space/digits conflict) | 03 §2, D-13, Q-08 |
-| Stable task IDs (`^id`) for Today, reminders, undo, CLI | 04 §3, D-12, Q-09 |
+| Stable task IDs for Today, reminders, undo, CLI | 04 §3 (`[id:: …]` field), D-12, D-20, Q-09 |
 | Capture-selection fails on admin windows → popup empty with hint | CAP-07, 05 §5 |
 | Restore clipboard + wait for modifier release in capture-selection | CAP-07, 05 §5 |
 | Tray resident + autostart (required for reminders and hotkeys) | APP-01, REM-09 |
@@ -105,13 +105,46 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Only main window + popup alive at idle; mini mode on demand then hidden | 05 §3 |
 | Core logic in pure TS packages; narrow Platform interface (future shell switch, other apps) | 05 §2, 05 §7 |
 | CodeMirror 6 editor; electron-builder (NSIS) + electron-updater | 05 §1 |
-| Code signing (SmartScreen); Azure DevOps pipeline on Windows agent | 05 §6 |
-| 2–3 day spike: capture-selection, actionable toast in Action Center, popup latency over full-screen Teams | 06 §1 |
+| Code signing (SmartScreen) | Later: 05 §6, D-19 (Artifact Signing unavailable in Georgia; unsigned internal builds in v1) |
+| Azure DevOps pipeline on Windows agent | 05 §6 |
+| Risky pieces first (popup latency, capture-selection, actionable toast in Action Center), built as production code instead of a throwaway spike | 06 §1, D-18 |
 | App/UI state outside the Flint folder | 04 §1–2, D-14 |
 | OneDrive sync lessons for later | 04 §7 |
 | Non-goals: assignees, statuses, calendars, comments, nested projects, recurring, tags, backlinks/graph, voice | 01, D-10 |
 | Ideas considered and not selected | 01 |
 | Brand: cool palette only; logo direction | 01 Brand, D-06, 03 §4 |
-| Priority colors must fit the cool palette | 03 §4, Q-01 |
+| Priority colors must fit the cool palette | 03 §4, 09 §4, D-17 (Q-01 resolved: grayscale) |
 | Files stay Obsidian/VS Code/GitHub compatible | LIST-02, 04 §1 |
 | Autosave (no Save button) | 04 §1 |
+
+## D. Visual design (agreed during design review)
+
+| Item | Where |
+|---|---|
+| Final logo `assets/icon/flint-icon-512.svg` | README, 01 Brand, D-17 |
+| Dark mode only in v1; light mode Later | 09 §2, 03 §4, APP-11, 06 Later |
+| Grayscale + accent `#9AA0AB`, white for emphasis, no purple | 09 §3, 01 Brand, D-17 |
+| `#999E98` rejected (green tint) | 09 §2, D-17 |
+| Add-in-inspired: soft shadows, rounded corners, icon tiles, chips, composer, emphasized heading words, rounded bullets | 09 §1, §8 |
+| "Solid glass": Liquid-Glass feel without translucency | 09 §1, §6 |
+| Grayscale priority by lightness + thickness | 09 §4, TASK-03, D-17 |
+| Geist / Geist Mono, bundled locally | 09 §7, 05 §1 |
+| Motion: spring curve, 150 ms ceiling, reduce-motion | 09 §9, 03 §5 |
+| No decorative graphics in v1 | 09 §1, 06 Later |
+| Design tokens | `design/tokens.css` |
+| Screenshots of all six screens | `design/screenshots/`, 09 §10 |
+| Static HTML mockups | `design/mockups/`, 09 §10 |
+
+## E. Build and release decisions
+
+| Item | Where |
+|---|---|
+| No throwaway spike; risky pieces first in M2/M3 | 06 §1–2, D-18 |
+| Internal tool, `.exe` handed out manually | 05 §6, D-19, 06 Q-10 |
+| Unsigned v1; SmartScreen "Run anyway" | 05 §6, D-19 |
+| No auto-update in v1; v1 makes no network requests | APP-06, APP-09, D-19 |
+| Dataview inline fields `[key:: value]` for task metadata | 04 §3, D-20, Q-09 |
+| Everything important in the markdown line; side files only hold losable bookkeeping | 04 §3 |
+| Round-trip and fuzz tests for the file format | 04 §3, 06 M1 |
+| Repo on Azure DevOps (`DavitKhachaturovi/flint`) | README, CLAUDE.md |
+| Open-sourcing out of scope for now | D-19 |

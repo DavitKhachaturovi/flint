@@ -17,12 +17,15 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 | 06 | [Roadmap & Open Questions](06-roadmap-and-open-questions.md) | Technical spike, v1 milestone plan, Later items, open questions that need a decision |
 | 07 | [Decision Log](07-decision-log.md) | Every decision made so far, with rationale and alternatives considered |
 | 08 | [Coverage Checklist](08-coverage-checklist.md) | Traceability: every agreed item mapped to where it is specified |
+| 09 | [Visual Design](09-visual-design.md) | Dark-mode visual language, tokens, components, depth, motion, screen-by-screen mockups (`design/`) |
 
 ## Status
 
-- **Phase:** Design complete for v1, implementation not started.
-- **Repository:** `C:\Forge\flint` (not yet a git repository).
-- **Target platform (v1):** Windows x64, distributed as an installable `.exe`. macOS and ARM come later.
+- **Phase:** Product and visual design complete for v1, implementation not started.
+- **Logo:** `assets/icon/flint-icon-512.svg` (final), with small-size variants `flint-icon-24.svg` and `flint-icon-16.svg`.
+- **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
+- **Repository:** `C:\Forge\flint`, Azure DevOps `DavitKhachaturovi/flint` (branch `main`).
+- **Target platform (v1):** Windows x64, an unsigned installable `.exe` handed to coworkers manually (internal tool, D-19). macOS and ARM come later.
 - **Stack:** Electron + React + TypeScript + Vite. See [05](05-architecture-and-performance.md).
 - **Who builds it:** No dedicated developer resources are assigned. Flint is expected to be built and maintained primarily by Claude (Claude Code), with other engineers able to step in. This is why the stack is TypeScript end to end.
 

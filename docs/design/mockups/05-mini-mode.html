@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flint mini mode — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.mm *{box-sizing:border-box}
+:where(.mm button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.r{border-radius:11px;transition:background-color 120ms}
+.r:hover{background:#1C1E21}
+.tile{width:28px;height:28px;border-radius:8px;background:#ECEDEE;color:#0E0F11;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.tool{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8E9196}
+.tool:hover{background:#1F2124;color:#ECEDEE}
+</style>
+</head>
+<body>
+
+
+<div class="mm" style="width: 440px; height: 640px; background: #0A0B0C; display: flex; align-items: center; justify-content: center; font-family: 'Geist', system-ui, sans-serif; color: #E8E9EB; font-size: 13px">
+<div style="width: 364px; border-radius: 22px; background: #141517; box-shadow: 0 0 0 1px #25272B, inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.4), 0 34px 80px -18px rgba(0,0,0,.85); padding: 10px">
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 10px 2px">
+<div style="display: flex; padding: 3px; border-radius: 12px; background: #0E0F11; box-shadow: inset 0 0 0 1px #212327">
+<button style="height: 28px; padding: 0 14px; border-radius: 9px; background: #222428; box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 2px 6px rgba(0,0,0,.4); color: #FFFFFF; font-weight: 500">Today</button>
+<button style="height: 28px; padding: 0 14px; border-radius: 9px; color: #8E9196">Inbox</button>
+</div>
+<div style="display: flex; align-items: center; gap: 2px">
+<button class="tool" aria-label="Unpin from top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg></button>
+<button class="tool" aria-label="Hide mini mode"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+</div>
+</div>
+
+<div style="padding: 12px; border-radius: 16px; background: #1B1D20; box-shadow: 0 0 0 1px #2A2C30, inset 0 1px 0 rgba(255,255,255,.07), 0 12px 28px -12px rgba(0,0,0,.8); margin-bottom: 8px">
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+<span class="tile"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span>
+<div style="display: flex; flex-direction: column; min-width: 0">
+<span style="color: #8E9196; font-size: 11.5px; font-family: 'Geist Mono', monospace">Reminder · 15:00</span>
+<span style="color: #FFFFFF; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Fix null ref in tenant resolver</span>
+</div>
+</div>
+<div style="display: flex; gap: 6px">
+<button style="flex: 1; height: 32px; border-radius: 10px; background: #ECEDEE; color: #0E0F11; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,.45)">Done</button>
+<button style="flex: 1; height: 32px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #D9DADC">Snooze 10m</button>
+<button style="flex: 1; height: 32px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #D9DADC">Open</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 2px 0 8px 0">
+<div class="r" style="position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px">
+<span style="position: absolute; left: 3px; top: 9px; bottom: 9px; width: 4px; border-radius: 3px; background: #FFFFFF"></span>
+<span style="width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid #4A4D52; flex: 0 0 auto"></span>
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Fix null ref in tenant resolver</span>
+</div>
+<div class="r" style="position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px">
+<span style="position: absolute; left: 3px; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: #9AA0AB"></span>
+<span style="width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid #4A4D52; flex: 0 0 auto"></span>
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Finish search indexing</span>
+</div>
+<div class="r" style="position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px">
+<span style="width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid #4A4D52; flex: 0 0 auto"></span>
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Pair with the intern on pipeline YAML</span>
+</div>
+<div class="r" style="position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px">
+<span style="position: absolute; left: 3px; top: 9px; bottom: 9px; width: 2px; border-radius: 3px; background: #55585D"></span>
+<span style="width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid #4A4D52; flex: 0 0 auto"></span>
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Check VPN gateway logs after the call</span>
+</div>
+</div>
+
+<label for="miniadd" style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px 0 12px; border-radius: 13px; background: #0F1012; box-shadow: inset 0 0 0 1px #212327, inset 0 2px 4px rgba(0,0,0,.35); cursor: text">
+<input id="miniadd" placeholder="Add to Today…" style="flex: 1 1 0%; min-width: 0px; background: transparent; border: 0px; outline: none; color: rgb(236, 237, 238); font: inherit;">
+<span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 9px; background: #222428; box-shadow: inset 0 0 0 1px #2C2E33; color: #5F6267; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></span>
+</label>
+</div>
+</div>
+
+</body>
+</html>

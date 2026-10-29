@@ -1,7 +1,7 @@
 # 04 — Data & Storage
 
 All user data is plain markdown in a folder the user chooses. No database, no server, no account.
-Most of the concrete format below is **Proposed** (it was designed to satisfy the agreed features but not individually confirmed). Changing it later requires a migration, so settle Q-09 before writing the parser.
+The task-line format (§3) uses the established **Dataview inline-field convention**, chosen for reliable parsing (D-20, decided). Changing it later requires a migration of users' files, so treat it as stable.
 
 ---
 
@@ -49,7 +49,9 @@ App data (not in the Flint folder):
 
 ---
 
-## 3. Task-list file format (Proposed)
+## 3. Task-list file format
+
+Task metadata uses **Dataview bracketed inline fields**: `[key:: value]`. This is an existing, widely used plain-text convention from the Obsidian ecosystem (the Dataview plugin, and the Obsidian Tasks plugin's "Dataview format", which reads `[priority:: high]`, `[completion:: …]`, `[created:: …]` and similar). Files therefore stay readable and queryable in Obsidian, and render as normal checklists in VS Code and GitHub.
 
 ```markdown
 ---
@@ -57,36 +59,50 @@ flint: 1
 id: l7c2
 mode: tasks
 ---
-- [ ] Fix null ref in tenant resolver !high ⏰2026-10-30T15:00 ^k3f9
+- [ ] Fix null ref in tenant resolver [priority:: high] [reminder:: 2026-10-30T15:00] [id:: k3f9]
     Stack trace from staging:
     ```
     NullReferenceException at TenantResolver.Resolve(...)
     ```
-    - [ ] Add regression test ^m2p1
-- [ ] Ask about staging DNS ★ ^q8x2
-- [ ] Update CI agent image !low ^r5t0
+    - [ ] Add regression test [id:: m2p1]
+- [ ] Ask about staging DNS [today:: true] [id:: q8x2]
+- [ ] Update CI agent image [priority:: low] [id:: r5t0]
 
 ## Completed
-- [x] Rotate service principal secret !med ✓2026-10-28T14:03 ^a1b2
+- [x] Rotate service principal secret [priority:: medium] [completion:: 2026-10-28T14:03] [id:: a1b2]
 ```
 
-### Line structure
-A task line is: `- [ ] <title> <trailing tokens>`.
-Trailing tokens are read **from the end of the line backwards**; everything before them is the title. The app never shows tokens as text.
+### Why this format is reliable
+The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) read backwards from the end of the line. That is fragile: a title that ends in `!high` or contains `★` is ambiguous, and emoji can be stored differently across systems. Bracketed fields fix this:
+- **Explicit boundaries.** A field is exactly `[` key `::` value `]`. No guessing where the title ends.
+- **Position-independent and order-independent.** Fields may appear anywhere in the line (Flint writes them at the end, in a fixed order).
+- **Extensible and lossless.** Unknown keys (from Dataview, Obsidian Tasks, or a future Flint version) are kept and written back unchanged.
+- **Plain ASCII keys, ISO 8601 values.** No emoji encodings, no locale-dependent dates.
+- **Human-editable.** Someone editing the file by hand (or Claude via the CLI) can see and change every field.
 
-| Token | Meaning | Feature |
-|---|---|---|
-| `^xxxx` | Stable task ID (always last) | Required by Today, reminders, undo, CLI |
-| `!low` / `!med` / `!high` | Priority (absent = none) | TASK-03 |
-| `⏰YYYY-MM-DDTHH:MM` | Reminder time (local time) | REM-01 |
-| `★` | Starred into Today | TODAY-01 |
-| `✓YYYY-MM-DDTHH:MM` | Completion timestamp (completed tasks only) | TASK-06 |
+### Fields
+| Field | Values | Meaning | Feature |
+|---|---|---|---|
+| `id` | short base-36 string, 4–6 chars | Stable task ID, unique within the Flint folder | Today, reminders, undo, CLI |
+| `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
+| `reminder` | `YYYY-MM-DDTHH:MM` (local time) | Reminder time | REM-01 |
+| `today` | `true` (absent = not starred) | Starred into Today | TODAY-01 |
+| `completion` | `YYYY-MM-DDTHH:MM` | Completion timestamp (completed tasks only) | TASK-06 |
+
+The app never shows fields as text; it renders them as the stripe, bell, star, and so on. The capture shorthand (`!h #list @15:00`, CAP-03) is input syntax only and is never written to disk.
+
+### Parsing and writing rules
+- **Tolerant reader, canonical writer.** Read fields in any position and either bracket style (`[]` or `()`); always write `[]` fields at the end of the line in the order `priority`, `reminder`, `today`, `completion`, `id`, followed by any unknown fields in their original order.
+- **Only touch what changed.** Lines Flint didn't modify are written back byte-for-byte. Non-task content (headings, paragraphs, blank lines, HTML comments) is preserved exactly.
+- **Missing IDs** (lines added by hand or by the CLI) are assigned on Flint's next save of that file.
+- **Duplicate IDs** (e.g. a line copy-pasted in a text editor): the first keeps the ID, later ones get new IDs.
+- **Invalid values** (e.g. `[priority:: urgent]`, a malformed date) are kept as unknown fields, never silently dropped; the task shows as having no priority / no reminder.
+- **Format version:** `flint: 1` in frontmatter. A file with a higher version than the app understands is opened read-only with a notice.
+- **Required tests (M1):** round-trip tests (`serialize(parse(file)) === file` for untouched files), property-based/fuzz tests over random titles, fields, bodies and line endings, and fixtures of hand-edited and Obsidian-edited files.
 
 ### Task IDs
-- `^` + short base-36 string (e.g. 4–6 chars), unique within the Flint folder.
-- This is Obsidian's own block-reference syntax, so files stay Obsidian-friendly.
 - **Why IDs are mandatory:** Today holds references, reminders point at tasks, undo restores tasks, and the CLI edits files the app has open. All of that breaks if tasks are identified by line position.
-- Lines added without an ID (by hand or by CLI) get one assigned by Flint on its next save of that file.
+- Stored as the `id` field (not Obsidian's `^block` syntax, so there is one convention for all metadata).
 
 ### Body and subtasks
 - A **task body** (TASK-05) is the indented, non-list-item content directly under a task (standard markdown list-item continuation), including fenced code blocks and media links.
@@ -96,10 +112,10 @@ Trailing tokens are read **from the end of the line backwards**; everything befo
 - **Line order is the manual order.** Dragging or Alt+↑/↓ rewrites line order (TASK-01). Temporary sort by priority never touches the file (TASK-08).
 - Active tasks first, then a `## Completed` heading followed by completed tasks (most recently completed first, **Proposed**).
 
-### Bookkeeping in `.flint/meta.json`
-- Per task ID: `created`, `lastTouched` (any edit, move, priority change, completion).
-- `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration.
-- If an entry is missing (e.g. task added by CLI), Flint creates it on first sight.
+### Bookkeeping in `.flint/meta.json` and `.flint/today.json`
+- Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
+- `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight.
+- `today.json`: the manual order of Today. Today membership itself is the `today` field in the line, so losing this file only loses the order.
 
 ---
 
@@ -118,7 +134,7 @@ mode: note
 ```
 
 - Free-form markdown. Checkboxes in notes are plain markdown checkboxes; they become tasks only via conversion (LIST-04).
-- Converting a task list to a note keeps trailing tokens on checklist lines so converting back is lossless (LIST-04).
+- Converting a task list to a note keeps the `[key:: value]` fields on checklist lines so converting back is lossless (LIST-04).
 
 ---
 

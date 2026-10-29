@@ -64,8 +64,8 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Decision:** Never destroy windows (hide only); never quit by accident (X hides, Quit in tray); apply updates on quit or idle, never mid-session; recover from renderer crashes silently; keep the popup tiny and pre-warmed. Budgets in 05.
 
 ### D-12 — Stable task IDs
-- **Date:** Oct 2026 · **Status:** Proposed (Q-09)
-- **Decision:** Every task has a stable ID stored as an Obsidian-style `^id` at the end of its line.
+- **Date:** Oct 2026 · **Status:** Decided; storage format superseded by D-20 (`[id:: …]` field instead of `^id`)
+- **Decision:** Every task has a stable ID stored in its markdown line.
 - **Rationale:** Today references, reminders, undo, and external edits (CLI/Claude) all break if tasks are identified by line position.
 
 ### D-13 — Navigate vs Edit keyboard states
@@ -85,3 +85,35 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 ### D-16 — No telemetry
 - **Date:** Oct 2026 · **Status:** Decided
 - **Decision:** No telemetry or analytics. The only network use is auto-update. Stated plainly: "Your notes never leave your machine."
+
+### D-17 — Visual design v1: dark, grayscale, "solid glass"
+- **Date:** Oct 2026 · **Status:** Decided
+- **Decision:**
+  - Logo final: `assets/icon/flint-icon-512.svg`.
+  - v1 ships **dark mode only**; light mode is Later.
+  - Grayscale palette with one cool-gray accent **`#9AA0AB`** and **white** for emphasis. No purple or other hues in the UI.
+  - Visual language inspired by a chat-style Excel add-in: soft layered shadows, smooth rounded corners, icon tiles, monospace chips, composer-style capture box, headings with key words emphasized, rounded-square bullets. Its purple highlights become white.
+  - "Solid glass": Liquid-Glass-like depth (edge ring, inner top highlight, soft drop shadows) and springy motion, **without translucency**.
+  - Priority by lightness and thickness only (High 4 px white, Medium 3 px accent, Low 2 px dim): **resolves Q-01** and makes the separate color-blind palette option unnecessary.
+  - Fonts Geist / Geist Mono, bundled with the app.
+  - Motion capped at 150 ms (spring curve with slight overshoot).
+  - No decorative graphics in v1 (a faint header graphic on Today was tried and removed).
+- **Alternatives considered:** accent `#999E98` (rejected: slight green tint clashes with the cool logo and the no-greens rule); a cool-hued priority scale (gray/blue/purple, rejected in favour of grayscale).
+- **Spec:** [09](09-visual-design.md), tokens in `design/tokens.css`, screenshots and static mockups in `design/`.
+
+### D-18 — No separate spike; risk-first production build
+- **Date:** Oct 2026 · **Status:** Decided
+- **Decision:** Drop the throwaway 2–3 day spike (former M0). Build the three riskiest pieces first as production code, at the start of M2/M3, with measurable acceptance checks (06 §1: R-1 popup latency, R-2 capture-selection, R-3 actionable toast).
+- **Rationale:** the spike existed to de-risk the shell choice (Electron vs Tauri). With Electron decided and these features on documented paths, a failure would mean reworking one feature, not changing the stack, so throwaway code would mostly be wasted time. Building them first still surfaces problems in the first days.
+
+### D-19 — Internal distribution, unsigned, no auto-update in v1
+- **Date:** Oct 2026 · **Status:** Decided
+- **Decision:** v1 is a tool handed out by hand. The installer `.exe` (a pipeline artifact) is handed to coworkers manually. No code signing and no auto-update in v1; both move to Later. Open-sourcing is far in the future and out of scope.
+- **Rationale:** Azure Artifact Signing (formerly Trusted Signing) does not issue public-trust certificates to organizations in Georgia; the alternative (an OV certificate from a commercial CA) needs CA identity validation, a hardware/HSM-held key, and a yearly fee, and new certificates still have to build SmartScreen reputation. Not worth it for an internal tool. Without a hosted feed, auto-update has nothing to update from.
+- **Consequences:** users click "More info → Run anyway" on SmartScreen once per new installer; updates are installed by running the new `.exe` over the old one; v1 makes no network requests at all.
+
+### D-20 — Task metadata uses Dataview inline fields
+- **Date:** Oct 2026 · **Status:** Decided (resolves Q-09)
+- **Decision:** Task metadata is written as Dataview bracketed inline fields, `[key:: value]`: `priority`, `reminder`, `today`, `completion`, `id`. Unknown fields are preserved; the reader is tolerant, the writer canonical. Everything that matters is in the markdown line; side files (`meta.json`, `today.json`) hold only bookkeeping that is harmless to lose.
+- **Rationale:** an existing, widely used convention (Dataview, Obsidian Tasks "Dataview format") instead of an invented one; explicit delimiters make parsing unambiguous, unlike the earlier trailing tokens (`!high ⏰… ★ ^id`), which could collide with title text and depended on emoji encodings.
+- **Alternatives considered:** the original trailing-token format; Obsidian Tasks' emoji format (compact but emoji-dependent); todo.txt (different file model, not markdown).

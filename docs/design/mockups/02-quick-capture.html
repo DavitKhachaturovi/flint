@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flint quick-capture popup — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cp *{box-sizing:border-box}
+:where(.cp button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.pop{transition:opacity 150ms ease,transform 150ms cubic-bezier(.2,.9,.3,1.15)}
+.pop.out{opacity:0;transform:translateX(-50%) scale(.97) translateY(-6px)!important}
+.chip{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;font-family:'Geist Mono',monospace;font-size:12px;color:#D9DADC;white-space:nowrap;animation:chipin 150ms cubic-bezier(.2,.9,.3,1.35)}
+.chip.warn{color:#A4A7AB;box-shadow:inset 0 0 0 1px #2C2E33,inset 0 0 0 999px rgba(255,255,255,.01)}
+@keyframes chipin{from{opacity:0;transform:scale(.9)}}
+.x{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#75787D;transition:background-color 120ms,color 120ms}
+.x:hover{background:#2A2C30;color:#ECEDEE}
+.tile{width:28px;height:28px;border-radius:8px;background:#222428;box-shadow:inset 0 0 0 1px #2C2E33;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#B9BDC4}
+.sug{transition:background-color 120ms}
+.sug:hover,.sug.hi{background:#202226}
+.tool{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8E9196;transition:background-color 120ms,color 120ms}
+.tool:hover{background:#1F2124;color:#ECEDEE}
+.send{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;transition:background-color 140ms,transform 150ms cubic-bezier(.2,.9,.3,1.5)}
+.send:active{transform:scale(.9)}
+.saved{animation:rise 150ms cubic-bezier(.2,.9,.3,1.2)}
+@keyframes rise{from{opacity:0;transform:translate(-50%,10px)}}
+@media (prefers-reduced-motion:reduce){.cp *{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="cp" style="--accent: #9AA0AB; width: 1280px; height: 760px; position: relative; overflow: hidden; background: #0A0B0C; font-family: 'Geist', system-ui, sans-serif; color: #E8E9EB">
+
+<div aria-hidden="true" style="position: absolute; inset: 0; padding: 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; opacity: 0.3">
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+<div style="border-radius: 18px; background: #1A1B1E; display: flex; align-items: center; justify-content: center"><div style="width: 72px; height: 72px; border-radius: 50%; background: #2A2C30"></div></div>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 40px; bottom: 14px; font-size: 12px; color: #55585D">Full-screen call in the background</div>
+
+<div class="pop" style="position: absolute; left: 50%; top: 140px; transform: translateX(-50%); width: 680px">
+<div style="border-radius: 22px; background: #16171A; box-shadow: 0 0 0 1px #26282C, inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.4), 0 40px 90px -20px rgba(0,0,0,.85); padding: 12px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 4px 0 4px; min-height: 32px">
+
+<span class="chip">
+<span style="width: 4px; height: 12px; border-radius: 2px; background: #FFFFFF"></span>
+
+High<button class="x" aria-label="Remove"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></button>
+</span>
+
+<span class="chip">
+
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path></svg>
+Unicorn<button class="x" aria-label="Remove"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></button>
+</span>
+
+<span class="chip">
+
+
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg>Today 15:00<button class="x" aria-label="Remove"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></button>
+</span>
+
+<span class="chip"><span aria-hidden="true" style="width: 18px; height: 14px; border-radius: 4px; background: #34363B; display: block"></span>screenshot.png<button class="x" aria-label="Remove attachment"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></button></span>
+</div>
+
+<label for="cap" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Capture a task</label>
+<input id="cap" value="fix token refresh !h #unicorn @15:00" placeholder="Capture a task…" autocomplete="off" style="display: block; width: 100%; height: 56px; padding: 0px 8px; background: transparent; border: 0px; outline: none; color: rgb(255, 255, 255); font-style: inherit; font-variant: inherit; font-weight: inherit; font-stretch: inherit; line-height: inherit; font-family: inherit; font-optical-sizing: inherit; font-size-adjust: inherit; font-kerning: inherit; font-feature-settings: inherit; font-variation-settings: inherit; font-size: 20px; letter-spacing: -0.01em; caret-color: rgb(154, 160, 171);">
+
+
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<div style="display: flex; align-items: center; gap: 2px">
+<button class="tool" aria-label="Attach"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+<button class="tool" aria-label="Set priority"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg></button>
+<button class="tool" aria-label="Choose list"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path></svg></button>
+<button class="tool" aria-label="Set reminder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #8E9196">
+<img src="../../../assets/icon/flint-icon-512.svg" alt="" style="width: 16px; height: 16px; display: block">Unicorn</span>
+<button class="send" aria-label="Save task" style="background: #ECEDEE; color: #0E0F11; box-shadow: 0 4px 12px rgba(0,0,0,.5)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+</div>
+</div>
+</div>
+<div style="text-align: center; padding-top: 12px; font-size: 12px; color: #6E7176">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</div>
+</div>
+
+
+</div>
+
+</body>
+</html>

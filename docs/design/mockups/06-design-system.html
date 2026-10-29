@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flint dark palette, components, depth and motion — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.sy *{box-sizing:border-box}
+:where(.sy button){font:inherit;color:inherit;background:none;border:0;padding:0}
+.lbl{margin:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:#8E9196;font-weight:500}
+.tile{width:30px;height:30px;border-radius:9px;background:#1F2124;box-shadow:inset 0 0 0 1px #2A2C30;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#B9BDC4}
+.tile.strong{background:#ECEDEE;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#0E0F11}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:7px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;font-family:'Geist Mono',monospace;font-size:12px;color:#D9DADC;white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:2px;background:#9AA0AB;flex:0 0 auto;margin-top:8px}
+</style>
+</head>
+<body>
+
+
+<div class="sy" style="box-sizing: border-box; width: 1280px; height: 1000px; background: #0D0E10; color: #E8E9EB; font-family: 'Geist', system-ui, sans-serif; padding: 56px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px">
+
+<section style="display: flex; flex-direction: column; gap: 16px">
+<h2 class="lbl">Accent and emphasis</h2>
+<div style="display: flex; align-items: center; gap: 18px">
+<img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo" style="width: 88px; height: 88px; display: block; filter: drop-shadow(0 10px 24px rgba(0,0,0,.6))">
+<div style="display: flex; flex-direction: column; gap: 10px; font-family: 'Geist Mono', monospace; font-size: 12.5px">
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 34px; height: 34px; border-radius: 10px; background: #9AA0AB; box-shadow: 0 4px 12px rgba(0,0,0,.5)"></span><span>#9AA0AB<br><span style="color: #8E9196">accent: focus, caret, checks</span></span></div>
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 34px; height: 34px; border-radius: 10px; background: #FFFFFF; box-shadow: 0 4px 12px rgba(0,0,0,.5)"></span><span>#FFFFFF<br><span style="color: #8E9196">highlight: active, emphasis</span></span></div>
+</div>
+</div>
+<div style="padding: 20px; border-radius: 18px; background: #151619; box-shadow: 0 0 0 1px #232529, inset 0 1px 0 rgba(255,255,255,.045), 0 14px 34px -12px rgba(0,0,0,.6)">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: #B9BDC4">Good morning. Four tasks are <span style="color: #FFFFFF">in focus.</span></div>
+<div style="margin-top: 8px; font-size: 13px; color: #8E9196">Headings in soft gray, the key words in white.</div>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Priority by lightness and weight</h2>
+<div style="padding: 6px; border-radius: 18px; background: #151619; box-shadow: 0 0 0 1px #232529, inset 0 1px 0 rgba(255,255,255,.045), 0 14px 34px -12px rgba(0,0,0,.6); display: flex; flex-direction: column">
+<div style="position: relative; padding: 10px 14px 10px 18px; font-size: 14px"><span style="position: absolute; left: 3px; top: 10px; bottom: 10px; width: 4px; border-radius: 3px; background: #FFFFFF"></span>High · 4px · white</div>
+<div style="position: relative; padding: 10px 14px 10px 18px; font-size: 14px"><span style="position: absolute; left: 3px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: #9AA0AB"></span>Medium · 3px · accent</div>
+<div style="position: relative; padding: 10px 14px 10px 18px; font-size: 14px"><span style="position: absolute; left: 3px; top: 10px; bottom: 10px; width: 2px; border-radius: 3px; background: #55585D"></span>Low · 2px · dim</div>
+<div style="padding: 10px 14px 10px 18px; font-size: 14px; color: #A4A7AB">None · no stripe</div>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Bullets</h2>
+<div style="display: flex; flex-direction: column; gap: 4px; color: #C9CCCF; font-size: 14px; line-height: 1.55">
+<div style="display: flex; gap: 12px"><span class="dot"></span><span>Rounded-square bullets in the accent</span></div>
+<div style="display: flex; gap: 12px"><span class="dot"></span><span>Checkboxes share the 7 px corner</span></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 16px">
+<h2 class="lbl">Grounds</h2>
+<div style="display: flex; flex-direction: column; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 12px">
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #0D0E10; box-shadow: inset 0 0 0 1px #26282C"></span><span>#0D0E10</span><span style="color: #8E9196">window</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #111214; box-shadow: inset 0 0 0 1px #26282C"></span><span>#111214</span><span style="color: #8E9196">sidebar</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #151619; box-shadow: inset 0 0 0 1px #26282C"></span><span>#151619</span><span style="color: #8E9196">card</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #1B1D20; box-shadow: inset 0 0 0 1px #2A2C30"></span><span>#1B1D20</span><span style="color: #8E9196">floating, selected</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span><span>#1F2124</span><span style="color: #8E9196">tiles, chips</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 56px; height: 34px; border-radius: 9px; background: #232529"></span><span>#232529</span><span style="color: #8E9196">card edge</span></div>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Text</h2>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 15px">
+<span style="color: #FFFFFF">Highlight · #FFFFFF</span>
+<span style="color: #ECEDEE">Primary · #ECEDEE</span>
+<span style="color: #B9BDC4">Heading soft · #B9BDC4</span>
+<span style="color: #A4A7AB">Secondary · #A4A7AB</span>
+<span style="color: #8E9196">Muted · #8E9196</span>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Type</h2>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 30px; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF">Geist 30 / 700</span>
+<span style="font-size: 14px; color: #D9DADC">Geist 14 / 400 for tasks and notes</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #A4A7AB">Geist Mono 12 for times, counts, chips</span>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 16px">
+<h2 class="lbl">Components</h2>
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+<span class="tile strong"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span>
+<span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span>
+<span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span>
+<span style="font-size: 12px; color: #8E9196">icon tiles: strong = active</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path></svg>Unicorn</span>
+<span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg>Today 15:00</span>
+<span class="chip">PR 42</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button style="height: 34px; padding: 0 16px; border-radius: 10px; background: #ECEDEE; color: #0E0F11; font-weight: 500; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.5)">Primary</button>
+<button style="height: 34px; padding: 0 14px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #D9DADC; font-size: 13px">Secondary</button>
+<button style="height: 34px; padding: 0 12px; border-radius: 10px; color: #A4A7AB; font-size: 13px">Quiet</button>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Depth, solid not translucent</h2>
+<div style="height: 58px; border-radius: 14px; background: #111214; display: flex; align-items: center; padding: 0 18px; color: #A4A7AB; font-size: 13px">0 · flat, part of the page</div>
+<div style="height: 58px; border-radius: 18px; background: #151619; box-shadow: 0 0 0 1px #232529, inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.45), 0 14px 34px -12px rgba(0,0,0,.6); display: flex; align-items: center; padding: 0 18px; color: #C9CCCF; font-size: 13px">1 · card: edge, top light, soft drop</div>
+<div style="height: 58px; border-radius: 20px; background: #1B1D20; box-shadow: 0 0 0 1px #2A2C30, inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.4), 0 34px 80px -18px rgba(0,0,0,.85); display: flex; align-items: center; padding: 0 18px; color: #FFFFFF; font-size: 13px">2 · floating: popup, toast, menus</div>
+
+<h2 class="lbl" style="margin-top: 16px">Radius</h2>
+<div style="display: flex; align-items: flex-end; gap: 12px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8E9196">
+<div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 7px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span>7</div>
+<div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 10px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span>10</div>
+<div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 12px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span>12</div>
+<div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 18px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span>18</div>
+<div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 22px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33"></span>22</div>
+</div>
+
+<h2 class="lbl" style="margin-top: 16px">Motion</h2>
+<div style="display: flex; flex-direction: column; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 12px; color: #C9CCCF">
+<span>spring  cubic-bezier(.2,.9,.3,1.15) · 150ms</span>
+<span>press   scale(.86) → 1 · overshoot 1.5</span>
+<span>lift    translateY(-2px) on hover</span>
+<span style="color: #8E9196">nothing over 150ms · off with reduce-motion</span>
+</div>
+</section>
+</div>
+
+</body>
+</html>

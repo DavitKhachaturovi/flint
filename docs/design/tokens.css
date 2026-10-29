@@ -1,0 +1,98 @@
+/*
+ * Flint design tokens — v1 (dark mode only)
+ * Source of truth: docs/09-visual-design.md
+ * Copy these into the app's base stylesheet; components must use tokens, never raw hex values.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ── Grounds (back to front) ─────────────────────────────── */
+  --fl-ground-window:   #0D0E10; /* main window background */
+  --fl-ground-sidebar:  #111214; /* sidebar */
+  --fl-ground-card:     #151619; /* cards: task list, composer, completed */
+  --fl-ground-float:    #1B1D20; /* popup, toast, menus, selected row */
+  --fl-ground-tile:     #1F2124; /* icon tiles, chips, keycaps */
+  --fl-ground-well:     #0E0F11; /* code blocks, inset inputs */
+  --fl-ground-hover:    #1A1B1E; /* row hover */
+
+  /* ── Edges ───────────────────────────────────────────────── */
+  --fl-edge-card:       #232529; /* 1px ring around cards */
+  --fl-edge-float:      #2A2C30; /* ring around floating surfaces */
+  --fl-edge-chip:       #2C2E33; /* inset ring on tiles/chips */
+  --fl-edge-divider:    #1C1E21; /* sidebar border, section dividers */
+  --fl-checkbox-border: #4A4D52;
+
+  /* ── Text ────────────────────────────────────────────────── */
+  --fl-text-highlight:  #FFFFFF; /* emphasis words, active items */
+  --fl-text-primary:    #ECEDEE;
+  --fl-text-body:       #E3E4E6; /* task titles */
+  --fl-text-heading-soft: #B9BDC4; /* heading base; key words use highlight */
+  --fl-text-secondary:  #A4A7AB;
+  --fl-text-muted:      #8E9196; /* lowest level allowed for readable text */
+  --fl-text-faint:      #75787D; /* section labels, completed titles (large/secondary only) */
+
+  /* ── Accent & emphasis ───────────────────────────────────── */
+  --fl-accent:          #9AA0AB; /* focus ring, caret, checked boxes, bullets, medium priority */
+  --fl-strong-bg:       #ECEDEE; /* strong icon tile, primary button */
+  --fl-strong-fg:       #0E0F11;
+
+  /* ── Priority stripes (lightness + thickness, never hue) ── */
+  --fl-pri-high-color:  #FFFFFF; --fl-pri-high-width: 4px;
+  --fl-pri-med-color:   var(--fl-accent); --fl-pri-med-width: 3px;
+  --fl-pri-low-color:   #55585D; --fl-pri-low-width: 2px;
+  /* none = no stripe */
+
+  /* ── Radius ──────────────────────────────────────────────── */
+  --fl-radius-check:    7px;   /* checkboxes, chips */
+  --fl-radius-tile:     8px;   /* icon tiles (9px at 30px size) */
+  --fl-radius-button:   10px;
+  --fl-radius-row:      12px;  /* rows, sidebar items, menu items */
+  --fl-radius-card:     18px;
+  --fl-radius-popup:    22px;  /* capture popup, mini mode */
+  --fl-radius-pill:     999px;
+
+  /* ── Depth: solid surfaces, no translucency ──────────────── */
+  --fl-shadow-card:
+    0 0 0 1px var(--fl-edge-card),
+    inset 0 1px 0 rgba(255, 255, 255, .045),
+    0 1px 2px rgba(0, 0, 0, .45),
+    0 14px 34px -12px rgba(0, 0, 0, .6);
+  --fl-shadow-card-hover:
+    0 0 0 1px var(--fl-edge-float),
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 2px 4px rgba(0, 0, 0, .45),
+    0 22px 44px -14px rgba(0, 0, 0, .75);
+  --fl-shadow-float:
+    0 0 0 1px var(--fl-edge-float),
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 2px 4px rgba(0, 0, 0, .4),
+    0 34px 80px -18px rgba(0, 0, 0, .85);
+  --fl-shadow-selected:
+    0 0 0 1px var(--fl-edge-float),
+    inset 0 1px 0 rgba(255, 255, 255, .05),
+    0 6px 16px -8px rgba(0, 0, 0, .7);
+  --fl-shadow-strong-tile: 0 2px 6px rgba(0, 0, 0, .45);
+  --fl-shadow-primary-button: 0 4px 12px rgba(0, 0, 0, .5);
+
+  /* ── Type (fonts are bundled with the app, never fetched) ── */
+  --fl-font-ui:   'Geist', system-ui, sans-serif;
+  --fl-font-mono: 'Geist Mono', ui-monospace, monospace;
+  --fl-size-title:   30px;  /* weight 700, letter-spacing -0.025em */
+  --fl-size-greeting: 36px; /* Today greeting, weight 700, -0.03em */
+  --fl-size-capture: 20px;  /* capture popup input */
+  --fl-size-body:    14px;  /* tasks */
+  --fl-size-note:    15px;  /* note body */
+  --fl-size-meta:    12px;  /* mono: times, counts, chips */
+  --fl-size-label:   11px;  /* uppercase section labels, letter-spacing 0.07em */
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --fl-ease-spring:  cubic-bezier(.2, .9, .3, 1.15); /* settle with a small overshoot */
+  --fl-ease-press:   cubic-bezier(.2, .9, .3, 1.5);  /* checkbox press rebound */
+  --fl-dur-fast:     120ms; /* hover, color */
+  --fl-dur-base:     150ms; /* everything else — hard ceiling */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

@@ -20,10 +20,12 @@
 | Spring animations | A spring animation library (e.g. Motion / react-spring), disabled under reduce-motion |
 | Syntax highlighting | CodeMirror language packages (in editor) |
 | Fuzzy search | A small in-memory fuzzy matcher (data sizes are small) |
+| Fonts | Geist + Geist Mono (OFL), **bundled as local font files**; never loaded from Google Fonts at runtime (offline, no network, APP-09) |
+| Design tokens | `docs/design/tokens.css` (09) as the base stylesheet's CSS custom properties |
 | File watching | chokidar or Node `fs.watch` with debouncing |
 | Win32 calls (capture-selection) | An FFI library such as **koffi** (calls Win32 directly, no native addon rebuilds per Electron version) |
 | Packaging | electron-builder, NSIS installer |
-| Updates | electron-updater |
+| Updates | electron-updater (Later, D-19) |
 | Tests | Vitest (core), Playwright for Electron (end-to-end) |
 
 ---
@@ -60,7 +62,7 @@ flint/
 
 ## 3. Process and window model
 
-- **Main process** owns: storage (read/parse/write), the file watcher, the reminder scheduler, global hotkeys, the tray, notifications, auto-update, single-instance lock.
+- **Main process** owns: storage (read/parse/write), the file watcher, the reminder scheduler, global hotkeys, the tray, notifications, auto-update (Later, D-19), single-instance lock.
 - **Renderer windows:**
   - **Main window** — created at startup (hidden if Flint was started at login).
   - **Capture popup** — created at startup, kept rendered and hidden (pre-warmed).
@@ -104,7 +106,7 @@ flint/
 5. **Only main window + popup alive at idle**; mini mode on demand (then kept hidden).
 6. **Rendering discipline:** memoized rows, update only changed rows, animate with transforms/opacity only, virtualize very long lists (Proposed: above a few hundred rows).
 7. **Main-process work never blocks the UI**: file I/O is async; parsing large files off the hot path.
-8. **Updates never mid-session** (APP-06).
+8. **Updates never mid-session** (applies once APP-06 auto-update is added; v1 users update by running a new installer).
 
 ---
 
@@ -142,9 +144,9 @@ flint/
 - All file I/O in the main process via the core format package; atomic writes (DATA-01) with retry for transient Windows file locks.
 - File watcher ignores Flint's own writes and preserves cursor/selection on reload (DATA-06).
 
-### Auto-update (APP-06)
-- electron-updater with the NSIS target: check and download in the background; **install on quit, or at idle** (Proposed: only when no Flint window is visible and the user has been idle for a while), never during active use.
-- Update feed hosting: Q-10.
+### Auto-update (APP-06) — Later (D-19)
+- Not in v1: Flint is distributed manually as an `.exe`. Users update by running the newer installer over the old one (same per-user install location; settings and data are kept).
+- When added later: electron-updater with the NSIS target and a generic feed (e.g. a static Azure Storage endpoint published by the pipeline); check and download in the background; **install on quit, or at idle**, never during active use.
 
 ### Window state (APP-05)
 - Persist bounds per **monitor setup** (keyed by the set of connected displays and their bounds); if a saved position is off-screen, fall back to the active monitor.
@@ -153,9 +155,11 @@ flint/
 
 ## 6. Build, signing, and distribution
 
-- **Installer:** NSIS via electron-builder, Windows x64, per-user install (no admin rights needed, Proposed).
-- **Code signing is required.** An unsigned `.exe` triggers Windows SmartScreen warnings, which undermines "easily installable" on the first click. Use Azure's managed code-signing service from the pipeline.
-- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → lint → typecheck → unit tests (core) → e2e smoke tests → build → sign → publish installer + update feed.
+- **Installer:** NSIS via electron-builder, Windows x64, per-user install (no admin rights needed). Installing over an existing version upgrades it in place.
+- **Distribution (v1):** internal tool; the `.exe` is handed to coworkers manually (D-19).
+- **Code signing: not in v1 (D-19).** Azure Artifact Signing (formerly Trusted Signing) only issues public-trust certificates to organizations in a fixed list of regions that does not include Georgia, so the alternative is an OV certificate from a commercial CA: organization validation by the CA (documents and verification, typically days), a private key that must live on a hardware token or cloud HSM, and a yearly fee. Even signed, a new certificate has to build SmartScreen reputation. For an internal tool this is not worth it yet.
+- **What unsigned means for users:** on first run of a downloaded installer, Windows SmartScreen shows "Windows protected your PC"; the user clicks **More info → Run anyway**. Mention this in the hand-out message. Toast notifications still work unsigned (they depend on the AppUserModelID and the Start Menu shortcut the installer creates, not on a signature).
+- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → lint → typecheck → unit tests (core) → e2e smoke tests → build → publish the installer as a pipeline artifact. Signing and an update feed slot in later.
 - **Logs** stay local (`%LOCALAPPDATA%\Flint\logs`); nothing is uploaded (APP-09).
 
 ---

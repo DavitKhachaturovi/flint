@@ -100,16 +100,14 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 ## 4. Visual language
 
 ### Palette
-- **Cool palette only:** black, grays, blues, white, purple. **No warm colors, no greens** (brand decision, 01).
-- Two themes: **dark** and **light**, plus "follow system".
-- Every color is a theme token; no hard-coded colors in components.
+- **v1: dark mode only**, grayscale with one cool-gray accent **`#9AA0AB`** and **white** for emphasis (brand rule: cool palette, no warm colors, no greens). Light mode is Later.
+- Every color is a theme token (`docs/design/tokens.css`); no hard-coded colors in components.
+- Full visual spec (grounds, text levels, depth, components): [09](09-visual-design.md).
 
 ### Priority styling (TASK-03)
 - **None (default):** no stripe. Visually neutral.
 - **Low / Medium / High:** a **thin left-edge stripe** on the row. The row itself is never tinted.
-- A **second cue** besides color, so priority is readable without color perception: stripe **thickness** increases with priority (e.g. 2 / 3 / 4 px), optionally plus a tiny shape.
-- A **color-blind-safe palette** option in settings.
-- **Default priority colors:** must fit the cool-only brand palette. The originally discussed scheme was red/amber-style; it conflicts with "no warm colors." **Proposed default:** a cool scale with strong luminance differences — Low = slate gray, Medium = blue, High = vivid purple/violet — with thickness doing the heavy lifting for accessibility (blue vs purple can be confused by color-blind users). Final palette: Q-01.
+- **Decided (D-17, resolves Q-01):** lightness and thickness only, never hue. High = 4 px `#FFFFFF`, Medium = 3 px accent `#9AA0AB`, Low = 2 px `#55585D`. Color-blind-safe by default, so no separate palette option.
 - No priority text is shown on rows.
 
 ### Row anatomy (task list)
@@ -123,7 +121,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 - Rendered muted (lower contrast, checked). **Proposed:** no strikethrough, to keep the section calm and readable.
 
 ### Typography
-- A clean, highly readable sans-serif for UI and text; a monospace font for code blocks and for the monospace toggle (NOTE-06).
+- **Geist** for UI and text, **Geist Mono** for code blocks, times, counts, chips, and the monospace toggle (NOTE-06). Both are bundled with the app, never fetched at runtime (09 §7).
 - Restraint in sizes and weights: one size for task text, a smaller muted size for indicators/metadata.
 
 ### Density
@@ -159,7 +157,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 
 ## 6. Accessibility
 
-- Priority never relies on color alone (thickness/shape cue + color-blind-safe palette).
+- Priority never relies on color alone (lightness + thickness, no hue).
 - Every action is keyboard-reachable; focus is always visible.
 - Reduce-motion respected.
 - **Proposed:** proper accessible names/roles for rows, checkboxes, and buttons so screen readers work.

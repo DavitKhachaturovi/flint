@@ -109,7 +109,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each task can have priority **low, medium, high**, or **none**.
 - **"No priority" is the default** and is visually neutral. If every task were colored, nothing would stand out.
 - Priority is shown with a **thin left-edge stripe**, not by tinting the whole row, which keeps the UI calm.
-- Because color-only priority is an accessibility problem (red/amber/green is exactly the combination roughly 8% of men cannot reliably tell apart), the stripe is paired with a **second subtle cue** (stripe thickness and/or a tiny shape), and a **color-blind-safe palette option** is available in settings.
+- Because color-only priority is an accessibility problem (red/amber/green is exactly the combination roughly 8% of men cannot reliably tell apart), the stripe is paired with a **second subtle cue** (stripe thickness). **Decided (D-17):** priority uses lightness and thickness only, never hue (High = 4 px white, Medium = 3 px accent, Low = 2 px dim gray), so it is color-blind-safe by default and no separate color-blind palette option is needed in v1. Spec in 09 §4.
 - No priority text label is added to the row. Visual spec in 03.
 
 ### TASK-04 — One level of subtasks, max (v1)
@@ -336,8 +336,9 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-05 — Remembered window positions (v1)
 - Each window (main, mini mode) remembers its size and position **per monitor setup**.
 
-### APP-06 — Auto-update, applied safely (v1)
-- Flint updates itself; nobody reinstalls by hand.
+### APP-06 — Auto-update, applied safely (Later, D-19)
+- v1 is distributed manually; users update by running the newer installer over the old one.
+- When added: Flint updates itself; nobody reinstalls by hand.
 - Updates are **applied on quit or at idle, never mid-session**. An update restart must never happen during a call.
 
 ### APP-07 — Silent crash recovery (v1)
@@ -348,7 +349,7 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-09 — No telemetry, stated plainly (v1)
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
-- The only network access is checking for and downloading updates (APP-06).
+- The only network access is checking for and downloading updates (APP-06), and that is Later: **v1 makes no network requests at all.**
 
 ### APP-10 — Teaching Inbox onboarding (v1)
 - On first launch, Inbox contains sample tasks that each teach one shortcut (e.g. "Press Space to complete me", "Press 3 to make me high priority", "Press your capture hotkey from any app").
@@ -360,8 +361,8 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Flint folder location.
 - Global hotkeys (capture, capture-selection).
 - Start with Windows.
-- Theme (light / dark / follow system), density (comfortable / compact), monospace toggle.
-- Priority palette (default / color-blind-safe).
+- Theme: **dark only in v1** (light mode Later; the setting may be omitted until then), density (comfortable / compact), monospace toggle.
+- ~~Priority palette (default / color-blind-safe)~~: not needed in v1, priority is grayscale by lightness and thickness (D-17).
 - Notifications on/off, sound on/off and sound choice, Focus Assist explanation.
 - Today rollover prompt on/off.
 - Auto-archive completed tasks after N days (on/off, N).
