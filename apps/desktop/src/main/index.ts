@@ -14,7 +14,6 @@ import {
 import {
   Channels,
   epochNow,
-  type DevEvent,
   type PopupNotice,
   type PopupShown,
   type PopupSubmit,
@@ -113,20 +112,16 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 function log(message: string): void {
-  const event: DevEvent = { at: Date.now(), message };
   console.log(`[flint] ${message}`);
   // Local log only, never uploaded (APP-09, docs/05 §6).
   try {
     mkdirSync(app.getPath('logs'), { recursive: true });
     appendFileSync(
       join(app.getPath('logs'), 'flint.log'),
-      `${new Date(event.at).toISOString()} ${message}\n`,
+      `${new Date().toISOString()} ${message}\n`,
     );
   } catch {
     // Logging must never break the app.
-  }
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send(Channels.devEvent, event);
   }
 }
 
@@ -219,11 +214,16 @@ async function start(): Promise<void> {
   app.on('window-all-closed', () => undefined);
 
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 640,
+    width: 1120,
+    height: 780,
+    minWidth: 720,
+    minHeight: 480,
     show: false,
     backgroundColor: '#0D0E10',
     title: 'Flint',
+    // Frameless like mockup 01; Windows still draws its own caption buttons (snap layouts work).
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0D0E10', symbolColor: '#7C7F84', height: 40 },
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/main.cjs'),
       contextIsolation: true,
@@ -258,6 +258,34 @@ async function start(): Promise<void> {
   watchListFolder(folder.folder, (path) => {
     workspace.fileChanged(path).catch((error: unknown) => log(`reload failed: ${String(error)}`));
   });
+  // M4: the main window's lists, read from and changed through the workspace.
+  const owns = (sender: Electron.WebContents): boolean => sender === mainWindow.webContents;
+  ipcMain.handle(Channels.mainLists, (event) =>
+    owns(event.sender) ? workspace.summaries(new Date()) : [],
+  );
+  ipcMain.handle(Channels.mainView, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string' ? workspace.view(id, new Date()) : null,
+  );
+  ipcMain.handle(Channels.mainToggle, (event, id: unknown, key: unknown) =>
+    owns(event.sender) && typeof id === 'string' && typeof key === 'string'
+      ? workspace.toggleDone(id, key, new Date()).catch((error: unknown) => {
+          log(`could not change the task: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  ipcMain.handle(Channels.mainUndo, (event) =>
+    owns(event.sender)
+      ? workspace.undoLast(new Date()).catch((error: unknown) => {
+          log(`undo failed: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  workspace.onChange(() => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
+  });
+
   const drafts = new DraftFile(join(app.getPath('userData'), 'drafts.json'));
   await drafts.load();
   /** The follow-up message for the next popup open (D-26), and what its Undo reverts. */
@@ -501,8 +529,6 @@ async function start(): Promise<void> {
   });
   handleActivation(activationOf(process.argv));
   handleDevCommand(process.argv);
-
-  ipcMain.on(Channels.devSendToast, (_event, kind: ToastKind) => sendTestToast(kind));
 
   // Test hooks are development-only: an installed Flint ignores these variables.
   const devEnv = (name: string): string | undefined =>

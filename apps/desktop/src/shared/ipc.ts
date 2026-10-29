@@ -28,8 +28,11 @@ export const Channels = {
   hotkeysState: 'hotkeys:state',
   hotkeysRecording: 'hotkeys:recording',
   hotkeysRebind: 'hotkeys:rebind',
-  devEvent: 'dev:event',
-  devSendToast: 'dev:send-toast',
+  mainLists: 'main:lists',
+  mainView: 'main:view',
+  mainToggle: 'main:toggle',
+  mainUndo: 'main:undo',
+  mainChanged: 'main:changed',
 } as const;
 
 /**
@@ -105,12 +108,6 @@ export interface PopupSubmitAck {
 
 export type ToastKind = 'default' | 'reminder' | 'urgent';
 
-/** Main → dev window: something happened (toast action, latency sample). */
-export interface DevEvent {
-  readonly at: number;
-  readonly message: string;
-}
-
 /** APP-08: a global hotkey as the Hotkeys window shows it. */
 export interface HotkeyView {
   readonly accelerator: string;
@@ -123,3 +120,51 @@ export type HotkeyName = 'capture' | 'selection';
 export type HotkeysView = Readonly<Record<HotkeyName, HotkeyView>>;
 
 export type RebindOutcome = 'saved' | 'in-use' | 'invalid' | 'needs-modifier' | 'same-as-other';
+
+/** M4 main window: a list in the sidebar (LIST-01). */
+export interface ListSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly mode: 'tasks' | 'note';
+  /** Open top-level tasks. */
+  readonly open: number;
+  readonly inbox: boolean;
+}
+
+/** A task as a row (TASK-01..06). */
+export interface TaskRow {
+  readonly key: string;
+  /** The task line as written; empty for an untitled task (D-45). */
+  readonly title: string;
+  /** What the row shows when the title is empty (D-45: made here, never written). */
+  readonly label: string;
+  /** Untitled task whose body is code: shown as a collapsed code row (D-45). */
+  readonly code: { readonly kind: string; readonly lines: number; readonly peek: string } | null;
+  readonly priority: 'high' | 'medium' | 'low' | null;
+  /** `Today 15:00`, `Tomorrow 09:00` (REM-08). */
+  readonly reminder: string | null;
+  readonly done: boolean;
+  /** When it was completed: `Today 11:42`, `Yesterday`, `Mon` (TASK-06). */
+  readonly completed: string | null;
+  readonly body: string;
+  readonly subtasks: readonly TaskRow[];
+}
+
+/** Something in a task list that isn't a task: shown read-only (TASK-15). */
+export type ListItem =
+  | { readonly kind: 'task'; readonly task: TaskRow }
+  | { readonly kind: 'heading'; readonly text: string }
+  | { readonly kind: 'text'; readonly text: string };
+
+export interface ListView {
+  readonly id: string;
+  readonly name: string;
+  readonly mode: 'tasks' | 'note';
+  readonly open: number;
+  readonly items: readonly ListItem[];
+  readonly completed: readonly TaskRow[];
+  /** Why the list can't be changed, if it can't (not UTF-8, newer format…). */
+  readonly readOnly: string | null;
+  /** A note's text (LIST-01), shown read-only until the note editor (M5). */
+  readonly noteText: string | null;
+}

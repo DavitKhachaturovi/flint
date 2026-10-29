@@ -10,19 +10,7 @@
     <link rel="stylesheet" href="./main-window.css" />
   </head>
   <body>
-    <main>
-      <h1>Flint <span>· development harness</span></h1>
-      <p>
-        R-1: press Ctrl+Shift+Space from any app. R-3: send a test reminder, then try Done, Snooze
-        10m and Open on the toast and from Action Center.
-      </p>
-      <div class="actions">
-        <button data-toast="default">Test toast</button>
-        <button data-toast="reminder">Test reminder toast</button>
-        <button data-toast="urgent">Test urgent toast</button>
-      </div>
-      <ol class="log" aria-live="polite"></ol>
-    </main>
-    <script type="module" src="./main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
   </body>
 </html>

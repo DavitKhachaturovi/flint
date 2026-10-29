@@ -3,15 +3,20 @@ import { join } from 'node:path';
 import {
   addTask,
   allTasks,
+  completeTask,
   deleteTask,
   findTask,
   generateId,
   serializeDocument,
+  uncompleteTask,
+  type Applied,
   type Op,
 } from '@flint/core';
 import { parseCapture, type CaptureParse, type ListInfo } from '@flint/core/shorthand';
 import { fromDate } from '@flint/core/time';
+import type { ListSummary, ListView } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import { listView } from '../views.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
 
@@ -107,7 +112,103 @@ export class Workspace {
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const run = this.queue.catch(() => undefined).then(work);
     this.queue = run;
+    // Whatever changed, the main window shows it (M4).
+    void run.then(
+      () => this.notify(),
+      () => this.notify(),
+    );
     return run;
+  }
+
+  private readonly listeners = new Set<() => void>();
+
+  /** Called after every change: a capture, an edit, an undo, a file changed by another program. */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener();
+  }
+
+  /** The sidebar (M4, LIST-01): Inbox first, then the lists in folder order. */
+  summaries(now: Date): ListSummary[] {
+    return this.listInfos().map((info) => {
+      const loaded = this.find(info.id);
+      const open =
+        loaded && info.mode === 'tasks'
+          ? listView(loaded.file.document, { ...info, readOnly: null }, now).open
+          : 0;
+      return { id: info.id, name: info.name, mode: info.mode, open, inbox: info.id === INBOX_ID };
+    });
+  }
+
+  /** One list as the main window shows it (M4). */
+  view(id: string, now: Date): ListView | null {
+    const loaded = this.find(id);
+    if (!loaded) return null;
+    const info = this.listInfos().find((list) => list.id === id);
+    return listView(
+      loaded.file.document,
+      {
+        id,
+        name: info?.name ?? loaded.entry.name,
+        mode: info?.mode ?? 'tasks',
+        readOnly: loaded.file.readOnly,
+      },
+      now,
+    );
+  }
+
+  /** Undo for the main window (DATA-03): the last change made there, newest first. */
+  private readonly undoStack: { label: string; list: string; inverse: Op }[] = [];
+  /** TASK-06: where a completed task stood, to put it back on un-check (`completedAfter`). */
+  private readonly completedAfter = new Map<string, string | null>();
+
+  private async record(list: Loaded, op: Op, label: string, now: Date): Promise<string> {
+    const applied = await this.applyAndSave(list, op, now);
+    this.undoStack.push({ label, list: list.entry.path, inverse: applied.inverse });
+    if (this.undoStack.length > 100) this.undoStack.shift();
+    return label;
+  }
+
+  /** Space or the checkbox (TASK-06): completes an open task, reopens a completed one. */
+  toggleDone(id: string, key: string, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      const found = list ? findTask(list.file.document, key) : undefined;
+      if (!list || !found) return null;
+      const document = list.file.document;
+      const path = list.file.path;
+      const done = found.task.line.status !== ' ';
+      if (!done) {
+        const completion = completeTask(document, path, key, fromDate(now));
+        if (!completion) return null;
+        this.completedAfter.set(`${path}:${key}`, completion.completedAfter);
+        return this.record(list, completion.op, 'Completed', now);
+      }
+      const op = uncompleteTask(
+        document,
+        path,
+        key,
+        (task) => this.completedAfter.get(`${path}:${task}`) ?? null,
+      );
+      return op ? this.record(list, op, 'Reopened', now) : null;
+    });
+  }
+
+  /** Undoes the newest change made in the main window; resolves to what was undone. */
+  undoLast(now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const entry = this.undoStack.pop();
+      const list = entry
+        ? this.lists.find(({ entry: item }) => item.path === entry.list)
+        : undefined;
+      if (!entry || !list) return null;
+      await this.applyAndSave(list, entry.inverse, now);
+      return entry.label;
+    });
   }
 
   private async refresh(path: string): Promise<void> {
@@ -259,11 +360,13 @@ export class Workspace {
     }
   }
 
-  private async applyAndSave(list: Loaded, op: Op, now: Date): Promise<void> {
+  private async applyAndSave(list: Loaded, op: Op, now: Date): Promise<Applied> {
     if (list.file.readOnly)
       throw new Error(`${list.entry.name} can't be edited (${list.file.readOnly})`);
-    if (!list.file.apply(op)) throw new Error(`could not add the task to ${list.entry.name}`);
+    const applied = list.file.apply(op);
+    if (!applied) throw new Error(`could not change ${list.entry.name}`);
     await list.file.save({ now: fromDate(now), isTaken: this.isTaken });
+    return applied;
   }
 
   private async createList(name: string): Promise<Loaded> {

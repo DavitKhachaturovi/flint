@@ -1,16 +1,24 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { Channels, type DevEvent, type ToastKind } from '../shared/ipc.js';
+import { Channels, type ListSummary, type ListView } from '../shared/ipc.js';
 
-/**
- * Main window bridge. For now only the development harness for R-1 and R-3 (event log, test toasts);
- * the real main window arrives in M4.
- */
+/** The main window's only way to the OS (docs/05 §2): its lists, and changing them (M4). */
 const main = {
-  onEvent(listener: (event: DevEvent) => void): void {
-    ipcRenderer.on(Channels.devEvent, (_event, devEvent: DevEvent) => listener(devEvent));
+  lists(): Promise<ListSummary[]> {
+    return ipcRenderer.invoke(Channels.mainLists) as Promise<ListSummary[]>;
   },
-  sendTestToast(kind: ToastKind): void {
-    ipcRenderer.send(Channels.devSendToast, kind);
+  view(id: string): Promise<ListView | null> {
+    return ipcRenderer.invoke(Channels.mainView, id) as Promise<ListView | null>;
+  },
+  /** Space or the checkbox (TASK-06); resolves to what happened, for the undo toast. */
+  toggle(id: string, key: string): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainToggle, id, key) as Promise<string | null>;
+  },
+  undo(): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainUndo) as Promise<string | null>;
+  },
+  /** Something changed (a capture, an edit, another program): fetch again. */
+  onChanged(listener: () => void): void {
+    ipcRenderer.on(Channels.mainChanged, () => listener());
   },
 };
 

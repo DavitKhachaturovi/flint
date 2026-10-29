@@ -388,6 +388,34 @@ test('rebinding a hotkey in the Hotkeys window (APP-08)', async () => {
     .toContain('"captureHotkey": "Control+Shift+F9"');
 });
 
+test('main window: a list from the sidebar, complete with Space, undo with Ctrl+Z (TASK-06, D-48)', async () => {
+  const file = join(dataDirectory, 'Flint', 'Errands.md');
+  const original =
+    '---\nflint: 1\nid: err1\nmode: tasks\n---\n- [ ] Renew the parking permit [priority:: medium] [id:: e1]\n- [ ] Book the dentist [id:: e2]\n';
+  await writeFile(file, original);
+  const mainPage = () => app.windows().find((page) => page.url().includes('main-window'));
+  await expect.poll(() => mainPage() !== undefined, { timeout: 15_000 }).toBe(true);
+  const main = mainPage();
+  if (!main) throw new Error('main window page not found');
+
+  // The watcher picks the new list up; the window is never shown, so nothing takes focus.
+  await main.locator('.nav', { hasText: 'Errands' }).click();
+  await expect(main.locator('h1')).toHaveText('Errands · 2 open');
+  await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
+
+  await main.keyboard.press('Space');
+  await expect(main.locator('h1')).toHaveText('Errands · 1 open');
+  await expect(main.locator('.toast')).toContainText('Completed');
+  await expect(main.locator('.completed .row .title')).toHaveText(['Renew the parking permit']);
+  expect(await readFile(file, 'utf8')).toMatch(
+    /^- \[ \] Book the dentist \[id:: e2\]\n\n## Completed\n- \[x\] Renew the parking permit \[completion:: [0-9T:-]+\] \[priority:: medium\] \[id:: e1\]\n$/m,
+  );
+
+  await main.keyboard.press('Control+z');
+  await expect(main.locator('h1')).toHaveText('Errands · 2 open');
+  await expect.poll(() => readFile(file, 'utf8')).toBe(original);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

@@ -25,7 +25,7 @@ export default defineConfig(
   },
   {
     // TypeScript checks undefined names itself (typescript-eslint recommends this).
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     rules: { 'no-undef': 'off' },
   },
   {

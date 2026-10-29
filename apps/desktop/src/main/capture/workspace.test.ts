@@ -243,3 +243,40 @@ describe('drafts (CAP-08)', () => {
     await expect(readFile(first.file)).rejects.toThrow();
   });
 });
+
+describe('the main window: complete, undo, views (M4, TASK-06)', () => {
+  it('completes into the Completed section, and Undo restores the file exactly', async () => {
+    const original =
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] first [id:: aaa1]\n- [ ] second [id:: bbb2]\n';
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    const changes: number[] = [];
+    workspace.onChange(() => changes.push(1));
+    expect(await workspace.toggleDone('inbox', 'aaa1', now)).toBe('Completed');
+    expect(await inbox()).toBe(
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] second [id:: bbb2]\n\n## Completed\n- [x] first [completion:: 2026-10-29T14:30] [id:: aaa1]\n',
+    );
+    expect(workspace.summaries(now).find((list) => list.inbox)?.open).toBe(1);
+    expect(workspace.view('inbox', now)?.completed.map((task) => task.title)).toEqual(['first']);
+    expect(await workspace.undoLast(now)).toBe('Completed');
+    expect(await inbox()).toBe(original);
+    expect(await workspace.undoLast(now)).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('reopening puts a task back after the one it followed', async () => {
+    await writeFile(
+      join(folder, 'Inbox.md'),
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n- [ ] three [id:: ccc3]\n',
+    );
+    const workspace = await open();
+    await workspace.toggleDone('inbox', 'bbb2', now);
+    expect(await workspace.toggleDone('inbox', 'bbb2', now)).toBe('Reopened');
+    expect(
+      workspace
+        .view('inbox', now)
+        ?.items.map((item) => (item.kind === 'task' ? item.task.title : '')),
+    ).toEqual(['one', 'two', 'three']);
+  });
+});

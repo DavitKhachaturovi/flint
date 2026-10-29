@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
 const root = import.meta.dirname;
@@ -36,6 +37,8 @@ export default defineConfig(({ mode }) => ({
   },
   renderer: {
     root: resolve(root, 'src/renderer'),
+    // React for the main window (docs/05 §1); the capture popup stays plain DOM (CAP-10).
+    plugins: [react()],
     // The popup parses shorthand itself (CAP-04), from the same core source as the main process.
     resolve: { alias: coreAlias },
     // The design tokens are imported straight from docs/design (the source of truth, docs/09).
