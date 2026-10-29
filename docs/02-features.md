@@ -1,0 +1,385 @@
+# 02 — Features
+
+Every feature has a stable ID and a status: **v1** (ships in the first release) or **Later** (agreed, deferred).
+Items marked **Proposed** are concrete designs that were not explicitly confirmed; implement them as written unless the matching open question in [06](06-roadmap-and-open-questions.md) is decided otherwise.
+Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-language.md); on-disk details live in [04](04-data-and-storage.md); implementation details live in [05](05-architecture-and-performance.md).
+
+---
+
+## 1. Lists and modes
+
+### LIST-01 — Multiple lists, two modes (v1)
+- Users can create any number of lists. Each list is either a **task list** (mode: tasks) or a **note** (mode: note).
+- Each list is one markdown file in the Flint folder (see 04).
+- Lists can be created, renamed, reordered in the sidebar, and deleted (deleted lists go to Trash, DATA-02).
+
+### LIST-02 — Markdown by default (v1)
+- All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
+- Files must stay readable and editable in other markdown tools (Obsidian, VS Code, GitHub). See 04.
+
+### LIST-03 — Inbox (v1)
+- A built-in task list named **Inbox** always exists and cannot be deleted.
+- It is the default target for every capture (CAP-02).
+
+### LIST-04 — Convert between modes (v1)
+- A note can be converted into a task list and back.
+- Note → task list: checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved). **Proposed:** other bullet lines also become tasks; headings and paragraphs that are not list items are kept as the body of the nearest preceding task, or dropped only after showing a confirmation that lists what would be lost. Example use: meeting notes → action items.
+- Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless.
+- Conversion is undoable (DATA-03).
+
+---
+
+## 2. Capture
+
+### CAP-01 — Global hotkey quick-capture popup (v1)
+- A global hotkey opens a **Spotlight-style popup** over any app, **including a full-screen Teams call**, without switching to the main Flint window.
+- The user types and presses **Enter**: the task is saved and the popup disappears. **Esc** closes the popup (the draft is kept, CAP-08).
+- Focus returns to whatever app the user was in before.
+- The popup is pre-warmed and must appear in under 100 ms (target < 50 ms). See CAP-10 and 05.
+- Default hotkey: see open question Q-03. Hotkeys are rebindable (APP-08).
+
+### CAP-02 — Inbox as the default target (v1)
+- Capture requires **zero decisions**. Without any shorthand, every capture lands at the top of Inbox (**Proposed:** top, so the newest capture is visible first).
+- Sorting into other lists happens later (or never).
+
+### CAP-03 — Inline shorthand in the capture box (v1)
+- Example: `fix token refresh !h #unicorn` → task "fix token refresh", high priority, in list "unicorn".
+- Example: `deploy hotfix !h @30m` → high priority, reminder in 30 minutes, in Inbox.
+- Tokens:
+  - **Priority:** `!h` / `!high`, `!m` / `!med` / `!medium`, `!l` / `!low`.
+  - **List:** `#listname` (autocomplete, CAP-05).
+  - **Reminder:** `@<time>` using natural-language times (REM-02), e.g. `@30m`, `@15:00`, `@tomorrow 10`, `@fri`.
+- The shorthand is **stripped from the stored task text**.
+- Parsing rules (**Proposed**):
+  - A token is recognized only at a word boundary (start of input or after whitespace). `AB#1234` inside a word is *not* a list token.
+  - `@` is only parsed when what follows is a valid time expression; `email @alex` is left as text.
+  - A backslash escapes a token: `\#5` is stored literally as `#5`.
+  - The live chip preview (CAP-04) is the source of truth for what was parsed.
+- The same shorthand parser is used by the capture popup, the in-list task input, and the CLI (CLI-01), from one shared package (05).
+
+### CAP-04 — Live preview chips while typing (v1)
+- As the user types, recognized shorthand appears as chips below the text, e.g. `High · #unicorn · ⏰ 15:00`.
+- The user sees exactly what will be parsed **before** pressing Enter. This is what makes the inline syntax trustworthy.
+- Reminder chips show the resolved absolute time (e.g. `⏰ Tomorrow 10:00`).
+
+### CAP-05 — List autocomplete on `#` (v1)
+- Typing `#` shows a fuzzy autocomplete of existing list names.
+- An unknown list name must **never fail silently**: either offer to create the list, or fall back to Inbox with a **visible note** in the chips (e.g. `#unistrem not found → Inbox`).
+
+### CAP-06 — Paste-to-capture (v1)
+- **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
+- **Pasting a stack trace or JSON** auto-wraps it in a fenced code block (with a language hint when detectable, e.g. `json`).
+- **Proposed:** pasted code goes into the task **body**; the task title is what the user typed, or, if nothing was typed, the first meaningful line of the paste (e.g. the exception message), truncated.
+- This is how bugs actually show up, so it is high-value for developers.
+
+### CAP-07 — Capture-selection hotkey (v1)
+- A **second global hotkey** captures the currently selected text in any app (an error in a terminal, a line in a Teams chat) and opens the capture popup **prefilled** with it.
+- Implementation: simulates Ctrl+C in the foreground app and reads the clipboard (05). **The user's previous clipboard content must be restored afterwards.**
+- **Known limitation:** Windows blocks simulated input into elevated (administrator) windows, e.g. an admin PowerShell or terminal, when Flint is not elevated. When the copy fails, open the popup empty with a short hint ("Couldn't read selection from an admin window; paste with Ctrl+V") rather than failing silently.
+- The same paste rules as CAP-06 apply to the prefilled text (stack traces/JSON → code block).
+
+### CAP-08 — Draft persistence (v1)
+- If the user presses Esc or the popup loses focus, the typed text (and any pasted attachment) is kept and restored the next time the popup opens.
+- Drafts survive app restarts (persisted in app data, see 04).
+- The draft is cleared only on successful capture or by explicitly clearing it.
+
+### CAP-09 — Open on the active monitor (v1)
+- The popup appears on the monitor the user is currently working on (the monitor with the cursor/foreground window), not the primary monitor.
+
+### CAP-10 — Pre-warmed, tiny popup (v1)
+- The capture window is created at startup, kept rendered, and hidden. The hotkey only shows it.
+- The popup loads only what it needs: input box, chip preview, list autocomplete, paste handling. Not the whole app.
+- Performance targets in 05.
+
+---
+
+## 3. Task-list mode
+
+### TASK-01 — Each line is a separate draggable task (v1)
+- In a task list, each task is its own row (like the Microsoft To Do list behaviour).
+- Tasks can be **dragged** to reorder, e.g. dragged to the top to focus on them first. The manual order is the source of truth and is persisted (it is the order of lines in the file, 04).
+- Drag uses snappy spring animations (03).
+
+### TASK-02 — Fully keyboard-driven (v1)
+- **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
+- Full keymap, including the navigate/edit state model that makes these keys safe, is in 03.
+- Drag-and-drop works too; the keyboard is faster for power users.
+
+### TASK-03 — Priority: low / medium / high, shown by color, not text (v1)
+- Each task can have priority **low, medium, high**, or **none**.
+- **"No priority" is the default** and is visually neutral. If every task were colored, nothing would stand out.
+- Priority is shown with a **thin left-edge stripe**, not by tinting the whole row, which keeps the UI calm.
+- Because color-only priority is an accessibility problem (red/amber/green is exactly the combination roughly 8% of men cannot reliably tell apart), the stripe is paired with a **second subtle cue** (stripe thickness and/or a tiny shape), and a **color-blind-safe palette option** is available in settings.
+- No priority text label is added to the row. Visual spec in 03.
+
+### TASK-04 — One level of subtasks, max (v1)
+- **Tab** indents a task once, making it a subtask of the task above. **Shift+Tab** outdents.
+- Only one level is allowed; unlimited nesting is where simplicity dies.
+- **Proposed:** subtasks move with their parent when dragged or moved to another list; completing a parent completes its open subtasks (undoable).
+
+### TASK-05 — Expandable task body (v1)
+- Any one-line task can be expanded into a **markdown body** (for a stack trace, notes, screenshots).
+- Collapsed, the row shows only a **small indicator** that a body exists. The list stays clean without forcing a separate note.
+- The body supports the same editor features as note mode (live preview, code blocks, media).
+
+### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
+- Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
+- Completed tasks move to a **Completed section in the same list**; they do not disappear.
+- The Completed section is **collapsible** and shows a **count**, e.g. "Completed · 14".
+- Each completed task stores a **completion timestamp**.
+- Un-checking a completed task returns it to the active tasks (**Proposed:** to its previous position if still valid, otherwise the bottom).
+- **Auto-archive:** Flint offers to auto-archive completed tasks older than **N days** (N configurable) so the Completed section doesn't grow forever. Archived tasks remain on disk (04) and remain searchable via Ctrl+K (**Proposed**).
+
+### TASK-07 — Multi-select and bulk actions (v1)
+- **Shift+↑/↓** (and Shift+click / Ctrl+click with the mouse) selects multiple tasks.
+- Bulk actions: set priority, move to another list, complete, star to Today (and delete, undoable).
+
+### TASK-08 — Temporary "sort by priority" (v1)
+- A one-off action that sorts the visible tasks by priority (high → none) **without destroying the manual order**.
+- Manual (drag) order stays the source of truth: the temporary sort is a view; leaving it, or reordering manually, returns to manual order. **Proposed:** a clear "Sorted by priority · Back to manual order" indicator while active.
+
+### TASK-09 — Multi-line paste creates multiple tasks (v1)
+- Pasting N lines of plain text into a task list creates N tasks, with a toast offering **"Keep as one?"** (which merges them back into a single task with the text as its body). Great for dumping meeting action items.
+- **Proposed:** if the pasted text is detected as a stack trace, code, or JSON (CAP-06 rules), it is treated as one task with a code-block body instead of being split.
+
+### TASK-10 — Smart link titles (v1)
+- Pasted URLs are displayed with short, meaningful titles; the full URL is kept in the file.
+- Example: `https://dev.azure.com/.../pullrequest/42` displays as **"PR 42"**.
+- **Proposed** built-in recognizers: Azure DevOps pull requests and work items, GitHub pull requests and issues. Other URLs display as domain + shortened path.
+- **Long URLs never wrap rows**; they truncate with an ellipsis.
+- Applies in task titles, task bodies, and notes.
+
+### TASK-11 — Move tasks between lists (v1)
+- Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or drag onto a list in the sidebar.
+- This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
+
+### TASK-12 — Delete tasks (v1)
+- Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
+
+### TASK-13 — Stale-task fading (Later)
+- Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
+- Requires a per-task "last touched" timestamp, which **v1 must already record** (04) so this can ship without a migration.
+
+### TASK-14 — Triage mode for Inbox (Later)
+- Steps through Inbox tasks one at a time: pick a list, priority, star to Today, or delete, all by keyboard.
+- Turns "sorted later, or never" into a 2-minute ritual.
+
+---
+
+## 4. Today
+
+### TODAY-01 — Today view of starred tasks (v1)
+- Users **star** tasks from any list into **Today**.
+- Today holds **references, not copies**: completing, editing, or changing priority of a task in Today changes it in its home list, and vice versa.
+- Each task in Today shows its home list subtly. **Proposed:** Today has its own manual order (drag to reorder) independent of home-list order.
+
+### TODAY-02 — End-of-day rollover prompt (v1, optional)
+- At the end of the day, Flint can optionally prompt: **"Roll over unfinished?"** — keep unfinished tasks starred for tomorrow, or clear them from Today (they stay in their home lists).
+- The prompt is optional (can be turned off in settings). When and how the prompt appears is open question Q-04.
+
+### TODAY-03 — Reminders section in Today (v1)
+- Today includes a **Reminders** section listing tasks with upcoming reminders (see REM-08), so users can see what's scheduled without opening each task.
+
+---
+
+## 5. Reminders
+
+### REM-01 — A reminder on any task (v1)
+- Every task can have a reminder: press a button (or key), configure the time, done.
+- When due, Flint shows a **Windows notification** and/or **plays a sound** (configurable, REM-06) so the user remembers the task.
+- One reminder per task (**Proposed**). No recurring reminders (Non-goals).
+
+### REM-02 — Natural-language times (v1)
+- Accepted in both the reminder picker and the capture box.
+- Must support at least: `in 20m`, `at 15:00`, `tomorrow 10`, `fri` (plus equivalents like `20m`, `2h`, `15:00`, weekday names).
+- The resolved absolute time is always shown before confirming (picker preview / capture chip).
+- Default time when only a day is given (`tomorrow`, `fri`): see Q-02.
+
+### REM-03 — Reminder shorthand in capture (v1)
+- `deploy hotfix !h @30m` captures with a reminder in one line, no picker at all (CAP-03).
+
+### REM-04 — Lightweight snooze presets (v1)
+- Quick presets such as **"in 1h"** and **"tomorrow"** in the reminder picker and in the missed-reminders list. (The notification itself has the fixed Done / Snooze 10m / Open buttons, REM-05.) This is the ceiling for time features (Non-goals).
+
+### REM-05 — Actionable notifications (v1)
+- The toast has three buttons: **Done**, **Snooze 10m**, **Open**.
+  - **Done** completes the task (in its home list).
+  - **Snooze 10m** re-schedules the reminder 10 minutes later.
+  - **Open** shows the main window with the task selected.
+- Clicking the toast body behaves like **Open**.
+- Buttons must work while the toast is on screen and from Action Center. Implementation notes in 05.
+
+### REM-06 — Sound option and Focus Assist (v1)
+- Settings: notification on/off, sound on/off (and choice of a short sound).
+- Windows **Focus Assist / Do Not Disturb silently suppresses toasts**, and people often enable it during exactly the calls where they capture tasks. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
+
+### REM-07 — Missed-reminder recovery (v1)
+- If the app was closed or the PC was asleep when a reminder was due, Flint shows **"N reminders you missed"** on next launch / wake, listing them with the same actions (Done / Snooze / Open).
+- Silent misses destroy trust in reminders faster than anything else.
+
+### REM-08 — Bell indicator (v1)
+- Tasks with a reminder show a small **bell** indicator on the row (and the time on hover/selection). Combined with TODAY-03, users can see what's scheduled without opening each task.
+
+### REM-09 — Reminders require Flint to be running (v1)
+- Flint runs in the system tray and starts with Windows (APP-01), otherwise reminders cannot fire. Users are told this during onboarding and in settings.
+
+---
+
+## 6. Note mode
+
+### NOTE-01 — Free-form markdown with Obsidian-style live preview (v1)
+- A note is a free-form text document, like an Obsidian note.
+- **Live preview** (formatting renders inline as you type, markdown syntax revealed near the cursor), **not** a split editor/preview pane.
+
+### NOTE-02 — Right-click formatting menu (v1)
+- An Obsidian-like right-click context menu for inserting/formatting: bullet list, numbered list, checkbox, heading, code block, quote, link, image, table, bold/italic/strikethrough/inline code (**Proposed** item set).
+
+### NOTE-03 — Slash commands (v1)
+- Typing `/` opens a command menu: e.g. `/check` inserts a checkbox, `/code` a code block. Same items as the right-click menu.
+- Slash commands are for keyboard users; the right-click menu stays for mouse users.
+
+### NOTE-04 — Syntax-highlighted code blocks (v1)
+- Fenced code blocks are syntax highlighted (in notes and task bodies).
+
+### NOTE-05 — Copy button on code blocks (v1)
+- Every code block has a copy button (visible on hover/focus).
+
+### NOTE-06 — Monospace toggle (v1)
+- A setting (and per-note toggle, **Proposed**) to render text in a monospace font.
+
+### NOTE-07 — Configurable auto-linking patterns (v1)
+- Users configure patterns that auto-link: e.g. `AB#1234` → the Azure DevOps work item URL.
+- Configuration = a pattern + a URL template (e.g. `AB#(\d+)` → `https://dev.azure.com/<org>/<project>/_workitems/edit/$1`).
+- Works in notes, task titles, and task bodies. Gives integration value without building an integration.
+
+---
+
+## 7. Media
+
+### MEDIA-01 — Images and videos (v1)
+- Images and videos can be added to notes and task bodies via paste, drag-and-drop, or the insert menu.
+- Images render inline; videos render with a player and thumbnail.
+
+### MEDIA-02 — Attachments folder with relative paths (v1)
+- Media is stored in an `attachments/` folder inside the Flint folder and referenced by **relative paths**, so moving the Flint folder never breaks images.
+
+### MEDIA-03 — Large-file warning (v1, Proposed)
+- Warn when adding a file above a size threshold (e.g. large videos), since everything lives on local disk and is included in snapshots/exports.
+
+### MEDIA-04 — Orphaned-attachment cleanup (v1)
+- When a task or note leaves the Trash permanently, attachments no longer referenced by any list (or by anything still in Trash) are deleted too. Otherwise the attachments folder grows forever.
+
+---
+
+## 8. Navigation and views
+
+### NAV-01 — Ctrl+K command palette (v1)
+- Fuzzy search across **all lists** (task titles, bodies, notes) plus commands (create list, move task, switch theme, open settings, etc.).
+- Fully keyboard-driven.
+
+### NAV-02 — `?` keyboard cheat sheet (v1)
+- Pressing `?` (in navigate state) shows all shortcuts. Essential for a keyboard-first app.
+
+### NAV-03 — Main window layout (v1, Proposed)
+- A minimal, collapsible sidebar: Today and Inbox pinned at the top, then the user's lists. The content area shows the selected list.
+
+### MINI-01 — Mini mode (v1)
+- A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
+- **Proposed:** supports adding a task, completing, and seeing reminders; everything else opens the main window.
+- Created on first use, then hidden (never destroyed) when closed (APP-02). Remembers size/position (APP-05).
+
+---
+
+## 9. Data safety
+
+Without sync, the local disk is the only copy, so this matters more.
+
+### DATA-01 — Atomic writes (v1)
+- Every save writes to a temporary file, then renames it over the original. A crash or power loss mid-save can never corrupt a list.
+
+### DATA-02 — Trash, kept 30 days (v1)
+- Deleted tasks and deleted lists go to Trash and can be restored for 30 days, after which they are permanently removed (and MEDIA-04 runs).
+
+### DATA-03 — Global Ctrl+Z (v1)
+- Undo (and redo, **Proposed:** Ctrl+Shift+Z / Ctrl+Y) works for deletes, moves, reorders, priority changes, completion, conversions, and bulk actions, not just text edits.
+
+### DATA-04 — Local snapshots (v1)
+- Flint keeps automatic local snapshots of the Flint folder so a bad change can be restored. Retention policy: see Q-05.
+
+### DATA-05 — One-click zip export (v1)
+- Export the whole Flint folder (lists + attachments) as a zip.
+
+### DATA-06 — File watcher (v1)
+- Flint watches the Flint folder and reloads lists changed on disk by anything else (the CLI, Claude via the CLI, a text editor) **live**, without losing the cursor position or selection.
+
+### DATA-07 — User-configurable Flint folder (v1)
+- The user chooses where the Flint folder lives (set during onboarding, changeable in settings).
+- v1 does **not** support syncing this folder between machines (Non-goals, 04).
+
+---
+
+## 10. App behaviour
+
+### APP-01 — Lives in the tray, starts with Windows (v1)
+- Flint runs as a tray app and starts at login (configurable, default on). The global hotkeys and reminders depend on it running.
+- Tray menu (**Proposed** items): Open Flint, Quick capture, Mini mode, Settings, Quit.
+
+### APP-02 — Never destroy windows; only hide them (v1)
+- Closing the main window hides it to the tray. The capture popup and main window stay alive; mini mode stays alive after first open. This removes the "opening a closed window" cost entirely.
+
+### APP-03 — Never quit by accident (v1)
+- The window's X button hides to the tray. Quitting is an explicit **Quit** in the tray menu (and a palette command).
+
+### APP-04 — Single instance (v1)
+- Launching Flint again focuses the running instance instead of starting a second one.
+
+### APP-05 — Remembered window positions (v1)
+- Each window (main, mini mode) remembers its size and position **per monitor setup**.
+
+### APP-06 — Auto-update, applied safely (v1)
+- Flint updates itself; nobody reinstalls by hand.
+- Updates are **applied on quit or at idle, never mid-session**. An update restart must never happen during a call.
+
+### APP-07 — Silent crash recovery (v1)
+- If the UI (renderer) process crashes, Flint detects it and reloads the window automatically. The tray and global hotkeys keep working.
+
+### APP-08 — Rebindable global hotkeys with conflict detection (v1)
+- Both global hotkeys (capture, capture-selection) are rebindable. If a chosen hotkey is already taken by another app, Flint says so and asks for another one.
+
+### APP-09 — No telemetry, stated plainly (v1)
+- Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
+- The only network access is checking for and downloading updates (APP-06).
+
+### APP-10 — Teaching Inbox onboarding (v1)
+- On first launch, Inbox contains sample tasks that each teach one shortcut (e.g. "Press Space to complete me", "Press 3 to make me high priority", "Press your capture hotkey from any app").
+- Users learn by doing and deleting them.
+- First launch also asks for the Flint folder location (DATA-07) and confirms the capture hotkey.
+
+### APP-11 — Settings (v1)
+Settings live in app data, not in the Flint folder (04). They include at least:
+- Flint folder location.
+- Global hotkeys (capture, capture-selection).
+- Start with Windows.
+- Theme (light / dark / follow system), density (comfortable / compact), monospace toggle.
+- Priority palette (default / color-blind-safe).
+- Notifications on/off, sound on/off and sound choice, Focus Assist explanation.
+- Today rollover prompt on/off.
+- Auto-archive completed tasks after N days (on/off, N).
+- Auto-link patterns.
+
+### APP-12 — Respect OS reduce-motion (v1)
+- If Windows "show animations" / reduce motion is off, Flint's spring and completion animations turn off automatically.
+
+---
+
+## 11. CLI (Later)
+
+### CLI-01 — Add tasks from the terminal (Later)
+- Example: `flint add "null ref in tenant resolver" -p high`.
+- Supports the same shorthand as the capture box (CAP-03) and a target list.
+- Cheap to build: it writes to the same markdown files using the **same core package** as the app; the running app picks up the change via the file watcher (DATA-06).
+- Lets AI models and agents (e.g. Claude) add tasks too.
+- Command name: `flint` was proposed before the app was named Flint; see Q-07.
+
+### CLI-02 — Machine-friendly output (Later, with the CLI)
+- `flint list --json` and **stable exit codes**, so models and scripts can read tasks, not just add them.
