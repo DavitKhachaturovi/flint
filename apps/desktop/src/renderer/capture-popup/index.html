@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Flint capture</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="card" aria-label="Capture a task">
+      <div class="chips" aria-live="polite"></div>
+      <label class="visually-hidden" for="capture">Capture a task</label>
+      <input id="capture" autocomplete="off" spellcheck="false" placeholder="Capture a task…" />
+      <div class="tools"><span class="hint-chip">!h ##list @15:00</span></div>
+    </main>
+    <p class="hint">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</p>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

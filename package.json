@@ -11,8 +11,8 @@
     "node": ">=24.22.1 <25"
   },
   "scripts": {
-    "build": "npm run build -w @flint/core",
-    "typecheck": "tsc -p packages/core/tsconfig.build.json --noEmit && tsc -p packages/core/tsconfig.json",
+    "build": "npm run build -w @flint/core && npm run build -w @flint/desktop",
+    "typecheck": "tsc -p packages/core/tsconfig.build.json --noEmit && tsc -p packages/core/tsconfig.json && tsc -p apps/desktop/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,7 +20,8 @@
     "format:check": "prettier --check .",
     "measure": "npm run build && node packages/core/bench/measure.mjs",
     "audit": "npm audit --audit-level=high",
-    "check:electron-node": "npm run install-electron -w @flint/desktop && npm run check:electron-node -w @flint/desktop"
+    "check:electron-node": "npm run install-electron -w @flint/desktop && npm run check:electron-node -w @flint/desktop",
+    "dev": "npm run dev -w @flint/desktop"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

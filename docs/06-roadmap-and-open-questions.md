@@ -20,9 +20,11 @@ Also measure: keypress → screen (one frame), Enter → popup hidden and focus 
 | M1 | Shorthand parse per keystroke | < 1 ms (Proposed) | 0.008 ms |
 | M1 | Shorthand + time parser size, minified and gzipped (it ships in the capture popup) | < 15 KB (Proposed) | 3.7 KB (time parser alone 2.0 KB) |
 
+R-1 numbers: `FLINT_BENCH=50` (apps/desktop) presses the real hotkey through Windows (`SendInput`) over a full-screen stand-in window; key → first frame with the focused input; Electron 45.1.0, 29 Oct 2026. Windows sometimes refuses to hand over the foreground; the popup then takes it explicitly (attaching to the foreground thread), which this run never needed. The benchmark takes over the screen: run it only when the machine is free.
+
 M1 numbers: `npm run measure` (median of 200–5,000 runs, Node 24) on a developer laptop (Intel Core Ultra 7 258V, 32 GB), not yet on an average laptop. Re-measured on Node 24.22.1 after D-30: parse 6.0 ms, serialize 0.04 ms, save path 0.15 ms, keystroke 0.012 ms, bundle unchanged. Parsing has the least headroom; re-measure it on an average laptop in M2. Parsing happens in the main process, off the capture hot path.
-| M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | — |
-| M2/M3 | Enter → popup hidden and focus returned | < 50 ms | — |
+| M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | p50 28.2 ms, p95 40.3 ms, max 47.7 ms (50/50, developer laptop, full-screen stand-in window; not yet an average laptop with Teams) |
+| M2/M3 | Enter → popup hidden and focus returned | < 50 ms | p50 13.5 ms, p95 20.2 ms, max 28.9 ms (same run) |
 | M2/M3 | Enter → capture durably on disk | < 100 ms at p95 | — |
 | M4 | Keypress → character on screen | one frame (~16 ms) | — |
 
@@ -63,7 +65,7 @@ Each has a proposed default that is used until decided. Record decisions in [07]
 |---|---|---|
 | Q-01 | ~~Priority colors vs cool-only palette.~~ **Resolved (D-17):** grayscale by lightness and thickness, High = 4 px white, Medium = 3 px accent `#9AA0AB`, Low = 2 px `#55585D`. | — |
 | Q-02 | Default time when a reminder gives only a day (`tomorrow`, `fri`). (Workday-aware defaults were not selected.) | A fixed 09:00, shown in the chip/preview before confirming. |
-| Q-03 | Default global hotkeys for capture and capture-selection. Must avoid common conflicts (Alt+Space = PowerToys Run / window menu, Ctrl+Space = input method switching, Win+ combos = reserved). | Test candidates such as Ctrl+Alt+N (capture) and Ctrl+Alt+Shift+N (capture-selection) while building R-1/R-2; pick what's free on typical the author machines. |
+| Q-03 | Default global hotkeys for capture and capture-selection. Must avoid common conflicts (Alt+Space = PowerToys Run / window menu, Ctrl+Space = input method switching, Win+ combos = reserved). | No Alt in the default: Alt is a common push-to-talk key (Discord at the author), so an Alt hotkey would key the microphone during the very calls Flint is for; Ctrl+Alt is also AltGr on many keyboard layouts. R-1 tests with Ctrl+Shift+Space; pick what's free on typical the author machines while building R-1/R-2. |
 | Q-04 | When/how the Today rollover prompt appears. | On the first open of a new day: "Yesterday's unfinished Today tasks — roll over?" (no fixed end-of-day time needed). |
 | Q-05 | Snapshot frequency and retention. | Only when changed; hourly for 48 h, then daily for 30 days. |
 | Q-06 | Single-key binding for "move to list" (the `M` key idea was not selected). | No dedicated key in v1; move via Ctrl+K, context menu, and drag to sidebar. |

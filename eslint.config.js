@@ -5,7 +5,13 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['**/dist/**', '**/coverage/**', 'docs/**', 'packages/core/test/fixtures/**'],
+    ignores: [
+      '**/dist/**',
+      '**/out/**',
+      '**/coverage/**',
+      'docs/**',
+      'packages/core/test/fixtures/**',
+    ],
   },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -16,6 +22,11 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+  {
+    // TypeScript checks undefined names itself (typescript-eslint recommends this).
+    files: ['**/*.ts'],
+    rules: { 'no-undef': 'off' },
   },
   {
     // packages/core must not know it runs in Electron or Node (docs/05 §2).

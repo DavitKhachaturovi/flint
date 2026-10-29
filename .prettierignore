@@ -6,3 +6,4 @@ packages/core/test/fixtures/
 dist/
 coverage/
 package-lock.json
+out/

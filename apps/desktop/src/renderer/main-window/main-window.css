@@ -1,0 +1,63 @@
+@import '../../../../../docs/design/tokens.css';
+
+body {
+  margin: 0;
+  background: var(--fl-ground-window);
+  color: var(--fl-text-primary);
+  font-family: var(--fl-font-ui);
+  font-size: var(--fl-size-body);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+h1 {
+  font-size: var(--fl-size-title);
+  letter-spacing: -0.025em;
+  color: var(--fl-text-highlight);
+  margin: 0 0 8px;
+}
+
+h1 span {
+  color: var(--fl-text-heading-soft);
+  font-weight: 500;
+}
+
+p {
+  color: var(--fl-text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0;
+}
+
+button {
+  font: inherit;
+  color: var(--fl-text-primary);
+  background: var(--fl-ground-tile);
+  border: 0;
+  border-radius: var(--fl-radius-button);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--fl-accent);
+  outline-offset: 2px;
+}
+
+.log {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+  background: var(--fl-ground-well);
+  border-radius: var(--fl-radius-row);
+  padding: 12px 12px 12px 36px;
+  min-height: 120px;
+}
