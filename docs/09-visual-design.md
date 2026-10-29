@@ -142,6 +142,9 @@ Three levels, all opaque:
 - **Toast:** floating level, 16 px radius, strong tile with a check + message + secondary "Undo" button.
 - **Code block:** card on the well color with a header bar (language label left, copy button right).
 - **Icons:** simple 1.8–2 px stroke line icons, rounded caps. No emoji anywhere in the UI.
+- **Non-task content in task lists (TASK-15, D-22, Proposed visual):** headings use the section-label style (11 px, uppercase, +0.07em, faint) as quiet dividers between rows; other text is note-body markdown in `--fl-text-muted`. No hover, selection or edit affordances.
+- **List card in the capture popup (D-25, Proposed visual):** a floating-level row under the input, in the style of the autocomplete menu: the offered list as a chip with its key (`Unicorn · Enter`), then the alternative in secondary text (`New list "unis" · Tab`). Keys are shown as keycaps.
+- **Next-open notice in the capture popup (D-26, Proposed visual):** one line above the chips in `--fl-text-secondary` with a quiet button (`Undo`, `Retry`) and a dismiss ×. Never a separate window or overlay.
 
 ---
 
@@ -160,13 +163,15 @@ Three levels, all opaque:
 
 | # | Screen | Screenshot | Mockup | What it shows |
 |---|---|---|---|---|
-| 1 | Main window, Inbox | `design/screenshots/01-main-inbox.png` | `design/mockups/01-main-inbox.html` | Sidebar with icon tiles (active = strong tile); title with white emphasis; Ctrl+K pill; composer card (input, tool icons, shorthand hint chip); task-list card with priority stripes, selected row, smart link chip, attachment/bell/body indicators, one expanded body with a stack-trace code card, a subtask; Completed card with count chip. Window controls top right. |
-| 2 | Quick-capture popup | `design/screenshots/02-quick-capture.png` | `design/mockups/02-quick-capture.html` | Floating composer over a full-screen call: removable chips for parsed shorthand (priority, list, reminder) and an attachment; large input; tools bottom left; target list + round send button bottom right; hint line under the card. |
+| 1 | Main window, Inbox | `design/screenshots/01-main-inbox.png` | `design/mockups/01-main-inbox.html` | Sidebar with icon tiles (active = strong tile); title with white emphasis; Ctrl+K pill; composer card (input, tool icons, shorthand hint chip `!h ##list @15:00`); task-list card with priority stripes, selected row, smart link chip, attachment/bell/body indicators, one expanded body with a stack-trace code card, a subtask; Completed card with count chip. Window controls top right. |
+| 2 | Quick-capture popup | `design/screenshots/02-quick-capture.png` | `design/mockups/02-quick-capture.html` | Floating composer over a full-screen call: removable chips for parsed shorthand (priority, list, reminder) and an attachment; large input (`fix token refresh !h ##unicorn @15:00`); tools bottom left; target list + round send button bottom right; hint line under the card. A normal capture has **no after-save overlay**: the popup hiding is the confirmation (D-26). |
 | 3 | Today | `design/screenshots/03-today.png` | `design/mockups/03-today.html` | Greeting heading with white emphasis; rollover card with bullets and Clear / Roll over; two reminder cards side by side; Focus card with home-list chips. |
 | 4 | Note mode | `design/screenshots/04-note-mode.png` | `design/mockups/04-note-mode.html` | Live preview: headings, rounded-square bullets, an auto-linked `AB#1234` chip, raw `**` syntax visible at the cursor, checklist, code card with copy, slash menu with icon tiles; "Convert to task list" button. |
 | 5 | Mini mode | `design/screenshots/05-mini-mode.png` | `design/mockups/05-mini-mode.html` | Segmented Today/Inbox toggle; in-app reminder card with Done / Snooze 10m / Open; compact rows; composer-style input. |
 | 6 | Design system | `design/screenshots/06-design-system.png` | `design/mockups/06-design-system.html` | Accent and emphasis, priority stripes, bullets, grounds, text levels, type, components, depth levels, radius, motion. |
 
 The mockups use example content (task titles, list names) for illustration only.
+
+**Screenshots 01 and 02 predate D-25** (the `##` list shorthand): the PNGs still show `!h #list @15:00` and `#unicorn`. The HTML mockups have been updated to `##`; where a screenshot and the text disagree, the text wins. Re-render both PNGs once Playwright is set up in M2 (headless Edge on the author machines can't render them: managed policy extensions crash it). Neither screenshot shows the D-25 list card or the D-26 next-open notice; they are specified in §8.
 
 Interactive versions (completing tasks with undo, live shorthand parsing in the capture box) were reviewed on the design canvas during design; the screenshots show their default states.

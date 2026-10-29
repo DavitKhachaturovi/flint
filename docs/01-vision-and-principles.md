@@ -33,7 +33,7 @@ These principles decide every ambiguous case. When a feature request conflicts w
 7. **Your files, your machine.** Data is plain markdown in a folder the user chooses. No server, no account, no telemetry. "Your notes never leave your machine."
 8. **Never lose a thought.** Drafts persist, writes are atomic, deletes go to trash, everything is undoable, missed reminders are surfaced.
 9. **Snappy and smooth.** Instant response (< 100 ms for anything the user waits on), short spring animations, nothing slower than ~150 ms.
-10. **Respect the user's system.** Reduce-motion, light/dark theme, accessibility (color-blind-safe priority), focus, monitor setup.
+10. **Respect the user's system.** Reduce-motion, accessibility (color-blind-safe priority), focus, monitor setup. (Following the system light/dark theme comes with light mode, Later; v1 is dark only, D-17.)
 
 ## Non-goals ("Not doing")
 

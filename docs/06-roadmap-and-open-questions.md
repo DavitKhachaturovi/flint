@@ -10,7 +10,19 @@ There is **no throwaway spike**. Instead, the three riskiest pieces are built fi
 | R-2 | **Capture-selection** (CAP-07) | Selected text is captured from a normal window (browser, Teams chat, normal terminal); the original clipboard is restored; hotkey modifiers don't corrupt the Ctrl+C; from an **admin** terminal the failure is detected and the popup opens empty with the hint. |
 | R-3 | **Actionable toast** (REM-05) | Done / Snooze 10m / Open work while the toast is on screen **and** from Action Center, including when the main window is hidden; AppUserModelID set; protocol activation routed to the running instance. Works with the unsigned build. |
 
-Also measure: keypress → screen (one frame) and Enter → saved + hidden (< 100 ms). Record the numbers here.
+Also measure: keypress → screen (one frame), Enter → popup hidden and focus returned (< 50 ms), and Enter → capture durably on disk (< 100 ms at p95) (D-27). Record the numbers here.
+
+### Measurements
+
+| Milestone | What | Target | Measured |
+|---|---|---|---|
+| M1 | Parse and serialize a 1,000-task list file (`packages/core`) | < 10 ms (Proposed) | — |
+| M1 | Shorthand parse per keystroke | < 1 ms (Proposed) | — |
+| M1 | Shorthand + time parser size, minified and gzipped (it ships in the capture popup) | < 15 KB (Proposed) | — |
+| M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | — |
+| M2/M3 | Enter → popup hidden and focus returned | < 50 ms | — |
+| M2/M3 | Enter → capture durably on disk | < 100 ms at p95 | — |
+| M4 | Keypress → character on screen | one frame (~16 ms) | — |
 
 If a piece fails badly, record the finding and decide in the Decision Log before continuing. (Switching shells later is possible but costly; see 05, Future.)
 
@@ -21,7 +33,7 @@ If a piece fails badly, record the finding and decide in the Decision Log before
 | **M1 — Core** | `packages/core`: file format parse/serialize (Dataview inline fields, 04 §3) with round-trip and fuzz tests, task IDs, shorthand parser, natural-language time parser, list/task operations, undo model |
 | **M2 — Shell** | **First: R-1 (pre-warmed popup + latency checks) and R-3 (actionable toast).** Then tray, autostart, single instance, hide-not-destroy windows, no accidental quit, crash recovery, settings storage, Flint folder selection, atomic writes, file watcher, window-state per monitor setup |
 | **M3 — Capture** | **First: R-2 (capture-selection).** Then shorthand + live chips, `#` autocomplete, paste-to-capture, draft persistence, rebindable hotkeys with conflict detection |
-| **M4 — Task lists** | Rows, navigate/edit model, full keymap, drag with springs, priority stripes, subtasks (1 level), expandable body, completion + undo toast + Completed section + timestamps + auto-archive, multi-select bulk actions, temporary sort, multi-line paste, smart link titles, move between lists, delete to Trash |
+| **M4 — Task lists** | Rows, navigate/edit model, full keymap, drag with springs, priority stripes, subtasks (1 level), non-task content shown read-only (TASK-15), expandable body, completion + undo toast + Completed section + timestamps + auto-archive, multi-select bulk actions, temporary sort, multi-line paste, smart link titles, move between lists, delete to Trash |
 | **M5 — Notes & media** | CodeMirror live preview, right-click menu, slash commands, code blocks (highlight + copy), monospace toggle, auto-link patterns, images/videos, attachments with relative paths, large-file warning, mode conversion |
 | **M6 — Today & reminders** | Star to Today (references), Today ordering, rollover prompt, reminders on any task, natural-language picker, actionable toasts, sound / Focus Assist handling, missed-reminder recovery, bell indicator, Reminders section |
 | **M7 — Data safety** | Trash (30 days), global undo for structural ops, snapshots + restore, zip export, orphaned-attachment cleanup |
@@ -60,6 +72,6 @@ Each has a proposed default that is used until decided. Record decisions in [07]
 | Q-11 | Trademark clearance for the name "Flint". | Clear before any public release. |
 | Q-12 | Exact capabilities of mini mode. | Add task, complete task, toggle Today/Inbox, see reminders; everything else opens the main window. |
 | Q-13 | Auto-archive default and trigger. | Off by default; Flint offers it when a Completed section grows large (e.g. 50+ items); N = 14 days when enabled. |
-| Q-14 | Where new captures land inside Inbox. | Top of Inbox. |
-| Q-15 | Default Flint folder location. | `Documents\Flint`, chosen/confirmed during onboarding. |
-| Q-16 | Note → task-list conversion of non-list content (headings, paragraphs). | Attach to the nearest preceding task's body; confirm before dropping anything (LIST-04). |
+| Q-14 | ~~Where new captures land inside Inbox.~~ **Resolved (D-22):** top of Inbox, meaning just before the first task (not above a heading or paragraph the file starts with). | — |
+| Q-15 | ~~Default Flint folder location.~~ **Resolved (D-24):** `%USERPROFILE%\Flint` (outside OneDrive Known Folder Move), confirmed during onboarding; warn but allow when the chosen folder is inside OneDrive. | — |
+| Q-16 | ~~Note → task-list conversion of non-list content (headings, paragraphs).~~ **Resolved (D-22):** it stays in place as non-task content, shown read-only in the task list; nothing is dropped, no confirmation. | — |

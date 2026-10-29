@@ -12,6 +12,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Users can create any number of lists. Each list is either a **task list** (mode: tasks) or a **note** (mode: note).
 - Each list is one markdown file in the Flint folder (see 04).
 - Lists can be created, renamed, reordered in the sidebar, and deleted (deleted lists go to Trash, DATA-02).
+- Lists are the top-level `*.md` files in the Flint folder. A file without Flint frontmatter (e.g. created in VS Code or by Claude) shows up as a note; Flint adds its header only when the user edits the file in Flint (D-23).
 
 ### LIST-02 — Markdown by default (v1)
 - All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
@@ -20,11 +21,12 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### LIST-03 — Inbox (v1)
 - A built-in task list named **Inbox** always exists and cannot be deleted.
 - It is the default target for every capture (CAP-02).
+- **Proposed (D-23):** Inbox is identified by the reserved frontmatter `id: inbox`, always displays as "Inbox", is pinned at the top, and cannot be renamed in Flint. If no list has that id at startup, Flint adopts `Inbox.md` if it exists, otherwise creates it.
 
 ### LIST-04 — Convert between modes (v1)
 - A note can be converted into a task list and back.
-- Note → task list: checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved). **Proposed:** other bullet lines also become tasks; headings and paragraphs that are not list items are kept as the body of the nearest preceding task, or dropped only after showing a confirmation that lists what would be lost. Example use: meeting notes → action items.
-- Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless.
+- Note → task list (**D-22**, resolves Q-16): checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved), and plain bullet lines become tasks too. Everything else (headings, paragraphs) stays in place as non-task content, which task lists show read-only (TASK-15). Nothing is dropped and no confirmation is needed. Example use: meeting notes → action items.
+- Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless. While the list is a note, its task fields are inert: no Today membership, no reminders (**Proposed**).
 - Conversion is undoable (DATA-03).
 
 ---
@@ -35,36 +37,48 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - A global hotkey opens a **Spotlight-style popup** over any app, **including a full-screen Teams call**, without switching to the main Flint window.
 - The user types and presses **Enter**: the task is saved and the popup disappears. **Esc** closes the popup (the draft is kept, CAP-08).
 - Focus returns to whatever app the user was in before.
+- **No after-save overlay (D-26):** for a normal capture, the popup hiding is the confirmation. Messages that must follow a capture (e.g. `Created list "unis" · Undo`, CAP-05, or a failed save) appear as an in-app toast if the main window or mini mode is visible, otherwise as one quiet line at the top of the popup the next time it opens, until dismissed or until the next capture is saved. No system notification.
+- **Saving (D-27):** on Enter the popup hands the capture to the main process, waits only for the IPC acknowledgement, then hides. The main process owns the pending capture until the write is confirmed; if the write fails, the next-open notice says `Couldn't save your last capture · Retry` with the text restored.
 - The popup is pre-warmed and must appear in under 100 ms (target < 50 ms). See CAP-10 and 05.
 - Default hotkey: see open question Q-03. Hotkeys are rebindable (APP-08).
 
 ### CAP-02 — Inbox as the default target (v1)
-- Capture requires **zero decisions**. Without any shorthand, every capture lands at the top of Inbox (**Proposed:** top, so the newest capture is visible first).
+- Capture requires **zero decisions**. Without any shorthand, every capture lands at the top of Inbox, so the newest capture is visible first. "Top" means just before the first task, not above a heading or paragraph the file starts with (D-22, resolves Q-14).
 - Sorting into other lists happens later (or never).
 
 ### CAP-03 — Inline shorthand in the capture box (v1)
-- Example: `fix token refresh !h #unicorn` → task "fix token refresh", high priority, in list "unicorn".
+- Example: `fix token refresh !h ##unicorn` → task "fix token refresh", high priority, in list "Unicorn".
 - Example: `deploy hotfix !h @30m` → high priority, reminder in 30 minutes, in Inbox.
+- Example: `fix regression from #123 ##infra` → task "fix regression from #123" in list "Infra". A single `#` is never a token.
 - Tokens:
   - **Priority:** `!h` / `!high`, `!m` / `!med` / `!medium`, `!l` / `!low`.
-  - **List:** `#listname` (autocomplete, CAP-05).
+  - **List:** `##listname` (D-25; autocomplete and unknown lists: CAP-05). Matching ignores case, spaces, hyphens and underscores, so `##meeting-notes` finds "Meeting notes"; autocomplete inserts the hyphenated form. A single `#` always stays text (`#123`, `#bug`, `#hotfix`, `C#`).
   - **Reminder:** `@<time>` using natural-language times (REM-02), e.g. `@30m`, `@15:00`, `@tomorrow 10`, `@fri`.
-- The shorthand is **stripped from the stored task text**.
+- A token is **stripped from the stored task text only if it resolves to something valid** (D-25); anything else stays in the title as text.
+- With several valid tokens of one kind, the **last** wins and only it is stripped; the others stay in the title as text and the chip says so (e.g. `2 lists → Unicorn`). This applies to `##` and `!`, and (**Proposed**) to `@`.
 - Parsing rules (**Proposed**):
-  - A token is recognized only at a word boundary (start of input or after whitespace). `AB#1234` inside a word is *not* a list token.
+  - A token is recognized only at a word boundary (start of input or after whitespace). `foo##bar` inside a word is *not* a list token.
   - `@` is only parsed when what follows is a valid time expression; `email @alex` is left as text.
-  - A backslash escapes a token: `\#5` is stored literally as `#5`.
+  - Nothing inside inline code (backticks) is a token.
+  - A backslash escapes a token: `\##infra` is stored literally as `##infra`.
+  - A `##` token is made of Unicode letters and digits plus `-` `_` `.` (Georgian list names work); trailing punctuation is not part of it (`##infra,`).
   - The live chip preview (CAP-04) is the source of truth for what was parsed.
 - The same shorthand parser is used by the capture popup, the in-list task input, and the CLI (CLI-01), from one shared package (05).
 
 ### CAP-04 — Live preview chips while typing (v1)
-- As the user types, recognized shorthand appears as chips below the text, e.g. `High · #unicorn · ⏰ 15:00`.
+- As the user types, recognized shorthand appears as chips with the text, e.g. `High · Unicorn · 15:00` (each chip with its icon: priority stripe, list `#` glyph, bell; no emoji, 09 §8).
 - The user sees exactly what will be parsed **before** pressing Enter. This is what makes the inline syntax trustworthy.
-- Reminder chips show the resolved absolute time (e.g. `⏰ Tomorrow 10:00`).
+- Reminder chips show the resolved absolute time (e.g. bell icon + `Tomorrow 10:00`).
 
-### CAP-05 — List autocomplete on `#` (v1)
-- Typing `#` shows a fuzzy autocomplete of existing list names.
-- An unknown list name must **never fail silently**: either offer to create the list, or fall back to Inbox with a **visible note** in the chips (e.g. `#unistrem not found → Inbox`).
+### CAP-05 — List autocomplete on `##`, new lists from capture (v1, D-25)
+- Typing `##` shows a fuzzy autocomplete of existing **task list** names.
+- An unknown list name must **never fail silently**. Before Enter, the popup shows a small card with what will happen:
+  - **Close match** (an existing task list whose name starts with the token, 2+ characters, or is within edit distance 2, or 1 for names of 4 characters or fewer): `Unicorn · Enter · New list "unis" · Tab`. **Enter** saves into the close match. **Tab** switches the choice to creating the new list (the card then reads `New list "unis" · Enter`). When several lists match the prefix, the most recently used one is offered; sidebar order only breaks exact ties.
+  - **No close match:** `New list "<name>" · Enter`.
+  - **Enter is the only key that saves.**
+- An unmatched `##name` **creates a new task list**, named exactly as typed, when the capture is saved. Confirmation: `Created list <name> · Undo` (shown per CAP-01, D-26). Undo moves the task to Inbox and deletes the new list if it is still empty.
+- `##name` pointing at a **note**: the token stays as text, the task goes to Inbox, and the chip says `<name> is a note → Inbox`.
+- **Proposed:** a name Windows can't use as a file name (`##con`, illegal characters) stays as text, the task goes to Inbox and the chip explains why. "Most recently used" means the last capture or move target (kept in app data, `ui-state.json`).
 
 ### CAP-06 — Paste-to-capture (v1)
 - **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
@@ -81,7 +95,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### CAP-08 — Draft persistence (v1)
 - If the user presses Esc or the popup loses focus, the typed text (and any pasted attachment) is kept and restored the next time the popup opens.
 - Drafts survive app restarts (persisted in app data, see 04).
-- The draft is cleared only on successful capture or by explicitly clearing it.
+- The draft is cleared only on successful capture (after the main process confirms the write, D-27) or by explicitly clearing it.
 
 ### CAP-09 — Open on the active monitor (v1)
 - The popup appears on the monitor the user is currently working on (the monitor with the cursor/foreground window), not the primary monitor.
@@ -98,6 +112,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-01 — Each line is a separate draggable task (v1)
 - In a task list, each task is its own row (like the Microsoft To Do list behaviour).
 - Tasks can be **dragged** to reorder, e.g. dragged to the top to focus on them first. The manual order is the source of truth and is persisted (it is the order of lines in the file, 04).
+- Drag-and-drop and Alt+↑/↓ follow one rule: only the task's block (line, body, subtasks) moves; non-task content in the file never moves as a side effect (D-22).
 - Drag uses snappy spring animations (03).
 
 ### TASK-02 — Fully keyboard-driven (v1)
@@ -116,6 +131,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Tab** indents a task once, making it a subtask of the task above. **Shift+Tab** outdents.
 - Only one level is allowed; unlimited nesting is where simplicity dies.
 - **Proposed:** subtasks move with their parent when dragged or moved to another list; completing a parent completes its open subtasks (undoable).
+- **Proposed (D-28):** completed subtasks stay under their parent (only top-level tasks move to the Completed section). Tab on a task that has subtasks does nothing. An outdented subtask moves to just after its parent's group, so the remaining subtasks keep their parent.
 
 ### TASK-05 — Expandable task body (v1)
 - Any one-line task can be expanded into a **markdown body** (for a stack trace, notes, screenshots).
@@ -127,7 +143,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Completed tasks move to a **Completed section in the same list**; they do not disappear.
 - The Completed section is **collapsible** and shows a **count**, e.g. "Completed · 14".
 - Each completed task stores a **completion timestamp**.
-- Un-checking a completed task returns it to the active tasks (**Proposed:** to its previous position if still valid, otherwise the bottom).
+- Un-checking a completed task returns it to the active tasks (**Proposed:** to its previous position if still valid, i.e. after the task that preceded it when it was completed, remembered in `.flint/meta.json`; otherwise the bottom).
 - **Auto-archive:** Flint offers to auto-archive completed tasks older than **N days** (N configurable) so the Completed section doesn't grow forever. Archived tasks remain on disk (04) and remain searchable via Ctrl+K (**Proposed**).
 
 ### TASK-07 — Multi-select and bulk actions (v1)
@@ -155,6 +171,11 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
+
+### TASK-15 — Non-task content shown read-only (v1, D-22)
+- A task-list file can contain content that isn't a task: headings, paragraphs and plain bullets added in Obsidian or VS Code, or kept from a note → task-list conversion (LIST-04).
+- It stays exactly where it is in the file and is **shown read-only**: headings as quiet section labels, other text as muted markdown. It is not selectable in Navigate state. To edit it, convert the list to a note or use another editor.
+- There is no UI for creating or collapsing sections: Flint shows what's in the file, it does not grow a sections feature.
 
 ### TASK-13 — Stale-task fading (Later)
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
@@ -194,6 +215,12 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Must support at least: `in 20m`, `at 15:00`, `tomorrow 10`, `fri` (plus equivalents like `20m`, `2h`, `15:00`, weekday names).
 - The resolved absolute time is always shown before confirming (picker preview / capture chip).
 - Default time when only a day is given (`tomorrow`, `fri`): see Q-02.
+- **Proposed grammar (M1):**
+  - Relative: `20m`, `2h`, `1h30m`, `in 20m`, `in 2 hours`, `3d` (three days from now, at the default time).
+  - Clock: `15:00`, `at 15:00`, `9`, `3pm`, `9:30am`.
+  - Days: `today`, `tomorrow`, `mon`…`sun` and full weekday names, `next fri`, each with an optional time.
+  - Dates: `2026-11-02`, `2.11` / `02.11` (day.month, the local convention), `2 nov` / `nov 2`, each with an optional time.
+  - A clock time that has already passed today means its next occurrence; an explicit date in the past is not a valid time (so `@` stays text).
 
 ### REM-03 — Reminder shorthand in capture (v1)
 - `deploy hotfix !h @30m` captures with a reminder in one line, no picker at all (CAP-03).
@@ -274,7 +301,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ## 8. Navigation and views
 
 ### NAV-01 — Ctrl+K command palette (v1)
-- Fuzzy search across **all lists** (task titles, bodies, notes) plus commands (create list, move task, switch theme, open settings, etc.).
+- Fuzzy search across **all lists** (task titles, bodies, notes) plus commands (create list, move task, open settings, open Flint folder, etc.). No theme switching in v1 (dark only).
 - Fully keyboard-driven.
 
 ### NAV-02 — `?` keyboard cheat sheet (v1)
@@ -315,6 +342,9 @@ Without sync, the local disk is the only copy, so this matters more.
 ### DATA-07 — User-configurable Flint folder (v1)
 - The user chooses where the Flint folder lives (set during onboarding, changeable in settings).
 - v1 does **not** support syncing this folder between machines (Non-goals, 04).
+- **Default: `%USERPROFILE%\Flint`** (D-24, resolves Q-15), which OneDrive Known Folder Move never redirects. If the chosen folder is inside OneDrive, Flint warns plainly that it is synced and that sync isn't supported yet, and allows continuing. If it is an Obsidian vault root, Flint suggests a `Flint` subfolder inside the vault (D-23).
+- An **"Open Flint folder"** command (palette and settings).
+- **Proposed (D-24):** a list that can't be read because it is cloud-only or locked shows that plainly instead of an empty list; a OneDrive conflict copy shows a notice saying so instead of appearing as a normal extra list.
 
 ---
 
@@ -354,7 +384,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-10 — Teaching Inbox onboarding (v1)
 - On first launch, Inbox contains sample tasks that each teach one shortcut (e.g. "Press Space to complete me", "Press 3 to make me high priority", "Press your capture hotkey from any app").
 - Users learn by doing and deleting them.
-- First launch also asks for the Flint folder location (DATA-07) and confirms the capture hotkey.
+- First launch also asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 
 ### APP-11 — Settings (v1)
 Settings live in app data, not in the Flint folder (04). They include at least:

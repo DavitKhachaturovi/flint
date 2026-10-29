@@ -20,13 +20,15 @@
 | Spring animations | A spring animation library (e.g. Motion / react-spring), disabled under reduce-motion |
 | Syntax highlighting | CodeMirror language packages (in editor) |
 | Fuzzy search | A small in-memory fuzzy matcher (data sizes are small) |
+| Shorthand and natural-language time parsing | Small custom parsers in `packages/core`, no library such as chrono-node: they run in the capture popup, which must stay tiny (CAP-10, D-28) |
+| Monorepo | npm workspaces (D-28) |
 | Fonts | Geist + Geist Mono (OFL), **bundled as local font files**; never loaded from Google Fonts at runtime (offline, no network, APP-09) |
 | Design tokens | `docs/design/tokens.css` (09) as the base stylesheet's CSS custom properties |
 | File watching | chokidar or Node `fs.watch` with debouncing |
 | Win32 calls (capture-selection) | An FFI library such as **koffi** (calls Win32 directly, no native addon rebuilds per Electron version) |
 | Packaging | electron-builder, NSIS installer |
 | Updates | electron-updater (Later, D-19) |
-| Tests | Vitest (core), Playwright for Electron (end-to-end) |
+| Tests | Vitest with fast-check for property-based tests (core), Playwright for Electron (end-to-end) |
 
 ---
 
@@ -38,7 +40,7 @@ flint/
   packages/
     core/                    ← pure TypeScript, no Electron imports
       format/                ← markdown parse/serialize for lists, tokens, IDs (04)
-      shorthand/             ← capture shorthand parser: !h #list @time (CAP-03)
+      shorthand/             ← capture shorthand parser: !h ##list @time (CAP-03)
       time/                  ← natural-language time parser (REM-02)
       model/                 ← lists, tasks, operations (move, reorder, complete, convert…)
       undo/                  ← operation history (DATA-03)
@@ -86,13 +88,16 @@ flint/
 |---|---|
 | Global hotkey → popup visible **with a focused cursor** | **< 50 ms** (hard limit 100 ms) |
 | Keypress → character on screen | One frame (~16 ms) |
-| Enter in popup → task saved **and** popup gone | **< 100 ms** |
+| Enter in popup → popup hidden and focus returned (after the main process acknowledges the capture over IPC) | **< 50 ms** (D-27) |
+| Enter in popup → capture durably on disk | **< 100 ms at p95** (D-27) |
 | Switching lists, opening a note | < 100 ms (Proposed) |
 | Ctrl+K results update per keystroke | < 50 ms for typical data (Proposed) |
 | Idle CPU (tray, nothing happening) | ~0% (Proposed) |
 | Idle RAM | ~150–200 MB accepted |
 
 **Test conditions:** an average laptop (not a developer workstation) **with a Teams call running**, including a full-screen Teams call.
+
+**Capture save path (D-27):** the popup never waits for the disk. On Enter it hands the capture to the main process, waits for the IPC acknowledgement, and hides; the main process owns the pending capture until the write is confirmed, and the draft (CAP-08) is cleared only then. **Accepted risk:** if the main process itself crashes between the acknowledgement and the write, the fallback is the last persisted draft, which can lag the final keystrokes by one draft-save debounce (~300 ms).
 
 ### Why cold start doesn't matter (and reliability does)
 - Electron cold start is roughly 1–1.5 s (vs ~0.4 s for Tauri in one 2026 benchmark). It only happens at Windows login (background), first launch after install, after an update restart (controlled, APP-06), or after a crash/quit.
@@ -142,6 +147,7 @@ flint/
 
 ### Storage (04)
 - All file I/O in the main process via the core format package; atomic writes (DATA-01) with retry for transient Windows file locks.
+- Before writing, re-read the file; if it changed on disk, re-parse it and re-apply the pending operations by task ID (core operations are keyed by ID and can be replayed), so external writes (CLI, Claude, an editor) are never overwritten (04 §6, Proposed).
 - File watcher ignores Flint's own writes and preserves cursor/selection on reload (DATA-06).
 
 ### Auto-update (APP-06) — Later (D-19)

@@ -29,7 +29,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 |---|---|
 | Global hotkey quick-capture (over any app incl. full-screen Teams) | CAP-01 |
 | Inbox as default target, zero decisions | CAP-02, LIST-03 |
-| Inline shorthand (`!h #list`), stripped from stored text | CAP-03 |
+| Inline shorthand (`!h ##list`, D-25), stripped from stored text | CAP-03 |
 | Paste-to-capture (screenshot → attachment; stack trace/JSON → code block) | CAP-06 |
 | CLI later (`flint add … -p high`), also for AI models | CLI-01, D-15 |
 | Mini mode (always-on-top, Today or Inbox) | MINI-01 |
@@ -45,7 +45,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Syntax-highlighted code, monospace toggle, configurable auto-linking (`AB#1234`) | NOTE-04, NOTE-06, NOTE-07 |
 | Ctrl+K command palette, fuzzy search across all lists | NAV-01 |
 | Spring animations on drag, completion animation, nothing slower than ~150 ms | 03 §5, TASK-06 |
-| Density setting, dark/light themes, calm empty states | 03 §4, APP-11 |
+| Density setting, dark/light themes (v1 dark only; light Later, D-17), calm empty states | 03 §4, APP-11 |
 | Lightweight snooze ("in 1h / tomorrow") | REM-04 |
 | Natural-language times in picker and capture (`@30m`) | REM-02, REM-03, CAP-03 |
 | Actionable notifications (Done / Snooze 10m / Open) | REM-05, 05 §5 |
@@ -70,7 +70,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Respect OS reduce-motion | APP-12, 03 §5 |
 | Machine-friendly CLI output (Later) | CLI-02 |
 | Live preview chips while typing | CAP-04 |
-| `#` list autocomplete, never silent on unknown list | CAP-05 |
+| `##` list autocomplete, never silent on unknown list (D-25) | CAP-05 |
 | Popup opens on the active monitor | CAP-09 |
 | Pre-warmed popup (< 100 ms) | CAP-10, 05 §4 |
 | Copy button on code blocks | NOTE-05 |
@@ -148,3 +148,31 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Round-trip and fuzz tests for the file format | 04 §3, 06 M1 |
 | Repo on Azure DevOps (`DavitKhachaturovi/flint`) | README, CLAUDE.md |
 | Open-sourcing out of scope for now | D-19 |
+
+## F. Pre-M1 review (Oct 2026)
+
+| Item | Where |
+|---|---|
+| Flint's own fields recognised anywhere only with a valid value; unknown fields only in the trailing run with a space after `::`; never inside inline code | 04 §3, D-21 |
+| Canonical field order `reminder, today, completion, priority, id`, block ID last; honest Dataview / Obsidian Tasks compatibility statement | 04 §3, D-21 |
+| Invalid Flint field values stay visible as title text | 04 §3, D-21 |
+| Non-task content in task lists stays in place, shown read-only; task moves never move it | TASK-15, TASK-01, 04 §3, 03 §4, 09 §8, D-22 |
+| Note → task list keeps non-list content in place, no confirmation (resolves Q-16) | LIST-04, D-22 |
+| "Top of Inbox" = just before the first task (resolves Q-14) | CAP-02, 04 §3, D-22 |
+| Lists = top-level `*.md` files; files without frontmatter shown as notes, header added lazily | LIST-01, 04 §2, §4, D-23 |
+| Obsidian vault root → suggest a `Flint` subfolder | DATA-07, APP-10, 04 §2, D-23 |
+| Inbox identified by reserved `id: inbox` (Proposed) | LIST-03, 04 §2, D-23 |
+| Duplicate list files (Explorer copies, two Inboxes): older file keeps its IDs (Proposed) | 04 §2–3, D-23 |
+| Default Flint folder `%USERPROFILE%\Flint`; warn but allow inside OneDrive; "Open Flint folder" (resolves Q-15) | DATA-07, 04 §2, D-24 |
+| OneDrive conflict-copy notice; cloud-only / locked lists shown plainly (Proposed) | DATA-07, 04 §2, §6, D-24 |
+| `##name` list shorthand; single `#` is always text | CAP-03, D-25 |
+| Only valid tokens are stripped; last valid token wins, others stay as text | CAP-03, D-25 |
+| Unknown `##name` creates a list; card before Enter; close match by prefix or edit distance; MRU among prefix matches; Enter is the only save key, Tab chooses "new list" | CAP-05, 03 §3, 09 §8, D-25 |
+| `Created list <name> · Undo` | CAP-05, D-25, D-26 |
+| No after-save overlay for captures; follow-up messages as in-app toast or next-open notice | CAP-01, 03 §4, 09 §8, §10, D-26 |
+| Split Enter budget (< 50 ms hidden, < 100 ms p95 on disk); main process owns the pending capture; draft cleared after confirmed write | CAP-01, CAP-08, 05 §4, 06 §1, D-27 |
+| Accepted risk: main-process crash inside the draft debounce window | 05 §4, D-27 |
+| Gap-fills: provisional IDs, ID uniqueness scope, hand-checked tasks, indentation, raw field values, line endings / BOM / UTF-8, subtask rules, re-read before writing, custom time parser, npm workspaces (Proposed) | 02, 04 §3, §6, 05 §1–2, D-28 |
+| Natural-language time grammar for M1 (Proposed) | REM-02 |
+| M1 measurement targets (Proposed) | 06 §1 |
+| Screenshots 01/02 predate D-25; re-render in M2 | 09 §10 |

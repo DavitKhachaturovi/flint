@@ -45,7 +45,9 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 |---|---|---|
 | Save task and close | Enter | Decided |
 | Close (draft kept) | Esc | Decided |
-| Accept `#list` autocomplete | Tab / Enter while the suggestion menu is open | Proposed |
+| Save into the suggested list for a `##` token (exact or close match) | Enter (Enter is the only key that saves) | Decided (D-25) |
+| Choose another suggested list | ↑ / ↓ while the `##` suggestion menu is open | Proposed |
+| Create a new list instead of the close match | Tab (the card switches to `New list "<name>" · Enter`) | Decided (D-25) |
 | New line in text | Shift+Enter | Proposed |
 | Paste screenshot / stack trace / JSON | Ctrl+V | Decided (behaviour in CAP-06) |
 
@@ -114,6 +116,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 - Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), star (only if starred, **Proposed**).
 - Indicators are small, monochrome, and low-contrast until hover/selection.
 - Subtasks are indented one step; no tree lines.
+- Non-task content in the file (TASK-15) appears between rows where it sits: headings as quiet section labels, other text as muted markdown; never selectable in Navigate state, and ↑/↓ skips it.
 - Long URLs are shown as smart titles and **never wrap** the row (TASK-10).
 
 ### Completed tasks
@@ -137,7 +140,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 
 ### Capture popup look
 - Frameless, centered horizontally on the **active monitor**, in the upper third (Spotlight-like) (**Proposed** position).
-- One input line (grows for pasted content), the chip preview row beneath, autocomplete menu when typing `#`.
+- One input line (grows for pasted content), the chip preview row, autocomplete menu when typing `##`, and the small list card for unknown or close-match lists (CAP-05, D-25).
+- No after-save overlay: the popup hiding is the confirmation. A follow-up message (e.g. `Created list "unis" · Undo`) waits as one quiet line at the top of the popup the next time it opens, if no Flint window is visible (D-26).
 - Background color matches the theme so it never flashes white/blank when shown (05).
 
 ### Mini mode look
@@ -161,7 +165,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 - Every action is keyboard-reachable; focus is always visible.
 - Reduce-motion respected.
 - **Proposed:** proper accessible names/roles for rows, checkboxes, and buttons so screen readers work.
-- Sufficient text contrast in both themes.
+- Sufficient text contrast in the dark theme (light mode is Later).
 
 ---
 
