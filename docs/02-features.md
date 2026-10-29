@@ -393,6 +393,7 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-08 — Rebindable global hotkeys with conflict detection (v1)
 - Both global hotkeys (capture, capture-selection) are rebindable. If a chosen hotkey is already taken by another app, Flint says so and asks for another one.
+- **Proposed (D-44, until the Settings screen in M8):** a small **Hotkeys** window from the tray: click a hotkey, press the new keys; Flint tries the combination at once and keeps the old one if another app owns it. A hotkey needs Ctrl, Alt or Win (Shift alone would swallow capital letters everywhere); the two must differ; Alt is allowed with a note that it is often a push-to-talk key. While recording, the current hotkeys are switched off. A hotkey that is taken at startup shows as a warning item at the top of the tray menu, which opens the window. Only combinations other apps register globally can be detected, not an app's own shortcuts (e.g. VS Code's).
 
 ### APP-09 — No telemetry, stated plainly (v1)
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**

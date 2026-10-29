@@ -52,6 +52,7 @@ export interface E2EHooks {
   readonly blockedRequests: string[];
   readonly captured: string[];
   showPopup?: () => void;
+  showHotkeys?: () => void;
 }
 
 export function e2eHooks(): E2EHooks | undefined {
@@ -117,11 +118,19 @@ export function applyStartWithWindows(enabled: boolean): void {
 export interface TrayActions {
   readonly open: () => void;
   readonly capture: () => void;
+  /** APP-08: the Hotkeys window. */
+  readonly hotkeys: () => void;
   readonly quit: () => void;
 }
 
+export interface TrayHandle {
+  readonly tray: Tray;
+  /** A problem the user must see, e.g. a hotkey another app owns (APP-08); null clears it. */
+  setWarning(warning: string | null): void;
+}
+
 /** APP-01, APP-03: the tray, with the only Quit in the app (Proposed menu, docs/02). */
-export function createTray(actions: TrayActions): Tray {
+export function createTray(actions: TrayActions): TrayHandle {
   const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
   const icon = nativeImage.createFromPath(join(resources, 'tray-32.png'));
   icon.addRepresentation({
@@ -129,19 +138,29 @@ export function createTray(actions: TrayActions): Tray {
     buffer: nativeImage.createFromPath(join(resources, 'tray-16.png')).toPNG(),
   });
   const tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip(app.getName());
-  tray.setContextMenu(
+  const menu = (warning: string | null): Menu =>
     Menu.buildFromTemplate([
+      ...(warning
+        ? ([{ label: warning, click: actions.hotkeys }, { type: 'separator' }] as const)
+        : []),
       { label: 'Open Flint', click: actions.open },
       { label: 'Quick capture', click: actions.capture },
       { label: 'Mini mode', enabled: false },
+      { label: 'Hotkeys…', click: actions.hotkeys },
       { label: 'Settings', enabled: false },
       { type: 'separator' },
       { label: 'Quit Flint', click: actions.quit },
-    ]),
-  );
+    ]);
+  tray.setToolTip(app.getName());
+  tray.setContextMenu(menu(null));
   tray.on('click', actions.open);
-  return tray;
+  return {
+    tray,
+    setWarning(warning) {
+      tray.setContextMenu(menu(warning));
+      tray.setToolTip(warning ? `${app.getName()}: ${warning}` : app.getName());
+    },
+  };
 }
 
 /**

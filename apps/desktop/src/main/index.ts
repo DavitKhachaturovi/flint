@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import {
   app,
   BrowserWindow,
-  globalShortcut,
   ipcMain,
   nativeImage,
   Notification,
@@ -26,7 +25,10 @@ import { IDENTITIES, type BuildKind } from './identity.js';
 import { showReminderToast } from './notifications.js';
 import { DraftFile } from './capture/drafts.js';
 import { captureSelection } from './capture/selection.js';
+import { displayAccelerator } from '../shared/accelerator.js';
+import { HotkeyRegistry } from './hotkey-registry.js';
 import { acceleratorKeys } from './hotkeys.js';
+import { hotkeysWindow } from './hotkeys-window.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
@@ -193,10 +195,11 @@ async function start(): Promise<void> {
   }
   blockNetwork();
   serveRenderer();
-  const settings = await new SettingsFile(
+  const settingsFile = new SettingsFile(
     join(app.getPath('userData'), 'settings.json'),
     !app.isPackaged,
-  ).load();
+  );
+  const settings = await settingsFile.load();
   const testData = testDataDirectory();
   const folder = await prepareFlintFolder(
     testData ? join(testData, 'Flint') : settings.flintFolder,
@@ -368,68 +371,92 @@ async function start(): Promise<void> {
 
   recoverFromCrashes(popup.window, 'capture popup', log);
 
-  const hotkey = settings.captureHotkey;
-  // D-41: the hotkey opens the popup, brings back the cursor to one that stayed open, and closes
-  // one that has it (the draft is kept, like Esc).
-  const registered = globalShortcut.register(hotkey, () => {
+  // D-41: the capture hotkey opens the popup, brings the cursor back to one that stayed open, and
+  // closes one that has it (the draft is kept, like Esc).
+  const onCaptureHotkey = (): void => {
     if (popup.isFocused()) popup.hide();
     else popup.show(epochNow());
-  });
-  log(
-    registered
-      ? `capture hotkey ${hotkey} registered`
-      : `capture hotkey ${hotkey} is already used by another app`,
-  );
+  };
 
   // CAP-07, R-2: copy what is selected in the app in front, then open the popup with it.
-  const selectionHotkey = settings.captureSelectionHotkey;
-  const selectionKeys = acceleratorKeys(selectionHotkey);
   let selecting = false;
-  const selectionRegistered =
-    selectionKeys !== null &&
-    globalShortcut.register(selectionHotkey, () => {
-      if (selecting) return;
-      selecting = true;
-      const hotkeyAt = epochNow();
-      captureSelection(selectionKeys)
-        .then((selection) => {
-          log(`capture-selection: ${selection.kind}`);
-          if (selection.kind === 'text') {
-            // D-39: a closed popup starts fresh (its draft is set aside as the previous draft);
-            // an open one collects the selection below what it already has.
-            const fresh = !popup.window.isVisible();
-            const ready = fresh ? drafts.setAside() : Promise.resolve();
-            return ready.then(() => {
-              if (fresh) popupHasContent = false;
-              popup.show(hotkeyAt, { prefill: selection.text, replaceDraft: fresh });
-            });
-          }
-          if (selection.kind === 'elevated') {
-            popup.show(hotkeyAt, {
-              hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
-            });
-          } else popup.show(hotkeyAt, { hint: 'Nothing was selected; paste with Ctrl+V' });
-          return undefined;
-        })
-        .catch((error: unknown) => {
-          log(`capture-selection failed: ${String(error)}`);
-          popup.show(hotkeyAt, { hint: "Couldn't read the selection; paste with Ctrl+V" });
-        })
-        .finally(() => {
-          selecting = false;
-        });
-    });
-  log(
-    selectionRegistered
-      ? `capture-selection hotkey ${selectionHotkey} registered`
-      : `capture-selection hotkey ${selectionHotkey} is already used by another app`,
-  );
+  const onSelectionHotkey = (): void => {
+    const keys = acceleratorKeys(hotkeys.get('selection').accelerator);
+    if (selecting || !keys) return;
+    selecting = true;
+    const hotkeyAt = epochNow();
+    captureSelection(keys)
+      .then((selection) => {
+        log(`capture-selection: ${selection.kind}`);
+        if (selection.kind === 'text') {
+          // D-39: a closed popup starts fresh (its draft is set aside as the previous draft);
+          // an open one collects the selection below what it already has.
+          const fresh = !popup.window.isVisible();
+          const ready = fresh ? drafts.setAside() : Promise.resolve();
+          return ready.then(() => {
+            if (fresh) popupHasContent = false;
+            popup.show(hotkeyAt, { prefill: selection.text, replaceDraft: fresh });
+          });
+        }
+        if (selection.kind === 'elevated') {
+          popup.show(hotkeyAt, {
+            hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
+          });
+        } else popup.show(hotkeyAt, { hint: 'Nothing was selected; paste with Ctrl+V' });
+        return undefined;
+      })
+      .catch((error: unknown) => {
+        log(`capture-selection failed: ${String(error)}`);
+        popup.show(hotkeyAt, { hint: "Couldn't read the selection; paste with Ctrl+V" });
+      })
+      .finally(() => {
+        selecting = false;
+      });
+  };
 
-  createTray({
+  // APP-08: both hotkeys, rebindable with conflict detection.
+  const hotkeys = new HotkeyRegistry(
+    { capture: settings.captureHotkey, selection: settings.captureSelectionHotkey },
+    { capture: onCaptureHotkey, selection: onSelectionHotkey },
+  );
+  /** A hotkey another app owns must never fail silently: the tray says so (APP-08). */
+  const hotkeyWarning = (): string | null => {
+    const capture = hotkeys.get('capture');
+    const selection = hotkeys.get('selection');
+    if (!capture.registered)
+      return `${displayAccelerator(capture.accelerator)} is taken: change the capture hotkey…`;
+    if (!selection.registered)
+      return `${displayAccelerator(selection.accelerator)} is taken: change the selection hotkey…`;
+    return null;
+  };
+  for (const name of ['capture', 'selection'] as const) {
+    const state = hotkeys.get(name);
+    log(
+      state.registered
+        ? `${name} hotkey ${state.accelerator} registered`
+        : `${name} hotkey ${state.accelerator} is already used by another app`,
+    );
+  }
+
+  const tray = createTray({
     open: showMain,
     capture: () => popup.show(epochNow()),
+    hotkeys: () => hotkeysPanel.show(),
     quit: () => app.quit(),
   });
+  const hotkeysPanel = hotkeysWindow(pageUrl('hotkeys'), hotkeys, (name, accelerator) => {
+    log(`${name} hotkey changed to ${accelerator}`);
+    tray.setWarning(hotkeyWarning());
+    settingsFile
+      .update(
+        name === 'capture'
+          ? { captureHotkey: accelerator }
+          : { captureSelectionHotkey: accelerator },
+      )
+      .catch((error: unknown) => log(`hotkey not saved: ${String(error)}`));
+  });
+  tray.setWarning(hotkeyWarning());
+  if (hooks) hooks.showHotkeys = () => hotkeysPanel.show();
 
   const handleActivation = (activation: ReminderActivation | null): void => {
     if (!activation) return;
@@ -496,7 +523,7 @@ async function start(): Promise<void> {
     popup.window.webContents.once('did-finish-load', () =>
       quitAfter(
         import('./laptop-bench.js').then(({ runLaptopBench }) =>
-          runLaptopBench(popup, benchHooks, CAPTURE_HOTKEY, registered, log),
+          runLaptopBench(popup, benchHooks, CAPTURE_HOTKEY, hotkeys.get('capture').registered, log),
         ),
       ),
     );

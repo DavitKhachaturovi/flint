@@ -39,6 +39,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 |---|---|---|
 | Open capture popup (CAP-01) | Ctrl+Shift+Space, rebindable (D-37) | Decided |
 | Capture selected text (CAP-07) | Ctrl+Shift+X, rebindable (D-37) | Decided |
+| Change a global hotkey (APP-08) | Tray → Hotkeys…, click the hotkey, press the new keys; Esc cancels | Proposed (D-44) |
 
 ### Capture popup
 | Action | Key | Status |

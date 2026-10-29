@@ -313,6 +313,31 @@ test('paste-to-capture: stack trace to the selection area, screenshot to attachm
   expect((await readFile(join(dataDirectory, 'Flint', link))).length).toBeGreaterThan(60);
 });
 
+test('rebinding a hotkey in the Hotkeys window (APP-08)', async () => {
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showHotkeys?: () => void } }).__flintE2E?.showHotkeys?.(),
+  );
+  const page = () => app.windows().find((window) => window.url().includes('/hotkeys/'));
+  await expect.poll(() => page() !== undefined, { timeout: 15_000 }).toBe(true);
+  const hotkeys = page();
+  if (!hotkeys) throw new Error('hotkeys page not found');
+  const capture = hotkeys.locator('.row[data-name="capture"] .record');
+  await expect(capture).toHaveText('Ctrl+Shift+Space');
+  await capture.click();
+  await expect(capture).toHaveText('Press the new keys…');
+  await hotkeys.keyboard.press('Shift+K');
+  await expect(hotkeys.locator('.message')).toHaveText('Use Ctrl, Alt or Win together with a key.');
+  await capture.click();
+  await hotkeys.keyboard.press('Control+Shift+F9');
+  await expect(hotkeys.locator('.message')).toHaveText(
+    'Saved: Ctrl+Shift+F9 opens the capture popup.',
+  );
+  await expect(capture).toHaveText('Ctrl+Shift+F9');
+  await expect
+    .poll(() => readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8').catch(() => ''))
+    .toContain('"captureHotkey": "Control+Shift+F9"');
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

@@ -24,6 +24,9 @@ export const Channels = {
   popupResize: 'popup:resize',
   popupAttach: 'popup:attach',
   popupDetach: 'popup:detach',
+  hotkeysState: 'hotkeys:state',
+  hotkeysRecording: 'hotkeys:recording',
+  hotkeysRebind: 'hotkeys:rebind',
   devEvent: 'dev:event',
   devSendToast: 'dev:send-toast',
 } as const;
@@ -104,3 +107,16 @@ export interface DevEvent {
   readonly at: number;
   readonly message: string;
 }
+
+/** APP-08: a global hotkey as the Hotkeys window shows it. */
+export interface HotkeyView {
+  readonly accelerator: string;
+  /** False when another app owns the combination, so it doesn't work. */
+  readonly registered: boolean;
+}
+
+export type HotkeyName = 'capture' | 'selection';
+
+export type HotkeysView = Readonly<Record<HotkeyName, HotkeyView>>;
+
+export type RebindOutcome = 'saved' | 'in-use' | 'invalid' | 'needs-modifier' | 'same-as-other';

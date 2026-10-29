@@ -292,3 +292,8 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 ### D-43 — R-2 (capture-selection) accepted
 - **Date:** 29 Oct 2026 · **Status:** Decided (Davit's run)
 - **Decision:** R-2 passes: the selection is captured from a browser / Notepad, a Teams chat and a normal terminal; an admin terminal gives "Couldn't read selection from an admin window; paste with Ctrl+V"; the clipboard afterwards still holds what the user had copied; Ctrl+Shift+X doesn't conflict in VS Code. The JSON finding from the same run led to D-38. Implementation notes: the copy waits for the hotkey's keys to be released, Ctrl+C is detected by the clipboard sequence number, the elevated case by the foreground process's token, and the clipboard is restored with Electron 45's async API (every item and type it can read).
+
+### D-44 — Rebinding the global hotkeys before the Settings screen
+- **Date:** 29 Oct 2026 · **Status:** Proposed (obvious answer to a gap: APP-08 is M3, the Settings screen M8)
+- **Decision:** APP-08 gets a small **Hotkeys** window from the tray (it moves into Settings in M8). Click a hotkey and press the new keys; Flint tries to register the combination at once: if another app owns it the old hotkey stays and the window says so, otherwise it is saved in `settings.json`. Rules: Ctrl, Alt or Win required; the two hotkeys differ; Alt allowed with a push-to-talk note (Q-03). While recording, the current hotkeys are off, yet a taken combination is still detected. A hotkey taken at startup shows as a warning item at the top of the tray menu, so a dead capture hotkey never fails silently.
+- **Limit:** Windows only reports combinations other apps register globally; an app's own shortcuts (VS Code's, Teams') can't be detected.
