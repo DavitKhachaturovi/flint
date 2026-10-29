@@ -18,6 +18,8 @@ export interface Settings {
   /** REM-06. */
   readonly notifications: boolean;
   readonly sound: boolean;
+  /** REM-10: toasts say only "Flint reminder", for screen sharing. Default off. */
+  readonly hideNotificationText: boolean;
 }
 
 /** Development builds default to their own folder, so they never write into the real one. */
@@ -28,6 +30,7 @@ export function defaultSettings(development = false): Settings {
     startWithWindows: true,
     notifications: true,
     sound: true,
+    hideNotificationText: false,
   };
 }
 
@@ -54,6 +57,12 @@ export function readSettings(stored: Stored, development = false): Settings {
     startWithWindows: pick(stored, 'startWithWindows', isBoolean, defaults.startWithWindows),
     notifications: pick(stored, 'notifications', isBoolean, defaults.notifications),
     sound: pick(stored, 'sound', isBoolean, defaults.sound),
+    hideNotificationText: pick(
+      stored,
+      'hideNotificationText',
+      isBoolean,
+      defaults.hideNotificationText,
+    ),
   };
 }
 

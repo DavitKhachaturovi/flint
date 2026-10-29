@@ -24,13 +24,23 @@ describe('settings (APP-11)', () => {
       flintFolder: join(homedir(), 'Flint'),
       captureHotkey: 'Control+Shift+Space',
       startWithWindows: true,
+      hideNotificationText: false,
     });
+    expect(readSettings({ hideNotificationText: true }).hideNotificationText).toBe(true);
   });
 
   it('falls back per key on invalid values', () => {
-    expect(readSettings({ startWithWindows: 'yes', sound: false, flintFolder: '' })).toMatchObject({
+    expect(
+      readSettings({
+        startWithWindows: 'yes',
+        sound: false,
+        flintFolder: '',
+        hideNotificationText: 1,
+      }),
+    ).toMatchObject({
       startWithWindows: true,
       sound: false,
+      hideNotificationText: false,
       flintFolder: join(homedir(), 'Flint'),
     });
   });

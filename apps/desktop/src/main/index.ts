@@ -280,7 +280,7 @@ async function start(): Promise<void> {
     if (BUILD !== 'development' || !protocol) return;
     showReminderToast(
       { id, title: 'Fix null ref in tenant resolver', label: `Reminder · ${kind}`, kind },
-      protocol,
+      { protocol, hideText: settings.hideNotificationText },
       log,
     );
     log(`sent a ${kind} toast for task ${id}`);

@@ -31,15 +31,29 @@ function escapeXml(text: string): string {
   return text.replace(/[<>&'"]/g, (char) => `&#${char.charCodeAt(0)};`);
 }
 
-export function reminderToastXml(toast: ReminderToast, protocol: string): string {
+/** REM-10: what a toast says instead of the task when "Hide task text in notifications" is on. */
+export const PRIVATE_TOAST_TEXT = 'Flint reminder';
+
+export interface ToastOptions {
+  /** The build's scheme for the buttons (D-33). */
+  readonly protocol: string;
+  /** REM-10: show only "Flint reminder", never the task or its time (screen sharing). */
+  readonly hideText: boolean;
+}
+
+export function reminderToastXml(
+  toast: ReminderToast,
+  { protocol, hideText }: ToastOptions,
+): string {
   const actionUrl = (action: ReminderAction): string =>
     escapeXml(`${protocol}://reminder/${action}?id=${encodeURIComponent(toast.id)}`);
   const scenario = toast.kind === 'default' ? '' : ` scenario="${toast.kind}"`;
   return [
     `<toast launch="${actionUrl('open')}" activationType="protocol"${scenario}>`,
     '<visual><binding template="ToastGeneric">',
-    `<text>${escapeXml(toast.label)}</text>`,
-    `<text>${escapeXml(toast.title)}</text>`,
+    ...(hideText
+      ? [`<text>${PRIVATE_TOAST_TEXT}</text>`]
+      : [`<text>${escapeXml(toast.label)}</text>`, `<text>${escapeXml(toast.title)}</text>`]),
     '</binding></visual>',
     '<actions>',
     `<action content="Done" arguments="${actionUrl('done')}" activationType="protocol"/>`,

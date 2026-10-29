@@ -33,7 +33,7 @@ describe('reminder toasts (REM-05, R-3)', () => {
   } as const;
 
   it('buttons launch the build’s own scheme, with the text escaped', () => {
-    const xml = reminderToastXml(toast, 'flint-dev');
+    const xml = reminderToastXml(toast, { protocol: 'flint-dev', hideText: false });
     expect(xml).toContain('scenario="reminder"');
     expect(xml).toContain('arguments="flint-dev://reminder/done?id=k3f9"');
     expect(xml).toContain('arguments="flint-dev://reminder/snooze?id=k3f9"');
@@ -43,7 +43,19 @@ describe('reminder toasts (REM-05, R-3)', () => {
   });
 
   it('a default toast has no scenario', () => {
-    expect(reminderToastXml({ ...toast, kind: 'default' }, 'flint')).not.toContain('scenario');
+    expect(
+      reminderToastXml({ ...toast, kind: 'default' }, { protocol: 'flint', hideText: false }),
+    ).not.toContain('scenario');
+  });
+
+  it('with task text hidden, says only "Flint reminder" and keeps the buttons (REM-10)', () => {
+    const xml = reminderToastXml(toast, { protocol: 'flint', hideText: true });
+    expect(xml).toContain('<text>Flint reminder</text>');
+    expect(xml).not.toContain('null');
+    expect(xml).not.toContain('15:00');
+    expect(xml.match(/<text>/g)).toHaveLength(1);
+    expect(xml).toContain('arguments="flint://reminder/done?id=k3f9"');
+    expect(xml).toContain('scenario="reminder"');
   });
 
   it('parses only its own scheme', () => {

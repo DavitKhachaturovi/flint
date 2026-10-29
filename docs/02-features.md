@@ -246,7 +246,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
 - Windows **Focus Assist / Do Not Disturb silently suppresses ordinary toasts**, and people often enable it during exactly the calls where they capture tasks.
-- **Proposed (verified 29 Oct 2026, docs/06 §1):** reminder toasts use Windows' reminder scenario (`scenario="reminder"`): they stay on screen until acted on, and with Windows' default priority settings ("reminders" allowed) they still appear during Do Not Disturb, where an ordinary toast is suppressed. Flint's own sound and in-app alert remain for users who turn that setting off. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
+- **Decided (D-35, verified 29 Oct 2026, docs/06 §1):** reminder toasts use Windows' reminder scenario (`scenario="reminder"`): they stay on screen until acted on, and with Windows' default priority settings ("reminders" allowed) they still appear during Do Not Disturb, where an ordinary toast is suppressed. Flint's own sound and in-app alert remain for users who turn that setting off. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
 
 ### REM-07 — Missed-reminder recovery (v1)
 - If the app was closed or the PC was asleep when a reminder was due, Flint shows **"N reminders you missed"** on next launch / wake, listing them with the same actions (Done / Snooze / Open).
@@ -257,6 +257,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-09 — Reminders require Flint to be running (v1)
 - Flint runs in the system tray and starts with Windows (APP-01), otherwise reminders cannot fire. Users are told this during onboarding and in settings.
+
+### REM-10 — Hide task text in notifications (v1, D-35)
+- Setting **"Hide task text in notifications"**, default **off**. When on, a reminder toast says only **"Flint reminder"**: no task title, list or time, so nothing leaks while the screen is shared (reminder toasts show even during Do Not Disturb, REM-06). It applies to the toast and to its copy in Action Center.
+- **Proposed:** the Done / Snooze 10m / Open buttons stay (they reveal nothing); Open shows the task in Flint. Until the settings screen exists (M8) the setting is `hideNotificationText` in `settings.json`.
 
 ---
 
@@ -402,7 +406,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Start with Windows.
 - Theme: **dark only in v1** (light mode Later; the setting may be omitted until then), density (comfortable / compact), monospace toggle.
 - ~~Priority palette (default / color-blind-safe)~~: not needed in v1, priority is grayscale by lightness and thickness (D-17).
-- Notifications on/off, sound on/off and sound choice, Focus Assist explanation.
+- Notifications on/off, sound on/off and sound choice, Focus Assist explanation, "Hide task text in notifications" (REM-10).
 - Today rollover prompt on/off.
 - Auto-archive completed tasks after N days (on/off, N).
 - Auto-link patterns.

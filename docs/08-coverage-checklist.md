@@ -97,6 +97,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Tray resident + autostart (required for reminders and hotkeys) | APP-01, REM-09 |
 | AppUserModelID required for Windows toasts | 05 §5 |
 | Focus Assist suppresses toasts → own sound / in-app alert | REM-06 |
+| Reminder toasts show through Do Not Disturb (`scenario="reminder"`); "Hide task text in notifications" for screen sharing | REM-06, REM-10, D-35 |
 | Electron stack, rationale, alternatives | 05 §1, D-04 |
 | Perception thresholds (100 ms / 1 s) and performance budgets | 05 §4 |
 | Test on average laptop with a Teams call | 05 §4, 06 §1 |
