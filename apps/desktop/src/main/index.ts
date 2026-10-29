@@ -1,5 +1,14 @@
+import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, session } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Notification,
+  session,
+  shell,
+} from 'electron';
 import {
   Channels,
   epochNow,
@@ -29,6 +38,31 @@ const CAPTURE_HOTKEY = {
   key: 0x20,
 } as const;
 
+/**
+ * Development builds get their own AppUserModelID and Start Menu shortcut, as the installer does for
+ * the real app (05 §5): Windows silently drops toasts from an app identity without a shortcut.
+ */
+const DEV_APP_ID = 'com.example.flint.dev';
+
+function ensureDevShortcut(): void {
+  const link = join(
+    app.getPath('appData'),
+    'Microsoft',
+    'Windows',
+    'Start Menu',
+    'Programs',
+    'Flint (development).lnk',
+  );
+  const details = {
+    target: process.execPath,
+    args: `"${app.getAppPath()}"`,
+    appUserModelId: DEV_APP_ID,
+    description: 'Flint development build (Windows needs this shortcut to show its toasts)',
+  };
+  if (!shell.writeShortcutLink(link, 'replace', details))
+    shell.writeShortcutLink(link, 'create', details);
+}
+
 const rendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 const rendererFile = (name: string): string =>
   join(import.meta.dirname, `../renderer/${name}/index.html`);
@@ -43,6 +77,16 @@ if (!app.requestSingleInstanceLock()) {
 function log(message: string): void {
   const event: DevEvent = { at: Date.now(), message };
   console.log(`[flint] ${message}`);
+  // Local log only, never uploaded (APP-09, docs/05 §6).
+  try {
+    mkdirSync(app.getPath('logs'), { recursive: true });
+    appendFileSync(
+      join(app.getPath('logs'), 'flint.log'),
+      `${new Date(event.at).toISOString()} ${message}\n`,
+    );
+  } catch {
+    // Logging must never break the app.
+  }
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(Channels.devEvent, event);
   }
@@ -73,8 +117,8 @@ function registerProtocol(): void {
 }
 
 async function start(): Promise<void> {
-  // Unpackaged builds have no Start Menu shortcut; Windows shows their toasts under the exe path.
-  app.setAppUserModelId(app.isPackaged ? APP_ID : process.execPath);
+  app.setAppUserModelId(app.isPackaged ? APP_ID : DEV_APP_ID);
+  if (!app.isPackaged) ensureDevShortcut();
   registerProtocol();
   await app.whenReady();
   blockNetwork();
@@ -143,8 +187,41 @@ async function start(): Promise<void> {
       mainWindow.focus();
     }
   };
-  app.on('second-instance', (_event, argv) => handleActivation(findActivation(argv)));
+  // Development only: `flint://dev/toast?kind=reminder` sends a test toast, so R-3 can be tested by a script.
+  const handleDevCommand = (argv: readonly string[]): void => {
+    if (app.isPackaged) return;
+    const command = argv.find((argument) => argument.startsWith(`${PROTOCOL}://dev/toast`));
+    if (!command) return;
+    const url = new URL(command);
+    const kind = (url.searchParams.get('kind') ?? 'reminder') as ToastKind;
+    const id = url.searchParams.get('id') ?? 'k3f9';
+    if (url.searchParams.get('kind') === 'plain') {
+      // Diagnostic: a notification without custom toast XML.
+      const plain = new Notification({ title: 'Flint test', body: `Plain notification ${id}` });
+      plain.on('show', () => log(`plain notification shown (${id})`));
+      plain.on('failed', (_event, error) => log(`plain notification failed (${id}): ${error}`));
+      plain.show();
+      log(`sent a plain notification (${id}); supported: ${String(Notification.isSupported())}`);
+      return;
+    }
+    showReminderToast(
+      {
+        id,
+        title: 'Fix null ref in tenant resolver',
+        label: `Reminder · ${kind}`,
+        kind,
+      },
+      log,
+    );
+    log(`sent a ${kind} toast for task ${id}`);
+  };
+  app.on('second-instance', (_event, argv) => {
+    log(`second launch: ${argv.slice(1).join(' ')}`);
+    handleActivation(findActivation(argv));
+    handleDevCommand(argv);
+  });
   handleActivation(findActivation(process.argv));
+  handleDevCommand(process.argv);
 
   ipcMain.on(Channels.devSendToast, (_event, kind: ToastKind) => {
     showReminderToast({

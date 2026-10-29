@@ -80,10 +80,17 @@ export function findActivation(argv: readonly string[]): ReminderActivation | nu
 /** Keeps shown toasts referenced: a garbage-collected Notification can lose its events. */
 const shown = new Set<Notification>();
 
-export function showReminderToast(toast: ReminderToast): void {
+export function showReminderToast(
+  toast: ReminderToast,
+  log: (message: string) => void = () => {},
+): void {
   const notification = new Notification({ toastXml: reminderToastXml(toast) });
   shown.add(notification);
+  notification.on('show', () => log(`toast shown for task ${toast.id}`));
   notification.on('close', () => shown.delete(notification));
-  notification.on('failed', () => shown.delete(notification));
+  notification.on('failed', (_event, error) => {
+    log(`toast failed for task ${toast.id}: ${error}`);
+    shown.delete(notification);
+  });
   notification.show();
 }
