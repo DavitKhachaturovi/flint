@@ -1,4 +1,5 @@
 @import '../../../../../docs/design/tokens.css';
+@import '../fonts.css';
 
 html,
 body {
@@ -21,10 +22,82 @@ body {
 }
 
 .chips {
-  min-height: 8px;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+  padding: 4px 4px 0;
+}
+
+.chips:empty {
+  display: none;
+}
+
+/* CAP-04 chips: icon, text, remove (docs/design/mockups/02). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 4px 0 9px;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-primary);
+  white-space: nowrap;
+  animation: chip-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.chip.note {
+  color: var(--fl-text-secondary);
+  padding-right: 9px;
+}
+
+.stripe {
+  width: var(--width);
+  height: 12px;
+  border-radius: 2px;
+  background: var(--color);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--fl-accent);
+}
+
+.x {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.x:hover {
+  background: var(--fl-edge-float);
+  color: var(--fl-text-primary);
 }
 
 textarea {
@@ -52,20 +125,157 @@ textarea::placeholder {
   color: var(--fl-text-muted);
 }
 
-.tools {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 4px 2px;
+/* CAP-05: the `##` suggestions. */
+.suggestions {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 4px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-card);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
 }
 
-.hint-chip {
-  font-family: var(--fl-font-mono);
-  font-size: var(--fl-size-meta);
-  color: var(--fl-text-secondary);
+.suggestions[hidden],
+.choice[hidden] {
+  display: none;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--fl-radius-tile);
+  font-size: var(--fl-size-body);
+  color: var(--fl-text-body);
+  cursor: pointer;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.suggestion:hover,
+.suggestion[aria-selected='true'] {
+  background: var(--fl-ground-hover);
+}
+
+.tile {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--fl-radius-tile);
   background: var(--fl-ground-tile);
   box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
-  border-radius: var(--fl-radius-check);
-  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-text-heading-soft);
+}
+
+/* CAP-05, D-25: what Enter will do with an unknown or close-match `##` list. */
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 4px 8px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.option.selected {
+  color: var(--fl-text-highlight);
+}
+
+.key {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-label);
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-secondary);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-group + .tool-group {
+  gap: 10px;
+}
+
+.tool {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--fl-text-muted);
+}
+
+.target-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.send {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-primary-button);
+  transition: transform var(--fl-dur-base) var(--fl-ease-press);
+}
+
+.send:active {
+  transform: scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .hint {

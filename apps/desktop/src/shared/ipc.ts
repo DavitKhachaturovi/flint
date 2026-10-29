@@ -1,3 +1,5 @@
+import type { ListInfo } from '@flint/core/shorthand';
+
 /**
  * IPC between the main process and renderers. Renderers only reach the OS through the typed
  * bridges in the preload scripts (docs/05 §2); these are the messages behind them.
@@ -15,6 +17,7 @@ export const Channels = {
   popupDismiss: 'popup:dismiss',
   popupDraft: 'popup:draft',
   popupNoticeAction: 'popup:notice-action',
+  popupResize: 'popup:resize',
   devEvent: 'dev:event',
   devSendToast: 'dev:send-toast',
 } as const;
@@ -34,6 +37,8 @@ export interface PopupShown {
   /** The saved draft (CAP-08); replaces the input only when the popup's text differs. */
   readonly draft: string;
   readonly notice: PopupNotice | null;
+  /** The lists for `##` chips, autocomplete and the new-list card (CAP-04, CAP-05). */
+  readonly lists: readonly ListInfo[];
 }
 
 /** Popup → main: the input has focus and a frame with it has been produced (R-1). */

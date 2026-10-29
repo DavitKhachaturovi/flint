@@ -148,6 +148,16 @@ describe('changes made outside Flint (DATA-06)', () => {
     await workspace.fileChanged(join(folder, 'Inbox.md'));
     await workspace.capture({ text: 'from Flint', chooseNewList: false }, now);
     expect(await inbox()).toContain('- [ ] added in VS Code [id:: vsc1]');
+    // Several files at once (one watcher event each) must not add a list twice.
+    await writeFile(join(folder, 'A.md'), '---\nflint: 1\nid: aaa1\nmode: tasks\n---\n');
+    await writeFile(join(folder, 'B.md'), '---\nflint: 1\nid: bbb1\nmode: tasks\n---\n');
+    await Promise.all([
+      workspace.fileChanged(join(folder, 'A.md')),
+      workspace.fileChanged(join(folder, 'B.md')),
+    ]);
+    expect(workspace.listInfos().map((list) => list.name)).toEqual(['Inbox', 'Infra', 'A', 'B']);
+    await rm(join(folder, 'A.md'));
+    await rm(join(folder, 'B.md'));
     await rm(join(folder, 'Infra.md'));
     await workspace.fileChanged(join(folder, 'Infra.md'));
     expect(workspace.listInfos().map((list) => list.name)).toEqual(['Inbox']);

@@ -90,7 +90,19 @@ export class Workspace {
    * A file in the folder changed (DATA-06, from the watcher): lists added, removed or edited by
    * another program are picked up; Flint's own writes come back unchanged (`ListFile.reload`).
    */
-  async fileChanged(path: string): Promise<void> {
+  fileChanged(path: string): Promise<void> {
+    return this.serial(() => this.refresh(path));
+  }
+
+  /** Changes run one at a time: watcher refreshes, captures and undos never interleave. */
+  private queue: Promise<unknown> = Promise.resolve();
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.catch(() => undefined).then(work);
+    this.queue = run;
+    return run;
+  }
+
+  private async refresh(path: string): Promise<void> {
     const entries = await discoverLists(this.folder);
     for (const loaded of [...this.lists]) {
       const entry = entries.find((candidate) => candidate.path === loaded.entry.path);
@@ -158,7 +170,11 @@ export class Workspace {
   }
 
   /** Saves a capture (D-27): resolves when it is durably on disk; throws if it can't be written. */
-  async capture(request: CaptureRequest, now: Date): Promise<CaptureOutcome> {
+  capture(request: CaptureRequest, now: Date): Promise<CaptureOutcome> {
+    return this.serial(() => this.save(request, now));
+  }
+
+  private async save(request: CaptureRequest, now: Date): Promise<CaptureOutcome> {
     const parsed = this.parse(request, now);
     // CAP-06 (paste) gives a title to body-only captures; until then they need a title.
     if (parsed.title.trim() === '') return { kind: 'empty' };
@@ -194,7 +210,11 @@ export class Workspace {
   }
 
   /** `Created list <name> · Undo` (CAP-05): the task moves to Inbox; the list goes if still empty. */
-  async undoCreatedList(created: CreatedList, now: Date): Promise<void> {
+  undoCreatedList(created: CreatedList, now: Date): Promise<void> {
+    return this.serial(() => this.undo(created, now));
+  }
+
+  private async undo(created: CreatedList, now: Date): Promise<void> {
     const list = this.lists.find(({ entry }) => entry.path === created.path);
     const task = list ? findTask(list.file.document, created.taskId)?.task : undefined;
     if (!list || !task) return;

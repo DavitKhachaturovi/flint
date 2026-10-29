@@ -4,7 +4,6 @@ import {
   Channels,
   epochNow,
   type PopupFocused,
-  type PopupNotice,
   type PopupNoticeAction,
   type PopupShown,
   type PopupSubmit,
@@ -19,6 +18,8 @@ import { bringToForeground, forceForeground, foregroundWindow, handleValue } fro
 
 const WIDTH = 720;
 const HEIGHT = 300;
+/** Room for a pasted stack trace and the `##` menu (the window follows the card, CAP-05). */
+const MAX_HEIGHT = 560;
 /** Ground colour of the window behind the card; the card itself is opaque (docs/09). */
 const TRANSPARENT = '#00000000';
 
@@ -38,7 +39,7 @@ export interface PopupEvents {
     capture: PopupSubmit & { readonly hiddenAt: number; readonly returnedAt: number },
   ) => void;
   /** What the popup shows when it opens: the saved draft and any follow-up notice (CAP-08, D-26). */
-  readonly state: () => { readonly draft: string; readonly notice: PopupNotice | null };
+  readonly state: () => Omit<PopupShown, 'hotkeyAt'>;
   readonly onDraft: (text: string) => void;
   readonly onNoticeAction: (action: PopupNoticeAction) => void;
 }
@@ -134,6 +135,12 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     if (event.sender === window.webContents && typeof text === 'string') events.onDraft(text);
   });
 
+  ipcMain.on(Channels.popupResize, (event, height: unknown) => {
+    if (event.sender !== window.webContents || typeof height !== 'number') return;
+    const [width = WIDTH] = window.getSize();
+    window.setSize(width, Math.round(Math.min(Math.max(height, 120), MAX_HEIGHT)));
+  });
+
   ipcMain.on(Channels.popupNoticeAction, (event, action: unknown) => {
     if (event.sender !== window.webContents) return;
     if (action === 'undo' || action === 'dismiss') events.onNoticeAction(action);
@@ -150,7 +157,8 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     show(hotkeyAt: number) {
       const current = foregroundWindow();
       if (current !== windowHandle) previous = current;
-      window.setBounds(boundsOnActiveDisplay());
+      // Keep the height the card last asked for (popupResize).
+      window.setBounds({ ...boundsOnActiveDisplay(), height: window.getSize()[1] ?? HEIGHT });
       window.show();
       window.focus();
       // Windows sometimes refuses to hand over the foreground (its foreground lock); then the popup

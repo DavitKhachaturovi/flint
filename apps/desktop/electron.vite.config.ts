@@ -3,18 +3,17 @@ import { defineConfig } from 'electron-vite';
 
 const root = import.meta.dirname;
 const core = resolve(root, '../../packages/core/src');
+// @flint/core is bundled from source: no build order, no workspace symlink in the installer.
+const coreAlias = [
+  { find: /^@flint\/core\/(.+)$/, replacement: `${core}/$1/index.ts` },
+  { find: /^@flint\/core$/, replacement: `${core}/index.ts` },
+];
 
 // `--mode bench` builds the R-1 laptop benchmark (docs/06 §1, `npm run dist:bench`).
 export default defineConfig(({ mode }) => ({
   main: {
     define: { __FLINT_BENCH_BUILD__: JSON.stringify(mode === 'bench') },
-    // @flint/core is bundled from source: no build order, no workspace symlink in the installer.
-    resolve: {
-      alias: [
-        { find: /^@flint\/core\/(.+)$/, replacement: `${core}/$1/index.ts` },
-        { find: /^@flint\/core$/, replacement: `${core}/index.ts` },
-      ],
-    },
+    resolve: { alias: coreAlias },
     build: {
       externalizeDeps: { exclude: ['@flint/core'] },
       rolldownOptions: { input: { index: resolve(root, 'src/main/index.ts') } },
@@ -36,6 +35,8 @@ export default defineConfig(({ mode }) => ({
   },
   renderer: {
     root: resolve(root, 'src/renderer'),
+    // The popup parses shorthand itself (CAP-04), from the same core source as the main process.
+    resolve: { alias: coreAlias },
     // The design tokens are imported straight from docs/design (the source of truth, docs/09).
     server: { fs: { allow: [resolve(root, '../..')] } },
     build: {

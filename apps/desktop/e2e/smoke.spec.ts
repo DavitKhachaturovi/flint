@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -221,6 +221,38 @@ test('a capture typed in the popup is saved at the top of Inbox on Enter (CAP-02
   expect(await readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8')).toMatch(
     /^---\nflint: 1\nid: inbox\nmode: tasks\n---\n- \[ \] check the e2e capture \[priority:: high\] \[id:: [a-z0-9]{4,6}\]\n$/,
   );
+});
+
+test('shorthand chips, the ## menu and the close-match card (CAP-04, CAP-05, D-25)', async () => {
+  // A list added outside Flint is picked up by the watcher (DATA-06).
+  await writeFile(
+    join(dataDirectory, 'Flint', 'Unicorn.md'),
+    '---\nflint: 1\nid: uni1\nmode: tasks\n---\n',
+  );
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  const box = popup.locator('#capture');
+
+  await box.fill('x ##');
+  await expect(popup.locator('.suggestion').first()).toBeVisible();
+  await box.press('ArrowDown');
+  await expect(box).toHaveValue(/^x ##(Inbox|Unicorn)$/);
+
+  await box.fill('fix token refresh !h ##unis @tomorrow 10');
+  await expect(popup.locator('.chip')).toHaveText(['High', 'Unicorn', 'Tomorrow 10:00']);
+  await expect(popup.locator('.option')).toHaveText(['UnicornEnter', 'New list "unis"Tab']);
+  await box.press('Tab');
+  await expect(popup.locator('.option')).toHaveText(['New list "unis"Enter', 'UnicornTab']);
+  await expect(popup.locator('.target-name')).toHaveText('New list "unis"');
+  await box.press('Tab');
+  await box.press('Enter');
+  await expect
+    .poll(() => readFile(join(dataDirectory, 'Flint', 'Unicorn.md'), 'utf8'))
+    .toMatch(/- \[ \] fix token refresh \[reminder:: \d{4}-\d\d-\d\dT10:00\] \[priority:: high\]/);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

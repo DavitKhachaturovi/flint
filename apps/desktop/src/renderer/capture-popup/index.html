@@ -24,8 +24,93 @@
         autocomplete="off"
         spellcheck="false"
         placeholder="Capture a task…"
+        aria-controls="suggestions"
       ></textarea>
-      <div class="tools"><span class="hint-chip">!h ##list @15:00</span></div>
+      <ul id="suggestions" class="suggestions" role="listbox" aria-label="Lists" hidden></ul>
+      <div class="choice" aria-live="polite" hidden></div>
+      <div class="tools">
+        <div class="tool-group">
+          <button type="button" class="tool" data-insert="attach" aria-label="Attach" disabled>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </button>
+          <button type="button" class="tool" data-insert="!h" aria-label="Set priority">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 21V4M5 4h11l-2 4 2 4H5"></path>
+            </svg>
+          </button>
+          <button type="button" class="tool" data-insert="##" aria-label="Choose list">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path>
+            </svg>
+          </button>
+          <button type="button" class="tool" data-insert="@" aria-label="Set reminder">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+              <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="tool-group">
+          <span class="target"
+            ><img class="target-icon" alt="" /><span class="target-name">Inbox</span></span
+          >
+          <button type="button" class="send" aria-label="Save task">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 19V5M5 12l7-7 7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
     </main>
     <p class="hint">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</p>
     <script type="module" src="./main.ts"></script>

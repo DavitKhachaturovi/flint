@@ -48,6 +48,9 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Save into the suggested list for a `##` token (exact or close match) | Enter (Enter is the only key that saves) | Decided (D-25) |
 | Choose another suggested list | ↑ / ↓ while the `##` suggestion menu is open | Proposed |
 | Create a new list instead of the close match | Tab (the card switches to `New list "<name>" · Enter`) | Decided (D-25) |
+| Go back to the close match after Tab | Tab again (the card offers `<list> · Tab`) | Proposed |
+| Remove a parsed token (priority, list, time) | Click the × on its chip; the token leaves the text | Proposed |
+| Type a token without remembering it | The flag, `#` and bell buttons under the box insert `!h`, `##` and `@` at the caret | Proposed |
 | New line in text | Shift+Enter | Proposed |
 | Paste screenshot / stack trace / JSON | Ctrl+V | Decided (behaviour in CAP-06) |
 | Undo `Created list <name>` from the notice line (D-26) | Ctrl+Z while the box is empty, or click Undo | Proposed |

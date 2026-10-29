@@ -26,6 +26,10 @@ const popup = {
   saveDraft(text: string): void {
     ipcRenderer.send(Channels.popupDraft, text);
   },
+  /** The popup window follows the card's height, so no invisible area blocks clicks. */
+  resize(height: number): void {
+    ipcRenderer.send(Channels.popupResize, height);
+  },
   noticeAction(action: PopupNoticeAction): void {
     ipcRenderer.send(Channels.popupNoticeAction, action);
   },

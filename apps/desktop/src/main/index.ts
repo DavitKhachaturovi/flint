@@ -298,7 +298,11 @@ async function start(): Promise<void> {
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
       void saveCapture(capture);
     },
-    state: () => ({ draft: drafts.text, notice: notice?.popup ?? null }),
+    state: () => ({
+      draft: drafts.text,
+      notice: notice?.popup ?? null,
+      lists: workspace.listInfos(),
+    }),
     onDraft: (text) => {
       drafts.set(text).catch((error: unknown) => log(`draft not saved: ${String(error)}`));
     },
