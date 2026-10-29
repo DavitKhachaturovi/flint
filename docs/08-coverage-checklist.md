@@ -175,7 +175,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Gap-fills: provisional IDs, ID uniqueness scope, hand-checked tasks, indentation, raw field values, line endings / BOM / UTF-8, subtask rules, re-read before writing, custom time parser, npm workspaces (Proposed) | 02, 04 §3, §6, 05 §1–2, D-28 |
 | Natural-language time grammar for M1 (Proposed) | REM-02 |
 | M1 measurement targets (Proposed) | 06 §1 |
-| Screenshots 01/02 predate D-25; re-render in M2 | 09 §10 |
+| Screenshots 01/02 re-rendered for D-25 (`scripts/render-mockups.mjs`) | 09 §10 |
 | Shorthand read on the first line only; `@` takes the longest time expression; close-match ranking (Proposed) | CAP-03, CAP-05 |
 | Un-checking a subtask reopens its completed parent (Proposed) | TASK-04 |
 | A task moved to another list lands at its top (Proposed) | TASK-11 |

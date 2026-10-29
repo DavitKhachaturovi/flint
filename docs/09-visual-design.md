@@ -172,6 +172,6 @@ Three levels, all opaque:
 
 The mockups use example content (task titles, list names) for illustration only.
 
-**Screenshots 01 and 02 predate D-25** (the `##` list shorthand): the PNGs still show `!h #list @15:00` and `#unicorn`. The HTML mockups have been updated to `##`; where a screenshot and the text disagree, the text wins. Re-render both PNGs once Playwright is set up in M2 (headless Edge on the author machines can't render them: managed policy extensions crash it). Neither screenshot shows the D-25 list card or the D-26 next-open notice; they are specified in §8.
+**Screenshots** are rendered from the HTML mockups with `node scripts/render-mockups.mjs [01 02 …]` (Playwright's Chromium, 2x). 01 and 02 were re-rendered for D-25 (`##` list shorthand) on 29 Oct 2026; re-rendering an unchanged mockup (03) reproduces its original screenshot. Neither screenshot shows the D-25 list card or the D-26 next-open notice; they are specified in §8.
 
 Interactive versions (completing tasks with undo, live shorthand parsing in the capture box) were reviewed on the design canvas during design; the screenshots show their default states.
