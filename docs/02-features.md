@@ -226,6 +226,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - Days: `today`, `tomorrow`, `mon`…`sun` and full weekday names, `next fri`, each with an optional time.
   - Dates: `2026-11-02`, `2.11` / `02.11` (day.month, the local convention), `2 nov` / `nov 2`, each with an optional time.
   - A clock time that has already passed today means its next occurrence; an explicit date in the past is not a valid time (so `@` stays text).
+  - A weekday never means today (`fri` on a Friday is next week's Friday; today is `today`). `next fri` means the same as `fri`. `today` without a time is only valid before the default time. A date without a year is this year's, or next year's if it has passed.
 
 ### REM-03 — Reminder shorthand in capture (v1)
 - `deploy hotfix !h @30m` captures with a reminder in one line, no picker at all (CAP-03).
