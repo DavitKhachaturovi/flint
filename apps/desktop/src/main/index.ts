@@ -24,6 +24,15 @@ import {
   type ReminderActivation,
 } from './notifications.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
+import { SettingsFile } from './settings.js';
+import {
+  applyStartWithWindows,
+  configureAppPaths,
+  createTray,
+  recoverFromCrashes,
+  rememberWindowState,
+  STARTED_AT_LOGIN,
+} from './shell.js';
 import { VirtualKey } from './win32.js';
 
 /** AppUserModelID: must match the installer's Start Menu shortcut, or Windows hides the toasts (05 §5). */
@@ -66,6 +75,8 @@ function ensureDevShortcut(): void {
 const rendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 const rendererFile = (name: string): string =>
   join(import.meta.dirname, `../renderer/${name}/index.html`);
+
+configureAppPaths();
 
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
 if (!app.requestSingleInstanceLock()) {
@@ -122,6 +133,10 @@ async function start(): Promise<void> {
   registerProtocol();
   await app.whenReady();
   blockNetwork();
+  const settings = await new SettingsFile(join(app.getPath('userData'), 'settings.json')).load();
+  applyStartWithWindows(settings.startWithWindows);
+  // Windows are hidden, never closed (APP-02); closing the last one must not quit Flint.
+  app.on('window-all-closed', () => undefined);
 
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -149,6 +164,12 @@ async function start(): Promise<void> {
   app.on('before-quit', () => {
     quitting = true;
   });
+  recoverFromCrashes(mainWindow, 'main window', log);
+  void rememberWindowState(mainWindow, 'main', { x: 0, y: 0, width: 900, height: 640 });
+  const showMain = (): void => {
+    mainWindow.show();
+    mainWindow.focus();
+  };
 
   const focusedWaiters: ((sample: FocusSample) => void)[] = [];
   const capturedWaiters: ((
@@ -170,22 +191,26 @@ async function start(): Promise<void> {
     },
   });
 
-  const registered = globalShortcut.register(CAPTURE_HOTKEY.accelerator, () =>
-    popup.show(epochNow()),
-  );
+  recoverFromCrashes(popup.window, 'capture popup', log);
+
+  const hotkey = settings.captureHotkey;
+  const registered = globalShortcut.register(hotkey, () => popup.show(epochNow()));
   log(
     registered
-      ? `capture hotkey ${CAPTURE_HOTKEY.accelerator} registered`
-      : `capture hotkey ${CAPTURE_HOTKEY.accelerator} is already used by another app`,
+      ? `capture hotkey ${hotkey} registered`
+      : `capture hotkey ${hotkey} is already used by another app`,
   );
+
+  createTray({
+    open: showMain,
+    capture: () => popup.show(epochNow()),
+    quit: () => app.quit(),
+  });
 
   const handleActivation = (activation: ReminderActivation | null): void => {
     if (!activation) return;
     log(`toast action "${activation.action}" for task ${activation.id}`);
-    if (activation.action === 'open') {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    if (activation.action === 'open') showMain();
   };
   // Development only: `flint://dev/toast?kind=reminder` sends a test toast, so R-3 can be tested by a script.
   const handleDevCommand = (argv: readonly string[]): void => {
@@ -249,7 +274,8 @@ async function start(): Promise<void> {
         app.quit();
       });
     });
-  } else if (!app.isPackaged) {
+  } else if (!app.isPackaged && !STARTED_AT_LOGIN) {
+    // Development builds open the R-1/R-3 harness; installed builds start in the tray.
     mainWindow.show();
   }
 
