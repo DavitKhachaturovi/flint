@@ -17,12 +17,8 @@ import {
   type ToastKind,
 } from '../shared/ipc.js';
 import { runBench } from './bench.js';
-import {
-  findActivation,
-  PROTOCOL,
-  showReminderToast,
-  type ReminderActivation,
-} from './notifications.js';
+import { IDENTITIES, type BuildKind } from './identity.js';
+import { showReminderToast } from './notifications.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
@@ -37,10 +33,15 @@ import {
   STARTED_AT_LOGIN,
   testDataDirectory,
 } from './shell.js';
+import { findActivation, type ReminderActivation } from './toast.js';
 import { VirtualKey } from './win32.js';
 
-/** AppUserModelID: must match the installer's Start Menu shortcut, or Windows hides the toasts (05 §5). */
-const APP_ID = 'com.example.flint';
+/**
+ * Who this build is (D-33). The installed AppUserModelID must match the installer's Start Menu
+ * shortcut, or Windows hides the toasts (05 §5).
+ */
+const BUILD: BuildKind = app.isPackaged ? 'installed' : 'development';
+const IDENTITY = IDENTITIES[BUILD];
 /**
  * R-1 test hotkey; the default is decided with Q-03 and made rebindable with APP-08 (M3). No Alt:
  * Alt is a common push-to-talk key (Discord), so an Alt hotkey would key the user's microphone.
@@ -52,11 +53,10 @@ const CAPTURE_HOTKEY = {
 } as const;
 
 /**
- * Development builds get their own AppUserModelID and Start Menu shortcut, as the installer does for
- * the real app (05 §5): Windows silently drops toasts from an app identity without a shortcut.
+ * Development builds get their own Start Menu shortcut carrying their AppUserModelID, as the
+ * installer does for the real app (05 §5): Windows silently drops toasts from an app identity
+ * without a shortcut.
  */
-const DEV_APP_ID = 'com.example.flint.dev';
-
 function ensureDevShortcut(): void {
   const link = join(
     app.getPath('appData'),
@@ -69,7 +69,7 @@ function ensureDevShortcut(): void {
   const details = {
     target: process.execPath,
     args: `"${app.getAppPath()}"`,
-    appUserModelId: DEV_APP_ID,
+    appUserModelId: IDENTITY.appId,
     description: 'Flint development build (Windows needs this shortcut to show its toasts)',
   };
   if (!shell.writeShortcutLink(link, 'replace', details))
@@ -80,7 +80,7 @@ const rendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefi
 const rendererFile = (name: string): string =>
   join(import.meta.dirname, `../renderer/${name}/index.html`);
 
-configureAppPaths();
+configureAppPaths(IDENTITY.name);
 guardNodeNetworkForTests();
 
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
@@ -129,20 +129,25 @@ function blockNetwork(): void {
   app.on('session-created', guard);
 }
 
-function registerProtocol(): void {
+function registerProtocol(protocol: string): void {
   // Registered on every start (the uninstaller removes it); in development, point at this app folder.
-  if (app.isPackaged) app.setAsDefaultProtocolClient(PROTOCOL);
-  else app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [app.getAppPath()]);
+  if (app.isPackaged) app.setAsDefaultProtocolClient(protocol);
+  else app.setAsDefaultProtocolClient(protocol, process.execPath, [app.getAppPath()]);
 }
 
 async function start(): Promise<void> {
-  app.setAppUserModelId(app.isPackaged ? APP_ID : DEV_APP_ID);
+  const protocol = IDENTITY.protocol;
+  app.setAppUserModelId(IDENTITY.appId);
   // End-to-end runs leave the machine alone: no Start Menu shortcut, no taking over flint://.
   if (!testDataDirectory()) {
-    if (!app.isPackaged) ensureDevShortcut();
-    registerProtocol();
+    if (BUILD === 'development') ensureDevShortcut();
+    if (protocol) registerProtocol(protocol);
   }
   await app.whenReady();
+  // Set up notifications now (REM-05). Electron creates its toast machinery on first use; when that
+  // came later, from a toast-button launch of the hidden app, it reported notifications unsupported
+  // for the whole session (29 Oct 2026). Logged so a machine that refuses toasts is diagnosable.
+  log(`notifications supported: ${String(Notification.isSupported())} (${IDENTITY.appId})`);
   blockNetwork();
   const settings = await new SettingsFile(
     join(app.getPath('userData'), 'settings.json'),
@@ -243,10 +248,20 @@ async function start(): Promise<void> {
     log(`toast action "${activation.action}" for task ${activation.id}`);
     if (activation.action === 'open') showMain();
   };
-  // Development only: `flint://dev/toast?kind=reminder` sends a test toast, so R-3 can be tested by a script.
+  /** The R-3 test toast, until reminders exist (M6). Development builds only. */
+  const sendTestToast = (kind: ToastKind, id = 'k3f9'): void => {
+    if (BUILD !== 'development' || !protocol) return;
+    showReminderToast(
+      { id, title: 'Fix null ref in tenant resolver', label: `Reminder · ${kind}`, kind },
+      protocol,
+      log,
+    );
+    log(`sent a ${kind} toast for task ${id}`);
+  };
+  // Development only: `flint-dev://dev/toast?kind=reminder` sends a test toast, so R-3 can be tested by a script.
   const handleDevCommand = (argv: readonly string[]): void => {
-    if (app.isPackaged) return;
-    const command = argv.find((argument) => argument.startsWith(`${PROTOCOL}://dev/toast`));
+    if (BUILD !== 'development') return;
+    const command = argv.find((argument) => argument.startsWith(`${protocol}://dev/toast`));
     if (!command) return;
     const url = new URL(command);
     const kind = (url.searchParams.get('kind') ?? 'reminder') as ToastKind;
@@ -260,36 +275,24 @@ async function start(): Promise<void> {
       log(`sent a plain notification (${id}); supported: ${String(Notification.isSupported())}`);
       return;
     }
-    showReminderToast(
-      {
-        id,
-        title: 'Fix null ref in tenant resolver',
-        label: `Reminder · ${kind}`,
-        kind,
-      },
-      log,
-    );
-    log(`sent a ${kind} toast for task ${id}`);
+    sendTestToast(kind, id);
   };
+  const activationOf = (argv: readonly string[]): ReminderActivation | null =>
+    protocol ? findActivation(argv, protocol) : null;
   app.on('second-instance', (_event, argv) => {
     log(`second launch: ${argv.slice(1).join(' ')}`);
-    handleActivation(findActivation(argv));
+    handleActivation(activationOf(argv));
     handleDevCommand(argv);
   });
-  handleActivation(findActivation(process.argv));
+  handleActivation(activationOf(process.argv));
   handleDevCommand(process.argv);
 
-  ipcMain.on(Channels.devSendToast, (_event, kind: ToastKind) => {
-    showReminderToast({
-      id: 'k3f9',
-      title: 'Fix null ref in tenant resolver',
-      label: `Reminder · ${kind}`,
-      kind,
-    });
-    log(`sent a ${kind} toast`);
-  });
+  ipcMain.on(Channels.devSendToast, (_event, kind: ToastKind) => sendTestToast(kind));
 
-  const benchIterations = Number(process.env.FLINT_BENCH ?? 0);
+  // Test hooks are development-only: an installed Flint ignores these variables.
+  const devEnv = (name: string): string | undefined =>
+    BUILD === 'development' ? process.env[name] : undefined;
+  const benchIterations = Number(devEnv('FLINT_BENCH') ?? 0);
   if (benchIterations > 0) {
     popup.window.webContents.once('did-finish-load', () => {
       void runBench(
@@ -310,19 +313,8 @@ async function start(): Promise<void> {
     mainWindow.show();
   }
 
-  const testToast = process.env.FLINT_TEST_TOAST as ToastKind | undefined;
-  if (testToast) {
-    setTimeout(
-      () =>
-        showReminderToast({
-          id: 'k3f9',
-          title: 'Fix null ref in tenant resolver',
-          label: `Reminder · ${testToast}`,
-          kind: testToast,
-        }),
-      1500,
-    );
-  }
+  const testToast = devEnv('FLINT_TEST_TOAST') as ToastKind | undefined;
+  if (testToast) setTimeout(() => sendTestToast(testToast), 1500);
 }
 
 function waitFor<T>(waiters: ((value: T) => void)[], timeout: number): Promise<T | null> {

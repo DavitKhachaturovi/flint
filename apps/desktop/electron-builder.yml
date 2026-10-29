@@ -1,5 +1,7 @@
 # Installer (docs/05 §6, D-19): unsigned, per-user NSIS, no admin rights.
-appId: com.example.flint
+# Never change it once installed: upgrades, the start-with-Windows entry and Windows' notification
+# settings are keyed by it (D-33). Must match IDENTITIES.installed in src/main/identity.ts.
+appId: app.flint.desktop
 productName: Flint
 # The packaged app is "flint" (install folder %LOCALAPPDATA%\Programs\flint), not the workspace name.
 extraMetadata:

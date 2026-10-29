@@ -20,11 +20,10 @@ import {
 
 /**
  * App data (docs/04 §2): settings and state in %APPDATA%\Flint, logs in %LOCALAPPDATA%\Flint\logs.
- * Development builds use "Flint (development)" so they never touch a real installation's data.
+ * Other builds use their own name (identity.ts), so they never touch a real installation's data.
  * Must run before the single-instance lock, which is keyed by this folder.
  */
-export function configureAppPaths(): void {
-  const name = app.isPackaged ? 'Flint' : 'Flint (development)';
+export function configureAppPaths(name: string): void {
   app.setName(name);
   const testData = testDataDirectory();
   if (testData) {
@@ -128,7 +127,7 @@ export function createTray(actions: TrayActions): Tray {
     buffer: nativeImage.createFromPath(join(resources, 'tray-16.png')).toPNG(),
   });
   const tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip(app.isPackaged ? 'Flint' : 'Flint (development)');
+  tray.setToolTip(app.getName());
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open Flint', click: actions.open },

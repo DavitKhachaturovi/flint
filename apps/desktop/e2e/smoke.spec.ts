@@ -74,20 +74,25 @@ function flintPids(mainPid: number, dataDirectory: string): Set<number> {
 }
 
 /**
- * What a run could change on the machine: the flint:// handler (an installed Flint's toast buttons)
- * and the development Start Menu shortcut. A test run must leave both alone.
+ * What a run could change on the machine: the flint:// and flint-dev:// handlers (toast buttons,
+ * D-33) and the development Start Menu shortcut. A test run must leave them alone.
  */
 function machineState(): string {
-  let handler: string;
-  try {
-    handler = execFileSync(
-      'reg',
-      ['query', String.raw`HKCU\Software\Classes\flint\shell\open\command`, '/ve'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    ).trim();
-  } catch {
-    handler = 'none';
-  }
+  const handler = (scheme: string): string => {
+    try {
+      return execFileSync(
+        'reg',
+        [
+          'query',
+          ['HKCU', 'Software', 'Classes', scheme, 'shell', 'open', 'command'].join('\\'),
+          '/ve',
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      ).trim();
+    } catch {
+      return 'none';
+    }
+  };
   const shortcut = join(
     process.env.APPDATA ?? '',
     'Microsoft',
@@ -97,7 +102,7 @@ function machineState(): string {
     'Flint (development).lnk',
   );
   const stamp = statSync(shortcut, { throwIfNoEntry: false })?.mtimeMs ?? 'none';
-  return `flint:// ${handler}; development shortcut ${String(stamp)}`;
+  return `flint:// ${handler('flint')}; flint-dev:// ${handler('flint-dev')}; development shortcut ${String(stamp)}`;
 }
 
 const port = (address: string): string => address.slice(address.lastIndexOf(':') + 1);
@@ -212,7 +217,7 @@ test('a capture typed in the popup reaches the main process on Enter (D-27)', as
   await expect(popup.locator('#capture')).toHaveValue('');
 });
 
-test('leaves the machine alone: flint:// and the Start Menu are untouched (D-32)', () => {
+test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });
 
