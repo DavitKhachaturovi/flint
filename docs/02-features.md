@@ -62,6 +62,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - Nothing inside inline code (backticks) is a token.
   - A backslash escapes a token: `\##infra` is stored literally as `##infra`.
   - A `##` token is made of Unicode letters and digits plus `-` `_` `.` (Georgian list names work); trailing punctuation is not part of it (`##infra,`).
+  - Shorthand is read on the **first line only** (the title). Further lines (Shift+Enter, pasted stack traces) are the body, kept verbatim, so `@`, `!` and `##` inside pasted code are never touched.
+  - `@` takes the longest valid time expression right after it, up to 6 words: `@tomorrow 10 deploy` reads `tomorrow 10`. A bare number after a day is read as its time (`@tomorrow 10 people` → 10:00); the chip shows it.
   - The live chip preview (CAP-04) is the source of truth for what was parsed.
 - The same shorthand parser is used by the capture popup, the in-list task input, and the CLI (CLI-01), from one shared package (05).
 
@@ -79,6 +81,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - An unmatched `##name` **creates a new task list**, named exactly as typed, when the capture is saved. Confirmation: `Created list <name> · Undo` (shown per CAP-01, D-26). Undo moves the task to Inbox and deletes the new list if it is still empty.
 - `##name` pointing at a **note**: the token stays as text, the task goes to Inbox, and the chip says `<name> is a note → Inbox`.
 - **Proposed:** a name Windows can't use as a file name (`##con`, illegal characters) stays as text, the task goes to Inbox and the chip explains why. "Most recently used" means the last capture or move target (kept in app data, `ui-state.json`).
+- **Proposed (ranking):** a task list with the same normalized name is an exact match (an identical spelling wins, then sidebar order); a task list wins over a note of the same name. Among close matches, prefix matches come before typo matches; prefix matches are ordered most recently used first, typo matches by smallest edit distance first, and sidebar order breaks remaining ties.
 
 ### CAP-06 — Paste-to-capture (v1)
 - **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
