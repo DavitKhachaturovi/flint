@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=22.12"
+    "node": ">=24.22.1 <25"
   },
   "scripts": {
     "build": "npm run build -w @flint/core",
@@ -17,18 +17,19 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "measure": "npm run build && node packages/core/bench/measure.mjs"
+    "measure": "npm run build && node packages/core/bench/measure.mjs",
+    "audit": "npm audit --audit-level=high"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^24.19.2",
-    "eslint": "^10.13.0",
-    "eslint-config-prettier": "^10.1.8",
-    "fast-check": "^4.10.2",
-    "prettier": "^3.9.10",
-    "rolldown": "~1.2.15",
-    "typescript": "~6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "^5.0.5"
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "fast-check": "4.10.2",
+    "prettier": "3.9.10",
+    "rolldown": "1.2.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5"
   }
 }

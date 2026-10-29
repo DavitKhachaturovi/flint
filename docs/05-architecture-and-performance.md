@@ -22,6 +22,7 @@
 | Fuzzy search | A small in-memory fuzzy matcher (data sizes are small) |
 | Shorthand and natural-language time parsing | Small custom parsers in `packages/core`, no library such as chrono-node: they run in the capture popup, which must stay tiny (CAP-10, D-28) |
 | Monorepo | npm workspaces (D-28) |
+| Node | 24.22.1 or newer on the 24.x line, the major Electron embeds (D-30) |
 | Fonts | Geist + Geist Mono (OFL), **bundled as local font files**; never loaded from Google Fonts at runtime (offline, no network, APP-09) |
 | Design tokens | `docs/design/tokens.css` (09) as the base stylesheet's CSS custom properties |
 | File watching | chokidar or Node `fs.watch` with debouncing |
@@ -29,6 +30,12 @@
 | Packaging | electron-builder, NSIS installer |
 | Updates | electron-updater (Later, D-19) |
 | Tests | Vitest with fast-check for property-based tests (core), Playwright for Electron (end-to-end) |
+
+### Dependency policy (D-30)
+- **Latest stable version the rest of the toolchain supports**, pinned exactly: exact versions in `package.json`, the lockfile pins the whole tree. Exceptions are recorded in D-30 (TypeScript 6.0.3: typescript-eslint supports < 6.1).
+- **7-day cooldown** against supply-chain attacks: `min-release-age=7` in `.npmrc`, and `scripts/check-release-age.mjs` in CI checks the whole lockfile (npm only applies the setting when resolving). Security fixes from a project's official maintainers may skip it: installed with `--min-release-age=0` and listed in the script's allowlist.
+- **`npm audit --audit-level=high`** in CI; high or critical findings fail the build.
+- **Node and Electron security releases** are adopted promptly and recorded in the decision log. Electron must embed a patched Node: a test fails if its `process.versions.node` is below 24.22.1.
 
 ---
 

@@ -181,3 +181,6 @@ Traceability from everything agreed during design to where it is specified. Use 
 | A task moved to another list lands at its top (Proposed) | TASK-11 |
 | M1 measurements and `npm run measure` | 06 §1 |
 | Azure DevOps CI for M1: lint, format, typecheck, tests (10k fuzz runs), build | `azure-pipelines.yml`, 05 §6 |
+| Node 24.22.1+ (CVE-2026-111497), engines + engine-strict, CI pins Node | D-30, 05 §1, `.node-version`, `azure-pipelines.yml` |
+| Electron 45.1.0 and the embedded-Node guard test | D-30, 05 §1 (added with Electron in M2) |
+| Dependency policy: latest supported stable, exact pins, 7-day cooldown, npm audit in CI | D-30, 05 §1, CLAUDE.md, `.npmrc`, `scripts/check-release-age.mjs` |

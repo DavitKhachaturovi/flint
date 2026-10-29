@@ -214,3 +214,15 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Checklists in a body**: a `- [ ]` line in a top-level task's body is a subtask (04 §3). In the editor (M4), typing `- [ ]` in a body visibly turns that line into a subtask.
   - **`next fri`** means the same as `fri`; the chip shows the exact date.
 - **Rationale:** Enter must never do anything but save under time pressure, and a Tab pressed out of autocomplete habit must not save half-typed text; the format's definition of a subtask is kept rather than special-cased in the editor, and made visible instead.
+
+### D-30 — Dependency policy and the Node2Shell security update
+- **Date:** 29 Oct 2026 · **Status:** Decided
+- **Context:** CVE-2026-111497 "Node2Shell" (out-of-bounds write in Node.js's bundled Brotli decoder, remote code execution) and TLS/DNS fixes, in the Node.js security release of 20–21 Oct 2026: fixed in 22.23.4, 24.22.1 and 26.12.1. Electron embeds Node: 45.1.0 (27 Oct 2026) embeds 24.22.1; 45.0.0 embeds the vulnerable 24.22.0.
+- **Decision:**
+  - **Node for development and builds: >= 24.22.1 on the 24.x line** (`.node-version` / `.nvmrc` = 24.22.1, `"engines": { "node": ">=24.22.1 <25" }`, `engine-strict=true` in `.npmrc`; the Azure pipeline pins 24.22.1, a future GitHub Actions `setup-node` reads `.node-version`). Node 24, not 26, so tests run on the major Electron embeds.
+  - **Electron 45.1.0** when it is added in M2, with a test that launches Electron and fails if `process.versions.node` is below 24.22.1, so a vulnerable embedded Node never ships.
+  - **Versions:** the latest stable version the rest of the toolchain supports, pinned exactly (`save-exact=true`, exact versions in `package.json`, the lockfile pins the whole tree). Exceptions are recorded here: **TypeScript 6.0.3**, not 7.x, because typescript-eslint supports TypeScript < 6.1 only.
+  - **Supply-chain cooldown:** no version published less than 7 days ago (`min-release-age=7` in `.npmrc`, npm >= 11.10; the project uses npm 11.19.1). npm applies it only when resolving versions, not to an existing lockfile, so CI also runs `scripts/check-release-age.mjs` over every package in `package-lock.json`. Exception: a security fix from the project's official maintainers, installed with `--min-release-age=0` and listed in the script's allowlist. Recorded exceptions: **Electron 45.1.0** (security fix above).
+  - **`npm audit --audit-level=high` in CI**; high or critical findings fail the build.
+  - **Security releases** of Node or Electron are adopted promptly and recorded in this log.
+- **Applied (29 Oct 2026):** Node 24.22.1 locally and in CI; lockfile regenerated under the cooldown (158 packages, all >= 7 days old); typescript-eslint 8.72.1 (published 26 Oct) → 8.72.0 (19 Oct); all other M1 dependencies were already the newest eligible versions.

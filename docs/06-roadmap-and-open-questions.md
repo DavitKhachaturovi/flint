@@ -20,7 +20,7 @@ Also measure: keypress → screen (one frame), Enter → popup hidden and focus 
 | M1 | Shorthand parse per keystroke | < 1 ms (Proposed) | 0.008 ms |
 | M1 | Shorthand + time parser size, minified and gzipped (it ships in the capture popup) | < 15 KB (Proposed) | 3.7 KB (time parser alone 2.0 KB) |
 
-M1 numbers: `npm run measure` (median of 200–5,000 runs, Node 24) on a developer laptop (Intel Core Ultra 7 258V, 32 GB), not yet on an average laptop. Parsing has the least headroom; re-measure it on an average laptop in M2. Parsing happens in the main process, off the capture hot path.
+M1 numbers: `npm run measure` (median of 200–5,000 runs, Node 24) on a developer laptop (Intel Core Ultra 7 258V, 32 GB), not yet on an average laptop. Re-measured on Node 24.22.1 after D-30: parse 6.0 ms, serialize 0.04 ms, save path 0.15 ms, keystroke 0.012 ms, bundle unchanged. Parsing has the least headroom; re-measure it on an average laptop in M2. Parsing happens in the main process, off the capture hot path.
 | M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | — |
 | M2/M3 | Enter → popup hidden and focus returned | < 50 ms | — |
 | M2/M3 | Enter → capture durably on disk | < 100 ms at p95 | — |

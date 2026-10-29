@@ -54,7 +54,7 @@ export default defineConfig(
     files: ['**/*.mjs'],
     languageOptions: {
       parserOptions: { projectService: false },
-      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+      globals: { console: 'readonly', process: 'readonly', URL: 'readonly', fetch: 'readonly' },
     },
   },
   prettier,
