@@ -22,6 +22,10 @@ Also measure: keypress → screen (one frame), Enter → popup hidden and focus 
 
 R-1 numbers: `FLINT_BENCH=50` (apps/desktop) presses the real hotkey through Windows (`SendInput`) over a full-screen stand-in window; key → first frame with the focused input; Electron 45.1.0, 29 Oct 2026. Windows sometimes refuses to hand over the foreground; the popup then takes it explicitly (attaching to the foreground thread), which this run never needed. The benchmark takes over the screen: run it only when the machine is free.
 
+R-1 manual check by Davit (29 Oct 2026): hotkey → focused frame 17.3 and 32.1 ms, Enter → hidden and focus returned 8.8 ms, popup in front without the fallback.
+
+R-3 status (29 Oct 2026, Windows 11 25H2, development build): the reminder toast shows with Done / Snooze 10m / Open; clicking each button on the toast (default, reminder and urgent toasts) reaches the running app through `flint://`; opening the links while Flint is not running cold-starts it and handles the action. Still open: a click from Action Center, Do Not Disturb (REM-06), and the installed (NSIS) build. Development builds need their "Flint (development)" Start Menu shortcut, and must be started with electron.exe, not `electron-vite preview` (notifications report unsupported there).
+
 M1 numbers: `npm run measure` (median of 200–5,000 runs, Node 24) on a developer laptop (Intel Core Ultra 7 258V, 32 GB), not yet on an average laptop. Re-measured on Node 24.22.1 after D-30: parse 6.0 ms, serialize 0.04 ms, save path 0.15 ms, keystroke 0.012 ms, bundle unchanged. Parsing has the least headroom; re-measure it on an average laptop in M2. Parsing happens in the main process, off the capture hot path.
 | M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | p50 28.2 ms, p95 40.3 ms, max 47.7 ms (50/50, developer laptop, full-screen stand-in window; not yet an average laptop with Teams) |
 | M2/M3 | Enter → popup hidden and focus returned | < 50 ms | p50 13.5 ms, p95 20.2 ms, max 28.9 ms (same run) |
