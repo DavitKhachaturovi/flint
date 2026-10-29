@@ -15,16 +15,20 @@ import {
   Channels,
   epochNow,
   type DevEvent,
+  type PopupNotice,
   type PopupSubmit,
   type ToastKind,
 } from '../shared/ipc.js';
 import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
 import { showReminderToast } from './notifications.js';
+import { DraftFile } from './capture/drafts.js';
+import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
 import { APP_SCHEME, contentType, rendererPageUrl, resolveRendererFile } from './renderer-url.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
+import { watchListFolder } from './storage/watcher.js';
 import {
   applyStartWithWindows,
   configureAppPaths,
@@ -239,6 +243,43 @@ async function start(): Promise<void> {
     mainWindow.focus();
   };
 
+  // Captures (CAP-01, CAP-02, CAP-05, D-27): every list loaded, drafts kept in app data.
+  const workspace = await Workspace.open(
+    folder.folder,
+    join(app.getPath('userData'), 'ui-state.json'),
+  );
+  watchListFolder(folder.folder, (path) => {
+    workspace.fileChanged(path).catch((error: unknown) => log(`reload failed: ${String(error)}`));
+  });
+  const drafts = new DraftFile(join(app.getPath('userData'), 'drafts.json'));
+  await drafts.load();
+  /** The follow-up message for the next popup open (D-26), and what its Undo reverts. */
+  let notice: { readonly popup: PopupNotice; readonly undo: CreatedList | null } | null = null;
+
+  const saveCapture = async (capture: PopupSubmit): Promise<void> => {
+    try {
+      const outcome = await workspace.capture(capture, new Date());
+      if (outcome.kind === 'saved') {
+        log(
+          `capture saved to ${outcome.listName}; Enter → durably on disk ${(epochNow() - capture.keyAt).toFixed(1)} ms`,
+        );
+        notice = outcome.createdList
+          ? {
+              popup: { kind: 'created-list', name: outcome.createdList.name },
+              undo: outcome.createdList,
+            }
+          : null;
+      }
+      await drafts.clearIf(capture.text);
+      e2eHooks()?.captured.push(capture.text);
+    } catch (error) {
+      // D-27: the text comes back as the draft, with `Couldn't save your last capture · Retry`.
+      log(`capture could not be saved: ${String(error)}`);
+      notice = { popup: { kind: 'save-failed' }, undo: null };
+      await drafts.set(capture.text).catch(() => undefined);
+    }
+  };
+
   const focusedWaiters: ((sample: FocusSample) => void)[] = [];
   const capturedWaiters: ((
     capture: PopupSubmit & { hiddenAt: number; returnedAt: number },
@@ -251,12 +292,25 @@ async function start(): Promise<void> {
       focusedWaiters.splice(0).forEach((resolve) => resolve(sample));
     },
     onCaptured: (capture) => {
-      // M3 writes it to Inbox; until then the capture is only acknowledged.
       log(
-        `captured "${capture.text}"; Enter → hidden and focus returned ${(capture.returnedAt - capture.keyAt).toFixed(1)} ms`,
+        `capture handed over; Enter → hidden and focus returned ${(capture.returnedAt - capture.keyAt).toFixed(1)} ms`,
       );
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
-      e2eHooks()?.captured.push(capture.text);
+      void saveCapture(capture);
+    },
+    state: () => ({ draft: drafts.text, notice: notice?.popup ?? null }),
+    onDraft: (text) => {
+      drafts.set(text).catch((error: unknown) => log(`draft not saved: ${String(error)}`));
+    },
+    onNoticeAction: (action) => {
+      const undo = action === 'undo' ? notice?.undo : null;
+      notice = null;
+      if (undo) {
+        workspace
+          .undoCreatedList(undo, new Date())
+          .then(() => log(`undid the new list ${undo.name}`))
+          .catch((error: unknown) => log(`undo failed: ${String(error)}`));
+      }
     },
   });
   const hooks = e2eHooks();

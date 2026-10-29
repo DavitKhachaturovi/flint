@@ -13,13 +13,27 @@ export const Channels = {
   popupFocused: 'popup:focused',
   popupSubmit: 'popup:submit',
   popupDismiss: 'popup:dismiss',
+  popupDraft: 'popup:draft',
+  popupNoticeAction: 'popup:notice-action',
   devEvent: 'dev:event',
   devSendToast: 'dev:send-toast',
 } as const;
 
+/**
+ * A message that follows a capture (D-26): shown as one quiet line at the top of the popup the next
+ * time it opens, until dismissed or until the next capture is saved.
+ */
+export type PopupNotice =
+  { readonly kind: 'created-list'; readonly name: string } | { readonly kind: 'save-failed' };
+
+export type PopupNoticeAction = 'undo' | 'dismiss';
+
 /** Main → popup: the popup was just shown by the hotkey at `hotkeyAt`. */
 export interface PopupShown {
   readonly hotkeyAt: number;
+  /** The saved draft (CAP-08); replaces the input only when the popup's text differs. */
+  readonly draft: string;
+  readonly notice: PopupNotice | null;
 }
 
 /** Popup → main: the input has focus and a frame with it has been produced (R-1). */
@@ -35,6 +49,8 @@ export interface PopupFocused {
 export interface PopupSubmit {
   readonly text: string;
   readonly keyAt: number;
+  /** Tab on the close-match card: create the typed list instead (D-25). */
+  readonly chooseNewList: boolean;
 }
 
 export interface PopupSubmitAck {

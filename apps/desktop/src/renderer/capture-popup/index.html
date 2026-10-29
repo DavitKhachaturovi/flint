@@ -11,9 +11,20 @@
   </head>
   <body>
     <main class="card" aria-label="Capture a task">
+      <div class="notice" role="status" hidden>
+        <span class="notice-text"></span>
+        <button type="button" class="notice-action"></button>
+        <button type="button" class="notice-close" aria-label="Dismiss">×</button>
+      </div>
       <div class="chips" aria-live="polite"></div>
       <label class="visually-hidden" for="capture">Capture a task</label>
-      <input id="capture" autocomplete="off" spellcheck="false" placeholder="Capture a task…" />
+      <textarea
+        id="capture"
+        rows="1"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Capture a task…"
+      ></textarea>
       <div class="tools"><span class="hint-chip">!h ##list @15:00</span></div>
     </main>
     <p class="hint">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</p>

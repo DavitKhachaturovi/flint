@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   Channels,
   type PopupFocused,
+  type PopupNoticeAction,
   type PopupShown,
   type PopupSubmit,
   type PopupSubmitAck,
@@ -20,6 +21,13 @@ const popup = {
   },
   dismiss(): void {
     ipcRenderer.send(Channels.popupDismiss);
+  },
+  /** CAP-08: the main process keeps the draft in app data. */
+  saveDraft(text: string): void {
+    ipcRenderer.send(Channels.popupDraft, text);
+  },
+  noticeAction(action: PopupNoticeAction): void {
+    ipcRenderer.send(Channels.popupNoticeAction, action);
   },
 };
 

@@ -27,12 +27,17 @@ body {
   gap: 6px;
 }
 
-input {
+textarea {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  height: 56px;
-  padding: 0 8px;
+  min-height: 56px;
+  /* Grows with Shift+Enter lines and pasted text, then scrolls (CAP-06). */
+  max-height: 144px;
+  padding: 14px 8px;
+  resize: none;
+  overflow-y: auto;
+  line-height: 28px;
   background: transparent;
   border: 0;
   outline: none;
@@ -43,7 +48,7 @@ input {
   letter-spacing: -0.01em;
 }
 
-input::placeholder {
+textarea::placeholder {
   color: var(--fl-text-muted);
 }
 
@@ -76,4 +81,47 @@ input::placeholder {
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+/* D-26: one quiet line about the last capture, until dismissed or the next capture is saved. */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 8px 8px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+.notice[hidden] {
+  display: none;
+}
+
+.notice-text {
+  flex: 1;
+}
+
+.notice button {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--fl-radius-check);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.notice-action {
+  color: var(--fl-text-highlight);
+}
+
+.notice-close {
+  color: var(--fl-text-muted);
+}
+
+.notice button:hover {
+  background: var(--fl-ground-tile);
+}
+
+.notice button:focus-visible {
+  outline: 1px solid var(--fl-accent);
 }

@@ -4,6 +4,8 @@ import {
   Channels,
   epochNow,
   type PopupFocused,
+  type PopupNotice,
+  type PopupNoticeAction,
   type PopupShown,
   type PopupSubmit,
   type PopupSubmitAck,
@@ -35,6 +37,10 @@ export interface PopupEvents {
   readonly onCaptured: (
     capture: PopupSubmit & { readonly hiddenAt: number; readonly returnedAt: number },
   ) => void;
+  /** What the popup shows when it opens: the saved draft and any follow-up notice (CAP-08, D-26). */
+  readonly state: () => { readonly draft: string; readonly notice: PopupNotice | null };
+  readonly onDraft: (text: string) => void;
+  readonly onNoticeAction: (action: PopupNoticeAction) => void;
 }
 
 export interface CapturePopup {
@@ -124,6 +130,15 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     if (event.sender === window.webContents) hideAndReturn();
   });
 
+  ipcMain.on(Channels.popupDraft, (event, text: unknown) => {
+    if (event.sender === window.webContents && typeof text === 'string') events.onDraft(text);
+  });
+
+  ipcMain.on(Channels.popupNoticeAction, (event, action: unknown) => {
+    if (event.sender !== window.webContents) return;
+    if (action === 'undo' || action === 'dismiss') events.onNoticeAction(action);
+  });
+
   // Clicking elsewhere hides the popup; the draft stays (CAP-08). Focus is already elsewhere.
   window.on('blur', () => {
     if (window.isVisible()) window.hide();
@@ -142,7 +157,7 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
       // would be visible while keystrokes still go to the previous app. Take it explicitly.
       forced = foregroundWindow() !== windowHandle;
       if (forced) forceForeground(windowHandle);
-      const shown: PopupShown = { hotkeyAt };
+      const shown: PopupShown = { hotkeyAt, ...events.state() };
       window.webContents.send(Channels.popupShown, shown);
     },
     hide() {

@@ -19,7 +19,7 @@ Flint is a minimalist, keyboard-first quick-capture notes and task app for devel
 ## Where to start
 
 1. **M1, `packages/core`** (`docs/06` §2): the file format (Dataview inline fields, `docs/04` §3, decided in D-20) with round-trip and fuzz tests first.
-2. **M2/M3 start with the risky pieces** (`docs/06` §1): R-1 popup latency, R-3 actionable toast, R-2 capture-selection, built as production code with their acceptance checks. Record the measured numbers in `docs/06`. There is no throwaway spike (D-18).
+2. **M2/M3 start with the risky pieces** (`docs/06` §1): R-1 popup latency, R-3 actionable toast, R-2 capture-selection (in M3 after the capture is saved to Inbox, D-37), built as production code with their acceptance checks. Record the measured numbers in `docs/06`. There is no throwaway spike (D-18).
 3. Then the remaining milestones in order.
 
 ## Non-negotiables

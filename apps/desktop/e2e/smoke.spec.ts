@@ -199,7 +199,7 @@ test('creates the Flint folder with Inbox', async () => {
     .toBe('---\nflint: 1\nid: inbox\nmode: tasks\n---\n');
 });
 
-test('a capture typed in the popup reaches the main process on Enter (D-27)', async () => {
+test('a capture typed in the popup is saved at the top of Inbox on Enter (CAP-02, D-27)', async () => {
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
@@ -208,7 +208,7 @@ test('a capture typed in the popup reaches the main process on Enter (D-27)', as
   await expect.poll(() => popupPage() !== undefined, { timeout: 15_000 }).toBe(true);
   const popup = popupPage();
   if (!popup) throw new Error('capture popup page not found');
-  await popup.locator('#capture').fill('check the e2e capture');
+  await popup.locator('#capture').fill('check the e2e capture !h');
   await popup.locator('#capture').press('Enter');
   await expect
     .poll(() =>
@@ -216,8 +216,11 @@ test('a capture typed in the popup reaches the main process on Enter (D-27)', as
         () => (globalThis as { __flintE2E?: { captured: string[] } }).__flintE2E?.captured ?? [],
       ),
     )
-    .toEqual(['check the e2e capture']);
+    .toEqual(['check the e2e capture !h']);
   await expect(popup.locator('#capture')).toHaveValue('');
+  expect(await readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8')).toMatch(
+    /^---\nflint: 1\nid: inbox\nmode: tasks\n---\n- \[ \] check the e2e capture \[priority:: high\] \[id:: [a-z0-9]{4,6}\]\n$/,
+  );
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

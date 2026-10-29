@@ -262,3 +262,8 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
 - **Decision:** R-1 (popup latency) is accepted on the measurements already taken: hotkey → focused popup p50 28.2 ms, p95 40.3 ms over a full-screen stand-in, and 17.3 / 32.1 ms by hand, on Davit's standard work laptop (docs/06 §1). There is no separate run on another laptop during a Teams call; R-1 is re-measured only if capture feels slow in daily use. The laptop benchmark (`npm run dist:bench`) stays in the repo for that case and is compiled out of normal builds and the installer (`__FLINT_BENCH_BUILD__`).
 - **Rationale:** about 28 ms leaves enough headroom under the 50 ms budget; measuring again on purpose would cost time better spent on v1 features.
+
+### D-37 — M3 starts with saving captures; capture-selection hotkey Ctrl+Shift+X
+- **Date:** 29 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** M3 starts by saving captures to Inbox (D-27), with drafts and the follow-up notice line, because an unsaved capture is what keeps Flint from daily use; R-2 (capture-selection) follows the shorthand and paste work in the same milestone instead of opening it. Q-03 resolved: capture **Ctrl+Shift+Space**, capture-selection **Ctrl+Shift+X**. Both are rebindable with conflict detection (APP-08); Ctrl+Shift+X takes the combination from VS Code (Extensions view) and Teams (expand compose box), rarely used by keyboard.
+- **Proposed details (docs/03 §3):** in the popup, Ctrl+Z with an empty box undoes `Created list <name>`; Retry of a failed save is Enter, since the text is back in the box.

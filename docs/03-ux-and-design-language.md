@@ -37,8 +37,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 ### Global (work from any app)
 | Action | Key | Status |
 |---|---|---|
-| Open capture popup (CAP-01) | Rebindable; default see Q-03 | Decided (rebindable) |
-| Capture selected text (CAP-07) | Rebindable; default see Q-03 | Decided (rebindable) |
+| Open capture popup (CAP-01) | Ctrl+Shift+Space, rebindable (D-37) | Decided |
+| Capture selected text (CAP-07) | Ctrl+Shift+X, rebindable (D-37) | Decided |
 
 ### Capture popup
 | Action | Key | Status |
@@ -50,6 +50,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Create a new list instead of the close match | Tab (the card switches to `New list "<name>" · Enter`) | Decided (D-25) |
 | New line in text | Shift+Enter | Proposed |
 | Paste screenshot / stack trace / JSON | Ctrl+V | Decided (behaviour in CAP-06) |
+| Undo `Created list <name>` from the notice line (D-26) | Ctrl+Z while the box is empty, or click Undo | Proposed |
+| Retry `Couldn't save your last capture` | Enter (the text is back in the box), or click Retry | Proposed |
 
 ### Task list — Navigate state
 | Action | Key | Status |
