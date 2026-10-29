@@ -135,6 +135,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Only one level is allowed; unlimited nesting is where simplicity dies.
 - **Proposed:** subtasks move with their parent when dragged or moved to another list; completing a parent completes its open subtasks (undoable).
 - **Proposed (D-28):** completed subtasks stay under their parent (only top-level tasks move to the Completed section). Tab on a task that has subtasks does nothing. An outdented subtask moves to just after its parent's group, so the remaining subtasks keep their parent.
+- **Proposed:** un-checking a subtask whose parent is completed reopens the parent too (it returns to the active tasks like any un-checked task, TASK-06).
 
 ### TASK-05 — Expandable task body (v1)
 - Any one-line task can be expanded into a **markdown body** (for a stack trace, notes, screenshots).
@@ -171,6 +172,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-11 — Move tasks between lists (v1)
 - Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or drag onto a list in the sidebar.
 - This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
+- **Proposed:** a moved task lands at the top of the target list (like a capture), with its subtasks; a subtask moved on its own becomes a top-level task there. Its lines take on the target file's line endings.
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
