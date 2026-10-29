@@ -2,10 +2,19 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 
 const root = import.meta.dirname;
+const core = resolve(root, '../../packages/core/src');
 
 export default defineConfig({
   main: {
+    // @flint/core is bundled from source: no build order, no workspace symlink in the installer.
+    resolve: {
+      alias: [
+        { find: /^@flint\/core\/(.+)$/, replacement: `${core}/$1/index.ts` },
+        { find: /^@flint\/core$/, replacement: `${core}/index.ts` },
+      ],
+    },
     build: {
+      externalizeDeps: { exclude: ['@flint/core'] },
       rolldownOptions: { input: { index: resolve(root, 'src/main/index.ts') } },
     },
   },

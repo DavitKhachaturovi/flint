@@ -1,10 +1,14 @@
+// Main, preload and renderer code. electron-vite bundles each; this config only type-checks.
 {
-  // Main, preload and renderer code. electron-vite bundles each; this config only type-checks.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@flint/core": ["../../packages/core/src/index.ts"],
+      "@flint/core/*": ["../../packages/core/src/*/index.ts"]
+    }
   },
   "include": ["src", "electron.vite.config.ts"]
 }
