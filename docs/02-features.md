@@ -26,7 +26,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### LIST-04 — Convert between modes (v1)
 - A note can be converted into a task list and back.
 - Note → task list (**D-22**, resolves Q-16): checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved), and plain bullet lines become tasks too. Everything else (headings, paragraphs) stays in place as non-task content, which task lists show read-only (TASK-15). Nothing is dropped and no confirmation is needed. Example use: meeting notes → action items.
-- Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless. While the list is a note, its task fields are inert: no Today membership, no reminders (**Proposed**).
+- Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless. While the list is a note, its task fields are inert: no Today membership, no reminders (D-29).
 - Conversion is undoable (DATA-03).
 
 ---
@@ -62,8 +62,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - Nothing inside inline code (backticks) is a token.
   - A backslash escapes a token: `\##infra` is stored literally as `##infra`.
   - A `##` token is made of Unicode letters and digits plus `-` `_` `.` (Georgian list names work); trailing punctuation is not part of it (`##infra,`).
-  - Shorthand is read on the **first line only** (the title). Further lines (Shift+Enter, pasted stack traces) are the body, kept verbatim, so `@`, `!` and `##` inside pasted code are never touched.
-  - `@` takes the longest valid time expression right after it, up to 6 words: `@tomorrow 10 deploy` reads `tomorrow 10`. A bare number after a day is read as its time (`@tomorrow 10 people` → 10:00); the chip shows it.
+  - **D-29:** Shorthand is read on the **first line only** (the title). Further lines (Shift+Enter, pasted stack traces) are the body, kept verbatim, so `@`, `!` and `##` inside pasted code are never touched.
+  - **D-29:** `@` takes the longest valid time expression right after it, up to 6 words: `@tomorrow 10 deploy` reads `tomorrow 10`. A bare number after a day is read as its time (`@tomorrow 10 people` → 10:00); the chip shows it.
   - The live chip preview (CAP-04) is the source of truth for what was parsed.
 - The same shorthand parser is used by the capture popup, the in-list task input, and the CLI (CLI-01), from one shared package (05).
 
@@ -77,11 +77,11 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - An unknown list name must **never fail silently**. Before Enter, the popup shows a small card with what will happen:
   - **Close match** (an existing task list whose name starts with the token, 2+ characters, or is within edit distance 2, or 1 for names of 4 characters or fewer): `Unicorn · Enter · New list "unis" · Tab`. **Enter** saves into the close match. **Tab** switches the choice to creating the new list (the card then reads `New list "unis" · Enter`). When several lists match the prefix, the most recently used one is offered; sidebar order only breaks exact ties.
   - **No close match:** `New list "<name>" · Enter`.
-  - **Enter is the only key that saves.**
+  - **Enter is the only key that saves.** The card visibly flips when Tab changes the choice, so the selected option is always obvious (D-29).
 - An unmatched `##name` **creates a new task list**, named exactly as typed, when the capture is saved. Confirmation: `Created list <name> · Undo` (shown per CAP-01, D-26). Undo moves the task to Inbox and deletes the new list if it is still empty.
 - `##name` pointing at a **note**: the token stays as text, the task goes to Inbox, and the chip says `<name> is a note → Inbox`.
 - **Proposed:** a name Windows can't use as a file name (`##con`, illegal characters) stays as text, the task goes to Inbox and the chip explains why. "Most recently used" means the last capture or move target (kept in app data, `ui-state.json`).
-- **Proposed (ranking):** a task list with the same normalized name is an exact match (an identical spelling wins, then sidebar order); a task list wins over a note of the same name. Among close matches, prefix matches come before typo matches; prefix matches are ordered most recently used first, typo matches by smallest edit distance first, and sidebar order breaks remaining ties.
+- **Ranking (D-29):** a task list with the same normalized name is an exact match (an identical spelling wins, then sidebar order); a task list wins over a note of the same name. Among close matches, prefix matches come before typo matches; prefix matches are ordered most recently used first, typo matches by smallest edit distance first, and sidebar order breaks remaining ties.
 
 ### CAP-06 — Paste-to-capture (v1)
 - **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
@@ -134,13 +134,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Tab** indents a task once, making it a subtask of the task above. **Shift+Tab** outdents.
 - Only one level is allowed; unlimited nesting is where simplicity dies.
 - **Proposed:** subtasks move with their parent when dragged or moved to another list; completing a parent completes its open subtasks (undoable).
-- **Proposed (D-28):** completed subtasks stay under their parent (only top-level tasks move to the Completed section). Tab on a task that has subtasks does nothing. An outdented subtask moves to just after its parent's group, so the remaining subtasks keep their parent.
-- **Proposed:** un-checking a subtask whose parent is completed reopens the parent too (it returns to the active tasks like any un-checked task, TASK-06).
+- **D-28, confirmed by D-29:** completed subtasks stay under their parent (only top-level tasks move to the Completed section). Tab on a task that has subtasks does nothing. An outdented subtask moves to just after its parent's group, so the remaining subtasks keep their parent.
+- **D-29:** un-checking a subtask whose parent is completed reopens the parent too (it returns to the active tasks like any un-checked task, TASK-06).
 
 ### TASK-05 — Expandable task body (v1)
 - Any one-line task can be expanded into a **markdown body** (for a stack trace, notes, screenshots).
 - Collapsed, the row shows only a **small indicator** that a body exists. The list stays clean without forcing a separate note.
 - The body supports the same editor features as note mode (live preview, code blocks, media).
+- A checklist line (`- [ ]`) in a top-level task's body is a subtask (04 §3, D-29): typing `- [ ]` in a body visibly turns that line into a subtask.
 
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
 - Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
@@ -172,7 +173,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-11 — Move tasks between lists (v1)
 - Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or drag onto a list in the sidebar.
 - This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
-- **Proposed:** a moved task lands at the top of the target list (like a capture), with its subtasks; a subtask moved on its own becomes a top-level task there. Its lines take on the target file's line endings.
+- **D-29:** a moved task lands at the top of the target list (like a capture), with its subtasks; a subtask moved on its own becomes a top-level task there. Several tasks moved together (TASK-07) land at the top in their original relative order. Its lines take on the target file's line endings.
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
@@ -220,7 +221,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Must support at least: `in 20m`, `at 15:00`, `tomorrow 10`, `fri` (plus equivalents like `20m`, `2h`, `15:00`, weekday names).
 - The resolved absolute time is always shown before confirming (picker preview / capture chip).
 - Default time when only a day is given (`tomorrow`, `fri`): see Q-02.
-- **Proposed grammar (M1):**
+- **Grammar (D-29):**
   - Relative: `20m`, `2h`, `1h30m`, `in 20m`, `in 2 hours`, `3d` (three days from now, at the default time).
   - Clock: `15:00`, `at 15:00`, `9`, `3pm`, `9:30am`.
   - Days: `today`, `tomorrow`, `mon`…`sun` and full weekday names, `next fri`, each with an optional time.

@@ -15,6 +15,7 @@ import {
   editTitle,
   indentTask,
   moveDown,
+  moveTasksToList,
   moveToList,
   moveUp,
   outdentTask,
@@ -296,6 +297,15 @@ describe('deleting and moving between lists (TASK-11, TASK-12)', () => {
     const documents = docs({ a: LIST, b: '' });
     expect(text(apply(documents, moveToList(documents, 'a', 'bb11', 'b')), 'b')).toBe(
       '- [ ] B1 [id:: bb11]\n',
+    );
+  });
+
+  it('a bulk move lands at the top in the original relative order (D-29)', () => {
+    const documents = docs({ a: LIST, b: '- [ ] x [id:: xxxx]\n' });
+    // Selected in another order, and a subtask whose parent moves too.
+    const op = moveTasksToList(documents, 'a', ['cccc', 'bb11', 'aaaa', 'bbbb'], 'b');
+    expect(text(apply(documents, op), 'b')).toBe(
+      '- [ ] A [id:: aaaa]\n- [ ] B [id:: bbbb]\n    - [ ] B1 [id:: bb11]\n- [ ] C [id:: cccc]\n- [ ] x [id:: xxxx]\n',
     );
   });
 

@@ -147,7 +147,7 @@ flint/
 
 ### Storage (04)
 - All file I/O in the main process via the core format package; atomic writes (DATA-01) with retry for transient Windows file locks.
-- Before writing, re-read the file; if it changed on disk, re-parse it and re-apply the pending operations by task ID (core operations are keyed by ID and can be replayed), so external writes (CLI, Claude, an editor) are never overwritten (04 §6, Proposed).
+- Before writing, re-read the file; if it changed on disk, re-parse it and re-apply the pending operations by task ID (core operations are keyed by ID and can be replayed), so external writes (CLI, Claude, an editor) are never overwritten (04 §6, D-29).
 - File watcher ignores Flint's own writes and preserves cursor/selection on reload (DATA-06).
 
 ### Auto-update (APP-06) — Later (D-19)

@@ -1,4 +1,4 @@
-import type { FlintDocument, TaskNode, TextChunk } from '../format/document.js';
+import { allTasks, type FlintDocument, type TaskNode, type TextChunk } from '../format/document.js';
 import { escapeTitle, flintField, localDateTimeField, type Priority } from '../format/fields.js';
 import { isCompletedStatus, type TaskLine } from '../format/task-line.js';
 import type { LocalDateTime } from '../time/local-datetime.js';
@@ -280,26 +280,43 @@ export function deleteTask(list: string, key: string): Op {
 }
 
 /**
- * TASK-11: moves a task (with its subtasks, TASK-04) to the top of another list (**Proposed**: top,
- * like captures). It takes on that file's line endings.
+ * TASK-11, TASK-07: moves tasks (with their subtasks, TASK-04) to the top of another list, like
+ * captures, keeping their relative order from the source list (D-29). A subtask whose parent moves
+ * too goes with the parent; one moved on its own becomes a top-level task. The tasks take on the
+ * target file's line endings.
  */
-export function moveToList(documents: Documents, from: string, key: string, to: string): Op | null {
+export function moveTasksToList(
+  documents: Documents,
+  from: string,
+  keys: readonly string[],
+  to: string,
+): Op | null {
   const source = documents.get(from);
   const target = documents.get(to);
-  const found = source && locate(source, key);
-  if (!found || !target || from === to) return null;
-  return {
-    type: 'batch',
-    ops: [
-      { type: 'remove', list: from, key },
-      {
-        type: 'insert',
-        list: to,
-        task: withLineEndings(found.task, target.eol),
-        where: { at: 'top' },
-      },
-    ],
-  };
+  if (!source || !target || from === to) return null;
+  const selected = new Set(keys);
+  const moving = [...allTasks(source)]
+    .filter(({ task, parent }) => selected.has(task.key) && !(parent && selected.has(parent.key)))
+    .map(({ task }) => task);
+  if (moving.length === 0) return null;
+  const ops: Op[] = [];
+  let previous: string | null = null;
+  for (const task of moving) {
+    ops.push({ type: 'remove', list: from, key: task.key });
+    ops.push({
+      type: 'insert',
+      list: to,
+      task: withLineEndings(task, target.eol),
+      where: previous === null ? { at: 'top' } : { at: 'after', key: previous },
+    });
+    previous = task.key;
+  }
+  return { type: 'batch', ops };
+}
+
+/** TASK-11: one task to the top of another list. */
+export function moveToList(documents: Documents, from: string, key: string, to: string): Op | null {
+  return moveTasksToList(documents, from, [key], to);
 }
 
 /** TASK-07: several actions as one undo step. */

@@ -195,7 +195,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Alternatives considered:** hide only after the write completes (rejected: a slow or locked disk keeps the popup on top of the call).
 
 ### D-28 — Pre-M1 review gap-fills (Proposed defaults)
-- **Date:** Oct 2026 · **Status:** Proposed (accepted by Davit as defaults during the pre-M1 review; each is marked Proposed where it is specified)
+- **Date:** Oct 2026 · **Status:** Decided (confirmed after M1 by D-29; was Proposed)
 - **Decision:** the gaps found while reviewing the docs before M1 are filled as follows:
   - **IDs:** missing IDs are written on the next save of the file (as before); until then the task has a provisional in-memory ID that stays stable across re-parses. ID uniqueness covers lists, notes, the archive and Trash (04 §3).
   - **Hand-edited files:** a task checked outside Flint (`[x]` without `completion`) gets `completion` on the next save of that file; indentation is read as tabs, 2 or 4 spaces and written as 4 spaces unless the file already uses tabs; unchanged field values keep their raw text (`highest` is not rewritten as `high`); per-line endings, BOM and the final newline are preserved; a file that isn't valid UTF-8 opens read-only (04 §3, §6).
@@ -204,3 +204,13 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Tooling:** a small custom natural-language time parser instead of a library such as chrono-node, because it runs in the tiny capture popup; npm workspaces for the monorepo (05 §1–2).
   - **Docs hygiene:** no emoji in UI examples (CAP-04); no theme switching in v1 (NAV-01, 01 Principle 10, 03 §6).
   - **Filled while writing the spec, not yet reviewed (04 §3–4):** checkbox states (`[x]`/`[X]` completed; other status characters such as `[-]` are non-task content; `completion` on an open task is ignored and kept), list markers (`-`/`*`/`+` tasks; numbered items are non-task content), Completed-section recognition (first level-2 "Completed" heading; state comes from the checkbox, not the position), task fields are inert while a list is a note, a date-only `reminder` means 09:00, and `completedAfter` in `meta.json` for un-checking (TASK-06).
+
+### D-29 — M1 review: gap-fills confirmed; capture card, body checklists, bulk moves
+- **Date:** Oct 2026 · **Status:** Decided (after M1)
+- **Decision:**
+  - The D-28 gap-fills and the behaviours added as Proposed during M1 are confirmed: shorthand read on the first line only and `@` taking the longest time expression (CAP-03), close-match ranking (CAP-05), un-checking a subtask reopens its completed parent (TASK-04), a moved task lands at the top of the target list (TASK-11), the REM-02 grammar and weekday rules, repeated Flint fields, read-only files with an unknown `mode`, checkbox states, list markers, Completed-section recognition, inert fields in notes, and the format details in 04 §3–6. Each now points at D-29 where it is specified.
+  - **Bulk move** (TASK-07, TASK-11): tasks moved to another list together land at its top in their original relative order.
+  - **Close-match card** (D-25): Tab switches the card to "New list"; Enter is the only key that saves. The card visibly flips so the selected option is always obvious (09 §8).
+  - **Checklists in a body**: a `- [ ]` line in a top-level task's body is a subtask (04 §3). In the editor (M4), typing `- [ ]` in a body visibly turns that line into a subtask.
+  - **`next fri`** means the same as `fri`; the chip shows the exact date.
+- **Rationale:** Enter must never do anything but save under time pressure, and a Tab pressed out of autocomplete habit must not save half-typed text; the format's definition of a subtask is kept rather than special-cased in the editor, and made visible instead.

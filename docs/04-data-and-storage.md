@@ -91,9 +91,9 @@ The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) re
 ### Fields
 | Field | Values | Meaning | Feature |
 |---|---|---|---|
-| `id` | written: `[a-z0-9]{4,6}`; read: `[A-Za-z0-9_-]{1,32}` (**Proposed**, D-21) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (**Proposed**) | Today, reminders, undo, CLI |
+| `id` | written: `[a-z0-9]{4,6}`; read: `[A-Za-z0-9_-]{1,32}` (D-21, D-29) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (D-29) | Today, reminders, undo, CLI |
 | `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
-| `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (**Proposed**). A date-only value means 09:00 (Q-02). | Reminder time | REM-01 |
+| `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 09:00 (Q-02). | Reminder time | REM-01 |
 | `today` | `true`, any letter case (absent = not starred) | Starred into Today | TODAY-01 |
 | `completion` | written: `YYYY-MM-DDTHH:MM`; read: also `YYYY-MM-DD` (what Dataview and Obsidian Tasks write) and `…:SS` (**Proposed**) | Completion timestamp (completed tasks only) | TASK-06 |
 
@@ -104,16 +104,16 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
   - **Flint's own fields** (`priority`, `reminder`, `today`, `completion`, `id`) are recognised anywhere in the line, in `[]` or `()`, with or without a space after `::`, **only when the value is valid** for that key (see Fields).
   - **Unknown fields** are recognised only in the trailing run of fields at the end of the line, and only with whitespace after `::` (`[due:: 2026-11-02]`). Anywhere else, `[…::…]` and `(…::…)` are title text: `check [Vec::new] behaviour` keeps its text, visible and in place.
   - Nothing inside an inline code span is ever a field.
-  - A trailing Obsidian block ID (`^a1b2`) at the very end of the line doesn't break the trailing run (**Proposed**).
-- **Canonical writer (D-21):** `[]` fields at the end of the line in the order `reminder`, `today`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (**Proposed**).
+  - A trailing Obsidian block ID (`^a1b2`) at the very end of the line doesn't break the trailing run (D-29).
+- **Canonical writer (D-21):** `[]` fields at the end of the line in the order `reminder`, `today`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (D-29).
 - **Only touch what changed.** Lines Flint didn't modify are written back byte-for-byte. Non-task content (headings, paragraphs, plain bullets, blank lines, HTML comments) is preserved exactly and stays in place (D-22). Parsing and serializing an untouched file returns it byte-for-byte, including one with missing IDs: repair only happens as part of a save caused by an edit.
-- **Missing IDs** (lines added by hand or by the CLI) are assigned on Flint's next save of that file. Until then the task has a provisional in-memory ID that stays stable across re-parses (**Proposed**).
+- **Missing IDs** (lines added by hand or by the CLI) are assigned on Flint's next save of that file. Until then the task has a provisional in-memory ID that stays stable across re-parses (D-29).
 - **Duplicate IDs** (e.g. a line copy-pasted in a text editor): within a file, the first keeps the ID and later ones get new IDs; across files, the older file (by creation time, then path) keeps them (D-23, **Proposed**).
 - **Invalid values** (e.g. `[priority:: urgent]`, a malformed date): not a field. The text stays in the title, visible, never silently dropped or hidden; the task has no priority / no reminder (D-21).
-- **Repeated Flint fields (Proposed):** the first valid occurrence of a key is the field; later ones stay visible as title text. When Flint rewrites such a line it escapes them (`\[priority:: low]`) so they can't turn into the field; in general a written line is checked to read back as the same task, with the least escaping needed.
-- **Checkbox states (Proposed):** `[ ]` is open, `[x]`/`[X]` is completed. A task completed outside Flint (`[x]` without `completion`) gets `completion` on the next save of that file. A `completion` field on an open task is ignored and kept until Flint changes that task's completion state. Items with other status characters (Obsidian Tasks' `[-]`, `[/]`, …) are not Flint tasks: they are non-task content, shown read-only and never modified.
-- **List markers (Proposed):** `- [ ]`, `* [ ]` and `+ [ ]` items are tasks (the marker is kept as written). Numbered `1. [ ]` items and plain bullets without a checkbox are non-task content (D-22). Lines inside fenced code blocks or HTML comments are never tasks.
-- **Format version:** `flint: 1` in frontmatter. A file with a higher version than the app understands is opened read-only with a notice. So is a file whose `mode` is neither `tasks` nor `note` (**Proposed**); a missing `mode` means note (D-23).
+- **Repeated Flint fields (D-29):** the first valid occurrence of a key is the field; later ones stay visible as title text. When Flint rewrites such a line it escapes them (`\[priority:: low]`) so they can't turn into the field; in general a written line is checked to read back as the same task, with the least escaping needed.
+- **Checkbox states (D-29):** `[ ]` is open, `[x]`/`[X]` is completed. A task completed outside Flint (`[x]` without `completion`) gets `completion` on the next save of that file. A `completion` field on an open task is ignored and kept until Flint changes that task's completion state. Items with other status characters (Obsidian Tasks' `[-]`, `[/]`, …) are not Flint tasks: they are non-task content, shown read-only and never modified.
+- **List markers (D-29):** `- [ ]`, `* [ ]` and `+ [ ]` items are tasks (the marker is kept as written). Numbered `1. [ ]` items and plain bullets without a checkbox are non-task content (D-22). Lines inside fenced code blocks or HTML comments are never tasks.
+- **Format version:** `flint: 1` in frontmatter. A file with a higher version than the app understands is opened read-only with a notice. So is a file whose `mode` is neither `tasks` nor `note` (D-29); a missing `mode` means note (D-23).
 - **Required tests (M1):** round-trip tests (`serialize(parse(file)) === file` for untouched files), property-based/fuzz tests over random titles (including `::`, `#`, brackets, backticks and non-Latin text), fields, bodies and line endings, and fixtures of hand-edited, VS Code-edited and Obsidian-edited files (tabs, block IDs, Obsidian Tasks fields, CRLF, BOM).
 
 ### Task IDs
@@ -123,14 +123,14 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 ### Body and subtasks
 - A **task body** (TASK-05) is the indented, non-list-item content directly under a task (standard markdown list-item continuation), including fenced code blocks and media links.
 - A **subtask** (TASK-04) is an indented `- [ ]` item directly under a top-level task. Only one level is valid; content indented under a subtask, including deeper list items, is that subtask's body (**Proposed**).
-- **Indentation (Proposed):** read as tabs, 2 spaces or 4 spaces. Flint writes 4 spaces, or tabs if the file already indents with tabs.
+- **Indentation (D-29):** read as tabs, 2 spaces or 4 spaces. Flint writes 4 spaces, or tabs if the file already indents with tabs.
 
 ### Order
 - **Line order is the manual order.** Dragging or Alt+↑/↓ rewrites line order (TASK-01). Temporary sort by priority never touches the file (TASK-08).
 - **Non-task content stays in place (D-22).** Moving a task moves only its block (line, body, subtasks), placed next to the target task; non-task blocks never move as a side effect.
 - **New tasks "at the top"** go just before the first task, not above a heading or paragraph the file starts with (D-22).
-- Active tasks first, then a `## Completed` heading followed by completed tasks (most recently completed first, **Proposed**). The Completed section starts at the first level-2 heading whose text is "Completed" (any letter case); Flint appends one when the first task is completed (**Proposed**).
-- Open or completed comes from the checkbox, not the position: a task checked by hand above the heading shows as completed, and its line only moves when Flint changes that task (**Proposed**).
+- Active tasks first, then a `## Completed` heading followed by completed tasks (most recently completed first, **Proposed**). The Completed section starts at the first level-2 heading whose text is "Completed" (any letter case); Flint appends one when the first task is completed (D-29).
+- Open or completed comes from the checkbox, not the position: a task checked by hand above the heading shows as completed, and its line only moves when Flint changes that task (D-29).
 
 ### Bookkeeping in `.flint/meta.json` and `.flint/today.json`
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
@@ -154,7 +154,7 @@ mode: note
 ```
 
 - Free-form markdown. Checkboxes in notes are plain markdown checkboxes; they become tasks only via conversion (LIST-04).
-- Converting a task list to a note keeps the `[key:: value]` fields on checklist lines so converting back is lossless (LIST-04). While a list is a note, those fields are inert (no Today membership, no reminders) and their IDs stay reserved (**Proposed**).
+- Converting a task list to a note keeps the `[key:: value]` fields on checklist lines so converting back is lossless (LIST-04). While a list is a note, those fields are inert (no Today membership, no reminders) and their IDs stay reserved (D-29).
 - A `.md` file without Flint frontmatter is a note (D-23). When Flint adds its header on the first save caused by an edit, it inserts `flint`, `id` and `mode` into the existing frontmatter block (or creates one) without changing the other keys.
 
 ---
@@ -174,7 +174,7 @@ mode: note
 - Write to a temporary file **in the same directory** (same volume), flush to disk, then rename over the original.
 - Windows specifics: antivirus, the search indexer or OneDrive can briefly lock files; retry the rename with short backoff instead of failing.
 - A crash or power loss mid-save leaves either the old or the new file, never a corrupted one.
-- **Re-read before writing (Proposed):** if the file changed on disk since Flint last read it, Flint re-parses it and re-applies its pending operations by task ID, then writes. A CLI or Claude write is never overwritten by a stale in-memory copy.
+- **Re-read before writing (D-29):** if the file changed on disk since Flint last read it, Flint re-parses it and re-applies its pending operations by task ID, then writes. A CLI or Claude write is never overwritten by a stale in-memory copy.
 - **Unreadable files (D-24, Proposed):** a list that is cloud-only (OneDrive Files On-Demand) or locked shows that plainly on the list, never as an empty list.
 
 ### Trash (DATA-02)
@@ -197,8 +197,8 @@ mode: note
 - If the user is editing a task that also changed on disk: merge by task ID; if the same task changed in both places, keep the disk version and keep the user's version as an undo step (**Proposed**). Autosave keeps this window tiny.
 
 ### Encoding
-- UTF-8, `LF` line endings for files Flint creates; preserve the existing line endings of files it edits, per line (**Proposed**). New lines use the file's most common line ending.
-- Preserve a UTF-8 BOM and the presence or absence of a final newline. A file that isn't valid UTF-8 opens read-only with a notice (**Proposed**).
+- UTF-8, `LF` line endings for files Flint creates; preserve the existing line endings of files it edits, per line (D-29). New lines use the file's most common line ending.
+- Preserve a UTF-8 BOM and the presence or absence of a final newline. A file that isn't valid UTF-8 opens read-only with a notice (D-29).
 
 ---
 
