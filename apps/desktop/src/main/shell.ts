@@ -151,6 +151,11 @@ export function recoverFromCrashes(
   name: string,
   log: (message: string) => void,
 ): void {
+  // A window that fails to load would stay blank with no other trace.
+  window.webContents.on('did-fail-load', (_event, code, description, url) => {
+    log(`${name} failed to load ${url}: ${description} (${code})`);
+  });
+  window.webContents.on('did-finish-load', () => log(`${name} loaded`));
   window.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit') return;
     log(`${name} renderer gone (${details.reason}); reloading`);

@@ -56,11 +56,7 @@ function boundsOnActiveDisplay(): Rectangle {
   };
 }
 
-export function createCapturePopup(
-  rendererUrl: string | undefined,
-  rendererFile: string,
-  events: PopupEvents,
-): CapturePopup {
+export function createCapturePopup(url: string, events: PopupEvents): CapturePopup {
   const window = new BrowserWindow({
     ...boundsOnActiveDisplay(),
     show: false,
@@ -90,8 +86,7 @@ export function createCapturePopup(
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  if (rendererUrl) void window.loadURL(`${rendererUrl}/capture-popup/index.html`);
-  else void window.loadFile(rendererFile);
+  void window.loadURL(url);
 
   const windowHandle = handleValue(window.getNativeWindowHandle());
   let previous = 0n;

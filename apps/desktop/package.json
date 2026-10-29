@@ -14,12 +14,13 @@
     "install-electron": "install-electron",
     "check:electron-node": "node scripts/check-electron-node.mjs",
     "test:e2e": "playwright test",
-    "dist": "electron-vite build && electron-builder --win nsis --x64"
+    "dist": "electron-vite build && electron-builder --win nsis --x64 && node scripts/check-fuses.mjs"
   },
   "dependencies": {
     "koffi": "3.3.3"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@flint/core": "0.0.0",
     "@playwright/test": "1.64.1",
     "electron": "45.1.0",

@@ -1,4 +1,5 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   app,
@@ -6,6 +7,7 @@ import {
   globalShortcut,
   ipcMain,
   Notification,
+  protocol as schemes,
   session,
   shell,
 } from 'electron';
@@ -21,6 +23,7 @@ import { IDENTITIES, type BuildKind } from './identity.js';
 import { showReminderToast } from './notifications.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
+import { APP_SCHEME, contentType, rendererPageUrl, resolveRendererFile } from './renderer-url.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
 import {
   applyStartWithWindows,
@@ -76,12 +79,17 @@ function ensureDevShortcut(): void {
     shell.writeShortcutLink(link, 'create', details);
 }
 
-const rendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
-const rendererFile = (name: string): string =>
-  join(import.meta.dirname, `../renderer/${name}/index.html`);
+const devServerUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+/** Where a page loads from: the dev server while developing, otherwise `app://flint` (D-34). */
+const pageUrl = (page: string): string =>
+  devServerUrl ? `${devServerUrl}/${page}/index.html` : rendererPageUrl(page);
 
 configureAppPaths(IDENTITY.name);
 guardNodeNetworkForTests();
+// Before the app is ready: a standard, secure origin for the renderers, inside Flint only.
+schemes.registerSchemesAsPrivileged([
+  { scheme: APP_SCHEME, privileges: { standard: true, secure: true } },
+]);
 
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
 if (!app.requestSingleInstanceLock()) {
@@ -108,13 +116,32 @@ function log(message: string): void {
   }
 }
 
+/**
+ * Serves `app://flint/…` from the built renderer folder and nothing else (D-34). Read directly, not
+ * fetched as `file://`, so the network guard needs no exception for `file:`.
+ */
+function serveRenderer(): void {
+  const root = join(import.meta.dirname, '../renderer');
+  schemes.handle(APP_SCHEME, async (request) => {
+    const file = resolveRendererFile(request.url, root);
+    if (!file) return new Response('Not found', { status: 404 });
+    try {
+      return new Response(await readFile(file), {
+        headers: { 'Content-Type': contentType(file) },
+      });
+    } catch {
+      return new Response('Not found', { status: 404 });
+    }
+  });
+}
+
 /** Defense in depth for "no network requests at all in v1" (APP-09): only local content loads. */
 function blockNetwork(): void {
-  const devServer = rendererUrl ? new URL(rendererUrl).origin : null;
+  const devServer = devServerUrl ? new URL(devServerUrl).origin : null;
   const guard = (target: Electron.Session): void => {
     target.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, respond) => {
       const url = new URL(details.url);
-      const local = ['file:', 'devtools:', 'data:', 'blob:'].includes(url.protocol);
+      const local = [`${APP_SCHEME}:`, 'devtools:', 'data:', 'blob:'].includes(url.protocol);
       const dev =
         devServer !== null &&
         (url.origin === devServer || url.origin === devServer.replace(/^http/, 'ws'));
@@ -149,6 +176,7 @@ async function start(): Promise<void> {
   // for the whole session (29 Oct 2026). Logged so a machine that refuses toasts is diagnosable.
   log(`notifications supported: ${String(Notification.isSupported())} (${IDENTITY.appId})`);
   blockNetwork();
+  serveRenderer();
   const settings = await new SettingsFile(
     join(app.getPath('userData'), 'settings.json'),
     !app.isPackaged,
@@ -184,8 +212,7 @@ async function start(): Promise<void> {
       sandbox: true,
     },
   });
-  if (rendererUrl) void mainWindow.loadURL(`${rendererUrl}/main-window/index.html`);
-  else void mainWindow.loadFile(rendererFile('main-window'));
+  void mainWindow.loadURL(pageUrl('main-window'));
   // APP-02/03: closing hides; quitting is explicit (tray, M2).
   let quitting = false;
   mainWindow.on('close', (event) => {
@@ -208,7 +235,7 @@ async function start(): Promise<void> {
   const capturedWaiters: ((
     capture: PopupSubmit & { hiddenAt: number; returnedAt: number },
   ) => void)[] = [];
-  const popup: CapturePopup = createCapturePopup(rendererUrl, rendererFile('capture-popup'), {
+  const popup: CapturePopup = createCapturePopup(pageUrl('capture-popup'), {
     onFocused: (sample) => {
       log(
         `R-1 hotkey → focused frame ${(sample.frameAt - sample.hotkeyAt).toFixed(1)} ms (in front: ${String(sample.inFront)}, fallback: ${String(sample.forced)})`,

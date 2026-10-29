@@ -12,6 +12,17 @@ directories:
   buildResources: resources
 # The Electron that was installed and checked (D-30), not a second download.
 electronDist: ../../node_modules/electron/dist
+# Hardening (D-34): the packaged Flint.exe can't be used as a general Node runtime or debugged from
+# outside, runs only its own verified app.asar, and gives file:// no extra privileges (the UI is
+# served from app://flint instead). Checked by scripts/check-fuses.mjs after packaging.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 files:
   - out/**
   - package.json

@@ -27,7 +27,7 @@
 | Design tokens | `docs/design/tokens.css` (09) as the base stylesheet's CSS custom properties |
 | File watching | chokidar or Node `fs.watch` with debouncing |
 | Win32 calls (capture-selection) | An FFI library such as **koffi** (calls Win32 directly, no native addon rebuilds per Electron version) |
-| Packaging | electron-builder, NSIS installer |
+| Packaging | electron-builder, NSIS installer; Electron fuses set by electron-builder and checked with `@electron/fuses` (D-34) |
 | Updates | electron-updater (Later, D-19) |
 | Tests | Vitest with fast-check for property-based tests (core), Playwright for Electron (end-to-end) |
 
@@ -66,7 +66,7 @@ flint/
 ### Rules
 - **`packages/core` must not know it runs in Electron.** It operates on strings and a small file-system adapter. The same code powers the app, the CLI (Later), and future integrations, so the file format and shorthand parsing are identical everywhere.
 - **The UI reaches the OS only through a narrow, typed `Platform` interface** exposed by the preload script: windows (show/hide/position), notifications, global hotkeys, clipboard, file operations, autostart, updates. This keeps a future switch to another shell (e.g. Tauri) limited to rewriting this layer, and keeps other apps integration simple later.
-- **Security defaults:** `contextIsolation: true`, `nodeIntegration: false`, sandboxed renderers, no remote content loaded, strict Content-Security-Policy.
+- **Security defaults:** `contextIsolation: true`, `nodeIntegration: false`, sandboxed renderers, no remote content loaded, strict Content-Security-Policy. **D-34:** the renderers load from an in-app scheme, `app://flint/…` (standard and secure, served only from the built renderer folder, not registered with Windows), never `file://`; the network guard allows no `file:` requests. The packaged `Flint.exe` has its Electron fuses set: not usable as a Node runtime (`ELECTRON_RUN_AS_NODE` ignored), no `NODE_OPTIONS` and no inspector flags, loads only its own `app.asar` with embedded integrity validation, cookie encryption on, no extra `file://` privileges.
 
 ---
 
@@ -169,7 +169,7 @@ flint/
 
 ## 6. Build, signing, and distribution
 
-- **Installer:** NSIS via electron-builder, Windows x64, per-user install (no admin rights needed). Installing over an existing version upgrades it in place. One-click: installs to `%LOCALAPPDATA%\Programs\flint` and creates the Start Menu shortcut "Flint" carrying the AppUserModelID `app.flint.desktop` (D-33). Built with `npm run dist` in `apps/desktop` (`electron-builder.yml`, output `dist-installer/`).
+- **Installer:** NSIS via electron-builder, Windows x64, per-user install (no admin rights needed). Installing over an existing version upgrades it in place. One-click: installs to `%LOCALAPPDATA%\Programs\flint` and creates the Start Menu shortcut "Flint" carrying the AppUserModelID `app.flint.desktop` (D-33). Built with `npm run dist` in `apps/desktop` (`electron-builder.yml`, output `dist-installer/`), which fails if the packaged exe's fuses are not as configured (`scripts/check-fuses.mjs`, D-34).
 - **Uninstall (D-32):** "Flint" in Windows Settings → Apps, or `Uninstall Flint.exe` in the install folder. It closes Flint and removes the program folder, the Start Menu shortcut, the uninstall entry, and what Flint registered itself at runtime: the `flint://` handler (only if it still points at this installation), the start-with-Windows entry, and the installer copy electron-builder keeps for a future updater (`%LOCALAPPDATA%\flint-updater`, about 120 MB). It **keeps** the Flint folder (the user's notes, `%USERPROFILE%\Flint` by default, never touched), the settings and app state in `%APPDATA%\Flint`, and the logs in `%LOCALAPPDATA%\Flint\logs`, so reinstalling picks up where the user left off. Windows' own per-app notification settings for `app.flint.desktop` also stay. Installing over an existing version runs the old uninstaller in update mode, which keeps `flint://` and start-with-Windows. The cleanup lives in `apps/desktop/resources/installer.nsh`.
 - **Distribution (v1):** internal tool; the `.exe` is handed to coworkers manually (D-19).
 - **Code signing: not in v1 (D-19).** Azure Artifact Signing (formerly Trusted Signing) only issues public-trust certificates to organizations in a fixed list of regions that does not include Georgia, so the alternative is an OV certificate from a commercial CA: organization validation by the CA (documents and verification, typically days), a private key that must live on a hardware token or cloud HSM, and a yearly fee. Even signed, a new certificate has to build SmartScreen reputation. For an internal tool this is not worth it yet.
