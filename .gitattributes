@@ -1,0 +1,9 @@
+# Normalise text files to LF in the working copy on every machine (core.autocrlf would otherwise
+# check them out as CRLF on Windows).
+* text=auto eol=lf
+
+# Format fixtures must be byte-exact: CRLF, BOM and mixed line endings are what the tests are about.
+packages/core/test/fixtures/** -text
+
+*.png binary
+*.ico binary

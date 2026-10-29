@@ -1,0 +1,12 @@
+{
+  // Production build of the core sources. `types: []` keeps Node and DOM globals out, so any
+  // accidental use of `process`, `Buffer`, `fs`, `window`… fails to compile (docs/05 §2).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": []
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

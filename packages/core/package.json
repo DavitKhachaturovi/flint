@@ -1,0 +1,40 @@
+{
+  "name": "@flint/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Flint core: markdown format, capture shorthand, time parsing, list operations and undo. Pure TypeScript, no Electron or Node APIs (docs/05 §2).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./format": {
+      "types": "./dist/format/index.d.ts",
+      "default": "./dist/format/index.js"
+    },
+    "./shorthand": {
+      "types": "./dist/shorthand/index.d.ts",
+      "default": "./dist/shorthand/index.js"
+    },
+    "./time": {
+      "types": "./dist/time/index.d.ts",
+      "default": "./dist/time/index.js"
+    },
+    "./model": {
+      "types": "./dist/model/index.d.ts",
+      "default": "./dist/model/index.js"
+    },
+    "./undo": {
+      "types": "./dist/undo/index.d.ts",
+      "default": "./dist/undo/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

@@ -1,0 +1,8 @@
+# The docs are written by hand and are the spec; never reformat them.
+docs/
+*.md
+assets/
+packages/core/test/fixtures/
+dist/
+coverage/
+package-lock.json

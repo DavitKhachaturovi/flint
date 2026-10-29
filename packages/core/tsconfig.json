@@ -1,0 +1,9 @@
+{
+  // Editor, lint and test type-checking: sources plus tests (tests may use Node to read fixtures).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}
