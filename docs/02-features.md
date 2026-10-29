@@ -245,7 +245,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
-- Windows **Focus Assist / Do Not Disturb silently suppresses toasts**, and people often enable it during exactly the calls where they capture tasks. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
+- Windows **Focus Assist / Do Not Disturb silently suppresses ordinary toasts**, and people often enable it during exactly the calls where they capture tasks.
+- **Proposed (verified 29 Oct 2026, docs/06 §1):** reminder toasts use Windows' reminder scenario (`scenario="reminder"`): they stay on screen until acted on, and with Windows' default priority settings ("reminders" allowed) they still appear during Do Not Disturb, where an ordinary toast is suppressed. Flint's own sound and in-app alert remain for users who turn that setting off. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
 
 ### REM-07 — Missed-reminder recovery (v1)
 - If the app was closed or the PC was asleep when a reminder was due, Flint shows **"N reminders you missed"** on next launch / wake, listing them with the same actions (Done / Snooze / Open).
