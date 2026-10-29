@@ -29,6 +29,10 @@
     "./undo": {
       "types": "./dist/undo/index.d.ts",
       "default": "./dist/undo/index.js"
+    },
+    "./bench": {
+      "types": "./dist/bench/index.d.ts",
+      "default": "./dist/bench/index.js"
     }
   },
   "files": [

@@ -1,0 +1,10 @@
+# The R-1 laptop benchmark (docs/06 §1): `npm run dist:bench` builds a zip that is unpacked and run,
+# never installed. Same app and fuses as the installer; its own identity (D-33) and output folder.
+extends: electron-builder.yml
+appId: app.flint.desktop.bench
+productName: Flint R-1 benchmark
+extraMetadata:
+  name: flint-r1-benchmark
+directories:
+  output: dist-bench
+artifactName: Flint-R1-benchmark-${version}-win-x64.${ext}

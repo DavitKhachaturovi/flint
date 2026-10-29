@@ -1,6 +1,6 @@
 import dns from 'node:dns';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import net from 'node:net';
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
 import { writeFileAtomic } from './storage/atomic.js';
@@ -37,10 +37,12 @@ export function configureAppPaths(name: string): void {
 }
 
 /**
- * End-to-end tests run a development build against a throwaway folder (`FLINT_DATA_DIR`): app data,
- * logs and the Flint folder all live there. Ignored by installed builds.
+ * End-to-end tests run a development build against a throwaway folder (`FLINT_DATA_DIR`), and the R-1
+ * laptop benchmark keeps everything in `bench-data` next to its exe: app data, logs and the Flint
+ * folder all live there, and nothing is registered with Windows. Installed builds use neither.
  */
 export function testDataDirectory(): string | undefined {
+  if (__FLINT_BENCH_BUILD__) return join(dirname(process.execPath), 'bench-data');
   return !app.isPackaged ? process.env.FLINT_DATA_DIR || undefined : undefined;
 }
 

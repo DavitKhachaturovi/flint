@@ -14,7 +14,8 @@
     "install-electron": "install-electron",
     "check:electron-node": "node scripts/check-electron-node.mjs",
     "test:e2e": "playwright test",
-    "dist": "electron-vite build && electron-builder --win nsis --x64 && node scripts/check-fuses.mjs"
+    "dist": "electron-vite build && electron-builder --win nsis --x64 && node scripts/check-fuses.mjs",
+    "dist:bench": "electron-vite build --mode bench && electron-builder --config electron-builder.bench.yml --win zip --x64 && node scripts/check-fuses.mjs \"dist-bench/win-unpacked/Flint R-1 benchmark.exe\" && electron-vite build"
   },
   "dependencies": {
     "koffi": "3.3.3"

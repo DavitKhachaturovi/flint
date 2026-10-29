@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -43,7 +43,11 @@ import { VirtualKey } from './win32.js';
  * Who this build is (D-33). The installed AppUserModelID must match the installer's Start Menu
  * shortcut, or Windows hides the toasts (05 §5).
  */
-const BUILD: BuildKind = app.isPackaged ? 'installed' : 'development';
+const BUILD: BuildKind = __FLINT_BENCH_BUILD__
+  ? 'bench'
+  : app.isPackaged
+    ? 'installed'
+    : 'development';
 const IDENTITY = IDENTITIES[BUILD];
 /**
  * R-1 test hotkey; the default is decided with Q-03 and made rebindable with APP-08 (M3). No Alt:
@@ -174,7 +178,11 @@ async function start(): Promise<void> {
   // Set up notifications now (REM-05). Electron creates its toast machinery on first use; when that
   // came later, from a toast-button launch of the hidden app, it reported notifications unsupported
   // for the whole session (29 Oct 2026). Logged so a machine that refuses toasts is diagnosable.
-  log(`notifications supported: ${String(Notification.isSupported())} (${IDENTITY.appId})`);
+  // Not in test runs or the benchmark: they show no toasts, and setting up notifications can make
+  // Electron write a Start Menu shortcut for the app identity.
+  if (!testDataDirectory()) {
+    log(`notifications supported: ${String(Notification.isSupported())} (${IDENTITY.appId})`);
+  }
   blockNetwork();
   serveRenderer();
   const settings = await new SettingsFile(
@@ -195,7 +203,7 @@ async function start(): Promise<void> {
   if (folder.obsidianVaultRoot) {
     log('note: the Flint folder is an Obsidian vault root; a Flint subfolder is suggested (D-23)');
   }
-  applyStartWithWindows(settings.startWithWindows);
+  if (BUILD === 'installed') applyStartWithWindows(settings.startWithWindows);
   // Windows are hidden, never closed (APP-02); closing the last one must not quit Flint.
   app.on('window-all-closed', () => undefined);
 
@@ -319,23 +327,39 @@ async function start(): Promise<void> {
   // Test hooks are development-only: an installed Flint ignores these variables.
   const devEnv = (name: string): string | undefined =>
     BUILD === 'development' ? process.env[name] : undefined;
-  const benchIterations = Number(devEnv('FLINT_BENCH') ?? 0);
-  if (benchIterations > 0) {
-    popup.window.webContents.once('did-finish-load', () => {
-      void runBench(
-        popup,
-        {
-          waitFocused: (timeout) => waitFor(focusedWaiters, timeout),
-          waitCaptured: (timeout) => waitFor(capturedWaiters, timeout),
-        },
-        CAPTURE_HOTKEY,
-        benchIterations,
-      ).finally(() => {
-        quitting = true;
-        app.quit();
-      });
+  const benchHooks = {
+    waitFocused: (timeout: number) => waitFor(focusedWaiters, timeout),
+    waitCaptured: (timeout: number) => waitFor(capturedWaiters, timeout),
+  };
+  const quitAfter = (run: Promise<void>): void => {
+    void run.finally(() => {
+      quitting = true;
+      app.quit();
     });
-  } else if (!app.isPackaged && !STARTED_AT_LOGIN) {
+  };
+  const benchIterations = Number(devEnv('FLINT_BENCH') ?? 0);
+  if (__FLINT_BENCH_BUILD__) {
+    // The R-1 laptop benchmark build does nothing else (docs/06 §1). Other builds don't contain it.
+    popup.window.webContents.once('did-finish-load', () =>
+      quitAfter(
+        import('./laptop-bench.js').then(({ runLaptopBench }) =>
+          runLaptopBench(popup, benchHooks, CAPTURE_HOTKEY, registered, log),
+        ),
+      ),
+    );
+  } else if (benchIterations > 0) {
+    popup.window.webContents.once('did-finish-load', () =>
+      quitAfter(
+        runBench(popup, benchHooks, CAPTURE_HOTKEY, benchIterations).then((result) => {
+          writeFileSync(
+            join(app.getPath('userData'), 'bench-r1.json'),
+            `${JSON.stringify(result, null, 2)}\n`,
+          );
+          console.log(`FLINT_BENCH_RESULT ${JSON.stringify(result)}`);
+        }),
+      ),
+    );
+  } else if (BUILD === 'development' && !STARTED_AT_LOGIN) {
     // Development builds open the R-1/R-3 harness; installed builds start in the tray.
     mainWindow.show();
   }

@@ -190,3 +190,4 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Per-user NSIS installer; uninstall keeps the Flint folder and app data, removes `flint://`, start-with-Windows and the updater copy | D-32, D-19, 05 §6, `apps/desktop/electron-builder.yml`, `resources/installer.nsh` |
 | App identity `app.flint.desktop` (never changed once installed); development builds `.dev` with `flint-dev://`; test hooks development-only | D-33, 05 §5, `apps/desktop/src/main/identity.ts` |
 | Electron fuses on the packaged exe (checked by `npm run dist`); UI served from `app://flint`, no `file:` requests | D-34, 05 §2, `apps/desktop/scripts/check-fuses.mjs`, `src/main/renderer-url.ts` |
+| R-1 laptop benchmark build (`npm run dist:bench`): over a real Teams call, installs nothing, results next to the exe; M1 parse re-measured on the same laptop | 06 §1, `apps/desktop/src/main/laptop-bench.ts`, `packages/core/src/bench` |

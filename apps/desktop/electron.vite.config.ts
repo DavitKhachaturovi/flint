@@ -4,8 +4,10 @@ import { defineConfig } from 'electron-vite';
 const root = import.meta.dirname;
 const core = resolve(root, '../../packages/core/src');
 
-export default defineConfig({
+// `--mode bench` builds the R-1 laptop benchmark (docs/06 §1, `npm run dist:bench`).
+export default defineConfig(({ mode }) => ({
   main: {
+    define: { __FLINT_BENCH_BUILD__: JSON.stringify(mode === 'bench') },
     // @flint/core is bundled from source: no build order, no workspace symlink in the installer.
     resolve: {
       alias: [
@@ -45,4 +47,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
