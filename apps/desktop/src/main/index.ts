@@ -130,15 +130,18 @@ function blockNetwork(): void {
 }
 
 function registerProtocol(): void {
-  // Packaged builds are registered by the installer too; in development, point at this app folder.
+  // Registered on every start (the uninstaller removes it); in development, point at this app folder.
   if (app.isPackaged) app.setAsDefaultProtocolClient(PROTOCOL);
   else app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [app.getAppPath()]);
 }
 
 async function start(): Promise<void> {
   app.setAppUserModelId(app.isPackaged ? APP_ID : DEV_APP_ID);
-  if (!app.isPackaged) ensureDevShortcut();
-  registerProtocol();
+  // End-to-end runs leave the machine alone: no Start Menu shortcut, no taking over flint://.
+  if (!testDataDirectory()) {
+    if (!app.isPackaged) ensureDevShortcut();
+    registerProtocol();
+  }
   await app.whenReady();
   blockNetwork();
   const settings = await new SettingsFile(

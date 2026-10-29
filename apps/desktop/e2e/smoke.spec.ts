@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -72,10 +73,38 @@ function flintPids(mainPid: number, dataDirectory: string): Set<number> {
   return pids;
 }
 
+/**
+ * What a run could change on the machine: the flint:// handler (an installed Flint's toast buttons)
+ * and the development Start Menu shortcut. A test run must leave both alone.
+ */
+function machineState(): string {
+  let handler: string;
+  try {
+    handler = execFileSync(
+      'reg',
+      ['query', String.raw`HKCU\Software\Classes\flint\shell\open\command`, '/ve'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch {
+    handler = 'none';
+  }
+  const shortcut = join(
+    process.env.APPDATA ?? '',
+    'Microsoft',
+    'Windows',
+    'Start Menu',
+    'Programs',
+    'Flint (development).lnk',
+  );
+  const stamp = statSync(shortcut, { throwIfNoEntry: false })?.mtimeMs ?? 'none';
+  return `flint:// ${handler}; development shortcut ${String(stamp)}`;
+}
+
 const port = (address: string): string => address.slice(address.lastIndexOf(':') + 1);
 const isLoopback = (address: string): boolean => /^(127\.|\[::1\])/.test(address);
 
 let dataDirectory: string;
+let machineBefore: string;
 let proxy: Server;
 const proxied: string[] = [];
 let app: ElectronApplication;
@@ -84,6 +113,7 @@ let poller: NodeJS.Timeout | undefined;
 
 test.beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), 'flint-e2e-'));
+  machineBefore = machineState();
   proxy = createServer((request, response) => {
     proxied.push(`${request.method} ${request.url}`);
     response.destroy();
@@ -180,6 +210,10 @@ test('a capture typed in the popup reaches the main process on Enter (D-27)', as
     )
     .toEqual(['check the e2e capture']);
   await expect(popup.locator('#capture')).toHaveValue('');
+});
+
+test('leaves the machine alone: flint:// and the Start Menu are untouched (D-32)', () => {
+  expect(machineState()).toBe(machineBefore);
 });
 
 test('makes no network requests at all (APP-09)', async () => {

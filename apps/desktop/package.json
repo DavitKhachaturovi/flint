@@ -1,8 +1,10 @@
 {
   "name": "@flint/desktop",
+  "productName": "Flint",
   "version": "0.0.0",
   "private": true,
   "description": "Flint desktop app: Electron main process, preload bridge and renderers (docs/05).",
+  "author": "Davit Khachaturovi",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
@@ -11,13 +13,14 @@
     "start": "electron-vite preview",
     "install-electron": "install-electron",
     "check:electron-node": "node scripts/check-electron-node.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dist": "electron-vite build && electron-builder --win nsis --x64"
   },
   "dependencies": {
-    "@flint/core": "0.0.0",
     "koffi": "3.3.3"
   },
   "devDependencies": {
+    "@flint/core": "0.0.0",
     "@playwright/test": "1.64.1",
     "electron": "45.1.0",
     "electron-builder": "26.18.0",

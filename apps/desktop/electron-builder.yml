@@ -1,0 +1,41 @@
+# Installer (docs/05 §6, D-19): unsigned, per-user NSIS, no admin rights.
+appId: com.example.flint
+productName: Flint
+# The packaged app is "flint" (install folder %LOCALAPPDATA%\Programs\flint), not the workspace name.
+extraMetadata:
+  name: flint
+copyright: Davit Khachaturovi
+directories:
+  output: dist-installer
+  buildResources: resources
+# The Electron that was installed and checked (D-30), not a second download.
+electronDist: ../../node_modules/electron/dist
+files:
+  - out/**
+  - package.json
+# koffi loads a native binary, which Windows can't read from inside the asar archive.
+asarUnpack:
+  - '**/node_modules/koffi/**'
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - tray-*.png
+      - icon-256.png
+# flint:// is registered by the app at runtime (NSIS ignores `protocols`) and removed by installer.nsh.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon-256.png
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  createStartMenuShortcut: true
+  shortcutName: Flint
+  # Settings and drafts (%APPDATA%\Flint) survive an uninstall; the Flint folder is never touched.
+  deleteAppDataOnUninstall: false
+  # Removes what the app registered itself: flint:// and the start-with-Windows entry.
+  include: resources/installer.nsh
