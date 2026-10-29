@@ -203,7 +203,10 @@ test('a capture typed in the popup reaches the main process on Enter (D-27)', as
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
-  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  // Playwright may see the window before its page has reached app://flint/capture-popup.
+  const popupPage = () => app.windows().find((page) => page.url().includes('capture-popup'));
+  await expect.poll(() => popupPage() !== undefined, { timeout: 15_000 }).toBe(true);
+  const popup = popupPage();
   if (!popup) throw new Error('capture popup page not found');
   await popup.locator('#capture').fill('check the e2e capture');
   await popup.locator('#capture').press('Enter');
