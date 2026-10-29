@@ -17,12 +17,16 @@ export interface Identity {
 }
 
 export const IDENTITIES: Readonly<Record<BuildKind, Identity>> = {
-  installed: { appId: 'app.flint.desktop', protocol: 'flint', name: 'Flint' },
+  installed: { appId: 'com.davitkhachaturovi.flint', protocol: 'flint', name: 'Flint' },
   development: {
-    appId: 'app.flint.desktop.dev',
+    appId: 'com.davitkhachaturovi.flint.dev',
     protocol: 'flint-dev',
     name: 'Flint (development)',
   },
   // The R-1 laptop benchmark (docs/06 §1) shows no toasts and registers nothing.
-  bench: { appId: 'app.flint.desktop.bench', protocol: null, name: 'Flint R-1 benchmark' },
+  bench: {
+    appId: 'com.davitkhachaturovi.flint.bench',
+    protocol: null,
+    name: 'Flint R-1 benchmark',
+  },
 };

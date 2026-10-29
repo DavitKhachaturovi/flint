@@ -100,7 +100,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Reminder toasts show through Do Not Disturb (`scenario="reminder"`); "Hide task text in notifications" for screen sharing | REM-06, REM-10, D-35 |
 | Electron stack, rationale, alternatives | 05 §1, D-04 |
 | Perception thresholds (100 ms / 1 s) and performance budgets | 05 §4 |
-| Test on average laptop with a Teams call | 05 §4, 06 §1 |
+| Test on average laptop with a Teams call (R-1 accepted on the work-laptop measurement instead, D-36) | 05 §4, 06 §1, D-36 |
 | Cold start irrelevant if Flint is never not running | 05 §4 |
 | No blank/white flash (background color, rendered while hidden) | 05 §4, 03 §4 |
 | Only main window + popup alive at idle; mini mode on demand then hidden | 05 §3 |
@@ -188,6 +188,6 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Zero network requests enforced by the e2e smoke test; a network feature allowlists exactly its endpoint | D-31, APP-09, `apps/desktop/e2e/smoke.spec.ts` |
 | Flint folder setup: folder, Inbox (id: inbox / adopt / create), OneDrive and vault-root detection | DATA-07, LIST-03, D-23, D-24 |
 | Per-user NSIS installer; uninstall keeps the Flint folder and app data, removes `flint://`, start-with-Windows and the updater copy | D-32, D-19, 05 §6, `apps/desktop/electron-builder.yml`, `resources/installer.nsh` |
-| App identity `app.flint.desktop` (never changed once installed); development builds `.dev` with `flint-dev://`; test hooks development-only | D-33, 05 §5, `apps/desktop/src/main/identity.ts` |
+| App identity `com.davitkhachaturovi.flint` (never changed once installed); development builds `.dev` with `flint-dev://`; test hooks development-only | D-33, 05 §5, `apps/desktop/src/main/identity.ts` |
 | Electron fuses on the packaged exe (checked by `npm run dist`); UI served from `app://flint`, no `file:` requests | D-34, 05 §2, `apps/desktop/scripts/check-fuses.mjs`, `src/main/renderer-url.ts` |
-| R-1 laptop benchmark build (`npm run dist:bench`): over a real Teams call, installs nothing, results next to the exe; M1 parse re-measured on the same laptop | 06 §1, `apps/desktop/src/main/laptop-bench.ts`, `packages/core/src/bench` |
+| R-1 laptop benchmark build (`npm run dist:bench`), kept for a re-measure only (D-36): over a real Teams call, installs nothing, not in normal builds or the installer | 06 §1, `apps/desktop/src/main/laptop-bench.ts`, `packages/core/src/bench` |
