@@ -35,6 +35,7 @@
 - **Latest stable version the rest of the toolchain supports**, pinned exactly: exact versions in `package.json`, the lockfile pins the whole tree. Exceptions are recorded in D-30 (TypeScript 6.0.3: typescript-eslint supports < 6.1).
 - **7-day cooldown** against supply-chain attacks: `min-release-age=7` in `.npmrc`, and `scripts/check-release-age.mjs` in CI checks the whole lockfile (npm only applies the setting when resolving). Security fixes from a project's official maintainers may skip it: installed with `--min-release-age=0` and listed in the script's allowlist.
 - **`npm audit --audit-level=high`** in CI; high or critical findings fail the build.
+- **Install scripts** run only when approved in `package.json` `allowScripts`, pinned to an exact version (npm 11.19). Review what a script runs before approving it.
 - **Node and Electron security releases** are adopted promptly and recorded in the decision log. Electron must embed a patched Node: a test fails if its `process.versions.node` is below 24.22.1.
 
 ---
