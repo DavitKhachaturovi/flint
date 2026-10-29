@@ -46,8 +46,16 @@ export default defineConfig(
     },
   },
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // Plain Node scripts (measurements): Node globals, no type information.
+    files: ['**/*.mjs'],
+    languageOptions: {
+      parserOptions: { projectService: false },
+      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+    },
   },
   prettier,
 );

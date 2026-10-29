@@ -3,4 +3,8 @@
  * Sub-modules are also exported separately (`@flint/core/shorthand`, `@flint/core/time`, …) so the
  * capture popup can load only what it needs (CAP-10).
  */
-export {};
+export * from './format/index.js';
+export * from './model/index.js';
+export * from './shorthand/index.js';
+export * from './time/index.js';
+export * from './undo/index.js';

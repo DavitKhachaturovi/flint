@@ -16,9 +16,11 @@ Also measure: keypress → screen (one frame), Enter → popup hidden and focus 
 
 | Milestone | What | Target | Measured |
 |---|---|---|---|
-| M1 | Parse and serialize a 1,000-task list file (`packages/core`) | < 10 ms (Proposed) | — |
-| M1 | Shorthand parse per keystroke | < 1 ms (Proposed) | — |
-| M1 | Shorthand + time parser size, minified and gzipped (it ships in the capture popup) | < 15 KB (Proposed) | — |
+| M1 | Parse and serialize a 1,000-task list file (`packages/core`) | < 10 ms (Proposed) | parse 5.2 ms, serialize 0.03 ms; edit + save preparation + serialize 0.14 ms |
+| M1 | Shorthand parse per keystroke | < 1 ms (Proposed) | 0.008 ms |
+| M1 | Shorthand + time parser size, minified and gzipped (it ships in the capture popup) | < 15 KB (Proposed) | 3.7 KB (time parser alone 2.0 KB) |
+
+M1 numbers: `npm run measure` (median of 200–5,000 runs, Node 24) on a developer laptop (Intel Core Ultra 7 258V, 32 GB), not yet on an average laptop. Parsing has the least headroom; re-measure it on an average laptop in M2. Parsing happens in the main process, off the capture hot path.
 | M2 | R-1 hotkey → focused popup | < 50 ms (hard limit 100 ms) | — |
 | M2/M3 | Enter → popup hidden and focus returned | < 50 ms | — |
 | M2/M3 | Enter → capture durably on disk | < 100 ms at p95 | — |

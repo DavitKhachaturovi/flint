@@ -176,3 +176,8 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Natural-language time grammar for M1 (Proposed) | REM-02 |
 | M1 measurement targets (Proposed) | 06 §1 |
 | Screenshots 01/02 predate D-25; re-render in M2 | 09 §10 |
+| Shorthand read on the first line only; `@` takes the longest time expression; close-match ranking (Proposed) | CAP-03, CAP-05 |
+| Un-checking a subtask reopens its completed parent (Proposed) | TASK-04 |
+| A task moved to another list lands at its top (Proposed) | TASK-11 |
+| M1 measurements and `npm run measure` | 06 §1 |
+| Azure DevOps CI for M1: lint, format, typecheck, tests (10k fuzz runs), build | `azure-pipelines.yml`, 05 §6 |

@@ -21,7 +21,7 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 
 ## Status
 
-- **Phase:** Product and visual design complete for v1, implementation not started.
+- **Phase:** M1 (`packages/core`) built on branch `m1-core`: file format, IDs, shorthand, time parser, task operations, undo. M2 (shell) next.
 - **Logo:** `assets/icon/flint-icon-512.svg` (final), with small-size variants `flint-icon-24.svg` and `flint-icon-16.svg`.
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
 - **Repository:** `C:\Forge\flint`, Azure DevOps `DavitKhachaturovi/flint` (branch `main`).
