@@ -28,6 +28,7 @@ import {
   ListIcon,
   NoteIcon,
   PlusIcon,
+  ReminderBellIcon,
 } from './icons.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
@@ -153,6 +154,11 @@ export function App(): ReactElement {
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+  // REM-11: a reminder turns overdue on its own when its time passes.
+  useEffect(() => {
+    const timer = window.setInterval(() => void refreshRef.current(), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     window.flintMain.onChanged(() => void refreshRef.current());
     // A reminder's Open: its list, with the task selected once the rows are there.
@@ -355,6 +361,15 @@ export function App(): ReactElement {
     [change, showToast],
   );
 
+  /** REM-12, D-66: turns a reminder off (kept, never fired) or on, with Undo. */
+  const mute = useCallback(
+    async (key: string, muted: boolean): Promise<void> => {
+      const outcome = await change({ kind: 'mute', key, muted });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
     (row: TaskRow, at: Point, keyboard = false): void => {
@@ -382,6 +397,14 @@ export function App(): ReactElement {
                 'divider' as const,
               ]
             : []),
+          ...(open && row.reminder
+            ? [
+                {
+                  label: row.reminderState === 'muted' ? 'Turn reminder on' : 'Turn reminder off',
+                  action: () => void mute(row.key, row.reminderState !== 'muted'),
+                },
+              ]
+            : []),
           { label: 'Move to…', action: () => setPicker({ key: row.key, at }) },
           'divider',
           { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
@@ -390,7 +413,7 @@ export function App(): ReactElement {
         { keyboard },
       );
     },
-    [change, edit, remove, toggle],
+    [change, edit, mute, remove, toggle],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -577,6 +600,7 @@ export function App(): ReactElement {
     onTab: tab,
     onMenu: (task, at) => taskMenu(task, at),
     leaving,
+    onMute: (key, muted) => void mute(key, muted),
   };
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
@@ -1022,6 +1046,8 @@ interface RowHandlers {
   readonly onMenu: (task: TaskRow, at: Point) => void;
   /** Rows playing the completion animation. */
   readonly leaving: ReadonlySet<string>;
+  /** REM-12: the bell turns the reminder off or on. */
+  readonly onMute: (key: string, muted: boolean) => void;
 }
 
 function Row(
@@ -1096,10 +1122,25 @@ function Row(
       )}
       <span className="ind">
         {task.reminder && !task.done && (
-          <span className="reminder">
-            <BellIcon />
-            {task.reminder}
-          </span>
+          <button
+            type="button"
+            className={`reminder ${task.reminderState ?? 'on'}`}
+            title={
+              task.reminderState === 'muted' ? 'Turn the reminder on' : 'Turn the reminder off'
+            }
+            aria-pressed={task.reminderState === 'muted'}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onMute(task.key, task.reminderState !== 'muted');
+            }}
+          >
+            {task.reminderState === 'overdue' ? (
+              <span className="overdue-dot" aria-hidden="true" />
+            ) : (
+              <ReminderBellIcon />
+            )}
+            {task.reminderState === 'overdue' ? `Overdue · ${task.reminder}` : task.reminder}
+          </button>
         )}
         {task.done && task.completed && <span>{task.completed}</span>}
         {!task.done && !task.code && task.body.trim() !== '' && (

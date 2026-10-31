@@ -655,6 +655,35 @@ test('reminders fire once, missed ones say so; Done and Snooze change the task (
   expect((await toasts()).filter((toast) => toast.includes('Call'))).toHaveLength(2);
 });
 
+test('an overdue reminder, and the bell that turns it off and on (REM-11, REM-12, D-66)', async () => {
+  const file = join(dataDirectory, 'Flint', 'Calls.md');
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  const hourAgo = new Date(Date.now() - 60 * 60_000);
+  const stamp = `${hourAgo.getFullYear()}-${pad(hourAgo.getMonth() + 1)}-${pad(hourAgo.getDate())}T${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`;
+  await writeFile(
+    file,
+    `${await readFile(file, 'utf8')}- [ ] Pay the invoice [reminder:: ${stamp}] [id:: rem4]\n`,
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Calls' }).click();
+  const bell = main.locator('.row', { hasText: 'Pay the invoice' }).locator('.reminder');
+  await expect(bell).toHaveText(
+    `Overdue · Today ${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`,
+  );
+  await expect(bell).toHaveClass(/overdue/);
+
+  await bell.click();
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toContain(`[reminder:: ${stamp}] [muted:: true] [id:: rem4]`);
+  await expect(bell).toHaveClass(/muted/);
+  await expect(bell).toHaveText(`Today ${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`);
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('[muted:: true]');
+  await expect(bell).toHaveClass(/overdue/);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

@@ -17,6 +17,7 @@ import {
   outdentTask,
   serializeDocument,
   setPriority,
+  setMuted,
   setReminder,
   uncompleteTask,
   type Applied,
@@ -335,6 +336,15 @@ export class Workspace {
         case 'move': {
           const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
           return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
+        }
+        case 'mute': {
+          const found = findTask(document, change.key);
+          if (!found?.task.line.fields.reminder) return null;
+          const label = change.muted ? 'Reminder off' : 'Reminder on';
+          return outcome(
+            await this.record(list, setMuted(path, change.key, change.muted), label, now),
+            change.key,
+          );
         }
         case 'delete': {
           // TASK-12, D-50: the task goes to Trash storage first, so it is never only in memory.
@@ -668,6 +678,7 @@ export class Workspace {
           title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
           at,
           done: task.line.status !== ' ',
+          muted: task.line.fields.muted !== undefined,
         });
       }
     }

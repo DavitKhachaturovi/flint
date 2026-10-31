@@ -877,3 +877,45 @@ h1 .count {
     width var(--fl-dur-base) var(--fl-ease-spring),
     height var(--fl-dur-base) var(--fl-ease-spring);
 }
+
+/* REM-11, REM-12 (D-58, D-66): the reminder label is a button. Off: a strike line draws through the
+   bell and the time turns faint. Overdue: brighter text and a small dot instead of the bell. */
+.reminder {
+  font: inherit;
+  color: inherit;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 6px;
+  transition: color var(--fl-dur-fast);
+}
+
+.reminder:hover {
+  color: var(--fl-text-primary);
+}
+
+.bell-strike {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.reminder.muted .bell-strike {
+  stroke-dashoffset: 0;
+}
+
+.reminder.muted,
+.row:hover .reminder.muted,
+.row.sel .reminder.muted {
+  color: var(--fl-text-faint);
+}
+
+.reminder.overdue {
+  color: var(--fl-text-primary);
+}
+
+.overdue-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fl-overdue-dot);
+}

@@ -17,6 +17,8 @@ export interface ReminderTask {
   readonly title: string;
   readonly at: LocalDateTime;
   readonly done: boolean;
+  /** REM-12, D-66: turned off; never shown. */
+  readonly muted: boolean;
 }
 
 /** Task ID → the reminder value (`YYYY-MM-DDTHH:MM`) it was shown for. */
@@ -56,7 +58,9 @@ export function dueReminders(
     if (task.done) continue;
     const at = toDate(task.at).getTime();
     if (at > now.getTime()) continue;
-    due.push({ task, missed: now.getTime() - at > LATE_MS });
+    // D-66: a time that passes while the reminder is off is used up silently, so turning the
+    // reminder back on later never pops a notification for a time already gone.
+    if (!task.muted) due.push({ task, missed: now.getTime() - at > LATE_MS });
     next[task.id] = key;
   }
   due.sort((a, b) => toDate(a.task.at).getTime() - toDate(b.task.at).getTime());
@@ -71,7 +75,7 @@ export function nextReminderAt(
 ): Date | null {
   let next: number | null = null;
   for (const task of tasks) {
-    if (task.done || fired[task.id] === firedKey(task.at)) continue;
+    if (task.done || task.muted || fired[task.id] === firedKey(task.at)) continue;
     const at = toDate(task.at).getTime();
     if (at > now.getTime() && (next === null || at < next)) next = at;
   }

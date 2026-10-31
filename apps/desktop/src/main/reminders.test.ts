@@ -17,6 +17,7 @@ const task = (id: string, at: Date, extra: Partial<ReminderTask> = {}): Reminder
   title: `task ${id}`,
   at: fromDate(at),
   done: false,
+  muted: false,
   ...extra,
 });
 
@@ -60,6 +61,23 @@ describe('due reminders (REM-01, REM-05, REM-07; D-64)', () => {
     expect(result.fired).toEqual(fired);
     const reopened = [task('a1', minutes(-60))];
     expect(dueReminders(reopened, result.fired, now).due).toEqual([]);
+  });
+
+  it('never shows a turned-off reminder, nor its time later when it is turned back on (D-66)', () => {
+    const muted = [
+      task('m1', minutes(-0.5), { muted: true }),
+      task('m2', minutes(5), { muted: true }),
+    ];
+    const result = dueReminders(muted, {}, now);
+    expect(result.due).toEqual([]);
+    // The time that passed while off is used up; the future one is not.
+    expect(result.fired).toEqual({ m1: '2026-10-31T15:00' });
+    expect(nextReminderAt(muted, {}, now)).toBeNull();
+    const back = [task('m1', minutes(-0.5)), task('m2', minutes(5))];
+    expect(dueReminders(back, result.fired, minutes(1)).due).toEqual([]);
+    expect(dueReminders(back, result.fired, minutes(6)).due.map((entry) => entry.task.id)).toEqual([
+      'm2',
+    ]);
   });
 
   it('forgets tasks that are gone', () => {
