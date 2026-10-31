@@ -36,7 +36,7 @@ App data (not in the Flint folder):
 %APPDATA%\Flint\
   settings.json                 ← all settings (APP-11), incl. Flint folder path and hotkeys
   window-state.json             ← window sizes/positions per monitor setup (APP-05)
-  ui-state.json                 ← collapsed sections, last opened list, sidebar state
+  ui-state.json                 ← collapsed sections, last opened list, sidebar list order (D-54), guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
@@ -48,6 +48,7 @@ App data (not in the Flint folder):
 - File names are the list names, sanitized for Windows (illegal characters replaced). Renaming a list renames its file.
 - Each list also has a stable `id` in its frontmatter, so renames don't break references.
 - **Which files are lists (D-23):** the top-level `*.md` files only. Subfolders and dot-folders (`.obsidian/`, `.git/`, `.flint/`, `attachments/`) never contain lists.
+- The daily-use feedback of 31 Oct 2026 (D-52 to D-63) changes nothing in the file format: inline markdown in titles, page view, overdue reminders and the sidebar order are display or app-data matters. Deleted lists go to Trash storage like deleted tasks (D-50, D-55).
 - **Files Flint didn't create (D-23):** a file without Flint frontmatter (or without `mode`) is shown as a note. Flint adds `flint`, `id` and `mode` only when it next saves that file because the user edited it in Flint; other frontmatter keys are preserved byte-for-byte.
 - **Inbox (D-23, Proposed):** the list with the reserved `id: inbox`. If no list has it at startup, Flint adopts `Inbox.md` if it exists, otherwise creates it.
 - **Duplicate list IDs (D-23, Proposed):** e.g. Explorer's "Unicorn - Copy.md" (which also duplicates every task ID) or two files claiming `id: inbox`. The older file (by creation time, then path) keeps its IDs; the copy gets new IDs on its next save.

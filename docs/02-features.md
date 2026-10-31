@@ -13,10 +13,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each list is one markdown file in the Flint folder (see 04).
 - Lists can be created, renamed, reordered in the sidebar, and deleted (deleted lists go to Trash, DATA-02).
 - Lists are the top-level `*.md` files in the Flint folder. A file without Flint frontmatter (e.g. created in VS Code or by Claude) shows up as a note; Flint adds its header only when the user edits the file in Flint (D-23).
+- **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). Creating a note before the note editor exists is Q-20.
+- **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
+- **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
 
 ### LIST-02 — Markdown by default (v1)
 - All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
 - Files must stay readable and editable in other markdown tools (Obsidian, VS Code, GitHub). See 04.
+- **D-52 (M4, daily-use bug):** rows render a title's inline markdown (bold, italic, inline code, strikethrough, links) instead of showing the raw syntax (e.g. `**Recover from crashes silently.**`). The raw markdown shows only while the title is being edited. A link opens in the default browser when clicked (the only place with a hand cursor, UI-01).
 
 ### LIST-03 — Inbox (v1)
 - A built-in task list named **Inbox** always exists and cannot be deleted.
@@ -116,6 +120,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - The popup loads only what it needs: input box, chip preview, list autocomplete, paste handling. Not the whole app.
 - Performance targets in 05.
 
+### CAP-11 — Pickers for priority, list and reminder (v1, D-57)
+- The composer's and the capture popup's **flag**, **#** and **bell** buttons open pickers instead of typing `!h`, `##` and `@`:
+  - **Priority picker:** High, Medium, Low, None.
+  - **List picker:** a search field plus a few recent lists (most recently used first, D-25 matching; an unknown name offers "New list").
+  - **Date/time picker:** a proper date and time picker (month grid, time, and a natural-language field reading the same grammar as `@`, REM-02). Its milestone is Q-21.
+- All three pickers have the **same size and visual style** (floating level, 09 §8), are fully **keyboard-accessible** (the buttons are focusable; arrows move, Enter picks, Esc closes back to the text), and insert **the same chip** the shorthand would. The chosen value goes into the title as a live token, so chips, saving and undo behave exactly as with typed shorthand (D-45 live insertion).
+- Milestone: M4 for the composer and the capture popup.
+
 ---
 
 ## 3. Task-list mode
@@ -125,6 +137,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Tasks can be **dragged** to reorder, e.g. dragged to the top to focus on them first. The manual order is the source of truth and is persisted (it is the order of lines in the file, 04).
 - Drag-and-drop and Alt+↑/↓ follow one rule: only the task's block (line, body, subtasks) moves; non-task content in the file never moves as a side effect (D-22).
 - Drag uses snappy spring animations (03).
+- **D-54 (M4):** dragging is **locked to the vertical axis and to the list's bounds**: the row never floats freely. Other rows slide out of the way with a smooth spring (≤ 150 ms, off with reduce-motion). An expanded task collapses while it is dragged and re-expands after the drop if it was expanded. Subtasks move with their parent. Whether a task can still be dragged onto a list in the sidebar (TASK-11) is Q-18.
 
 ### TASK-02 — Fully keyboard-driven (v1)
 - **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
@@ -150,6 +163,11 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Collapsed, the row shows only a **small indicator** that a body exists. The list stays clean without forcing a separate note.
 - The body supports the same editor features as note mode (live preview, code blocks, media). **D-49:** in M4 the body is shown rendered (markdown, highlighted code blocks, images) and edited in a plain monospace field; M5 replaces the field with the note editor.
 - A checklist line (`- [ ]`) in a top-level task's body is a subtask (04 §3, D-29): typing `- [ ]` in a body visibly turns that line into a subtask.
+- **D-53 (M4):** today a row shows the "has a body" icon but can't be expanded. The rule:
+  - A **small body** (up to roughly **8 rendered lines**, measured by its rendered height, images included) **expands inline** under the row with an expand control (the chevron, or → / ←).
+  - A **larger body opens as a full page**; for it, the page is the only way to read it.
+  - **"Open as page"** is available for every task (right-click menu, and **Shift+Enter** in Navigate state, **Proposed**).
+  - In v1 the **page replaces the list view** with a **back arrow** (no tabs, NAV-05). Back also works with the mouse's back button and Alt+← (NAV-04). The page shows the editable title and the body, rendered, with D-49's plain editing until M5.
 
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
 - Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
@@ -162,6 +180,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-07 — Multi-select and bulk actions (v1)
 - **Shift+↑/↓** (and Shift+click / Ctrl+click with the mouse) selects multiple tasks.
 - Bulk actions: set priority, move to another list, complete, star to Today (and delete, undoable).
+- **D-59 (M4):** with **2+ tasks selected**, a **floating action bar** appears at the bottom of the list: the count, **Select all**, **Move**, **Priority**, **Star** (once Today exists, M6) and **Delete**, plus a clear (×). There is **no separate "edit mode"** and **no extra checkboxes** on rows (they would clash with the completion checkbox): selection looks like the single selected row. **Ctrl+A** in Navigate state selects all tasks in the list (**Proposed**). Esc clears the selection.
 
 ### TASK-08 — Temporary "sort by priority" (v1)
 - A one-off action that sorts the visible tasks by priority (high → none) **without destroying the manual order**.
@@ -182,6 +201,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or drag onto a list in the sidebar.
 - This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
 - **D-29:** a moved task lands at the top of the target list (like a capture), with its subtasks; a subtask moved on its own becomes a top-level task there. Several tasks moved together (TASK-07) land at the top in their original relative order. Its lines take on the target file's line endings.
+- Moving uses the list picker of CAP-11. Dragging onto a sidebar list conflicts with the locked drag of D-54: see Q-18. Milestone M4.
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
@@ -271,6 +291,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Setting **"Hide task text in notifications"**, default **off**. When on, a reminder toast says only **"Flint reminder"**: no task title, list or time, so nothing leaks while the screen is shared (reminder toasts show even during Do Not Disturb, REM-06). It applies to the toast and to its copy in Action Center.
 - **Proposed:** the Done / Snooze 10m / Open buttons stay (they reveal nothing); Open shows the task in Flint. Until the settings screen exists (M8) the setting is `hideNotificationText` in `settings.json`.
 
+### REM-11 — Overdue reminders (v1, D-58)
+- An open task whose reminder is in the past is **overdue**: noticeable but not alarming.
+- The row's time label becomes **"Overdue · <time>"** (same time format as REM-08, e.g. `Overdue · Today 09:00`, `Overdue · Mon 09:00`) in brighter text, with a **small dot** in place of the bell. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
+- The label turns overdue on its own when the time passes (the view checks every minute, **Proposed**).
+- **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
+- In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
+- Milestones: the row display in M4; the Today grouping and snooze in M6. Reminders don't fire as notifications before M6 today: Q-21.
+
 ---
 
 ## 6. Note mode
@@ -288,6 +316,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NOTE-04 — Syntax-highlighted code blocks (v1)
 - Fenced code blocks are syntax highlighted (in notes and task bodies).
+- **D-63:** highlighting is grayscale (UI-06): the popup's built-in JSON and stack-trace highlighter and rendered task bodies use it from M4, the CodeMirror theme for all languages in M5.
 
 ### NOTE-05 — Copy button on code blocks (v1)
 - Every code block has a copy button (visible on hover/focus).
@@ -330,6 +359,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NAV-03 — Main window layout (v1, Proposed)
 - A minimal, collapsible sidebar: Today and Inbox pinned at the top, then the user's lists. The content area shows the selected list.
+
+### NAV-04 — Back and forward (v1, D-53)
+- The main window keeps a history of the views shown this session (lists, Today, task pages). **Back / forward** with the **mouse's side buttons** and **Alt+← / Alt+→**.
+- No visible back/forward buttons, except the back arrow on a task page (TASK-05).
+- Milestone M4, with the page view.
+
+### NAV-05 — Tabs bar (Later, D-62)
+- Obsidian-style tabs for several open lists and pages. Later: it needs careful design to fit the visual language. v1 has one view at a time with back/forward (NAV-04).
 
 ### MINI-01 — Mini mode (v1)
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
@@ -404,10 +441,11 @@ Without sync, the local disk is the only copy, so this matters more.
 - The only network access is checking for and downloading updates (APP-06), and that is Later: **v1 makes no network requests at all.**
 - **Enforced (D-31):** an end-to-end test fails on any network request the app attempts. A future network feature allowlists exactly its own endpoint there; the check is never loosened.
 
-### APP-10 — Teaching Inbox onboarding (v1)
-- On first launch, Inbox contains sample tasks that each teach one shortcut (e.g. "Press Space to complete me", "Press 3 to make me high priority", "Press your capture hotkey from any app").
-- Users learn by doing and deleting them.
-- First launch also asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
+### APP-10 — First-run walkthrough (v1, D-61)
+- First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
+- Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
+- **Proposed (D-61):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.
+- Milestone M8.
 
 ### APP-11 — Settings (v1)
 Settings live in app data, not in the Flint folder (04). They include at least:
@@ -418,11 +456,28 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - ~~Priority palette (default / color-blind-safe)~~: not needed in v1, priority is grayscale by lightness and thickness (D-17).
 - Notifications on/off, sound on/off and sound choice, Focus Assist explanation, "Hide task text in notifications" (REM-10).
 - Today rollover prompt on/off.
+- Tips on/off ("Don't show tips", APP-14).
 - Auto-archive completed tasks after N days (on/off, N).
 - Auto-link patterns.
+- **D-52:** until this screen exists (M8), the sidebar's Settings entry is **hidden**, not shown disabled (it did nothing).
 
 ### APP-12 — Respect OS reduce-motion (v1)
 - If Windows "show animations" / reduce motion is off, Flint's spring and completion animations turn off automatically.
+
+### APP-13 — Guidance spotlight (v1, D-61)
+- One shared **spotlight** component for all guidance: a **soft dim** over the window and a **ring** around the target element, with a small card (one or two lines) and **Next / Skip / Skip all**. Used by the walkthrough (APP-10), contextual tips (APP-14) and What's new (APP-15). Visual spec in 09 §8.
+- Milestone M8.
+
+### APP-14 — Contextual tips (v1, D-61)
+- When the user repeats an inefficient pattern (e.g. sets priority with the button 3× instead of typing `!h`), Flint offers a one-line tip.
+- Rules: a **non-blocking card in a corner** of the main window; **never** in the capture popup; **never takes focus**; **never appears mid-typing**; each tip shows **once** and never again once dismissed; **at most one tip per session**; **"Don't show tips"** on the card and in settings (APP-11).
+- Pattern detection is **local only**: counters in app data, no telemetry (APP-09).
+- Milestone M8.
+
+### APP-15 — What's new (v1, D-61)
+- After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the tray ("What's new").
+- **Every version bump comes with short release notes**, which are what this shows. Where they live and when versioning starts is Q-22.
+- Milestone M8 (release notes from the first versioned build on, Q-22).
 
 ---
 
@@ -437,3 +492,51 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 
 ### CLI-02 — Machine-friendly output (Later, with the CLI)
 - `flint list --json` and **stable exit codes**, so models and scripts can read tasks, not just add them.
+
+---
+
+## 12. Look and feel
+
+Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-63). Visual details in [09](09-visual-design.md).
+
+### UI-01 — Cursors like native Windows (v1, D-52)
+- The normal **arrow cursor on all controls**: buttons, checkboxes, the composer's tools, rows, sidebar items, menus. The text cursor in text fields. The **hand only on real links**. No cursor flicker when moving across controls.
+- Milestone M4.
+
+### UI-02 — Thin scrollbar at the window edge (v1, D-52)
+- A thin scrollbar designed in the tokens (09 §8), at the **right edge of the window**, not next to the content column. No arrows, no visible track.
+- Milestone M4.
+
+### UI-03 — Row hover and selection (v1, D-52)
+- A hovered row next to the selected row must not stack two rounded backgrounds. The selected row keeps its look under the pointer; hover is a quieter background that never touches another row's background (09 §6, §8).
+- Milestone M4.
+
+### UI-04 — Minimal motion for selection and new rows (v1, D-56)
+- The selection highlight moves between rows and new rows appear with the motion specified in 03 §5 and 09 §9 (instead of jumping). No gimmicks, nothing slower than ~150 ms, off with reduce-motion (APP-12).
+- Milestone M4.
+
+### UI-05 — Fonts: Onest, FiraGO for Georgian, Geist Mono (v1, D-60)
+- **Onest** for UI and text. **FiraGO** for Georgian, applied only to Georgian characters (`unicode-range`), so Latin and Cyrillic stay Onest. **Geist Mono** for times, counts, chips, keycaps and code.
+- All bundled with the app under the SIL Open Font License, never fetched (APP-09). Supersedes the font part of D-17.
+- Milestone M4 (with the mockups and screenshots re-rendered).
+
+### UI-06 — Grayscale syntax highlighting (v1, D-63)
+- Code is highlighted by **lightness, weight and italics**, plus the cool accent for strings; no hues. Token spec in 09 §11 and `design/tokens.css`; reference mockup 07.
+- Milestones: the capture popup's JSON / stack-trace highlighter and rendered task bodies in M4; the CodeMirror theme for all languages in M5 (NOTE-04).
+
+### UI-07 — App icon sizes and the in-app logo (v1, D-52)
+- The taskbar icon looked noticeably smaller than other apps' icons (fine on the desktop): Flint shipped only a 256 px image that Windows scales down. The app icon becomes a proper `.ico` with hand-tuned small sizes (09 §8).
+- The in-app logo and the "Flint" wordmark in the sidebar get slightly bigger.
+- Milestone M4.
+
+### UI-08 — Right-click menus everywhere (v1, D-55)
+- Every object has a right-click menu with relevant actions: tasks, lists and notes in the sidebar, the sidebar's background, the composer.
+- **Every text field** keeps the standard **Cut / Copy / Paste / Select all** menu (Electron shows none by default).
+- Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6). How menus are drawn is Q-19.
+- Milestones: M4; note-specific items (NOTE-02) in M5.
+
+### UI-09 — Auto-closing brackets and quotes (v1, D-57)
+- Like Obsidian: typing `(` inserts `()` with the cursor inside; typing `)` right before an auto-inserted `)` just steps over it. Same for `[]`, `{}`, `""`, `''` and ``` `` ```.
+- Quotes pair only when **not directly after a letter or digit**, so "don't" works.
+- **Proposed:** Backspace right after an auto-inserted pair removes both; with text selected, typing an opening character wraps the selection.
+- Milestones: the composer, the capture popup and task editing in M4; the note editor (CodeMirror) in M5.

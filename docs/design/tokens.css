@@ -86,6 +86,32 @@
   --fl-size-meta:    12px;  /* mono: times, counts, chips */
   --fl-size-label:   11px;  /* uppercase section labels, letter-spacing 0.07em */
 
+  /* Fonts change to Onest + FiraGO (Georgian only) with UI-05 (D-60, docs/09 §7); until those
+     files are bundled, --fl-font-ui stays Geist so the app never falls back to a system font. */
+
+  /* ── Code highlighting: grayscale (UI-06, D-63, docs/09 §11) ── */
+  --fl-code-plain:       #C9CCCF;
+  --fl-code-keyword:     #FFFFFF; /* weight 600 */
+  --fl-code-number:      #FFFFFF;
+  --fl-code-literal:     #FFFFFF; /* italic: true, false, null */
+  --fl-code-key:         #E3E4E6; /* keys, variables, properties */
+  --fl-code-string:      var(--fl-accent);
+  --fl-code-function:    #ECEDEE; /* weight 500, underline --fl-code-underline */
+  --fl-code-underline:   #3A3D42; /* faint underline: functions, file:line */
+  --fl-code-type:        #B9BDC4; /* italic: types, flags */
+  --fl-code-punctuation: #6E7176;
+  --fl-code-comment:     #6E7176; /* italic */
+  --fl-code-exception:   #FFFFFF; /* weight 600: a stack trace's exception line */
+  --fl-code-frame:       #8E9196; /* stack-trace frames, dimmed */
+  --fl-code-location:    #C9CCCF; /* file:line, underline --fl-code-underline */
+
+  /* ── Scrollbar, overdue, spotlight (D-52, D-58, D-61; Proposed) ── */
+  --fl-scroll-thumb:       #2C2E33;
+  --fl-scroll-thumb-hover: #45484D;
+  --fl-scroll-size:        10px;  /* gutter; the thumb is a 6px pill inside it */
+  --fl-overdue-dot:        #FFFFFF;
+  --fl-spotlight-dim:      rgba(5, 6, 7, .55); /* the one deliberate translucency (D-61) */
+
   /* ── Motion ──────────────────────────────────────────────── */
   --fl-ease-spring:  cubic-bezier(.2, .9, .3, 1.15); /* settle with a small overshoot */
   --fl-ease-press:   cubic-bezier(.2, .9, .3, 1.5);  /* checkbox press rebound */

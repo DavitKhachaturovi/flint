@@ -23,7 +23,7 @@ This is the source of truth for how Flint **looks**. Behaviour and interaction l
 
 **Translated to Flint:** where the add-in uses purple for highlights, Flint uses **white**. Everything else is grayscale plus one cool gray accent.
 
-**Explicitly not used (for now):** decorative illustrations or background graphics (a faint line-and-node header graphic was tried on Today and removed), gradients, glows, translucency, any hue other than the cool accent.
+**Explicitly not used (for now):** decorative illustrations or background graphics (a faint line-and-node header graphic was tried on Today and removed), gradients, glows, translucency, any hue other than the cool accent. One deliberate exception: the guidance spotlight's soft dim over the window (APP-13, D-61).
 
 ---
 
@@ -109,6 +109,7 @@ Three levels, all opaque:
 
 - The **inner top highlight** is what gives the "light catching a glass edge" feel without translucency.
 - **Selected rows** get a level-1.5 treatment: `#1E2023` background, edge ring, top highlight, small drop shadow.
+- **Hover next to selection (UI-03, D-52, Proposed):** rows sit 2 px apart inside the card, so two row backgrounds never touch; the selected row keeps its level-1.5 look under the pointer; hover on other rows is `--fl-ground-hover` without ring or shadow.
 - **Hover lift** on clickable cards: up 2 px with a stronger shadow.
 - Exact values: `--fl-shadow-*` in tokens.css.
 
@@ -116,8 +117,10 @@ Three levels, all opaque:
 
 ## 7. Typography
 
-- **UI:** Geist (400/500/600/700). **Mono:** Geist Mono (400/500) for times, counts, chips, keycaps, code.
-- **Fonts are bundled with the app** (both are OFL-licensed). Never load them from Google Fonts at runtime: no network calls (APP-09, "your notes never leave your machine"), and the app must work offline.
+- **UI and text:** **Onest** (400/500/600/700; variable, from `github.com/simpals/onest`, OFL 1.1). **Georgian:** **FiraGO** 1.001 (bBox Type, OFL 1.1), Regular/Medium/SemiBold/Bold, applied only to Georgian characters with `unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F`, so Latin and Cyrillic stay Onest. **Mono:** Geist Mono (400/500) for times, counts, chips, keycaps, code; FiraGO is its fallback for Georgian characters (**Proposed**). Decided in D-60 (supersedes the font part of D-17).
+- **Fonts are bundled with the app** (all OFL-licensed, licence texts shipped alongside). Never load them from Google Fonts at runtime: no network calls (APP-09, "your notes never leave your machine"), and the app must work offline.
+- FiraGO carries the Reserved Font Name "Fira": Flint ships the official files **unmodified** (no subsetting or format conversion of our own), so the name stays usable. Georgian glyphs are only downloaded by the renderer when Georgian text appears (`unicode-range`), so they cost nothing otherwise.
+- The sizes below stay as they are with Onest unless the re-rendered screens show a need to adjust.
 
 | Role | Size / weight |
 |---|---|
@@ -128,6 +131,7 @@ Three levels, all opaque:
 | Task text | 14 / 400 |
 | Note body | 15 / 400, line-height 1.7 |
 | Meta (times, counts, chips) | Geist Mono 12 |
+| Sidebar wordmark "Flint" | 17 / 600 (was 15), logo tile 34 px (was 30) (UI-07, **Proposed**) |
 | Section labels | 11, uppercase, +0.07em tracking, faint |
 
 ---
@@ -144,11 +148,20 @@ Three levels, all opaque:
 - **Icons:** simple 1.8–2 px stroke line icons, rounded caps. No emoji anywhere in the UI.
 - **Non-task content in task lists (TASK-15, D-22, Proposed visual):** headings use the section-label style (11 px, uppercase, +0.07em, faint) as quiet dividers between rows; other text is note-body markdown in `--fl-text-muted`. No hover, selection or edit affordances.
 - **List card in the capture popup (D-25, Proposed visual):** a floating-level row under the input, in the style of the autocomplete menu: the offered list as a chip with its key (`Unicorn · Enter`), then the alternative in secondary text (`New list "unis" · Tab`). Keys are shown as keycaps. Tab visibly flips the card: the chosen option becomes the highlighted chip with `Enter`, the other drops to secondary text (D-29).
-- **Selection area (D-38):** blocks on `--fl-ground-well` with a 1 px `--fl-edge-card` ring and `--fl-radius-row`; a code block has a mono label (`JSON · 8 lines`) in `--fl-text-faint`, an expand chevron and a remove ×, and shows its first four lines collapsed; JSON keys `--fl-text-heading-soft`, strings `--fl-text-primary`, numbers and literals `--fl-text-highlight`; a stack trace's exception line `--fl-text-highlight`, frames `--fl-text-faint`, `file:line` `--fl-text-secondary`. No colours beyond the tokens.
+- **Selection area (D-38):** blocks on `--fl-ground-well` with a 1 px `--fl-edge-card` ring and `--fl-radius-row`; a code block has a mono label (`JSON · 8 lines`) in `--fl-text-faint`, an expand chevron and a remove ×, and shows its first four lines collapsed; JSON keys `--fl-text-heading-soft`, strings `--fl-text-primary`, numbers and literals `--fl-text-highlight`; a stack trace's exception line `--fl-text-highlight`, frames `--fl-text-faint`, `file:line` `--fl-text-secondary`. No colours beyond the tokens. **Highlighting colours superseded by §11 (D-63).**
 - **Popup close × and drag (D-46, D-47):** a 22 px × button in the card's top right (`--fl-text-faint`, hover `--fl-edge-float`); the card's background is the drag handle (no visible grip).
 - **Untitled task in a list (D-45, M4):** a collapsed code row with the body's kind and line count in mono `--fl-text-faint` and a one-line peek; expandable like the popup's code blocks.
 - **Popup window (D-42):** larger than the card by a transparent margin that holds the whole float shadow (72 px at the sides, 36 px above, 108 px below), with clicks passing through it; verified on a white desktop, a dark background and over text (29 Oct 2026).
 - **Next-open notice in the capture popup (D-26, Proposed visual):** one line above the chips in `--fl-text-secondary` with a quiet button (`Undo`, `Retry`) and a dismiss ×. Never a separate window or overlay.
+- **Cursors (UI-01, D-52):** `default` (arrow) on every control, `text` in text fields, `pointer` only on links (markdown links, smart-link chips). During a drag the arrow too (**Proposed**).
+- **Scrollbar (UI-02, D-52, Proposed):** the main area scrolls as a whole, so the bar sits at the window's right edge. No track, no arrows: a 6 px pill thumb (`--fl-scroll-thumb`, hover `--fl-scroll-thumb-hover`) in a 10 px gutter.
+- **Pickers (CAP-11, D-57, Proposed visual):** one shared floating panel, 280 px wide, `--fl-ground-float` with `--fl-shadow-float` and `--fl-radius-row`, anchored under its tool button. Rows like menu items (icon tile, label, key hint); the list picker has a search field on top (`--fl-ground-well`), then up to 5 recent lists; the date/time picker a month grid and a time field. The active row uses the selected-row look.
+- **Context menus (UI-08, D-55, Proposed visual):** the same floating panel style as the pickers, 220 px minimum width, items with an optional icon and a right-aligned key hint in mono, dividers in `--fl-edge-divider`. How they are drawn (in the page or native) is Q-19.
+- **Overdue reminder label (REM-11, D-58, Proposed visual):** "Overdue · <time>" in `--fl-text-primary` (instead of the faint indicator text), with a 5 px round dot in `--fl-overdue-dot` (white) in place of the bell. No red, no badge.
+- **Multi-select action bar (TASK-07, D-59, Proposed visual):** a floating-level bar centered at the bottom of the main area (toasts rise above it): "3 selected" in mono, then quiet buttons Select all · Move · Priority · Star · Delete and a ×. Selected rows look like the single selected row.
+- **Task page (TASK-05, D-53, Proposed visual):** replaces the list in the content column; a 30 px back-arrow icon tile left of the title (note-title style, 32 / 700), the body below in note-body type.
+- **Guidance spotlight (APP-13, D-61, Proposed visual):** the window dimmed with `--fl-spotlight-dim`, the target cut out with a 2 px `--fl-accent` ring at 6 px offset and the target's own radius; a floating-level card next to it with one or two lines, a "2 / 6" counter in mono and Next (primary) / Skip / Skip all (quiet). Tips (APP-14) use only the card, in the bottom-right corner, without dim or ring.
+- **App icon (UI-07, D-52):** the installer and the window use a multi-size `.ico` with **16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 96 and 256 px** (Windows' sizes for title bar, taskbar and Start at 100–400 % scaling; at least 16/24/32/48/256 per Microsoft). Sizes up to 36 px are drawn from `assets/icon/flint-icon-16.svg` / `-24.svg` with less padding so the mark fills the taskbar slot like other apps' icons; the window's own icon is set too, so development builds don't show Electron's.
 
 ---
 
@@ -159,6 +172,7 @@ Three levels, all opaque:
 - **Durations:** 120 ms for hover/color; **150 ms ceiling** for everything else (matches 03 §5).
 - **Completion:** the checked row fades and slides 10 px right while scaling to 0.985, then moves to Completed and the undo toast rises in.
 - **Hover lift** on cards: translateY(-2px).
+- **Selection (UI-04, D-56):** the selection highlight glides to the new row (`--fl-dur-base`, spring); a new row eases in (fade + 4 px rise); pickers and menus scale in from 0.98. Drag reordering uses the spring curve for the rows sliding out of the way (D-54).
 - **Reduce motion** disables all of it.
 
 ---
@@ -173,9 +187,37 @@ Three levels, all opaque:
 | 4 | Note mode | `design/screenshots/04-note-mode.png` | `design/mockups/04-note-mode.html` | Live preview: headings, rounded-square bullets, an auto-linked `AB#1234` chip, raw `**` syntax visible at the cursor, checklist, code card with copy, slash menu with icon tiles; "Convert to task list" button. |
 | 5 | Mini mode | `design/screenshots/05-mini-mode.png` | `design/mockups/05-mini-mode.html` | Segmented Today/Inbox toggle; in-app reminder card with Done / Snooze 10m / Open; compact rows; composer-style input. |
 | 6 | Design system | `design/screenshots/06-design-system.png` | `design/mockups/06-design-system.html` | Accent and emphasis, priority stripes, bullets, grounds, text levels, type, components, depth levels, radius, motion. |
+| 7 | Code highlighting | `design/screenshots/07-code-highlighting.png` | `design/mockups/07-code-highlighting.html` | The grayscale code token scheme (D-63, §11): a legend of token kinds, then JSON, YAML, TypeScript, bash and a stack trace highlighted with lightness, weight, italics and the accent for strings, and a card with the rules. Already set in Onest (D-60). |
 
 The mockups use example content (task titles, list names) for illustration only.
 
 **Screenshots** are rendered from the HTML mockups with `node scripts/render-mockups.mjs [01 02 …]` (Playwright's Chromium, 2x). 01 and 02 were re-rendered for D-25 (`##` list shorthand) on 29 Oct 2026; re-rendering an unchanged mockup (03) reproduces its original screenshot. Neither screenshot shows the D-25 list card or the D-26 next-open notice; they are specified in §8.
 
 Interactive versions (completing tasks with undo, live shorthand parsing in the capture box) were reviewed on the design canvas during design; the screenshots show their default states.
+
+Mockups 01–06 still use Geist; they are switched to Onest and re-rendered when UI-05 is built (M4, D-60). Mockup 07 (added 31 Oct 2026) already uses Onest.
+
+---
+
+## 11. Code highlighting (UI-06, D-63)
+
+Grayscale: tokens differ by **lightness, weight and italics**, plus the cool accent for strings. No hues. Reference: mockup 07. Used by the capture popup's JSON / stack-trace highlighter and rendered task bodies (M4) and by the CodeMirror theme for all languages (M5). Supersedes the highlighting colours listed for the selection area in §8 (D-38).
+
+| Token kind | Token | Value | Style |
+|---|---|---|---|
+| Plain code text | `--fl-code-plain` | `#C9CCCF` | regular |
+| Keywords | `--fl-code-keyword` | `#FFFFFF` | semibold (600) |
+| Numbers | `--fl-code-number` | `#FFFFFF` | regular |
+| Literals (`true`, `false`, `null`) | `--fl-code-literal` | `#FFFFFF` | italic |
+| Keys, variables, properties | `--fl-code-key` | `#E3E4E6` (light gray) | regular |
+| Strings | `--fl-code-string` | accent `#9AA0AB` | regular |
+| Functions | `--fl-code-function` | `#ECEDEE` | medium (500), faint underline `--fl-code-underline` `#3A3D42`, offset 3 px |
+| Types, flags | `--fl-code-type` | `#B9BDC4` (mid gray) | italic |
+| Punctuation | `--fl-code-punctuation` | `#6E7176` (dim gray) | regular |
+| Comments | `--fl-code-comment` | `#6E7176` | italic |
+| Stack trace: exception line | `--fl-code-exception` | `#FFFFFF` | semibold (600) |
+| Stack trace: frames | `--fl-code-frame` | `#8E9196` (dimmed) | regular |
+| Stack trace: `file:line` | `--fl-code-location` | `#C9CCCF` | faint underline like functions |
+
+- Punctuation and comments (`#6E7176`) are below 4.5:1 on `--fl-ground-well`, like `--fl-text-faint`: acceptable because they are de-emphasised on purpose.
+- The code-block card itself is unchanged (§8: well colour, header bar with language label and copy button).

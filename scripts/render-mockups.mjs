@@ -1,6 +1,6 @@
 // Re-renders docs/design/screenshots from the HTML mockups (docs/09 §10) with Playwright's Chromium,
 // at 2x like the originals. Usage: node scripts/render-mockups.mjs [01 02 …] [--out <dir>]
-// The mockups load Geist from Google Fonts: that is docs tooling, not the app (APP-09 covers the app).
+// The mockups load their fonts from Google Fonts: that is docs tooling, not the app (APP-09 covers the app).
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,7 @@ const SCREENS = {
   '04': { file: '04-note-mode', width: 1280, height: 820 },
   '05': { file: '05-mini-mode', width: 440, height: 640 },
   '06': { file: '06-design-system', width: 1280, height: 1000 },
+  '07': { file: '07-code-highlighting', width: 1280, height: 1040 },
 };
 
 const args = process.argv.slice(2);

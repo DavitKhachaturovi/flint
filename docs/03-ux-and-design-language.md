@@ -56,7 +56,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Create a new list instead of the close match | Tab (the card switches to `New list "<name>" · Enter`) | Decided (D-25) |
 | Go back to the close match after Tab | Tab again (the card offers `<list> · Tab`) | Proposed |
 | Remove a parsed token (priority, list, time) | Click the × on its chip; the token leaves the text | Proposed |
-| Type a token without remembering it | The flag, `#` and bell buttons under the box insert `!h`, `##` and `@` at the caret | Proposed |
+| Type a token without remembering it | The flag, `#` and bell buttons under the box open the priority, list and date/time pickers (CAP-11); each picks with the keyboard and inserts the same chip as the shorthand | Decided (D-57) |
 | Add a note below the title (the title line is always one line) | Shift+Enter; in a note Shift+Enter is a new line, Enter saves, Up from its first line or Shift+Tab goes back to the title, Backspace on an empty note removes it | Decided (D-38); note keys Proposed |
 | Capture hotkey while the popup stays open without focus | Ctrl+Shift+Space brings the cursor back; pressed again while focused, it closes the popup (draft kept) | Decided (D-41) |
 | Add another selection while the popup is open | Ctrl+Shift+X in the other app: appended to the selection area | Decided (D-39) |
@@ -76,6 +76,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Edit selected task | Enter | Proposed (see Q-08) |
 | New task | N (and Ctrl+N anywhere in the app) | Proposed (see Q-08) |
 | Expand / collapse task body | → / ← | Proposed |
+| Open task as page (TASK-05) | Shift+Enter | Proposed (D-53) |
+| Select all tasks (TASK-07) | Ctrl+A | Proposed (D-59) |
 | Star to / unstar from Today | S | Proposed |
 | Set reminder | R | Proposed |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |
@@ -98,6 +100,12 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Command palette / fuzzy search | Ctrl+K | Decided |
 | Keyboard cheat sheet | ? (Navigate state) | Decided |
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z (and Ctrl+Y) | Undo decided; redo proposed |
+| New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
+| Back / forward (NAV-04) | Alt+← / Alt+→, the mouse's side buttons | Decided (D-53) |
+
+### All text fields
+- Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.
+- Right-click: Cut / Copy / Paste / Select all (UI-08, D-55).
 
 ### Note mode
 | Action | Key | Status |
@@ -107,10 +115,12 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K inside a selection → link | Proposed (resolve Ctrl+K conflict: palette unless text is selected) |
 
 ### Mouse
-- Drag rows to reorder; drag rows onto a sidebar list to move them.
+- Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Dragging rows onto a sidebar list to move them is Q-18.
 - Click a task to edit; click the check to complete.
-- Right-click a task: priority, star to Today, reminder, move, delete (**Proposed** menu).
-- Shift+click / Ctrl+click for multi-select.
+- Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; star to Today and reminder join in M6 (**Proposed** items).
+- Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
+- The mouse's back and forward buttons navigate (NAV-04).
+- Cursor: the arrow on every control, the hand only on links (UI-01).
 
 ---
 
@@ -129,6 +139,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 ### Row anatomy (task list)
 - Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), star (only if starred, **Proposed**).
+- Task text renders its inline markdown; the raw syntax shows only while editing (LIST-02, D-52).
+- An overdue reminder reads "Overdue · <time>" in brighter text with a small dot instead of the bell; no red, no badge (REM-11, D-58).
+- Hover never stacks a second rounded background against the selected row (UI-03).
 - Indicators are small, monochrome, and low-contrast until hover/selection.
 - Subtasks are indented one step; no tree lines.
 - Non-task content in the file (TASK-15) appears between rows where it sits: headings as quiet section labels, other text as muted markdown; never selectable in Navigate state, and ↑/↓ skips it.
@@ -139,7 +152,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Rendered muted (lower contrast, checked). **Proposed:** no strikethrough, to keep the section calm and readable.
 
 ### Typography
-- **Geist** for UI and text, **Geist Mono** for code blocks, times, counts, chips, and the monospace toggle (NOTE-06). Both are bundled with the app, never fetched at runtime (09 §7).
+- **Onest** for UI and text, **FiraGO** for Georgian characters only, **Geist Mono** for code blocks, times, counts, chips, and the monospace toggle (NOTE-06). All bundled with the app, never fetched at runtime (09 §7, UI-05, D-60).
 - Restraint in sizes and weights: one size for task text, a smaller muted size for indicators/metadata.
 
 ### Density
@@ -172,6 +185,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 - **Spring animations** on drag-and-drop and reorder: snappy, physical, quick to settle.
 - A **small, satisfying completion animation** (check + row moving to Completed).
+- The **selection highlight** glides to the newly selected row and **new rows** ease in instead of appearing rigidly (UI-04, D-56).
 - **Nothing slower than ~150 ms.** Motion must never make the user wait.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).

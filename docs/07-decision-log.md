@@ -333,3 +333,61 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Navigate:** completing a task moves the selection to the next open task; double-click edits a task; Esc clears the selection.
   - **Undo / redo** in the main window covers its own changes this session, newest first; redo (Ctrl+Shift+Z, Ctrl+Y) as proposed in 03 §2. Global undo across captures and structural changes stays M7 (DATA-03).
 - **Why:** these fill gaps docs/03 §2 leaves open, in line with "never lose typed content" (01) and D-45; none changes the file format.
+
+### D-52 — Daily-use fixes (feedback of 31 Oct 2026)
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit; visual details Proposed)
+- **Decision:** From the first days of daily use, fixed early in the rest of M4:
+  - Row hover never stacks a second rounded background against the selected row (UI-03).
+  - The arrow cursor on all controls, the hand only on real links (UI-01).
+  - Task titles render their inline markdown; raw syntax only while editing (LIST-02).
+  - A thin scrollbar from the tokens, at the window edge (UI-02).
+  - Lists are created from a **+** next to "Lists" and with **Ctrl+Shift+N** (free in Flint's keymap), choosing task list or note (LIST-01; notes before M5: Q-20).
+  - The Settings entry is hidden until Settings exists (APP-11, M8).
+  - The app icon gets proper small sizes in a multi-size `.ico`; the in-app logo and wordmark get slightly bigger (UI-07).
+- **Why:** each was a visible rough edge in daily use. Root cause of the small taskbar icon: only a 256 px image was shipped, which Windows scales down (Microsoft asks for at least 16/24/32/48/256 px).
+
+### D-53 — Task bodies: inline when small, a page when large; back/forward
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); keys Proposed
+- **Decision:** A body up to roughly 8 rendered lines expands inline under its row; a larger one opens as a full page, which is its only view. "Open as page" works for every task. In v1 the page replaces the list view with a back arrow (no tabs). Back / forward via the mouse's side buttons and Alt+← / Alt+→, no visible buttons (NAV-04). Proposed: Shift+Enter opens a task as a page.
+- **Why:** a stack trace or long note in the list would push everything else away; the page keeps the list calm (03 §1, progressive disclosure). Builds on D-49 (rendered bodies, plain editing until M5).
+
+### D-54 — Locked, springy drag for rows and sidebar lists
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** Mouse drag to reorder (TASK-01) is locked to the vertical axis and to the list's bounds (no free floating); other rows slide out of the way with a spring; an expanded task collapses while dragged and re-expands after if it was expanded. Lists in the sidebar reorder the same way (order kept in `ui-state.json`, Proposed). Dragging onto a sidebar list to move a task conflicts with the lock: Q-18.
+
+### D-55 — Right-click menus everywhere
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); item sets Proposed
+- **Decision:** Tasks, lists, notes and the sidebar have right-click menus with relevant actions, in M4; note-specific items (NOTE-02) in M5. Every text field keeps Cut / Copy / Paste / Select all, which Electron doesn't provide by default. Deleting lists from the menu sends them to Trash storage like tasks (D-50). How menus are drawn: Q-19.
+
+### D-56 — Minimal motion for selection and new rows
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** The selection highlight and new rows animate with the motion already specified (03 §5, 09 §9): no gimmicks, nothing slower than ~150 ms, off with reduce-motion (UI-04).
+
+### D-57 — Pickers in the composer and popup; auto-closing brackets
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); visuals and some keys Proposed
+- **Decision:** The flag, # and bell buttons of the composer and the capture popup open a priority picker, a list picker (recent lists plus search) and a proper date/time picker, all the same size and style, keyboard-accessible, inserting the same chips as the shorthand (CAP-11; replaces the Proposed token-inserting buttons of 03 §3). Typing `(`, `[`, `{`, `"`, `'` or `` ` `` inserts the pair, and typing the closer before an auto-inserted one steps over it; quotes don't pair right after a letter (UI-09), in the composer, popup and task editing in M4, in the note editor in M5. When the date/time picker comes: Q-21.
+
+### D-58 — Overdue reminders: noticeable, not alarming
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); exact visual Proposed
+- **Decision:** An open task with a reminder in the past shows "Overdue · <time>" in brighter text with a small dot; no red (brand: no warm colours), no badges. In Today, overdue items sit at the top of Reminders. Completing or snoozing clears it (REM-11). Row display in M4, Today grouping in M6.
+
+### D-59 — Multi-select action bar
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); Ctrl+A Proposed
+- **Decision:** With 2+ tasks selected, a floating action bar shows the count, Select all, Move, Priority, Star and Delete. No separate edit mode and no extra checkboxes on rows (they would clash with the completion checkbox). Lists and notes in the sidebar: Ctrl/Shift-click multi-select plus Delete in the right-click menu (TASK-07, LIST-01). Star appears once Today exists (M6).
+
+### D-60 — Fonts: Onest, FiraGO for Georgian, Geist Mono
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit); mono fallback Proposed
+- **Decision:** Onest replaces Geist for UI and text. FiraGO is added for Georgian and applied only to Georgian characters via `unicode-range`, so Latin stays Onest. Geist Mono stays for times, counts and code. All bundled locally (OFL), never fetched. tokens.css, 09 §7 and the type spec are updated, and the docs/design mockups and screenshots re-rendered with the new fonts, when UI-05 is built in M4. **Supersedes the font part of D-17.**
+- **Facts checked (31 Oct 2026):** Onest is OFL 1.1 (`github.com/simpals/onest`, Latin and Cyrillic, variable weight). FiraGO 1.001 (bBox Type) is OFL 1.1 with the Reserved Font Name "Fira" and has static weights only, so Flint bundles the official files unmodified. Neither covers what the other does: Onest has no Georgian.
+
+### D-61 — Guidance: one spotlight for walkthrough, tips and What's new
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit), except where marked Proposed
+- **Decision:** One shared spotlight component (soft dim, ring around the target, Next / Skip / Skip all) serves (a) a first-run walkthrough of Flint-specific features, about 5–6 steps, skippable and replayable (APP-10); (b) contextual tips for repeated inefficient patterns, non-blocking, in a corner of the main window, never in the popup, never taking focus, never mid-typing, each shown once, at most one per session, with "Don't show tips", detection local only (APP-14); (c) What's new once after an update, also from the tray, with short release notes for every version bump (APP-15; versioning: Q-22). v1, M8. **Proposed (Davit's suggestion, to confirm):** the walkthrough replaces the teaching-Inbox sample tasks (old APP-10), so there is one onboarding system. The spotlight's dim is the one deliberate exception to "no translucency" (09 §1).
+
+### D-62 — Tabs Later; priority visibility stays an open question
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** An Obsidian-style tabs bar is Later (NAV-05): it needs careful design to fit the visual language. Priority visibility beyond the stripe (text fading or bolding) is not done for now and is open as Q-17, to revisit after more daily use.
+
+### D-63 — Grayscale syntax highlighting
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:** Code tokens by lightness, weight and italics, plus the accent for strings: keywords white semibold; numbers white; literals white italic; keys and variables light gray; strings accent `#9AA0AB`; functions and `file:line` light gray with a faint underline; types and flags mid-gray italic; punctuation and comments dim gray (comments italic); stack traces with a bright exception line and dimmed frames. Tokens in tokens.css and 09 §11; reference mockup 07 (added by Davit). Used by the popup's JSON / stack-trace highlighter and rendered task bodies in M4, and the CodeMirror theme for all languages in M5 (UI-06, NOTE-04). Supersedes the highlighting colours of the selection area in 09 §8 (D-38).
