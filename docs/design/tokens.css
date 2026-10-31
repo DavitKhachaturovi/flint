@@ -76,8 +76,8 @@
   --fl-shadow-primary-button: 0 4px 12px rgba(0, 0, 0, .5);
 
   /* ── Type (fonts are bundled with the app, never fetched) ── */
-  --fl-font-ui:   'Geist', system-ui, sans-serif;
-  --fl-font-mono: 'Geist Mono', ui-monospace, monospace;
+  --fl-font-ui:   'Onest', 'FiraGO', system-ui, sans-serif; /* FiraGO: Georgian only (unicode-range) */
+  --fl-font-mono: 'Geist Mono', 'FiraGO', ui-monospace, monospace;
   --fl-size-title:   30px;  /* weight 700, letter-spacing -0.025em */
   --fl-size-greeting: 36px; /* Today greeting, weight 700, -0.03em */
   --fl-size-capture: 20px;  /* capture popup input */
@@ -85,9 +85,6 @@
   --fl-size-note:    15px;  /* note body */
   --fl-size-meta:    12px;  /* mono: times, counts, chips */
   --fl-size-label:   11px;  /* uppercase section labels, letter-spacing 0.07em */
-
-  /* Fonts change to Onest + FiraGO (Georgian only) with UI-05 (D-60, docs/09 §7); until those
-     files are bundled, --fl-font-ui stays Geist so the app never falls back to a system font. */
 
   /* ── Code highlighting: grayscale (UI-06, D-63, docs/09 §11) ── */
   --fl-code-plain:       #C9CCCF;

@@ -119,7 +119,7 @@ Three levels, all opaque:
 
 - **UI and text:** **Onest** (400/500/600/700; variable, from `github.com/simpals/onest`, OFL 1.1). **Georgian:** **FiraGO** 1.001 (bBox Type, OFL 1.1), Regular/Medium/SemiBold/Bold, applied only to Georgian characters with `unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F`, so Latin and Cyrillic stay Onest. **Mono:** Geist Mono (400/500) for times, counts, chips, keycaps, code; FiraGO is its fallback for Georgian characters (**Proposed**). Decided in D-60 (supersedes the font part of D-17).
 - **Fonts are bundled with the app** (all OFL-licensed, licence texts shipped alongside). Never load them from Google Fonts at runtime: no network calls (APP-09, "your notes never leave your machine"), and the app must work offline.
-- FiraGO carries the Reserved Font Name "Fira": Flint ships the official files **unmodified** (no subsetting or format conversion of our own), so the name stays usable. Georgian glyphs are only downloaded by the renderer when Georgian text appears (`unicode-range`), so they cost nothing otherwise.
+- Flint ships the official files **unmodified** (no subsetting or format conversion of our own): Onest 2.001's variable `Onest[wght].woff2` from its release, and FiraGO's `FiraGO_WEB_1001` WOFF2 files for Regular, Medium, SemiBold and Bold, each with its licence (`apps/desktop/src/renderer/fonts/OFL-*.txt`). Some copies of FiraGO name "Fira" as a Reserved Font Name; the licence in the official repository declares none, and unmodified files keep the name usable either way (D-64). Georgian glyphs are only loaded by the renderer when Georgian text appears (`unicode-range`), so they cost nothing otherwise.
 - The sizes below stay as they are with Onest unless the re-rendered screens show a need to adjust.
 
 | Role | Size / weight |
@@ -195,7 +195,7 @@ The mockups use example content (task titles, list names) for illustration only.
 
 Interactive versions (completing tasks with undo, live shorthand parsing in the capture box) were reviewed on the design canvas during design; the screenshots show their default states.
 
-Mockups 01–06 still use Geist; they are switched to Onest and re-rendered when UI-05 is built (M4, D-60). Mockup 07 (added 31 Oct 2026) already uses Onest.
+All mockups use Onest since UI-05 was built (31 Oct 2026, D-60); screenshots 01–07 were re-rendered then.
 
 ---
 

@@ -131,7 +131,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Add-in-inspired: soft shadows, rounded corners, icon tiles, chips, composer, emphasized heading words, rounded bullets | 09 §1, §8 |
 | "Solid glass": Liquid-Glass feel without translucency | 09 §1, §6 |
 | Grayscale priority by lightness + thickness | 09 §4, TASK-03, D-17 |
-| Geist / Geist Mono, bundled locally | 09 §7, 05 §1 |
+| Geist / Geist Mono, bundled locally (UI font superseded by Onest + FiraGO, D-60) | 09 §7, 05 §1 |
 | Motion: spring curve, 150 ms ceiling, reduce-motion | 09 §9, 03 §5 |
 | No decorative graphics in v1 | 09 §1, 06 Later |
 | Design tokens | `design/tokens.css` |
@@ -200,7 +200,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Main window in React: sidebar, rows (stripes, reminders, code rows, read-only non-task content), completion with Undo toast and Completed section | TASK-01, TASK-03, TASK-06, TASK-15, D-48, `apps/desktop/src/renderer/main-window/` |
 | Navigate/Edit model: composer with shorthand, inline edit with inert existing title, Edit-state Enter rows, 1/2/3/0, Alt+↑/↓, Tab/Shift+Tab, undo/redo (Proposed details) | TASK-02, TASK-03, TASK-04, 03 §2, Q-08, D-45, D-51 |
 | Rebindable global hotkeys with conflict detection: Hotkeys window from the tray, tray warning when a hotkey is taken | APP-08, D-44, `apps/desktop/src/main/hotkey-registry.ts`, `src/renderer/hotkeys/` |
-| Geist and Geist Mono bundled with the app (variable woff2 from Vercel's `geist` 1.8.2, OFL), never loaded from the web | docs/09, APP-09, `apps/desktop/src/renderer/fonts/` |
+| Geist and Geist Mono bundled with the app (variable woff2 from Vercel's `geist` 1.8.2, OFL), never loaded from the web; since D-60 only Geist Mono, with Onest 2.001 and FiraGO 1.001 (Georgian only) | docs/09, APP-09, `apps/desktop/src/renderer/fonts/` |
 | R-1 laptop benchmark build (`npm run dist:bench`), kept for a re-measure only (D-36): over a real Teams call, installs nothing, not in normal builds or the installer | 06 §1, `apps/desktop/src/main/laptop-bench.ts`, `packages/core/src/bench` |
 
 ## G. Daily-use feedback (31 Oct 2026)

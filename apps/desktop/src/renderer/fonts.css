@@ -1,13 +1,53 @@
 /*
- * Geist and Geist Mono, bundled with the app (never loaded from the web: APP-09, docs/09).
- * Variable fonts from Vercel's `geist` 1.8.2 release, SIL Open Font License (fonts/OFL.txt).
+ * Fonts bundled with the app, never loaded from the web (APP-09, docs/09 §7, UI-05, D-60), all
+ * under the SIL Open Font License (fonts/OFL-*.txt), shipped as their official files, unmodified:
+ * - Onest 2.001, variable (github.com/simpals/onest): UI and text.
+ * - FiraGO 1.001, four weights (github.com/bBoxType/FiraGO): Georgian only. `unicode-range` keeps it
+ *   off Latin and Cyrillic, and the renderer loads it only when Georgian text appears.
+ * - Geist Mono, variable (Vercel's `geist` 1.8.2): times, counts, chips, code.
  */
 @font-face {
-  font-family: 'Geist';
-  src: url('./fonts/Geist-Variable.woff2') format('woff2');
+  font-family: 'Onest';
+  src: url('./fonts/Onest-Variable.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: block;
+}
+
+@font-face {
+  font-family: 'FiraGO';
+  src: url('./fonts/FiraGO-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
+}
+
+@font-face {
+  font-family: 'FiraGO';
+  src: url('./fonts/FiraGO-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
+}
+
+@font-face {
+  font-family: 'FiraGO';
+  src: url('./fonts/FiraGO-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
+}
+
+@font-face {
+  font-family: 'FiraGO';
+  src: url('./fonts/FiraGO-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+10A0-10FF, U+1C90-1CBF, U+2D00-2D2F;
 }
 
 @font-face {

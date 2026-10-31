@@ -35,6 +35,11 @@ extraResources:
     filter:
       - tray-*.png
       - icon.ico
+  # The OFL asks for its licence to travel with the fonts (docs/09 §7).
+  - from: src/renderer/fonts
+    to: licenses/fonts
+    filter:
+      - OFL-*.txt
 # flint:// is registered by the app at runtime (NSIS ignores `protocols`) and removed by installer.nsh.
 win:
   target:

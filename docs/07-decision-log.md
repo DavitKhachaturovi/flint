@@ -380,6 +380,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Date:** 31 Oct 2026 · **Status:** Decided (Davit); mono fallback Proposed
 - **Decision:** Onest replaces Geist for UI and text. FiraGO is added for Georgian and applied only to Georgian characters via `unicode-range`, so Latin stays Onest. Geist Mono stays for times, counts and code. All bundled locally (OFL), never fetched. tokens.css, 09 §7 and the type spec are updated, and the docs/design mockups and screenshots re-rendered with the new fonts, when UI-05 is built in M4. **Supersedes the font part of D-17.**
 - **Facts checked (31 Oct 2026):** Onest is OFL 1.1 (`github.com/simpals/onest`, Latin and Cyrillic, variable weight). FiraGO 1.001 (bBox Type) is OFL 1.1 with the Reserved Font Name "Fira" and has static weights only, so Flint bundles the official files unmodified. Neither covers what the other does: Onest has no Georgian.
+- **Correction (31 Oct 2026, when UI-05 was built):** the `OFL.txt` in FiraGO's official repository declares no Reserved Font Name; the "Fira" RFN appears in third-party copies of the notice. Shipping the official files unmodified (D-64) is right either way. Onest's licence declares none either. Bundled: Onest 2.001 (variable WOFF2 from its release) and FiraGO 1.001 WOFF2 Regular/Medium/SemiBold/Bold; Geist (UI) is removed, Geist Mono stays.
 
 ### D-61 — Guidance: one spotlight for walkthrough, tips and What's new
 - **Date:** 31 Oct 2026 · **Status:** Decided (Davit), except where marked Proposed

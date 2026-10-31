@@ -27,7 +27,7 @@ Flint is a minimalist, keyboard-first quick-capture notes and task app for devel
 - **Architecture** (`docs/05`): `packages/core` is pure TypeScript with no Electron imports; the UI reaches the OS only through the typed Platform interface in the preload; `contextIsolation` on, `nodeIntegration` off, sandboxed renderers.
 - **Performance budgets** (`docs/05` §4): hotkey → focused popup < 50 ms (hard limit 100 ms); keypress → screen one frame; Enter → saved and hidden < 100 ms. Pre-warmed, tiny capture popup; windows are hidden, never destroyed.
 - **Data** (`docs/04`): plain markdown, task metadata as `[key:: value]` fields with a stable `id`, tolerant reader and canonical writer, atomic writes, never destroy content the parser doesn't understand. Round-trip and fuzz tests for the format are mandatory.
-- **Privacy:** no telemetry and **no network requests at all in v1** (no auto-update yet). Fonts (Onest, FiraGO for Georgian, Geist Mono, D-60; Geist until UI-05 lands) are bundled locally, never loaded from Google Fonts.
+- **Privacy:** no telemetry and **no network requests at all in v1** (no auto-update yet). Fonts (Onest, FiraGO for Georgian only, Geist Mono; D-60) are bundled locally, never loaded from Google Fonts.
 - **Visual design** (`docs/09`): use `docs/design/tokens.css` variables only, no raw hex values in components. Match `docs/design/screenshots/` and `docs/design/mockups/`. Dark mode only in v1. No emoji in the UI. Motion ≤ 150 ms and off under reduce-motion.
 
 ## Working conventions
