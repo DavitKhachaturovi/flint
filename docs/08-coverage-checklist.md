@@ -232,3 +232,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 21 | Grayscale syntax highlighting; tokens in tokens.css and 09; mockup 07 and its screenshot | UI-06 · v1 · M4 (popup, bodies), M5 (CodeMirror) | 09 §10, §11, tokens.css, D-63 |
 | — | Found during intake: reminders didn't fire before M6 | REM-01, REM-05, REM-07 (basic) · v1 · M4 step 3 | D-64 |
 | — | Versioning 0.4.x with release notes per build | APP-15 · v1 · M4 | `docs/release-notes.md`, D-64 |
+
+## H. Feedback on 0.4.1 (31 Oct 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Cursor still flickers around the main composer's text box | UI-01 · v1 · M4 step 5 (start) | 03 §5, D-65 |
+| 2 | The undo toast covered by task text and hovered rows: always above the list | TASK-06 · v1 · M4 step 5 (start) | 03 §4 Toasts, D-65 |
+| 3 | Completing a task: the specified completion animation | TASK-06, UI-04 · v1 · M4 step 5 (start) | 09 §9, D-65 |
+| 4 | Taskbar icon still small: the mark fills nearly the whole square at 16–48 px; larger logo in the reminder toast (`appLogoOverride`) | UI-07, REM-05 · v1 · M4 step 5 (start) | 09 §8, D-65 |
+| 5 | Stack traces highlighted in the popup (exception bright, frames dimmed) | UI-06, CAP-06 · v1 · M4 step 5 (start) | 09 §11, D-65 |
+| 6 | Switching lists or pages: short fade with a small rise; the sidebar highlight glides | UI-04 · v1 · M4 step 5 (start) | 03 §5, D-65 |
+| 7 | Clickable bell turns a reminder off without deleting it; strike-line animation; undoable; new field | REM-12 · v1 · M4 step 5 | 04 §3, 03 §4, D-66 |
+| 8 | Full-language highlighting of rendered bodies with the M5 editor's parsers; the popup stays JSON + stack traces | UI-06 · v1 · M5 | D-65 |
+| — | Step-4 choices accepted: trash layout, target-first moves, Shift+F10 / Menu key | TASK-11, TASK-12, UI-08 · Decided | D-65 |

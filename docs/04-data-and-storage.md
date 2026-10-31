@@ -96,6 +96,7 @@ The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) re
 | `id` | written: `[a-z0-9]{4,6}`; read: `[A-Za-z0-9_-]{1,32}` (D-21, D-29) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (D-29) | Today, reminders, undo, CLI |
 | `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
 | `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 09:00 (Q-02). | Reminder time | REM-01 |
+| `muted` | `true`, any letter case (absent = the reminder is on) (D-66) | The reminder is turned off: kept, shown faint, never fired | REM-12 |
 | `today` | `true`, any letter case (absent = not starred) | Starred into Today | TODAY-01 |
 | `completion` | written: `YYYY-MM-DDTHH:MM`; read: also `YYYY-MM-DD` (what Dataview and Obsidian Tasks write) and `…:SS` (**Proposed**) | Completion timestamp (completed tasks only) | TASK-06 |
 
@@ -103,11 +104,11 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 
 ### Parsing and writing rules
 - **Tolerant reader (D-21):**
-  - **Flint's own fields** (`priority`, `reminder`, `today`, `completion`, `id`) are recognised anywhere in the line, in `[]` or `()`, with or without a space after `::`, **only when the value is valid** for that key (see Fields).
+  - **Flint's own fields** (`priority`, `reminder`, `muted`, `today`, `completion`, `id`) are recognised anywhere in the line, in `[]` or `()`, with or without a space after `::`, **only when the value is valid** for that key (see Fields).
   - **Unknown fields** are recognised only in the trailing run of fields at the end of the line, and only with whitespace after `::` (`[due:: 2026-11-02]`). Anywhere else, `[…::…]` and `(…::…)` are title text: `check [Vec::new] behaviour` keeps its text, visible and in place.
   - Nothing inside an inline code span is ever a field.
   - A trailing Obsidian block ID (`^a1b2`) at the very end of the line doesn't break the trailing run (D-29).
-- **Canonical writer (D-21):** `[]` fields at the end of the line in the order `reminder`, `today`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (D-29).
+- **Canonical writer (D-21, D-66):** `[]` fields at the end of the line in the order `reminder`, `muted`, `today`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (D-29).
 - **Only touch what changed.** Lines Flint didn't modify are written back byte-for-byte. Non-task content (headings, paragraphs, plain bullets, blank lines, HTML comments) is preserved exactly and stays in place (D-22). Parsing and serializing an untouched file returns it byte-for-byte, including one with missing IDs: repair only happens as part of a save caused by an edit.
 - **Missing IDs** (lines added by hand or by the CLI) are assigned on Flint's next save of that file. Until then the task has a provisional in-memory ID that stays stable across re-parses (D-29).
 - **Duplicate IDs** (e.g. a line copy-pasted in a text editor): within a file, the first keeps the ID and later ones get new IDs; across files, the older file (by creation time, then path) keeps them (D-23, **Proposed**).

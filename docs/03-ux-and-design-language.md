@@ -142,6 +142,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), star (only if starred, **Proposed**).
 - Task text renders its inline markdown; the raw syntax shows only while editing (LIST-02, D-52).
 - An overdue reminder reads "Overdue · <time>" in brighter text with a small dot instead of the bell; no red, no badge (REM-11, D-58).
+- The bell is a button: clicking it turns the reminder off (a strike line is drawn through the bell, the time turns faint) and on again (REM-12, D-66).
 - Hover never stacks a second rounded background against the selected row (UI-03).
 - Indicators are small, monochrome, and low-contrast until hover/selection.
 - Subtasks are indented one step; no tree lines.
@@ -165,6 +166,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 ### Toasts
 - Small, bottom-anchored, short-lived, always with **Undo** where an action is reversible (completion, delete, move, multi-line paste "Keep as one?").
+- A toast always sits **above** the list: rows, hovered rows and their text never cover it (D-65).
 - Never a blocking confirmation dialog for reversible actions.
 
 ### Capture popup look
@@ -187,6 +189,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - **Spring animations** on drag-and-drop and reorder: snappy, physical, quick to settle.
 - A **small, satisfying completion animation** (check + row moving to Completed).
 - The **selection highlight** glides to the newly selected row and **new rows** ease in instead of appearing rigidly (UI-04, D-56).
+- **Switching lists or pages:** the content fades in while rising a few pixels, and the sidebar's highlight glides to the new list (UI-04, D-65).
+- The whole composer card is one text target: the I-beam over all of it except its buttons, so the cursor doesn't flicker between arrow and I-beam around the text box (UI-01, D-65).
 - **Nothing slower than ~150 ms.** Motion must never make the user wait.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).

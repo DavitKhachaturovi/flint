@@ -299,6 +299,13 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
 - In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
 - Milestones: the row display in M4; the Today grouping and snooze presets in M6. Reminders fire as notifications from M4 step 3 (D-64, REM-05).
+- A reminder turned off (REM-12) is never overdue.
+
+### REM-12 — Turn a reminder off without deleting it (v1, D-66)
+- **Clicking the bell** on a task turns its reminder **off**: the time stays, but it won't fire. A quick animation draws a **strike line** through the bell, and the time turns faint. Clicking again turns it back **on**; a time that has already passed then shows as overdue (REM-11). Undoable. Also in the task's right-click menu (**Proposed**: "Turn reminder off" / "Turn reminder on").
+- Stored as the field `[muted:: true]` next to the reminder (04 §3). Setting a new reminder time (snooze, the picker, an edit with `@`) turns the reminder back on (**Proposed**).
+- A reminder whose time passes while it is off is not shown later when it is turned back on: turning it on doesn't pop a notification for a time that is already past (**Proposed**).
+- Milestone M4 step 5.
 
 ---
 
@@ -514,7 +521,9 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 
 ### UI-04 — Minimal motion for selection and new rows (v1, D-56)
 - The selection highlight moves between rows and new rows appear with the motion specified in 03 §5 and 09 §9 (instead of jumping). No gimmicks, nothing slower than ~150 ms, off with reduce-motion (APP-12).
-- Milestone M4.
+- **D-65:** completing a task plays the specified completion animation (09 §9: fade and slide, then it moves to Completed) instead of the row just disappearing.
+- **D-65:** switching lists or pages: the content fades in while rising a few pixels (~120–150 ms), and the sidebar's highlight glides to the new list like the row selection. Off with reduce-motion.
+- Milestone M4 (the switching transition and completion animation at the start of step 5).
 
 ### UI-05 — Fonts: Onest, FiraGO for Georgian, Geist Mono (v1, D-60)
 - **Onest** for UI and text. **FiraGO** for Georgian, applied only to Georgian characters (`unicode-range`), so Latin and Cyrillic stay Onest. **Geist Mono** for times, counts, chips, keycaps and code.
@@ -524,10 +533,12 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-06 — Grayscale syntax highlighting (v1, D-63)
 - Code is highlighted by **lightness, weight and italics**, plus the cool accent for strings; no hues. Token spec in 09 §11 and `design/tokens.css`; reference mockup 07.
 - Milestones: the capture popup's JSON / stack-trace highlighter and rendered task bodies in M4; the CodeMirror theme for all languages in M5 (NOTE-04).
+- **D-65:** the capture popup stays with JSON and stack traces only (it must stay small, CAP-10). Rendered task bodies in the main window get **full-language highlighting when the M5 editor arrives**, reusing its language parsers; until then they highlight JSON and stack traces like the popup. Stack traces are recognised in the common formats (.NET, Java, JavaScript/Node, Python, Go): the exception line bright, frames dimmed, `file:line` underlined.
 
 ### UI-07 — App icon sizes and the in-app logo (v1, D-52)
 - The taskbar icon looked noticeably smaller than other apps' icons (fine on the desktop). Cause, found when building it: the near-black tile disappears against the dark taskbar, so only the leaf (about 60 % of the slot) shows, and the sizes electron-builder downscaled from one 256 px image also lost the tile's rim. The app icon becomes a multi-size `.ico` drawn from the hand-tuned small logos, with a visible rim and a larger leaf (09 §8).
 - The in-app logo and the "Flint" wordmark in the sidebar get slightly bigger.
+- **D-65 (0.4.1 feedback):** still too small next to other apps' icons, whose mark fills the square edge to edge. For 16–48 px the mark fills nearly the whole square. The reminder toast also shows Flint's logo larger, as its `appLogoOverride` image (a local file, which Windows supports for desktop apps; in Windows 11 it sits left of the text, while the small header icon stays the app icon).
 - Milestone M4.
 
 ### UI-08 — Right-click menus everywhere (v1, D-55)

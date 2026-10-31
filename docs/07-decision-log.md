@@ -404,3 +404,18 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Q-22:** versions 0.4.x during M4; every build gets a short entry in `docs/release-notes.md`.
   - **D-61 confirmed:** the first-run walkthrough replaces the teaching-Inbox sample tasks.
   - **FiraGO** ships as the official, unmodified files (Reserved Font Name "Fira"), loaded via `unicode-range` (D-60).
+
+### D-65 — Feedback on 0.4.1; the step-4 choices accepted
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:**
+  - **Accepted (were Proposed in step 4):** the trash layout (docs/04, D-50), writing the target before removing the source when moving a task (TASK-11), Shift+F10 / the Menu key for a task's menu (03 §3).
+  - **Bugs, fixed at the start of step 5:** the cursor still flickered around the main composer's text box (UI-01: the whole card becomes one text target); the undo toast was covered by task text and hovered rows (it always sits above the list); completing a task made it disappear without the specified animation (09 §9); the taskbar icon still looked small (UI-07: the mark fills nearly the whole square at 16–48 px, and the reminder toast shows a larger logo with `appLogoOverride`); stack traces must be highlighted in the popup as JSON is (UI-06: common trace formats recognised).
+  - **Change, also at the start of step 5:** switching lists or pages fades the content in while it rises a few pixels (~120–150 ms) and the sidebar highlight glides to the new list (UI-04).
+  - **Highlighting scope:** the popup stays JSON + stack traces; rendered task bodies get full-language highlighting with the M5 editor's language parsers (UI-06).
+  - **Change, in step 5 with the reminder and picker work:** a clickable bell turns a reminder off without deleting it (REM-12, D-66).
+
+### D-66 — Reminders can be turned off: the `muted` field
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit asked for the feature and left the field name to Claude)
+- **Decision:** A turned-off reminder is stored as `[muted:: true]` on the task, next to its `reminder` field, which stays as it was. Values: `true`, any letter case; absent means the reminder is on. It is one of Flint's own fields (recognised anywhere in the line with a valid value, D-21), and the canonical order becomes `reminder`, `muted`, `today`, `completion`, `priority`, `id`. Setting a new reminder time removes it (Proposed); a reminder whose time passes while muted is never shown later (Proposed). Round-trip tests in `packages/core`.
+- **Why this name:** short and plain like the other keys (`today`, `priority`); it reads correctly next to the reminder in any markdown tool (`[reminder:: 2026-11-02T15:00] [muted:: true]`) and matches what the UI shows, a struck-through bell. A separate field keeps the `reminder` value a valid date for Dataview and Obsidian Tasks, which an encoding inside the date (`… off`) would break. Older Flint builds keep the field as an unknown one and would still fire the reminder; acceptable for an internal tool that updates together.
+- **Considered:** `reminderOff` (camel case, unlike the other keys), `remind:: off` (a second reminder-like key next to `reminder` is confusing), `paused` (suggests it resumes by itself).
