@@ -229,16 +229,6 @@ h1 .count {
   padding: 6px;
 }
 
-.card.note {
-  margin: 0;
-  padding: 18px 20px;
-  white-space: pre-wrap;
-  font-family: var(--fl-font-ui);
-  font-size: var(--fl-size-note);
-  line-height: 1.6;
-  color: var(--fl-text-body);
-}
-
 .empty {
   margin: 0;
   padding: 18px 16px;
@@ -723,20 +713,36 @@ h1 .count {
   color: var(--fl-text-secondary);
 }
 
-/* D-64: a note as plain monospace text until the note editor (M5). */
+/* D-64, D-68 (09 §8): a note is a page, not a card: its text in plain monospace until the note
+   editor (M5), on the window ground under the heading, filling the page's height and growing with
+   the text, so the page scrolls as a whole. */
+.content.note-page {
+  min-height: 100%;
+  padding-bottom: 40px;
+}
+
 .note-editor {
   display: block;
+  flex: 1;
   width: 100%;
-  min-height: 420px;
-  padding: 18px 20px;
+  min-height: 240px;
+  /* Lines up with the heading. */
+  padding: 0 4px;
   border: 0;
   outline: none;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  background: transparent;
   font-family: var(--fl-font-mono);
   font-size: 13.5px;
   line-height: 1.7;
   color: var(--fl-text-body);
   caret-color: var(--fl-accent);
+}
+
+.note-editor::placeholder {
+  color: var(--fl-text-faint);
 }
 
 /* D-65: a toast always sits above the list, its rows and their hover. */

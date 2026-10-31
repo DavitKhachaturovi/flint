@@ -44,8 +44,9 @@ export function NoteEditor(props: {
 
   return (
     <textarea
-      className="card note-editor"
+      className="note-editor"
       aria-label="Note"
+      placeholder={readOnly ? '' : 'Write here'}
       value={value}
       readOnly={readOnly}
       spellCheck={false}

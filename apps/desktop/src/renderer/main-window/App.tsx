@@ -814,7 +814,10 @@ export function App(): ReactElement {
         <div className="titlebar" />
         <div className="scroller">
           {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
-          <div className="content" key={view?.id ?? 'none'}>
+          <div
+            className={view?.mode === 'note' ? 'content note-page' : 'content'}
+            key={view?.id ?? 'none'}
+          >
             {view && (
               <header className="list-header">
                 <h1>
