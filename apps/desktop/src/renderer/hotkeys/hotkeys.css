@@ -65,7 +65,7 @@ h1 {
   color: var(--fl-text-primary);
   font-family: var(--fl-font-mono);
   font-size: var(--fl-size-meta);
-  cursor: pointer;
+  cursor: default;
   transition: background-color var(--fl-dur-fast);
 }
 

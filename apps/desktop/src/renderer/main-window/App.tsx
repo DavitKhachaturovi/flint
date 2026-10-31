@@ -26,7 +26,6 @@ import {
   InboxIcon,
   ListIcon,
   NoteIcon,
-  SettingsIcon,
 } from './icons.js';
 import { useInertText } from './inert-text.js';
 
@@ -430,79 +429,77 @@ export function App(): ReactElement {
             onSelect={() => openList(list.id)}
           />
         ))}
-        <div className="spacer" />
-        <button type="button" className="nav quiet" disabled title="Settings arrive in M8">
-          <span className="tile">
-            <SettingsIcon />
-          </span>
-          <span className="nav-name">Settings</span>
-        </button>
+        {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
       </aside>
 
       <main className="main">
         <div className="titlebar" />
-        <div className="content">
-          {view && (
-            <header className="list-header">
-              <h1>
-                {view.name}
-                {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-              </h1>
-              {lists.find((list) => list.id === view.id)?.inbox && (
-                <span className="subtitle">{INBOX_SUBTITLE}</span>
-              )}
-              {view.readOnly && (
-                <span className="subtitle">
-                  Read-only: Flint can&apos;t change this file ({view.readOnly}).
-                </span>
-              )}
-            </header>
-          )}
-
-          {view?.mode === 'note' && <pre className="card note">{view.noteText}</pre>}
-
-          {view?.mode === 'tasks' && (
-            <>
-              {!view.readOnly && (
-                <Composer
-                  key={view.id}
-                  listId={view.id}
-                  lists={lists}
-                  inputRef={composer}
-                  onAdd={addFromComposer}
-                />
-              )}
-
-              <section className="card tasks" aria-label="Tasks">
-                {view.items.length === 0 && (
-                  <p className="empty">
-                    Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
-                    hotkey.
-                  </p>
+        <div className="scroller">
+          <div className="content">
+            {view && (
+              <header className="list-header">
+                <h1>
+                  {view.name}
+                  {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                </h1>
+                {lists.find((list) => list.id === view.id)?.inbox && (
+                  <span className="subtitle">{INBOX_SUBTITLE}</span>
                 )}
-                {cardRows}
-              </section>
+                {view.readOnly && (
+                  <span className="subtitle">
+                    Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                  </span>
+                )}
+              </header>
+            )}
 
-              {view.completed.length > 0 && (
-                <section className="card completed" aria-label="Completed">
-                  <button
-                    type="button"
-                    className="completed-head"
-                    aria-expanded={completedOpen}
-                    onClick={() => setCompletedOpen(!completedOpen)}
-                  >
-                    <span className={completedOpen ? 'chev open' : 'chev'}>
-                      <ChevronIcon />
-                    </span>
-                    <span>Completed</span>
-                    <span className="chip">{view.completed.length}</span>
-                  </button>
-                  {completedOpen &&
-                    view.completed.map((task) => <Row key={task.key} task={task} {...rowProps} />)}
+            {view?.mode === 'note' && <pre className="card note">{view.noteText}</pre>}
+
+            {view?.mode === 'tasks' && (
+              <>
+                {!view.readOnly && (
+                  <Composer
+                    key={view.id}
+                    listId={view.id}
+                    lists={lists}
+                    inputRef={composer}
+                    onAdd={addFromComposer}
+                  />
+                )}
+
+                <section className="card tasks" aria-label="Tasks">
+                  {view.items.length === 0 && (
+                    <p className="empty">
+                      Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
+                      hotkey.
+                    </p>
+                  )}
+                  {cardRows}
                 </section>
-              )}
-            </>
-          )}
+
+                {view.completed.length > 0 && (
+                  <section className="card completed" aria-label="Completed">
+                    <button
+                      type="button"
+                      className="completed-head"
+                      aria-expanded={completedOpen}
+                      onClick={() => setCompletedOpen(!completedOpen)}
+                    >
+                      <span className={completedOpen ? 'chev open' : 'chev'}>
+                        <ChevronIcon />
+                      </span>
+                      <span>Completed</span>
+                      <span className="chip">{view.completed.length}</span>
+                    </button>
+                    {completedOpen &&
+                      view.completed.map((task) => (
+                        <Row key={task.key} task={task} {...rowProps} />
+                      ))}
+                  </section>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </main>
 

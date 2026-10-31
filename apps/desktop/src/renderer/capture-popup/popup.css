@@ -90,7 +90,7 @@ button {
   background: none;
   border: 0;
   padding: 0;
-  cursor: pointer;
+  cursor: default;
 }
 
 button:focus-visible {
@@ -291,7 +291,7 @@ button:focus-visible {
   border-radius: var(--fl-radius-tile);
   font-size: var(--fl-size-body);
   color: var(--fl-text-body);
-  cursor: pointer;
+  cursor: default;
   transition: background-color var(--fl-dur-fast);
 }
 
@@ -499,7 +499,7 @@ button:focus-visible {
   border: 0;
   border-radius: var(--fl-radius-check);
   padding: 2px 6px;
-  cursor: pointer;
+  cursor: default;
 }
 
 .notice-action,
