@@ -182,6 +182,7 @@ mode: note
 
 ### Trash (DATA-02)
 - Deleted lists move to `.flint/trash/` with their deletion time. Deleted tasks are stored there with their original list ID and deletion time so they can be restored in place.
+- **Layout (Proposed, M4 step 4, D-50):** plain markdown, readable and restorable by hand until the Trash screen (M7). A deleted list or note is its file, moved there as `<YYYY-MM-DD-HHmmss>-<name>.md`. A deleted task is `<YYYY-MM-DD-HHmmss>-task-<id>.md`: a header with `trashed` (the deletion time), `list` (the list ID) and `listName`, then the task block as it was, subtasks and body included. The task file is written before the task leaves its list, so it is never only in memory. IDs in the trash stay taken (D-29). Undo in the main window removes the trash file again or moves the list back.
 - Items older than 30 days are purged (then MEDIA-04 runs).
 
 ### Undo (DATA-03)

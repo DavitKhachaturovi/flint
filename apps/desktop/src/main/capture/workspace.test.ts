@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -422,5 +422,115 @@ describe('reminders from the lists (REM-01, REM-05; D-64)', () => {
     expect(await workspace.completeById('aaa1', now)).toBe('Completed');
     expect(await workspace.completeById('aaa1', now)).toBeNull();
     expect(await workspace.snoozeById('gone', now)).toBeNull();
+  });
+});
+
+describe('delete, move and list actions (M4 step 4: TASK-11, TASK-12, LIST-01, D-50, D-64)', () => {
+  const header = '---\nflint: 1\nid: inbox\nmode: tasks\n---\n';
+  const trashFiles = async (): Promise<string[]> =>
+    (await readdir(join(folder, '.flint', 'trash')).catch(() => [])).sort();
+
+  it('delete moves a task with its subtasks to Trash storage; undo and redo', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n    - [ ] sub [id:: sub1]\n- [ ] two [id:: bbb2]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    expect(await workspace.change('inbox', { kind: 'delete', key: 'aaa1' }, now)).toMatchObject({
+      label: 'Deleted',
+    });
+    expect(await inbox()).toBe(`${header}- [ ] two [id:: bbb2]\n`);
+    const [file] = await trashFiles();
+    expect(file).toBe('2026-10-29-143000-task-aaa1.md');
+    expect(await readFile(join(folder, '.flint', 'trash', file!), 'utf8')).toBe(
+      '---\nflint: 1\ntrashed: 2026-10-29T14:30\nlist: inbox\nlistName: "Inbox"\n---\n- [ ] one [id:: aaa1]\n    - [ ] sub [id:: sub1]\n',
+    );
+    // Trashed IDs stay taken (D-29).
+    expect(workspace.isTaken('sub1')).toBe(true);
+
+    expect(await workspace.undoLast(now)).toBe('Deleted');
+    expect(await inbox()).toBe(original);
+    expect(await trashFiles()).toEqual([]);
+    expect(await workspace.redoLast(now)).toBe('Deleted');
+    expect(await trashFiles()).toHaveLength(1);
+  });
+
+  it('moves a task to the top of another list, or a new one; undo puts it back', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    await writeFile(
+      join(folder, 'Infra.md'),
+      '---\nflint: 1\nid: inf1\nmode: tasks\n---\n- [ ] old [id:: ccc3]\n',
+    );
+    const workspace = await open();
+    expect(
+      await workspace.change('inbox', { kind: 'moveTo', key: 'bbb2', to: { list: 'inf1' } }, now),
+    ).toMatchObject({ label: 'Moved to Infra', listId: 'inf1', key: 'bbb2' });
+    expect(await inbox()).toBe(`${header}- [ ] one [id:: aaa1]\n`);
+    expect(await readFile(join(folder, 'Infra.md'), 'utf8')).toBe(
+      '---\nflint: 1\nid: inf1\nmode: tasks\n---\n- [ ] two [id:: bbb2]\n- [ ] old [id:: ccc3]\n',
+    );
+    expect(await workspace.undoLast(now)).toBe('Moved to Infra');
+    expect(await inbox()).toBe(original);
+
+    await workspace.change('inbox', { kind: 'moveTo', key: 'aaa1', to: { newList: 'Ops' } }, now);
+    expect(await readFile(join(folder, 'Ops.md'), 'utf8')).toContain('- [ ] one [id:: aaa1]');
+    expect(await workspace.undoLast(now)).toBe('Moved to Ops');
+    await expect(readFile(join(folder, 'Ops.md'))).rejects.toThrow();
+    expect(await inbox()).toBe(original);
+  });
+
+  it('creates, renames and deletes lists and notes, all undoable; Inbox is protected', async () => {
+    const workspace = await open();
+    expect(await workspace.newList('  ', 'tasks', now)).toEqual({
+      ok: false,
+      problem: 'A list needs a name',
+    });
+    expect(await workspace.newList('a:b', 'tasks', now)).toMatchObject({ ok: false });
+    expect(await workspace.newList('inbox', 'tasks', now)).toEqual({
+      ok: false,
+      problem: 'A list with that name exists',
+    });
+    const created = await workspace.newList('Ideas', 'note', now);
+    expect(created).toMatchObject({ ok: true, label: 'Created note Ideas' });
+    const id = created.ok ? created.listId : '';
+    expect(await readFile(join(folder, 'Ideas.md'), 'utf8')).toBe(
+      `---\nflint: 1\nid: ${id}\nmode: note\n---\n`,
+    );
+
+    expect(await workspace.renameList(id, 'Thoughts', now)).toMatchObject({ ok: true });
+    expect(await readFile(join(folder, 'Thoughts.md'), 'utf8')).toContain(`id: ${id}`);
+    await expect(readFile(join(folder, 'Ideas.md'))).rejects.toThrow();
+    expect(await workspace.undoLast(now)).toBe('Renamed to Thoughts');
+    expect(await readFile(join(folder, 'Ideas.md'), 'utf8')).toContain(`id: ${id}`);
+
+    expect(await workspace.deleteList(id, now)).toMatchObject({ ok: true, label: 'Deleted Ideas' });
+    await expect(readFile(join(folder, 'Ideas.md'))).rejects.toThrow();
+    expect(await trashFiles()).toEqual(['2026-10-29-143000-Ideas.md']);
+    expect(workspace.summaries(now).map((list) => list.name)).toEqual(['Inbox']);
+    expect(await workspace.undoLast(now)).toBe('Deleted Ideas');
+    expect(workspace.summaries(now).map((list) => list.name)).toEqual(['Inbox', 'Ideas']);
+
+    expect(await workspace.deleteList('inbox', now)).toMatchObject({ ok: false });
+    expect(await workspace.renameList('inbox', 'Other', now)).toMatchObject({ ok: false });
+  });
+
+  it('saves a note as plain text, adding the header to a file that had none (D-23, D-64)', async () => {
+    await writeFile(join(folder, 'Standup.md'), '# Standup\n\n- Alex: DNS\n');
+    const workspace = await open();
+    const note = workspace.summaries(now).find((list) => list.name === 'Standup');
+    expect(note?.mode).toBe('note');
+    const saved = await workspace.saveNote(note!.id, '# Standup\n\n- Alex: DNS fixed\n', now);
+    expect(saved.ok).toBe(true);
+    const id = saved.ok ? saved.listId : '';
+    expect(id).not.toBe(note!.id);
+    expect(await readFile(join(folder, 'Standup.md'), 'utf8')).toBe(
+      `---\nflint: 1\nid: ${id}\nmode: note\n---\n# Standup\n\n- Alex: DNS fixed\n`,
+    );
+    expect(workspace.view(id, now)?.noteText).toBe('# Standup\n\n- Alex: DNS fixed\n');
+    // Undo reverts the text; the header Flint added stays, so the open note keeps its ID.
+    expect(await workspace.undoLast(now)).toBe('Edited note');
+    expect(await readFile(join(folder, 'Standup.md'), 'utf8')).toBe(
+      `---\nflint: 1\nid: ${id}\nmode: note\n---\n# Standup\n\n- Alex: DNS\n`,
+    );
+    expect(workspace.view(id, now)?.noteText).toBe('# Standup\n\n- Alex: DNS\n');
   });
 });

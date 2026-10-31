@@ -196,7 +196,15 @@ export type ListChange =
       readonly priority: 'high' | 'medium' | 'low' | null;
     }
   | { readonly kind: 'move'; readonly key: string; readonly direction: 'up' | 'down' }
-  | { readonly kind: 'indent' | 'outdent'; readonly key: string };
+  | { readonly kind: 'indent' | 'outdent'; readonly key: string }
+  /** TASK-12, D-50: to Trash storage, undoable. */
+  | { readonly kind: 'delete'; readonly key: string }
+  /** TASK-11: to the top of another list, or of a new one. */
+  | {
+      readonly kind: 'moveTo';
+      readonly key: string;
+      readonly to: { readonly list: string } | { readonly newList: string };
+    };
 
 export interface ChangeOutcome {
   /** For the toast and undo: `Added`, `Added to Infra`, `Priority high`. */

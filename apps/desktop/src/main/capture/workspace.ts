@@ -1,5 +1,5 @@
-import { copyFile, mkdir, readFile, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, mkdir, readFile, rename, unlink } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import {
   addTask,
   allTasks,
@@ -12,6 +12,7 @@ import {
   getBody,
   indentTask,
   moveDown,
+  moveTasksToList,
   moveUp,
   outdentTask,
   serializeDocument,
@@ -22,7 +23,14 @@ import {
   type Op,
   type Where,
 } from '@flint/core';
-import { parseCapture, taskLabel, type CaptureParse, type ListInfo } from '@flint/core/shorthand';
+import {
+  isValidListName,
+  normalizeListName,
+  parseCapture,
+  taskLabel,
+  type CaptureParse,
+  type ListInfo,
+} from '@flint/core/shorthand';
 import { fromDate } from '@flint/core/time';
 import type { ChangeOutcome, ListChange, ListSummary, ListView } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
@@ -31,6 +39,13 @@ import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
+import {
+  ensureTrashFolder,
+  stamp,
+  trashedIds,
+  trashedTaskText,
+  trashFolder,
+} from '../storage/trash.js';
 
 /**
  * The lists in the Flint folder as the capture popup uses them (CAP-02, CAP-03, CAP-05, D-25,
@@ -44,12 +59,6 @@ export interface CaptureRequest {
   readonly chooseNewList: boolean;
   /** Pasted images waiting in app data (CAP-06), saved into `attachments/` with the task. */
   readonly attachments?: readonly { readonly file: string; readonly extension: string }[];
-}
-
-/** `2026-10-29-153012`: attachment names sort by time (docs/04 §5). */
-function stamp(now: Date): string {
-  const two = (value: number): string => String(value).padStart(2, '0');
-  return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
 }
 
 /** A list created by a capture, so `Created list <name> · Undo` can undo it (CAP-05). */
@@ -71,21 +80,46 @@ export type CaptureOutcome =
 interface Loaded {
   /** Re-read when the file changes outside Flint (its name, id or mode can change). */
   entry: ListEntry;
-  readonly file: ListFile;
+  /** Replaced when the list is renamed (its file moves). */
+  file: ListFile;
 }
 
 /** Snooze 10m on a reminder toast (REM-05). */
 const SNOOZE_MS = 10 * 60_000;
 
+/**
+ * One undo or redo step (DATA-03): doing it returns the step that reverts it again, or null when
+ * it no longer applies (its list is gone). Changes to lists' content and to their files alike.
+ */
 interface UndoEntry {
   readonly label: string;
-  /** The list file the change was made in. */
-  readonly list: string;
-  readonly inverse: Op;
-  readonly createdList: boolean;
+  readonly run: (now: Date) => Promise<UndoEntry | null>;
 }
 
-const NEW_LIST_HEADER = (id: string): string => `---\nflint: 1\nid: ${id}\nmode: tasks\n---\n`;
+/** What an operation step also does to files: a created list, a deleted task's trash file. */
+interface StepFiles {
+  /** Undoing removes this list again if it is still exactly as created (CAP-05). */
+  readonly createdList?: string;
+  /** Undoing removes this trash file, redoing writes it again (TASK-12, D-50). */
+  readonly trash?: { readonly path: string; readonly text: string };
+}
+
+export type ListMode = 'tasks' | 'note';
+
+/** What a list action did, or why it couldn't (shown next to the name being typed). */
+export type ListOutcome =
+  | { readonly ok: true; readonly listId: string; readonly label: string }
+  | { readonly ok: false; readonly problem: string };
+
+const NEW_LIST_HEADER = (id: string, mode: ListMode = 'tasks'): string =>
+  `---\nflint: 1\nid: ${id}\nmode: ${mode}\n---\n`;
+
+/** A list's name, as typed in the sidebar (LIST-01): Windows file-name rules (D-25). */
+function listNameProblem(name: string): string | null {
+  if (name.trim() === '') return 'A list needs a name';
+  if (!isValidListName(name.trim())) return 'Windows can’t use that as a file name';
+  return null;
+}
 
 export class Workspace {
   readonly folder: string;
@@ -93,16 +127,21 @@ export class Workspace {
   private readonly uiStatePath: string;
   private uiState: Record<string, unknown>;
 
+  /** IDs in the trash stay taken (D-29). */
+  private readonly trashed: Set<string>;
+
   private constructor(
     folder: string,
     lists: Loaded[],
     uiStatePath: string,
     uiState: Record<string, unknown>,
+    trashed: Set<string>,
   ) {
     this.folder = folder;
     this.lists = lists;
     this.uiStatePath = uiStatePath;
     this.uiState = uiState;
+    this.trashed = trashed;
   }
 
   /** Loads every list in the folder; `uiStatePath` keeps the most recently used lists (D-25). */
@@ -119,7 +158,7 @@ export class Workspace {
     } catch {
       uiState = {};
     }
-    return new Workspace(folder, lists, uiStatePath, uiState);
+    return new Workspace(folder, lists, uiStatePath, uiState, await trashedIds(folder));
   }
 
   /**
@@ -185,9 +224,8 @@ export class Workspace {
   }
 
   /**
-   * Undo and redo for the main window (DATA-03): its own changes, newest first. Applying an entry's
-   * inverse yields the inverse that goes on the other stack, so undo and redo are the same step.
-   * `createdList`: the change created that list, which goes again when undoing leaves it empty.
+   * Undo and redo for the main window (DATA-03): its own changes, newest first. Running an entry
+   * yields the entry that goes on the other stack, so undo and redo are the same step.
    */
   private readonly undoStack: UndoEntry[] = [];
   private readonly redoStack: UndoEntry[] = [];
@@ -199,13 +237,48 @@ export class Workspace {
     op: Op,
     label: string,
     now: Date,
-    createdList = false,
+    files: StepFiles = {},
   ): Promise<string> {
     const applied = await this.applyAndSave(list, op, now);
-    this.undoStack.push({ label, list: list.entry.path, inverse: applied.inverse, createdList });
+    this.remember(
+      this.opsStep(label, [{ path: list.entry.path, inverse: applied.inverse }], true, files),
+    );
+    return label;
+  }
+
+  private remember(entry: UndoEntry): void {
+    this.undoStack.push(entry);
     if (this.undoStack.length > 100) this.undoStack.shift();
     this.redoStack.length = 0;
-    return label;
+  }
+
+  /** Applies the inverses in order; the step it returns applies their inverses in reverse order. */
+  private opsStep(
+    label: string,
+    parts: readonly { readonly path: string; readonly inverse: Op }[],
+    undoing: boolean,
+    files: StepFiles,
+  ): UndoEntry {
+    return {
+      label,
+      run: async (now) => {
+        const next: { path: string; inverse: Op }[] = [];
+        for (const part of parts) {
+          const list = this.lists.find(({ entry }) => entry.path === part.path);
+          if (!list) return null;
+          const applied = await this.applyAndSave(list, part.inverse, now);
+          next.unshift({ path: part.path, inverse: applied.inverse });
+        }
+        if (files.trash) {
+          if (undoing) await unlink(files.trash.path).catch(() => undefined);
+          else await this.writeTrash(files.trash.path, files.trash.text);
+        }
+        const created = files.createdList;
+        const list = created ? this.lists.find(({ entry }) => entry.path === created) : undefined;
+        if (undoing && list) await this.dropIfEmpty(list);
+        return this.opsStep(label, next, !undoing, files);
+      },
+    };
   }
 
   /**
@@ -252,6 +325,25 @@ export class Workspace {
           const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
           return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
         }
+        case 'delete': {
+          // TASK-12, D-50: the task goes to Trash storage first, so it is never only in memory.
+          const found = findTask(document, change.key);
+          if (!found) return null;
+          const name = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
+          const trash = {
+            path: join(trashFolder(this.folder), `${stamp(now)}-task-${change.key}.md`),
+            text: trashedTaskText(found.task, { id: this.listId(list.entry), name }, now),
+          };
+          await this.writeTrash(trash.path, trash.text);
+          for (const { task } of allTasks({ ...document, blocks: [found.task] }))
+            this.trashed.add(task.key);
+          const label = await this.record(list, deleteTask(path, change.key), 'Deleted', now, {
+            trash,
+          });
+          return outcome(label, change.key);
+        }
+        case 'moveTo':
+          return this.moveTo(list, change.key, change.to, now);
         case 'indent':
         case 'outdent': {
           const op = (change.kind === 'indent' ? indentTask : outdentTask)(
@@ -270,6 +362,240 @@ export class Workspace {
    * The composer adds to the top of the list it sits in, Edit-state Enter below the task being
    * edited (docs/03 §2); `##list` sends the task elsewhere, to the top, like a capture (D-25).
    */
+  /**
+   * TASK-11, D-29: a task (with its subtasks) to the top of another list, or of a new one. The
+   * target is written first: a crash between the two writes leaves a copy, never a loss.
+   */
+  private async moveTo(
+    list: Loaded,
+    key: string,
+    to: Extract<ListChange, { kind: 'moveTo' }>['to'],
+    now: Date,
+  ): Promise<ChangeOutcome | null> {
+    let target: Loaded | undefined;
+    let created = false;
+    if ('newList' in to) {
+      const name = to.newList.trim();
+      if (listNameProblem(name) || this.sameName(name)) return null;
+      target = await this.createList(name);
+      created = true;
+    } else target = this.find(to.list);
+    if (!target || target === list || target.entry.mode === 'note' || target.file.readOnly)
+      return null;
+    const op = moveTasksToList(
+      new Map([
+        [list.file.path, list.file.document],
+        [target.file.path, target.file.document],
+      ]),
+      list.file.path,
+      [key],
+      target.file.path,
+    );
+    if (op?.type !== 'batch') return null;
+    const onto = (path: string): Op | null =>
+      bulk(op.ops.filter((part) => 'list' in part && part.list === path));
+    const inserted = onto(target.file.path);
+    const removed = onto(list.file.path);
+    if (!inserted || !removed) return null;
+    const added = await this.applyAndSave(target, inserted, now);
+    const taken = await this.applyAndSave(list, removed, now);
+    const name = target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name;
+    const label = `Moved to ${name}`;
+    this.remember(
+      this.opsStep(
+        label,
+        [
+          { path: list.entry.path, inverse: taken.inverse },
+          { path: target.entry.path, inverse: added.inverse },
+        ],
+        true,
+        created ? { createdList: target.entry.path } : {},
+      ),
+    );
+    await this.markRecent(this.listId(target.entry));
+    return { label, key, listId: this.listId(target.entry), listName: name };
+  }
+
+  /** Another list already has this name, ignoring case, spaces and hyphens (D-25). */
+  private sameName(name: string, except?: Loaded): boolean {
+    const wanted = normalizeListName(name);
+    return this.lists.some(
+      (loaded) =>
+        loaded !== except &&
+        normalizeListName(loaded.entry.id === INBOX_ID ? 'Inbox' : loaded.entry.name) === wanted,
+    );
+  }
+
+  private async writeTrash(path: string, text: string): Promise<void> {
+    await ensureTrashFolder(this.folder);
+    await writeFileAtomic(path, text, {
+      tempDirectory: tempDirectoryFor(join(this.folder, 'x.md')),
+    });
+  }
+
+  /** LIST-01, D-52: a new task list or note from the sidebar's + or Ctrl+Shift+N; undoable. */
+  newList(name: string, mode: ListMode, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const trimmed = name.trim();
+      const problem =
+        listNameProblem(trimmed) ??
+        (this.sameName(trimmed) ? 'A list with that name exists' : null);
+      if (problem) return { ok: false, problem };
+      const loaded = await this.createList(trimmed, mode);
+      const id = loaded.entry.id ?? '';
+      const label = mode === 'note' ? `Created note ${trimmed}` : `Created list ${trimmed}`;
+      const created = (): UndoEntry => ({
+        label,
+        run: async () => {
+          const list = this.find(id);
+          if (!list) return null;
+          await this.dropIfEmpty(list);
+          if (this.find(id)) return null;
+          return {
+            label,
+            run: async () => {
+              if (this.find(id) || this.sameName(trimmed)) return null;
+              await this.createList(trimmed, mode, id);
+              return created();
+            },
+          };
+        },
+      });
+      this.remember(created());
+      void now;
+      return { ok: true, listId: id, label };
+    });
+  }
+
+  /** LIST-01: renames the list's file; its ID, and so its references, stay (docs/04 §2). */
+  renameList(id: string, name: string, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      const trimmed = name.trim();
+      if (!list || list.entry.id === INBOX_ID)
+        return { ok: false, problem: 'Inbox keeps its name' };
+      if (trimmed === list.entry.name) return { ok: true, listId: id, label: '' };
+      const problem =
+        listNameProblem(trimmed) ??
+        (this.sameName(trimmed, list) ? 'A list with that name exists' : null);
+      if (problem) return { ok: false, problem };
+      const label = `Renamed to ${trimmed}`;
+      const previous = list.entry.name;
+      await this.moveListFile(list, trimmed);
+      const step = (from: string, to: string): UndoEntry => ({
+        label,
+        run: async () => {
+          const current = this.find(id);
+          if (!current || current.entry.name !== from || this.sameName(to, current)) return null;
+          await this.moveListFile(current, to);
+          return step(to, from);
+        },
+      });
+      // Undo renames from the new name back to the previous one; redo the other way.
+      this.remember(step(trimmed, previous));
+      void now;
+      return { ok: true, listId: this.listId(list.entry), label };
+    });
+  }
+
+  private async moveListFile(list: Loaded, name: string): Promise<void> {
+    const path = join(this.folder, `${name}.md`);
+    // Never overwrite another file; a change of case is the same file on Windows.
+    if (path.toLowerCase() !== list.entry.path.toLowerCase()) {
+      const exists = await readFile(path).then(
+        () => true,
+        () => false,
+      );
+      if (exists) throw new Error(`a file named ${name}.md already exists`);
+    }
+    await rename(list.entry.path, path);
+    list.entry = { ...list.entry, path, name };
+    list.file = await ListFile.open(path);
+  }
+
+  /**
+   * LIST-01, D-55: the list's file moves to Trash storage with its deletion time (D-50); Undo
+   * moves it back. Inbox can't be deleted (LIST-03).
+   */
+  deleteList(id: string, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list || list.entry.id === INBOX_ID)
+        return { ok: false, problem: "Inbox can't be deleted" };
+      const label = `Deleted ${list.entry.name}`;
+      const trashed = async (loaded: Loaded): Promise<UndoEntry> => {
+        const original = loaded.entry.path;
+        const inTrash = join(
+          await ensureTrashFolder(this.folder),
+          `${stamp(now)}-${basename(original)}`,
+        );
+        await rename(original, inTrash);
+        this.lists.splice(this.lists.indexOf(loaded), 1);
+        if (loaded.entry.id) this.trashed.add(loaded.entry.id);
+        for (const { task } of allTasks(loaded.file.document)) this.trashed.add(task.key);
+        return {
+          label,
+          run: async () => {
+            const back = await readFile(original).then(
+              () => false,
+              () => true,
+            );
+            if (!back) return null;
+            await rename(inTrash, original);
+            const restored: Loaded = { entry: loaded.entry, file: await ListFile.open(original) };
+            this.lists.push(restored);
+            return {
+              label,
+              run: async () => {
+                const current = this.lists.find(({ entry }) => entry.path === original);
+                return current ? trashed(current) : null;
+              },
+            };
+          },
+        };
+      };
+      this.remember(await trashed(list));
+      await this.forgetRecent(id);
+      return { ok: true, listId: id, label };
+    });
+  }
+
+  /**
+   * D-64: a note's text, edited as plain text until the note editor (M5). A file without Flint's
+   * header gets one now (D-23), so its ID may change: the outcome says which it is.
+   */
+  saveNote(id: string, text: string, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list || list.entry.mode !== 'note' || list.file.readOnly)
+        return { ok: false, problem: "This note can't be edited" };
+      let current = serializeDocument(list.file.document);
+      let header = /^---\r?\n[\s\S]*?\r?\n---\r?\n/.exec(current)?.[0];
+      if (!header) {
+        // The header comes first, on its own and not undoable, so undoing an edit never takes the
+        // note's ID away while it is open.
+        const newId = generateId(this.isTaken);
+        header = NEW_LIST_HEADER(newId, 'note');
+        current = header + current;
+        await this.applyAndSave(
+          list,
+          { type: 'setText', list: list.file.path, text: current },
+          now,
+        );
+        list.entry = { ...list.entry, id: newId };
+      }
+      const full = header + text;
+      if (full !== current)
+        await this.record(
+          list,
+          { type: 'setText', list: list.file.path, text: full },
+          'Edited note',
+          now,
+        );
+      return { ok: true, listId: this.listId(list.entry), label: 'Edited note' };
+    });
+  }
+
   private async add(
     list: Loaded,
     change: Extract<ListChange, { kind: 'add' }>,
@@ -304,7 +630,7 @@ export class Workspace {
       where,
     );
     const label = target === list ? 'Added' : `Added to ${target.entry.name}`;
-    await this.record(target, op, label, now, created);
+    await this.record(target, op, label, now, created ? { createdList: target.entry.path } : {});
     if (target !== list) await this.markRecent(this.listId(target.entry));
     return {
       label,
@@ -392,27 +718,20 @@ export class Workspace {
 
   /** Undoes the newest change made in the main window; resolves to what was undone. */
   undoLast(now: Date): Promise<string | null> {
-    return this.serial(() => this.step(this.undoStack, this.redoStack, now, true));
+    return this.serial(() => this.step(this.undoStack, this.redoStack, now));
   }
 
   /** Ctrl+Shift+Z / Ctrl+Y: redoes the newest undone change. */
   redoLast(now: Date): Promise<string | null> {
-    return this.serial(() => this.step(this.redoStack, this.undoStack, now, false));
+    return this.serial(() => this.step(this.redoStack, this.undoStack, now));
   }
 
-  private async step(
-    from: UndoEntry[],
-    to: UndoEntry[],
-    now: Date,
-    undoing: boolean,
-  ): Promise<string | null> {
+  private async step(from: UndoEntry[], to: UndoEntry[], now: Date): Promise<string | null> {
     const entry = from.pop();
     // A list deleted since (an undone new list, or by another program) can't be redone into.
-    const list = entry ? this.lists.find(({ entry: item }) => item.path === entry.list) : undefined;
-    if (!entry || !list) return null;
-    const applied = await this.applyAndSave(list, entry.inverse, now);
-    to.push({ ...entry, inverse: applied.inverse });
-    if (undoing && entry.createdList) await this.dropIfEmpty(list);
+    const opposite = entry ? await entry.run(now) : null;
+    if (!entry || !opposite) return null;
+    to.push(opposite);
     return entry.label;
   }
 
@@ -471,6 +790,7 @@ export class Workspace {
   /** IDs are unique in the whole Flint folder (D-21, D-29): tasks and lists. */
   isTaken = (id: string): boolean =>
     this.reserved.has(id) ||
+    this.trashed.has(id) ||
     this.lists.some(
       ({ entry, file }) =>
         entry.id === id ||
@@ -575,7 +895,10 @@ export class Workspace {
   /** Only a list that is exactly what a capture created is removed; anything added since stays. */
   private async dropIfEmpty(list: Loaded): Promise<void> {
     const id = list.entry.id ?? '';
-    if (serializeDocument(list.file.document) === NEW_LIST_HEADER(id)) {
+    if (
+      serializeDocument(list.file.document) ===
+      NEW_LIST_HEADER(id, list.entry.mode === 'note' ? 'note' : 'tasks')
+    ) {
       await unlink(list.file.path);
       this.lists.splice(this.lists.indexOf(list), 1);
       await this.forgetRecent(id);
@@ -591,9 +914,13 @@ export class Workspace {
     return applied;
   }
 
-  private async createList(name: string): Promise<Loaded> {
+  private async createList(
+    name: string,
+    mode: ListMode = 'tasks',
+    listId?: string,
+  ): Promise<Loaded> {
     const path = join(this.folder, `${name}.md`);
-    const id = generateId(this.isTaken);
+    const id = listId ?? generateId(this.isTaken);
     // `wx`-like guard: never overwrite a file that appeared since the folder was read.
     try {
       await readFile(path);
@@ -601,8 +928,10 @@ export class Workspace {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    await writeFileAtomic(path, NEW_LIST_HEADER(id), { tempDirectory: tempDirectoryFor(path) });
-    const entry: ListEntry = { path, name, id, mode: 'tasks', created: Date.now() };
+    await writeFileAtomic(path, NEW_LIST_HEADER(id, mode), {
+      tempDirectory: tempDirectoryFor(path),
+    });
+    const entry: ListEntry = { path, name, id, mode, created: Date.now() };
     const loaded = { entry, file: await ListFile.open(path) };
     this.lists.push(loaded);
     return loaded;
