@@ -661,21 +661,34 @@ test('an overdue reminder, and the bell that turns it off and on (REM-11, REM-12
   const main = app.windows().find((page) => page.url().includes('main-window'));
   if (!main) throw new Error('main window page not found');
   await main.locator('.nav', { hasText: 'Calls' }).click();
-  const bell = main.locator('.row', { hasText: 'Pay the invoice' }).locator('.reminder');
-  await expect(bell).toHaveText(
-    `Overdue · Today ${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`,
+  // D-68: no "Overdue" word; the bell stays, with a dot, and the time is brighter.
+  const reminder = main.locator('.row', { hasText: 'Pay the invoice' }).locator('.reminder');
+  await expect(reminder).toHaveText(
+    `Today ${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`,
   );
-  await expect(bell).toHaveClass(/overdue/);
+  await expect(reminder).toHaveClass(/overdue/);
 
-  await bell.click();
+  await reminder.locator('.reminder-bell').click();
   await expect
     .poll(() => readFile(file, 'utf8'))
     .toContain(`[reminder:: ${stamp}] [muted:: true] [id:: rem4]`);
-  await expect(bell).toHaveClass(/muted/);
-  await expect(bell).toHaveText(`Today ${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`);
+  await expect(reminder).toHaveClass(/muted/);
   await main.keyboard.press('Control+z');
   await expect.poll(() => readFile(file, 'utf8')).not.toContain('[muted:: true]');
-  await expect(bell).toHaveClass(/overdue/);
+  await expect(reminder).toHaveClass(/overdue/);
+
+  // REM-01, D-68: the time opens the date/time picker; a new time also turns a muted reminder on.
+  await reminder.locator('.reminder-bell').click();
+  await expect.poll(() => readFile(file, 'utf8')).toContain('[muted:: true] [id:: rem4]');
+  await reminder.locator('.reminder-time').click();
+  await expect(main.locator('.fl-picker')).toBeVisible();
+  await main.keyboard.type('tomorrow 9');
+  await main.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(/Pay the invoice \[reminder:: \d{4}-\d{2}-\d{2}T09:00\] \[id:: rem4\]/);
+  await expect(reminder).toHaveText('Tomorrow 09:00');
+  await expect(reminder).toHaveClass(/ on$/);
 });
 
 test('auto-closing brackets and quotes in the composer and the popup (UI-09, D-57)', async () => {

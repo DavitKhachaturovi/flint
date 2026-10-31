@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { parseCapture, type ListInfo, type TokenKind } from '@flint/core/shorthand';
+import { parseLocalDateTime } from '@flint/core/time';
 import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
 import {
   openListPicker,
@@ -386,6 +387,23 @@ export function App(): ReactElement {
     [change, showToast],
   );
 
+  /** REM-01, D-68: a new time for a task's reminder, also one that already fired; with Undo. */
+  const changeReminder = useCallback(
+    (row: TaskRow, anchor: DOMRect): void => {
+      const current = row.reminderAt ? (parseLocalDateTime(row.reminderAt)?.value ?? null) : null;
+      openTimePicker(
+        { anchor, returnFocus: null },
+        new Date(),
+        current,
+        (at) =>
+          void change({ kind: 'reminder', key: row.key, at }).then((outcome) => {
+            if (outcome) showToast(outcome.label, true);
+          }),
+      );
+    },
+    [change, showToast],
+  );
+
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
     (row: TaskRow, at: Point, keyboard = false): void => {
@@ -411,6 +429,14 @@ export function App(): ReactElement {
                 priority('Priority low', '1', 'low'),
                 priority('No priority', '0', null),
                 'divider' as const,
+              ]
+            : []),
+          ...(open
+            ? [
+                {
+                  label: row.reminder ? 'Change reminder…' : 'Set reminder…',
+                  action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
+                },
               ]
             : []),
           ...(open && row.reminder
@@ -445,7 +471,7 @@ export function App(): ReactElement {
         { keyboard },
       );
     },
-    [change, edit, mute, remove, toggle, lists, listId, moveTask],
+    [change, edit, mute, remove, toggle, lists, listId, moveTask, changeReminder],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -633,6 +659,7 @@ export function App(): ReactElement {
     onMenu: (task, at) => taskMenu(task, at),
     leaving,
     onMute: (key, muted) => void mute(key, muted),
+    onReminder: (task, anchor) => changeReminder(task, anchor),
   };
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
@@ -1117,6 +1144,8 @@ interface RowHandlers {
   readonly leaving: ReadonlySet<string>;
   /** REM-12: the bell turns the reminder off or on. */
   readonly onMute: (key: string, muted: boolean) => void;
+  /** REM-01, D-68: the time opens the date/time picker for the task. */
+  readonly onReminder: (task: TaskRow, anchor: DOMRect) => void;
 }
 
 function Row(
@@ -1191,25 +1220,36 @@ function Row(
       )}
       <span className="ind">
         {task.reminder && !task.done && (
-          <button
-            type="button"
-            className={`reminder ${task.reminderState ?? 'on'}`}
-            title={
-              task.reminderState === 'muted' ? 'Turn the reminder on' : 'Turn the reminder off'
-            }
-            aria-pressed={task.reminderState === 'muted'}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onMute(task.key, task.reminderState !== 'muted');
-            }}
-          >
-            {task.reminderState === 'overdue' ? (
-              <span className="overdue-dot" aria-hidden="true" />
-            ) : (
+          // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the
+          // overdue dot, and the time next to it opens the date/time picker (REM-01).
+          <span className={`reminder ${task.reminderState ?? 'on'}`}>
+            <button
+              type="button"
+              className="reminder-bell"
+              title={
+                task.reminderState === 'muted' ? 'Turn the reminder on' : 'Turn the reminder off'
+              }
+              aria-pressed={task.reminderState === 'muted'}
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onMute(task.key, task.reminderState !== 'muted');
+              }}
+            >
               <ReminderBellIcon />
-            )}
-            {task.reminderState === 'overdue' ? `Overdue · ${task.reminder}` : task.reminder}
-          </button>
+              <span className="overdue-dot" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="reminder-time"
+              title="Change the reminder"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onReminder(task, event.currentTarget.getBoundingClientRect());
+              }}
+            >
+              {task.reminder}
+            </button>
+          </span>
         )}
         {task.done && task.completed && <span>{task.completed}</span>}
         {!task.done && !task.code && task.body.trim() !== '' && (

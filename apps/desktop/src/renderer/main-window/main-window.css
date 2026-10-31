@@ -803,46 +803,74 @@ h1 .count {
     height var(--fl-dur-base) var(--fl-ease-spring);
 }
 
-/* REM-11, REM-12 (D-58, D-66): the reminder label is a button. Off: a strike line draws through the
-   bell and the time turns faint. Overdue: brighter text and a small dot instead of the bell. */
+/* REM-01, REM-11, REM-12 (D-66, D-68): the bell is the off/on toggle and never moves; the time
+   next to it opens the date/time picker. Off: a strike line draws through the bell (in both
+   directions, --fl-dur-state) and the time fades. Overdue: a small dot on the bell and brighter
+   time; turning it off removes the dot. */
 .reminder {
-  font: inherit;
-  color: inherit;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border-radius: 6px;
-  transition: color var(--fl-dur-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
-.reminder:hover {
+.reminder-bell,
+.reminder-time {
+  font: inherit;
+  color: inherit;
+  padding: 2px 3px;
+  border-radius: 6px;
+  transition: color var(--fl-dur-state) ease;
+}
+
+.reminder-bell {
+  position: relative;
+  display: flex;
+}
+
+.reminder-bell:hover,
+.reminder-time:hover {
   color: var(--fl-text-primary);
 }
 
 .bell-strike {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  transition: stroke-dashoffset var(--fl-dur-base) var(--fl-ease-spring);
+  transition: stroke-dashoffset var(--fl-dur-state) ease-in-out;
 }
 
 .reminder.muted .bell-strike {
   stroke-dashoffset: 0;
 }
 
-.reminder.muted,
-.row:hover .reminder.muted,
-.row.sel .reminder.muted {
+.reminder.muted .reminder-time,
+.row:hover .reminder.muted .reminder-time,
+.row.sel .reminder.muted .reminder-time {
   color: var(--fl-text-faint);
 }
 
-.reminder.overdue {
+.reminder.overdue .reminder-time {
   color: var(--fl-text-primary);
 }
 
 .overdue-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--fl-overdue-dot);
+  box-shadow: 0 0 0 1.5px var(--fl-ground-card);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--fl-dur-state) ease,
+    transform var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.reminder.overdue .overdue-dot {
+  opacity: 1;
+  transform: none;
 }
 
 /* UI-01, D-68: the I-beam only over text that can be edited right now; the arrow everywhere else. */

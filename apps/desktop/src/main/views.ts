@@ -6,7 +6,7 @@ import {
   type TaskNode,
 } from '@flint/core';
 import { classifyPaste, taskLabel } from '@flint/core/shorthand';
-import { describeTime, toDate, type LocalDateTime } from '@flint/core/time';
+import { describeTime, formatLocalDateTime, toDate, type LocalDateTime } from '@flint/core/time';
 import type { ListItem, ListView, TaskRow } from '../shared/ipc.js';
 
 /**
@@ -66,6 +66,7 @@ function taskRow(task: TaskNode, now: Date): TaskRow {
     code: title === '' ? codeSummary(body) : null,
     priority: line.fields.priority?.value ?? null,
     reminder: reminder ? describeTime(reminder, now) : null,
+    reminderAt: reminder ? formatLocalDateTime(reminder) : null,
     // REM-11, REM-12: a turned-off reminder is never overdue; a completed task never is either.
     reminderState: !reminder
       ? null

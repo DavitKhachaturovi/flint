@@ -158,6 +158,8 @@ export interface TaskRow {
   readonly priority: 'high' | 'medium' | 'low' | null;
   /** `Today 15:00`, `Tomorrow 09:00` (REM-08). */
   readonly reminder: string | null;
+  /** The reminder as written (`YYYY-MM-DDTHH:MM`), for the date/time picker (REM-01). */
+  readonly reminderAt: string | null;
   /** REM-11, REM-12: on, past while the task is open (overdue), or turned off (muted). */
   readonly reminderState: 'on' | 'overdue' | 'muted' | null;
   readonly done: boolean;
@@ -207,6 +209,19 @@ export type ListChange =
     }
   | { readonly kind: 'move'; readonly key: string; readonly direction: 'up' | 'down' }
   | { readonly kind: 'indent' | 'outdent'; readonly key: string }
+  /** REM-01, D-68: a new reminder time from the date/time picker (turns the reminder on). */
+  | {
+      readonly kind: 'reminder';
+      readonly key: string;
+      readonly at: {
+        readonly year: number;
+        readonly month: number;
+        readonly day: number;
+        readonly hour: number;
+        readonly minute: number;
+        readonly second: number;
+      };
+    }
   /** REM-12, D-66: the bell turns a reminder off (kept, never fired) or back on. */
   | { readonly kind: 'mute'; readonly key: string; readonly muted: boolean }
   /** TASK-12, D-50: to Trash storage, undoable. */

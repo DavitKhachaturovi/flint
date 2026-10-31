@@ -337,6 +337,13 @@ export class Workspace {
           const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
           return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
         }
+        case 'reminder': {
+          if (!findTask(document, change.key)) return null;
+          return outcome(
+            await this.record(list, setReminder(path, change.key, change.at), 'Reminder set', now),
+            change.key,
+          );
+        }
         case 'mute': {
           const found = findTask(document, change.key);
           if (!found?.task.line.fields.reminder) return null;
