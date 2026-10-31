@@ -673,12 +673,10 @@ required<HTMLButtonElement>('.previous-close').addEventListener('click', () => {
 
 required<HTMLButtonElement>('.card-close').addEventListener('click', close);
 
-// D-47: the card's background drags the popup; text fields, buttons, chips and code don't.
-required<HTMLElement>('.card').addEventListener('mousedown', (event) => {
-  if (event.button !== 0 || !(event.target instanceof Element)) return;
-  if (event.target.closest('input, textarea, button, a, .chip, .suggestion, .option, .block-code'))
-    return;
-  // Keeps the cursor where it was, too.
+// D-47, D-68: only the grip at the top of the card drags the popup, so text never moves it.
+required<HTMLElement>('.card-grip').addEventListener('mousedown', (event) => {
+  if (event.button !== 0) return;
+  // Keeps the cursor in the title, too.
   event.preventDefault();
   window.flintPopup.dragStart();
 });

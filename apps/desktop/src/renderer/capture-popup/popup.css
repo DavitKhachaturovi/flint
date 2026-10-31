@@ -380,6 +380,33 @@ button:focus-visible {
   gap: 14px;
 }
 
+/* D-47, D-68: the grip that moves the popup: a small pill at the top of the card, with a larger
+   area to catch the mouse. Nothing else on the card drags it. */
+.card-grip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 64px;
+  height: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-grip::before {
+  content: '';
+  width: 32px;
+  height: 4px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-edge-chip);
+  transition: background-color var(--fl-dur-fast);
+}
+
+.card-grip:hover::before {
+  background: var(--fl-text-faint);
+}
+
 /* The × in the top right: closes like Esc, the draft is kept (D-46). */
 .card-close {
   position: absolute;

@@ -131,12 +131,44 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   void window.loadURL(url);
 
   const windowHandle = handleValue(window.getNativeWindowHandle());
+  /** CAP-01, D-68: the window that was in front right before the popup last got the focus. */
   let previous = 0n;
   let forced = false;
 
-  /** Hides and gives focus back to the app the user was in (CAP-01). */
+  // While the popup is open without the focus (D-41), the window in front is noted, so that when
+  // the popup gets the focus back by a click, it returns to that window, not to the one it was
+  // opened from. Only while open and unfocused; a few calls a second.
+  let lastOther = 0n;
+  let watching: NodeJS.Timeout | undefined;
+  const stopWatching = (): void => {
+    clearInterval(watching);
+    watching = undefined;
+  };
+  const noteOther = (): void => {
+    const current = foregroundWindow();
+    if (current !== 0n && current !== windowHandle) lastOther = current;
+  };
+  window.on('blur', () => {
+    stopWatching();
+    if (!window.isVisible()) return;
+    noteOther();
+    watching = setInterval(noteOther, 250);
+  });
+  window.on('focus', () => {
+    stopWatching();
+    if (lastOther !== 0n) previous = lastOther;
+    lastOther = 0n;
+  });
+  window.on('hide', stopWatching);
+
+  /**
+   * Hides the popup (CAP-01). With the focus, it goes back to the window in front right before
+   * the popup last got it; without the focus, no focus is moved at all (D-68).
+   */
   const hideAndReturn = (): number => {
+    const hadFocus = window.isFocused();
     window.hide();
+    if (!hadFocus) return epochNow();
     if (previous !== 0n && previous !== windowHandle && foregroundWindow() !== previous) {
       bringToForeground(previous);
     }
@@ -246,6 +278,7 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     show(hotkeyAt: number, extra = {}) {
       const current = foregroundWindow();
       if (current !== windowHandle) previous = current;
+      lastOther = 0n;
       // A popup that stayed open (D-41) stays where it is; otherwise the active display (CAP-09),
       // keeping the height the card last asked for (popupResize).
       if (!window.isVisible())
