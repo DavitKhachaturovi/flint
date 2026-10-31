@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.2 (31 Oct 2026)
+
+- **Right-click menus** on tasks, lists, notes and the sidebar, and Cut / Copy / Paste / Select all in every text field (also in the capture popup). Shift+F10 or the Menu key opens a selected task's menu.
+- **Delete** a task with Del or from its menu: it goes to Flint's trash folder, never lost, and Undo brings it back.
+- **Move to another list** from a task's menu: search or pick a recent list, or type a new name.
+- **Create, rename and delete lists and notes**: the + next to "Lists" or Ctrl+Shift+N. Deleted lists go to the trash folder too, with Undo.
+- **Notes are editable** as plain text for now, saved as you type (the full note editor comes later).
+
 ## 0.4.1 (31 Oct 2026)
 
 - **New fonts.** Onest for everything you read, FiraGO for Georgian text (only Georgian characters use it), Geist Mono kept for times and code.
