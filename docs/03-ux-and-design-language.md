@@ -115,7 +115,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K inside a selection → link | Proposed (resolve Ctrl+K conflict: palette unless text is selected) |
 
 ### Mouse
-- Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Dragging rows onto a sidebar list to move them is Q-18.
+- Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
 - Click a task to edit; click the check to complete.
 - Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; star to Today and reminder join in M6 (**Proposed** items).
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).

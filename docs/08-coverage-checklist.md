@@ -213,21 +213,22 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | Arrow cursor on all controls, hand only on real links | UI-01 · v1 · M4 | 09 §8, 03 Mouse, D-52 |
 | 3 | Inline markdown rendered in task titles | LIST-02 · v1 · M4 | 03 §4, D-52 |
 | 4 | Thin token-designed scrollbar at the window edge | UI-02 · v1 · M4 | 09 §8, tokens.css, D-52 |
-| 5 | Create a list: "+" next to Lists and Ctrl+Shift+N, task list or note | LIST-01 · v1 · M4 (notes before M5: Q-20) | 03 §3, D-52 |
+| 5 | Create a list: "+" next to Lists and Ctrl+Shift+N, task list or note | LIST-01 · v1 · M4 (plain note editing until M5, D-64) | 03 §3, D-52 |
 | 6 | Settings entry hidden until Settings exists | APP-11 · v1 · M4 (Settings M8) | D-52 |
 | 7 | Proper small icon sizes in the `.ico`; bigger in-app logo and wordmark | UI-07 · v1 · M4 | 09 §7, §8, D-52 |
 | 8 | Task bodies: inline up to ~8 lines, otherwise a full page; "Open as page" for every task; page replaces the list with a back arrow | TASK-05 · v1 · M4 | 03 §3, 09 §8, D-53 |
-| 9 | Locked, springy mouse drag for rows (collapse while dragged) and sidebar lists | TASK-01, LIST-01 · v1 · M4 (drag to sidebar: Q-18) | 03 Mouse, 09 §9, D-54 |
-| 10 | Right-click menus everywhere; Cut / Copy / Paste / Select all in text fields | UI-08 · v1 · M4 (note items M5) | 03, 09 §8, D-55, Q-19 |
+| 9 | Locked, springy mouse drag for rows (collapse while dragged) and sidebar lists | TASK-01, LIST-01 · v1 · M4 (no drag to sidebar, D-64) | 03 Mouse, 09 §9, D-54 |
+| 10 | Right-click menus everywhere; Cut / Copy / Paste / Select all in text fields | UI-08 · v1 · M4 (note items M5) | 03, 09 §8, D-55, D-64 (in-page everywhere) |
 | 11 | Minimal motion for the selection highlight and new rows | UI-04 · v1 · M4 | 03 §5, 09 §9, D-56 |
 | 12 | Back/forward via mouse side buttons and Alt+←/→, no visible buttons | NAV-04 · v1 · M4 (with the page view) | 03 §3, D-53 |
-| 13 | Priority / list / date-time pickers in the composer and popup, same style, keyboard-accessible, inserting the same chips | CAP-11 · v1 · M4 (date/time picker: Q-21) | 03 §3, 09 §8, D-57 |
+| 13 | Priority / list / date-time pickers in the composer and popup, same style, keyboard-accessible, inserting the same chips | CAP-11 · v1 · M4 step 5 | 03 §3, 09 §8, D-57 |
 | 14 | Auto-closing brackets and quotes with overtype; quotes not after a letter | UI-09 · v1 · M4 (note editor M5) | 03 §3, D-57 |
-| 15 | Overdue reminders: "Overdue · <time>", brighter text, small dot, no red, no badges; top of Reminders in Today | REM-11 · v1 · M4 row, M6 Today | 03 §4, 09 §8, D-58, Q-21 |
+| 15 | Overdue reminders: "Overdue · <time>", brighter text, small dot, no red, no badges; top of Reminders in Today | REM-11 · v1 · M4 row, M6 Today | 03 §4, 09 §8, D-58 |
 | 16 | Multi-select floating action bar; sidebar Ctrl/Shift-click and Delete | TASK-07, LIST-01 · v1 · M4 | 03 Mouse, 09 §8, D-59 |
 | 17 | Fonts: Onest, FiraGO for Georgian (unicode-range), Geist Mono; mockups and screenshots re-rendered | UI-05 · v1 · M4 | 09 §7, 03 §4, D-60 (supersedes D-17's fonts) |
-| 18 | Guidance spotlight: first-run walkthrough (replacing the teaching Inbox, Proposed), contextual tips, What's new with release notes | APP-13, APP-10, APP-14, APP-15 · v1 · M8 (release notes: Q-22) | 09 §8, 04 §2, D-61 |
+| 18 | Guidance spotlight: first-run walkthrough (replacing the teaching Inbox, D-64), contextual tips, What's new with release notes | APP-13, APP-10, APP-14, APP-15 · v1 · M8 (release notes from 0.4.0, D-64) | 09 §8, 04 §2, D-61 |
 | 19 | Tabs bar (Obsidian-style) | NAV-05 · Later | 06 §3, D-62 |
 | 20 | Priority visibility: no text fading or bolding for now | Q-17 · Open question | 06 §4, D-62 |
 | 21 | Grayscale syntax highlighting; tokens in tokens.css and 09; mockup 07 and its screenshot | UI-06 · v1 · M4 (popup, bodies), M5 (CodeMirror) | 09 §10, §11, tokens.css, D-63 |
-| — | Found during intake: reminders don't fire before M6 | REM-01, REM-05 · Open question | Q-21 |
+| — | Found during intake: reminders didn't fire before M6 | REM-01, REM-05, REM-07 (basic) · v1 · M4 step 3 | D-64 |
+| — | Versioning 0.4.x with release notes per build | APP-15 · v1 · M4 | `docs/release-notes.md`, D-64 |

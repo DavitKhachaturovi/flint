@@ -13,7 +13,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each list is one markdown file in the Flint folder (see 04).
 - Lists can be created, renamed, reordered in the sidebar, and deleted (deleted lists go to Trash, DATA-02).
 - Lists are the top-level `*.md` files in the Flint folder. A file without Flint frontmatter (e.g. created in VS Code or by Claude) shows up as a note; Flint adds its header only when the user edits the file in Flint (D-23).
-- **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). Creating a note before the note editor exists is Q-20.
+- **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). **D-64:** a new note gets plain monospace editing (like task bodies, D-49) until M5's note editor; existing notes become editable the same way.
 - **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
 - **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
 
@@ -124,7 +124,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - The composer's and the capture popup's **flag**, **#** and **bell** buttons open pickers instead of typing `!h`, `##` and `@`:
   - **Priority picker:** High, Medium, Low, None.
   - **List picker:** a search field plus a few recent lists (most recently used first, D-25 matching; an unknown name offers "New list").
-  - **Date/time picker:** a proper date and time picker (month grid, time, and a natural-language field reading the same grammar as `@`, REM-02). Its milestone is Q-21.
+  - **Date/time picker:** a proper date and time picker (month grid, time, and a natural-language field reading the same grammar as `@`, REM-02). M4 step 5 (D-64).
 - All three pickers have the **same size and visual style** (floating level, 09 §8), are fully **keyboard-accessible** (the buttons are focusable; arrows move, Enter picks, Esc closes back to the text), and insert **the same chip** the shorthand would. The chosen value goes into the title as a live token, so chips, saving and undo behave exactly as with typed shorthand (D-45 live insertion).
 - Milestone: M4 for the composer and the capture popup.
 
@@ -137,7 +137,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Tasks can be **dragged** to reorder, e.g. dragged to the top to focus on them first. The manual order is the source of truth and is persisted (it is the order of lines in the file, 04).
 - Drag-and-drop and Alt+↑/↓ follow one rule: only the task's block (line, body, subtasks) moves; non-task content in the file never moves as a side effect (D-22).
 - Drag uses snappy spring animations (03).
-- **D-54 (M4):** dragging is **locked to the vertical axis and to the list's bounds**: the row never floats freely. Other rows slide out of the way with a smooth spring (≤ 150 ms, off with reduce-motion). An expanded task collapses while it is dragged and re-expands after the drop if it was expanded. Subtasks move with their parent. Whether a task can still be dragged onto a list in the sidebar (TASK-11) is Q-18.
+- **D-54 (M4):** dragging is **locked to the vertical axis and to the list's bounds**: the row never floats freely. Other rows slide out of the way with a smooth spring (≤ 150 ms, off with reduce-motion). An expanded task collapses while it is dragged and re-expands after the drop if it was expanded. Subtasks move with their parent. **D-64:** there is no dragging tasks onto sidebar lists in v1; tasks move with the right-click menu, the list picker, the action bar and Ctrl+K (TASK-11).
 
 ### TASK-02 — Fully keyboard-driven (v1)
 - **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
@@ -198,10 +198,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Applies in task titles, task bodies, and notes.
 
 ### TASK-11 — Move tasks between lists (v1)
-- Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or drag onto a list in the sidebar.
+- Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or the multi-select action bar. **D-64:** not by dragging onto a sidebar list (the drag is locked to the list, D-54).
 - This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
 - **D-29:** a moved task lands at the top of the target list (like a capture), with its subtasks; a subtask moved on its own becomes a top-level task there. Several tasks moved together (TASK-07) land at the top in their original relative order. Its lines take on the target file's line endings.
-- Moving uses the list picker of CAP-11. Dragging onto a sidebar list conflicts with the locked drag of D-54: see Q-18. Milestone M4.
+- Moving uses the list picker of CAP-11. Milestone M4.
 
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
@@ -271,6 +271,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Open** shows the main window with the task selected.
 - Clicking the toast body behaves like **Open**.
 - Buttons must work while the toast is on screen and from Action Center. Implementation notes in 05.
+- **D-64 (Davit, 31 Oct 2026):** pulled forward to **M4 step 3**, the first item: reminders fire as this toast while Flint runs; a reminder missed while Flint wasn't running or the PC slept is shown once at the next start (or wake) as a toast labelled "Missed". **Proposed:** more than 3 missed at once show as one toast, "N reminders you missed", whose Open shows the main window; the full REM-07 list comes in M6. A shown reminder is remembered in `reminders-state.json` (04 §2), so it is never shown twice.
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
@@ -297,7 +298,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - The label turns overdue on its own when the time passes (the view checks every minute, **Proposed**).
 - **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
 - In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
-- Milestones: the row display in M4; the Today grouping and snooze in M6. Reminders don't fire as notifications before M6 today: Q-21.
+- Milestones: the row display in M4; the Today grouping and snooze presets in M6. Reminders fire as notifications from M4 step 3 (D-64, REM-05).
 
 ---
 
@@ -444,7 +445,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
-- **Proposed (D-61):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.
+- **Decided (D-64):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.
 - Milestone M8.
 
 ### APP-11 — Settings (v1)
@@ -476,8 +477,8 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 
 ### APP-15 — What's new (v1, D-61)
 - After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the tray ("What's new").
-- **Every version bump comes with short release notes**, which are what this shows. Where they live and when versioning starts is Q-22.
-- Milestone M8 (release notes from the first versioned build on, Q-22).
+- **Every version bump comes with short release notes**, which are what this shows. **D-64:** versioning starts with the next build: **0.4.x during M4** (the minor number is the milestone), bumped for every build handed out, each with a short entry in [`docs/release-notes.md`](release-notes.md), which the app bundles for What's new.
+- Milestone M8 (release notes from 0.4.0 on).
 
 ---
 
@@ -532,7 +533,8 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-08 — Right-click menus everywhere (v1, D-55)
 - Every object has a right-click menu with relevant actions: tasks, lists and notes in the sidebar, the sidebar's background, the composer.
 - **Every text field** keeps the standard **Cut / Copy / Paste / Select all** menu (Electron shows none by default).
-- Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6). How menus are drawn is Q-19.
+- Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6).
+- **D-64:** menus are drawn **in the page**, with the tokens, **everywhere**, the capture popup included: while a menu is open there, the popup makes room for it (e.g. by enlarging its transparent margin or window). The native dark Windows menu is only a fallback if that genuinely doesn't work, and Davit is told if it comes to that.
 - Milestones: M4; note-specific items (NOTE-02) in M5.
 
 ### UI-09 — Auto-closing brackets and quotes (v1, D-57)

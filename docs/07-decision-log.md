@@ -391,3 +391,14 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 ### D-63 — Grayscale syntax highlighting
 - **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
 - **Decision:** Code tokens by lightness, weight and italics, plus the accent for strings: keywords white semibold; numbers white; literals white italic; keys and variables light gray; strings accent `#9AA0AB`; functions and `file:line` light gray with a faint underline; types and flags mid-gray italic; punctuation and comments dim gray (comments italic); stack traces with a bright exception line and dimmed frames. Tokens in tokens.css and 09 §11; reference mockup 07 (added by Davit). Used by the popup's JSON / stack-trace highlighter and rendered task bodies in M4, and the CodeMirror theme for all languages in M5 (UI-06, NOTE-04). Supersedes the highlighting colours of the selection area in 09 §8 (D-38).
+
+### D-64 — Answers to Q-18 to Q-22; the walkthrough replaces the teaching Inbox
+- **Date:** 31 Oct 2026 · **Status:** Decided (Davit)
+- **Decision:**
+  - **Q-21:** reminders fire as notifications from **M4 step 3, as its first item**, before the visual fixes: the actionable toast (Done / Snooze 10m / Open) while Flint runs; missed ones shown once at the next start. The date/time picker stays in step 5. "Reminders that silently don't fire are worse than none."
+  - **Q-18:** no dragging tasks onto sidebar lists in v1 (TASK-11, Q-06, 03 Mouse updated).
+  - **Q-19:** consistent in-page menus everywhere. The capture popup makes room for an open menu (e.g. by temporarily enlarging its transparent margin or window); the native dark menu only if that genuinely doesn't work, reported to Davit.
+  - **Q-20:** + offers Task list and Note; notes get plain monospace editing until M5.
+  - **Q-22:** versions 0.4.x during M4; every build gets a short entry in `docs/release-notes.md`.
+  - **D-61 confirmed:** the first-run walkthrough replaces the teaching-Inbox sample tasks.
+  - **FiraGO** ships as the official, unmodified files (Reserved Font Name "Fira"), loaded via `unicode-range` (D-60).
