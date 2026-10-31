@@ -1,15 +1,16 @@
-import type { BlockKind } from '@flint/core/shorthand';
+import { traceLineKinds, type BlockKind, type TraceLineKind } from '@flint/core/shorthand';
 
 /**
  * A small highlighter for what actually gets captured (D-38), in the grayscale scheme (UI-06, D-63):
- * JSON (keys, strings, numbers, literals, punctuation) and stack traces (the exception line bright, frames dim, file:line marked). Other code
- * stays plain monospace; a full highlighter would weigh down the pre-warmed popup (CAP-10).
+ * JSON (keys, strings, numbers, literals, punctuation) and stack traces in the common formats (the
+ * exception lines bright, frames and headers dim, file:line marked; core's `traceLineKinds`, D-65).
+ * Other code stays plain monospace; a full highlighter would weigh down the pre-warmed popup
+ * (CAP-10).
  * Everything is set as text, never as HTML.
  */
 
 const JSON_TOKEN =
   /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)/g;
-const FRAME = /^\s*(?:at\s|File\s+")|^\s+[\w$.<>`]+\(.*\)\s*$/;
 const LOCATION = /((?:[A-Za-z]:)?[\\/\w.-]+\.\w+(?::line)?[:\s]\d+(?::\d+)?)|(line \d+)/;
 
 function span(className: string, text: string): HTMLSpanElement {
@@ -47,8 +48,10 @@ function jsonLine(line: string): Node[] {
   return nodes;
 }
 
-function traceLine(line: string, first: boolean): Node[] {
-  if (!FRAME.test(line)) return [span(first ? 'tok-error' : '', line)];
+function traceLine(line: string, kind: TraceLineKind): Node[] {
+  if (kind === 'exception') return [span('tok-error', line)];
+  if (kind === 'header') return [span('tok-frame', line)];
+  if (kind === 'plain') return [span('', line)];
   const location = LOCATION.exec(line);
   if (!location) return [span('tok-frame', line)];
   return [
@@ -60,11 +63,12 @@ function traceLine(line: string, first: boolean): Node[] {
 
 /** One element per line, highlighted for the block's kind. */
 export function highlightLines(kind: BlockKind, lines: readonly string[]): HTMLElement[] {
+  const trace = kind === 'stack-trace' ? traceLineKinds(lines) : [];
   return lines.map((line, index) => {
     const row = document.createElement('span');
     row.className = 'code-line';
     if (kind === 'json') row.append(...jsonLine(line));
-    else if (kind === 'stack-trace') row.append(...traceLine(line, index === 0));
+    else if (kind === 'stack-trace') row.append(...traceLine(line, trace[index] ?? 'plain'));
     else row.textContent = line;
     return row;
   });

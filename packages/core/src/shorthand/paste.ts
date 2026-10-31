@@ -5,13 +5,12 @@
  * or else the first meaningful line of the paste (**Proposed**).
  */
 
+import { FRAME_LINE, TRACE_HEADER } from './trace.js';
+
 export type PasteKind = 'json' | 'stack-trace' | 'code' | 'text';
 
-const FRAME_LINES = [
-  /^\s+at\s+\S.*(?:\(.*:\d+(?::\d+)?\)|:\d+(?::\d+)?|\)\s+in\s+.+:line\s+\d+)\s*$/, // JS, Java, .NET
-  /^\s+at\s+[\w$.<>`]+\(.*\)\s*$/, // Java/.NET frames without a location
-  /^\s*File\s+".+",\s+line\s+\d+/, // Python
-];
+/** Frames, also without their indentation: log viewers often strip it (D-65). */
+const FRAME_LINES = FRAME_LINE;
 const TRACEBACK = /^Traceback \(most recent call last\):\s*$/m;
 
 function lines(text: string): string[] {
@@ -29,7 +28,7 @@ export function classifyPaste(text: string): PasteKind {
     }
   }
   const all = lines(trimmed).filter((line) => line.trim() !== '');
-  if (TRACEBACK.test(trimmed)) return 'stack-trace';
+  if (all.some((line) => TRACE_HEADER.test(line))) return 'stack-trace';
   const frames = all.filter((line) => FRAME_LINES.some((pattern) => pattern.test(line))).length;
   if (frames >= 2) return 'stack-trace';
   if (all.length >= 3) {
