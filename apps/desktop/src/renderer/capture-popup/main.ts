@@ -23,6 +23,7 @@ import {
   type PopupNotice,
   type PopupShown,
 } from '../../shared/ipc.js';
+import { enableAutoPair } from '../auto-pair.js';
 import { isTextField, openMenu, textFieldMenu } from '../menu/menu.js';
 import { highlightLines } from './highlight.js';
 import {
@@ -47,6 +48,8 @@ function required<T extends Element>(selector: string): T {
 }
 
 const input = required<HTMLInputElement>('#capture');
+// UI-09: auto-closing brackets and quotes in the title line.
+enableAutoPair(input);
 const chipsBox = required<HTMLElement>('.chips');
 const suggestionsBox = required<HTMLElement>('#suggestions');
 const choiceBox = required<HTMLElement>('.choice');

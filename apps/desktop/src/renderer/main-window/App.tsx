@@ -34,6 +34,7 @@ import { titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 import { ListPicker, type PickedList } from './ListPicker.js';
 import { NoteEditor } from './NoteEditor.js';
+import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
 
 /**
@@ -885,6 +886,8 @@ function Composer(props: {
 }): ReactElement {
   const { listId, lists, inputRef, onAdd } = props;
   const text = useInertText('', false);
+  // UI-09: auto-closing brackets and quotes in the composer.
+  useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
   const infos = useMemo(
     () => lists.map((list): ListInfo => ({ id: list.id, name: list.name, mode: list.mode })),
     [lists],
@@ -1274,6 +1277,9 @@ function EditField(props: {
   const { initial, inert, placeholder, repeat = false, onLeave, onTab } = props;
   const text = useInertText(initial, inert);
   const left = useRef(false);
+  const field = useRef<HTMLInputElement>(null);
+  // UI-09: auto-closing brackets and quotes while editing a task.
+  useEffect(() => (field.current ? enableAutoPair(field.current) : undefined), []);
   const leave = (how: Leave): void => {
     if (left.current) return;
     const empty = text.value.trim() === '';
@@ -1287,6 +1293,7 @@ function EditField(props: {
   };
   return (
     <input
+      ref={field}
       className="title-input"
       autoFocus
       value={text.value}

@@ -551,5 +551,5 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-09 — Auto-closing brackets and quotes (v1, D-57)
 - Like Obsidian: typing `(` inserts `()` with the cursor inside; typing `)` right before an auto-inserted `)` just steps over it. Same for `[]`, `{}`, `""`, `''` and ``` `` ```.
 - Quotes pair only when **not directly after a letter or digit**, so "don't" works.
-- **Proposed:** Backspace right after an auto-inserted pair removes both; with text selected, typing an opening character wraps the selection.
+- **Proposed:** Backspace right after an auto-inserted pair removes both; with text selected, typing an opening character wraps the selection. Nothing pairs directly before a letter or digit, so typing `(` in front of a word doesn't add a stray `)` (as most editors do).
 - Milestones: the composer, the capture popup and task editing in M4; the note editor (CodeMirror) in M5.

@@ -1,5 +1,6 @@
 import type { CaptureBlock, CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
 import type { AttachmentChip } from '../../shared/ipc.js';
+import { enableAutoPair } from '../auto-pair.js';
 
 /**
  * What the popup shows for the parsed text (CAP-04, CAP-05, D-25, D-29): chips, the `##` menu, the
@@ -210,6 +211,8 @@ export function renderBlocks(
     if (block.kind === 'text' || block.kind === 'note') {
       const section = element('section', `block ${block.kind}`);
       const field = element('textarea', 'block-text');
+      // UI-09: auto-closing brackets and quotes in notes and editable selections too.
+      enableAutoPair(field);
       field.rows = 1;
       field.spellcheck = false;
       field.value = block.text;

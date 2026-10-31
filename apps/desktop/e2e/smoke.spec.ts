@@ -684,6 +684,36 @@ test('an overdue reminder, and the bell that turns it off and on (REM-11, REM-12
   await expect(bell).toHaveClass(/overdue/);
 });
 
+test('auto-closing brackets and quotes in the composer and the popup (UI-09, D-57)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Inbox/);
+  const composer = main.locator('.composer-input');
+  await main.keyboard.press('Control+n');
+  await expect(composer).toBeFocused();
+  await main.keyboard.type('fn(x');
+  await expect(composer).toHaveValue('fn(x)');
+  await main.keyboard.type(')');
+  await expect(composer).toHaveValue('fn(x)');
+  await composer.fill('');
+  await main.keyboard.type("don't [skip");
+  await expect(composer).toHaveValue("don't [skip]");
+  await composer.fill('');
+  await main.keyboard.press('Escape');
+
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  await popup.locator('#capture').fill('');
+  await popup.keyboard.type('say "hi');
+  await expect(popup.locator('#capture')).toHaveValue('say "hi"');
+  await popup.locator('#capture').fill('');
+  await popup.keyboard.press('Escape');
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });
