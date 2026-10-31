@@ -23,6 +23,7 @@ import {
   type PopupNotice,
   type PopupShown,
 } from '../../shared/ipc.js';
+import { isTextField, openMenu, textFieldMenu } from '../menu/menu.js';
 import { highlightLines } from './highlight.js';
 import {
   fitHeight,
@@ -619,9 +620,34 @@ const setInteractive = (next: boolean): void => {
   window.flintPopup.setInteractive(next);
 };
 document.addEventListener('mousemove', (event) => {
-  setInteractive(event.target instanceof Element && event.target.closest('.card') !== null);
+  setInteractive(
+    event.target instanceof Element && event.target.closest('.card, .fl-menu') !== null,
+  );
 });
 document.addEventListener('mouseleave', () => setInteractive(false));
+
+// UI-08, D-64: text fields keep Cut / Copy / Paste / Select all, as an in-page menu like everywhere
+// in Flint. When the window is too short for it, the page grows while the menu is open (the window
+// follows the page, below), so the menu never has to be native.
+document.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
+  if (!isTextField(event.target)) return;
+  const field = event.target;
+  openMenu(
+    textFieldMenu(field, (command) => window.flintPopup.edit(command)),
+    { x: event.clientX, y: event.clientY },
+    {
+      room: {
+        grow: (height) => {
+          document.body.style.paddingBottom = `${height}px`;
+        },
+        release: () => {
+          document.body.style.paddingBottom = '';
+        },
+      },
+    },
+  );
+});
 
 // The window follows the card (its margin included), so the menu and blocks always fit.
 new ResizeObserver(() => {

@@ -14,6 +14,7 @@ import {
 import {
   Channels,
   epochNow,
+  type ListAction,
   type ListChange,
   type PopupNotice,
   type PopupShown,
@@ -299,10 +300,41 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  // UI-08: a text field's menu in any Flint window; the command runs on that window.
+  ipcMain.on(Channels.editCommand, (event, command: unknown) => {
+    const contents = event.sender;
+    if (command === 'cut') contents.cut();
+    else if (command === 'copy') contents.copy();
+    else if (command === 'paste') contents.paste();
+    else if (command === 'selectAll') contents.selectAll();
+  });
   ipcMain.on(Channels.mainOpenLink, (event, href: unknown) => {
     if (owns(event.sender) && typeof href === 'string' && isOpenableLink(href))
       void shell.openExternal(href);
   });
+  ipcMain.handle(Channels.mainListAction, (event, action: unknown) => {
+    if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
+    const request = action as ListAction;
+    const now = new Date();
+    const run =
+      request.kind === 'new'
+        ? workspace.newList(request.name, request.mode, now)
+        : request.kind === 'rename'
+          ? workspace.renameList(request.id, request.name, now)
+          : workspace.deleteList(request.id, now);
+    return run.catch((error: unknown) => {
+      log(`list action failed: ${String(error)}`);
+      return { ok: false, problem: 'Flint could not change the file' } as const;
+    });
+  });
+  ipcMain.handle(Channels.mainSaveNote, (event, id: unknown, text: unknown) =>
+    owns(event.sender) && typeof id === 'string' && typeof text === 'string'
+      ? workspace.saveNote(id, text, new Date()).catch((error: unknown) => {
+          log(`could not save the note: ${String(error)}`);
+          return { ok: false, problem: 'Flint could not save the note' } as const;
+        })
+      : null,
+  );
   ipcMain.handle(Channels.mainReserveId, (event) =>
     owns(event.sender) ? workspace.reserveId() : null,
   );

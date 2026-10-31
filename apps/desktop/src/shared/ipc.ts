@@ -11,6 +11,8 @@ export function epochNow(): number {
 }
 
 export const Channels = {
+  /** Any window → main: Cut / Copy / Paste / Select all from a text field's menu (UI-08). */
+  editCommand: 'edit:command',
   popupShown: 'popup:shown',
   popupFocused: 'popup:focused',
   popupSubmit: 'popup:submit',
@@ -40,6 +42,10 @@ export const Channels = {
   mainReveal: 'main:reveal',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',
+  /** Main window → main: new, rename or delete a list or note (LIST-01). */
+  mainListAction: 'main:list-action',
+  /** Main window → main: a note's text, edited as plain text until M5 (D-64). */
+  mainSaveNote: 'main:save-note',
 } as const;
 
 /**
@@ -136,6 +142,8 @@ export interface ListSummary {
   /** Open top-level tasks. */
   readonly open: number;
   readonly inbox: boolean;
+  /** Most recently used rank (0 = last move or capture target), for the list picker (D-25). */
+  readonly recentRank?: number;
 }
 
 /** A task as a row (TASK-01..06). */
@@ -215,3 +223,17 @@ export interface ChangeOutcome {
   readonly listId: string;
   readonly listName: string;
 }
+
+/** A text field's menu command, run by the main process on the sender (UI-08). */
+export type EditCommand = 'cut' | 'copy' | 'paste' | 'selectAll';
+
+/** LIST-01, D-52, D-55: what the sidebar asks of a list. */
+export type ListAction =
+  | { readonly kind: 'new'; readonly name: string; readonly mode: 'tasks' | 'note' }
+  | { readonly kind: 'rename'; readonly id: string; readonly name: string }
+  | { readonly kind: 'delete'; readonly id: string };
+
+/** What a list action did, or why it couldn't (shown next to the name being typed). */
+export type ListActionOutcome =
+  | { readonly ok: true; readonly listId: string; readonly label: string }
+  | { readonly ok: false; readonly problem: string };

@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   Channels,
   type ChangeOutcome,
+  type EditCommand,
+  type ListAction,
+  type ListActionOutcome,
   type ListChange,
   type ListSummary,
   type ListView,
@@ -32,6 +35,18 @@ const main = {
   },
   redo(): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainRedo) as Promise<string | null>;
+  },
+  /** LIST-01: new, rename or delete a list or note. */
+  listAction(action: ListAction): Promise<ListActionOutcome | null> {
+    return ipcRenderer.invoke(Channels.mainListAction, action) as Promise<ListActionOutcome | null>;
+  },
+  /** D-64: a note's text; resolves to its list ID, which changes when Flint adds its header. */
+  saveNote(id: string, text: string): Promise<ListActionOutcome | null> {
+    return ipcRenderer.invoke(Channels.mainSaveNote, id, text) as Promise<ListActionOutcome | null>;
+  },
+  /** A text field's menu (UI-08): Cut / Copy / Paste / Select all. */
+  edit(command: EditCommand): void {
+    ipcRenderer.send(Channels.editCommand, command);
   },
   /** A link in a title: the main process opens web and mail links in the browser. */
   openLink(href: string): void {

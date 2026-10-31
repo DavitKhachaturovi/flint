@@ -1,5 +1,6 @@
 @import '../../../../../docs/design/tokens.css';
 @import '../fonts.css';
+@import '../menu/menu.css';
 
 /* The main window (M4), after docs/design/mockups/01-main-inbox.html; tokens only (docs/09). */
 
@@ -666,4 +667,140 @@ h1 .count {
     opacity: 0;
     transform: translateY(4px);
   }
+}
+
+/* LIST-01, D-52: the + next to "Lists", and a list's name typed in place. */
+.lists-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 6px;
+}
+
+.add-list {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-check);
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.add-list:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.add-list svg {
+  display: block;
+}
+
+.name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fl-text-highlight);
+  font: inherit;
+  font-weight: 500;
+}
+
+.name-input::placeholder {
+  color: var(--fl-text-faint);
+  font-weight: 400;
+}
+
+.name-problem {
+  margin: 4px 10px 6px 43px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+/* The list picker (CAP-11, D-57, docs/09 §8): "Move to…" now, the composer's # in step 5. */
+.picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+.picker {
+  position: fixed;
+  width: 280px;
+  padding: 6px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  animation: fl-menu-in var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+.picker-search {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  color: var(--fl-text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.picker-search::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px 5px 5px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--fl-text-body);
+  text-align: left;
+}
+
+.picker-item.active {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-empty {
+  margin: 8px 10px;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+/* D-64: a note as plain monospace text until the note editor (M5). */
+.note-editor {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  padding: 18px 20px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  font-family: var(--fl-font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--fl-text-body);
+  caret-color: var(--fl-accent);
 }

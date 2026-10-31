@@ -27,8 +27,12 @@ import {
   InboxIcon,
   ListIcon,
   NoteIcon,
+  PlusIcon,
 } from './icons.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
+import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
+import { ListPicker, type PickedList } from './ListPicker.js';
+import { NoteEditor } from './NoteEditor.js';
 import { useInertText } from './inert-text.js';
 
 /**
@@ -48,6 +52,16 @@ const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
   '0': null,
 };
 const PRIORITY_NAMES = { high: 'High', medium: 'Medium', low: 'Low' } as const;
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** A list's name being typed in the sidebar (LIST-01). */
+type Naming =
+  | { readonly kind: 'new'; readonly mode: 'tasks' | 'note' }
+  | { readonly kind: 'rename'; readonly id: string; readonly name: string };
+
 /** Before a list's rows arrive: select its first row once they do. */
 const FIRST_ROW = '';
 
@@ -113,6 +127,12 @@ export function App(): ReactElement {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const composer = useRef<HTMLInputElement>(null);
+  /** "Move to…" (TASK-11): the task and where the picker opens. */
+  const [picker, setPicker] = useState<{ key: string; at: Point } | null>(null);
+  /** A list's name being typed in the sidebar: a new list or note, or a rename (LIST-01). */
+  const [naming, setNaming] = useState<Naming | null>(null);
+  const [namingProblem, setNamingProblem] = useState<string | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     const [nextLists, nextView] = await Promise.all([
@@ -292,9 +312,153 @@ export function App(): ReactElement {
     [change, listId, showToast],
   );
 
+  /** TASK-12, D-50: to Trash storage, with Undo. */
+  const remove = useCallback(
+    async (key: string): Promise<void> => {
+      const outcome = await change({ kind: 'delete', key });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+
+  /** TASK-11: to the top of another list, or a new one, with Undo. */
+  const moveTask = useCallback(
+    async (key: string, to: PickedList): Promise<void> => {
+      setPicker(null);
+      const outcome = await change({ kind: 'moveTo', key, to });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+
+  /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
+  const taskMenu = useCallback(
+    (row: TaskRow, at: Point, keyboard = false): void => {
+      const open = !row.done;
+      const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
+        label,
+        hint,
+        action: () => void change({ kind: 'priority', key: row.key, priority: value }),
+      });
+      openMenu(
+        [
+          ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
+          {
+            label: open ? 'Complete' : 'Reopen',
+            hint: 'Space',
+            action: () => void toggle(row.key),
+          },
+          'divider',
+          ...(open
+            ? [
+                priority('Priority high', '3', 'high'),
+                priority('Priority medium', '2', 'medium'),
+                priority('Priority low', '1', 'low'),
+                priority('No priority', '0', null),
+                'divider' as const,
+              ]
+            : []),
+          { label: 'Move to…', action: () => setPicker({ key: row.key, at }) },
+          'divider',
+          { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
+        ],
+        at,
+        { keyboard },
+      );
+    },
+    [change, edit, remove, toggle],
+  );
+
+  /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
+  const newListMenu = useCallback((at: Point, keyboard = false): void => {
+    const start = (mode: 'tasks' | 'note'): void => {
+      setNamingProblem(null);
+      setNaming({ kind: 'new', mode });
+    };
+    openMenu(
+      [
+        { label: 'New task list', hint: 'Ctrl+Shift+N', action: () => start('tasks') },
+        { label: 'New note', action: () => start('note') },
+      ],
+      at,
+      { keyboard },
+    );
+  }, []);
+
+  const submitName = useCallback(
+    async (name: string): Promise<void> => {
+      if (!naming) return;
+      const outcome = await window.flintMain.listAction(
+        naming.kind === 'new'
+          ? { kind: 'new', name, mode: naming.mode }
+          : { kind: 'rename', id: naming.id, name },
+      );
+      if (!outcome) return;
+      if (!outcome.ok) {
+        setNamingProblem(outcome.problem);
+        return;
+      }
+      setNaming(null);
+      setNamingProblem(null);
+      if (naming.kind === 'new') openList(outcome.listId);
+      if (outcome.label) showToast(outcome.label, true);
+    },
+    [naming, openList, showToast],
+  );
+
+  /** D-55: a list's right-click menu; Inbox has none (LIST-03). */
+  const listMenu = useCallback(
+    (list: ListSummary, at: Point): void => {
+      openMenu(
+        [
+          {
+            label: 'Rename',
+            action: () => {
+              setNamingProblem(null);
+              setNaming({ kind: 'rename', id: list.id, name: list.name });
+            },
+          },
+          {
+            label: list.mode === 'note' ? 'Delete note' : 'Delete list',
+            action: () =>
+              void window.flintMain.listAction({ kind: 'delete', id: list.id }).then((outcome) => {
+                if (!outcome) return;
+                if (!outcome.ok) return showToast(outcome.problem, false);
+                if (listId === list.id) openList('inbox');
+                showToast(outcome.label, true);
+              }),
+          },
+        ],
+        at,
+      );
+    },
+    [listId, openList, showToast],
+  );
+
+  // UI-08: every text field keeps Cut / Copy / Paste / Select all; elsewhere Electron shows nothing.
+  useEffect(() => {
+    const onMenu = (event: MouseEvent): void => {
+      event.preventDefault();
+      if (isTextField(event.target))
+        openMenu(
+          textFieldMenu(event.target, (command) => window.flintMain.edit(command)),
+          { x: event.clientX, y: event.clientY },
+        );
+    };
+    document.addEventListener('contextmenu', onMenu);
+    return () => document.removeEventListener('contextmenu', onMenu);
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
+      // Ctrl+Shift+N works anywhere in the window (LIST-01, D-52).
+      if (key === 'n' && event.ctrlKey && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        const box = addButton.current?.getBoundingClientRect();
+        newListMenu(box ? { x: box.left, y: box.bottom + 4 } : { x: 24, y: 120 }, true);
+        return;
+      }
       // Ctrl+N works anywhere in the window (docs/03 §2, Q-08 default).
       if (key === 'n' && event.ctrlKey && !event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -346,13 +510,22 @@ export function App(): ReactElement {
       } else if (event.key === 'Tab') {
         event.preventDefault();
         if (open) void change({ kind: event.shiftKey ? 'outdent' : 'indent', key: open.key });
+      } else if (event.key === 'Delete' && row) {
+        event.preventDefault();
+        void remove(row.key);
+      } else if ((event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) && row) {
+        event.preventDefault();
+        const box = document
+          .querySelector(`[data-key="${CSS.escape(row.key)}"]`)
+          ?.getBoundingClientRect();
+        taskMenu(row, box ? { x: box.left + 48, y: box.bottom } : { x: 300, y: 200 }, true);
       } else if (event.key === 'Escape') {
         setSelected(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [rows, selected, view, change, edit, toggle, undo, redo]);
+  }, [rows, selected, view, change, edit, toggle, undo, redo, remove, taskMenu, newListMenu]);
 
   const taskLists = lists.filter((list) => !list.inbox);
   const inbox = lists.find((list) => list.inbox);
@@ -378,6 +551,7 @@ export function App(): ReactElement {
     onEdit: edit,
     onLeaveTask: leaveTask,
     onTab: tab,
+    onMenu: (task, at) => taskMenu(task, at),
   };
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
@@ -437,7 +611,13 @@ export function App(): ReactElement {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <aside
+        className="sidebar"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          newListMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
         <div className="brand">
           <img src={flintIcon} alt="" />
           <span>Flint</span>
@@ -448,18 +628,57 @@ export function App(): ReactElement {
             active={listId === inbox.id}
             icon={<InboxIcon />}
             onSelect={() => openList(inbox.id)}
+            onMenu={() => undefined}
           />
         )}
-        {taskLists.length > 0 && <div className="section-label">Lists</div>}
-        {taskLists.map((list) => (
-          <NavItem
-            key={list.id}
-            list={list}
-            active={listId === list.id}
-            icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-            onSelect={() => openList(list.id)}
+        <div className="section-label lists-label">
+          <span>Lists</span>
+          <button
+            ref={addButton}
+            type="button"
+            className="add-list"
+            aria-label="New list or note"
+            title="New list or note (Ctrl+Shift+N)"
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect();
+              newListMenu({ x: box.left, y: box.bottom + 4 });
+            }}
+          >
+            <PlusIcon />
+          </button>
+        </div>
+        {taskLists.map((list) =>
+          naming?.kind === 'rename' && naming.id === list.id ? (
+            <NameField
+              key={list.id}
+              initial={list.name}
+              icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+              problem={namingProblem}
+              onSubmit={(name) => void submitName(name)}
+              onCancel={() => setNaming(null)}
+            />
+          ) : (
+            <NavItem
+              key={list.id}
+              list={list}
+              active={listId === list.id}
+              icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+              onSelect={() => openList(list.id)}
+              onMenu={(at) => listMenu(list, at)}
+            />
+          ),
+        )}
+        {naming?.kind === 'new' && (
+          <NameField
+            key={`new-${naming.mode}`}
+            initial=""
+            placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+            icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+            problem={namingProblem}
+            onSubmit={(name) => void submitName(name)}
+            onCancel={() => setNaming(null)}
           />
-        ))}
+        )}
         {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
       </aside>
 
@@ -484,7 +703,15 @@ export function App(): ReactElement {
               </header>
             )}
 
-            {view?.mode === 'note' && <pre className="card note">{view.noteText}</pre>}
+            {view?.mode === 'note' && (
+              <NoteEditor
+                key={view.name}
+                id={view.id}
+                text={view.noteText ?? ''}
+                readOnly={view.readOnly !== null}
+                onId={setListId}
+              />
+            )}
 
             {view?.mode === 'tasks' && (
               <>
@@ -541,6 +768,16 @@ export function App(): ReactElement {
         </div>
       </main>
 
+      {picker && view && (
+        <ListPicker
+          lists={lists}
+          exclude={view.id}
+          at={picker.at}
+          onPick={(to) => void moveTask(picker.key, to)}
+          onClose={() => setPicker(null)}
+        />
+      )}
+
       {toast && (
         <div className="toast" role="status" key={toast.id}>
           <span>{toast.text}</span>
@@ -560,10 +797,20 @@ function NavItem(props: {
   readonly active: boolean;
   readonly icon: ReactElement;
   readonly onSelect: () => void;
+  readonly onMenu: (at: Point) => void;
 }): ReactElement {
-  const { list, active, icon, onSelect } = props;
+  const { list, active, icon, onSelect, onMenu } = props;
   return (
-    <button type="button" className={active ? 'nav on' : 'nav'} onClick={onSelect}>
+    <button
+      type="button"
+      className={active ? 'nav on' : 'nav'}
+      onClick={onSelect}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onMenu({ x: event.clientX, y: event.clientY });
+      }}
+    >
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
       <span className="nav-name">{list.name}</span>
       {list.mode === 'tasks' && <span className="nav-count">{list.open}</span>}
@@ -679,6 +926,49 @@ function Composer(props: {
   );
 }
 
+/**
+ * A list's name typed in the sidebar (LIST-01): Enter saves, Esc or leaving the field cancels; a
+ * problem (a name Windows can't use, one already taken) shows under it.
+ */
+function NameField(props: {
+  readonly initial: string;
+  readonly placeholder?: string;
+  readonly icon: ReactElement;
+  readonly problem: string | null;
+  readonly onSubmit: (name: string) => void;
+  readonly onCancel: () => void;
+}): ReactElement {
+  const { initial, placeholder, icon, problem, onSubmit, onCancel } = props;
+  const [name, setName] = useState(initial);
+  return (
+    <div className="name-field">
+      <div className="nav on">
+        <span className="tile">{icon}</span>
+        <input
+          className="name-input"
+          autoFocus
+          value={name}
+          placeholder={placeholder}
+          spellCheck={false}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={onCancel}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSubmit(name);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              onCancel();
+            }
+          }}
+        />
+      </div>
+      {problem && <p className="name-problem">{problem}</p>}
+    </div>
+  );
+}
+
 interface RowHandlers {
   readonly selected: string | null;
   readonly editing: Editing | null;
@@ -687,6 +977,8 @@ interface RowHandlers {
   readonly onEdit: (key: string) => void;
   readonly onLeaveTask: (key: string, text: string, how: Leave) => void;
   readonly onTab: (how: 'indent' | 'outdent') => void;
+  /** UI-08: the row's right-click menu. */
+  readonly onMenu: (task: TaskRow, at: Point) => void;
 }
 
 function Row(
@@ -721,6 +1013,12 @@ function Row(
       data-key={task.key}
       className={classes.join(' ')}
       onMouseDown={() => onSelect(task.key)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(task.key);
+        props.onMenu(task, { x: event.clientX, y: event.clientY });
+      }}
       onDoubleClick={() => !task.done && onEdit(task.key)}
     >
       {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}

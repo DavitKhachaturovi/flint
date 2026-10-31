@@ -3,6 +3,7 @@ import {
   Channels,
   type AttachmentChip,
   type CaptureDraft,
+  type EditCommand,
   type PopupFocused,
   type PopupNoticeAction,
   type PopupShown,
@@ -53,6 +54,10 @@ const popup = {
     ipcRenderer.send(Channels.popupInteractive, interactive);
   },
   /** The popup window follows the card's height, so no invisible area blocks clicks. */
+  /** A text field's menu (UI-08): Cut / Copy / Paste / Select all. */
+  edit(command: EditCommand): void {
+    ipcRenderer.send(Channels.editCommand, command);
+  },
   resize(height: number): void {
     ipcRenderer.send(Channels.popupResize, height);
   },

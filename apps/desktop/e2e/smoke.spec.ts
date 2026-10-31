@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -145,7 +145,6 @@ test.beforeAll(async () => {
     ],
     env: { ...env, FLINT_E2E: '1', FLINT_DATA_DIR: dataDirectory },
   });
-
   const mainPid = app.process().pid ?? 0;
   let pids = flintPids(mainPid, dataDirectory);
   let ticks = 0;
@@ -397,8 +396,20 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   await expect.poll(() => mainPage() !== undefined, { timeout: 15_000 }).toBe(true);
   const main = mainPage();
   if (!main) throw new Error('main window page not found');
+  // A window that was never shown doesn't render, which makes every click wait for its stability
+  // check. So the main window is shown for the tests, but off-screen, without the focus and without
+  // a taskbar button: nothing appears on the desktop (Davit's machine runs these).
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find(
+      (candidate) => candidate.getTitle() === 'Flint',
+    );
+    if (!window) return;
+    window.setSkipTaskbar(true);
+    window.setBounds({ x: -6000, y: 0, width: 1120, height: 780 });
+    window.showInactive();
+  });
 
-  // The watcher picks the new list up; the window is never shown, so nothing takes focus.
+  // The watcher picks the new list up.
   await main.locator('.nav', { hasText: 'Errands' }).click();
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
   await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
@@ -487,6 +498,110 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
     'Fix the gate',
   ]);
   await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
+});
+
+test('menus, delete to trash, move between lists, list and note actions (M4 step 4: UI-08, TASK-11, TASK-12, LIST-01, D-64)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const menu = main.locator('.fl-menu');
+  const menuItems = menu.locator('.fl-menu-item > span:first-child');
+  await main.locator('.nav', { hasText: 'Errands' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Errands/);
+
+  // Delete (Del): the task goes to .flint/trash, with Undo.
+  await main.locator('.row', { hasText: 'Mow the lawn' }).click();
+  await main.keyboard.press('Delete');
+  await expect(main.locator('.toast')).toContainText('Deleted');
+  await expect
+    .poll(() => readFile(join(flint, 'Errands.md'), 'utf8'))
+    .not.toContain('Mow the lawn');
+  await expect
+    .poll(async () => (await readdir(join(flint, '.flint', 'trash'))).join())
+    .toMatch(/-task-[a-z0-9]+\.md/);
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(join(flint, 'Errands.md'), 'utf8')).toContain('Mow the lawn');
+
+  // Right-click a task: its menu; Move to… opens the list picker; a new name makes a new list.
+  await main.locator('.row', { hasText: 'Fix the gate' }).click({ button: 'right' });
+  await expect(menuItems).toContainText([
+    'Edit',
+    'Complete',
+    'Priority high',
+    'Move to…',
+    'Delete',
+  ]);
+  await menu.getByText('Move to…').click();
+  await expect(main.locator('.picker-search')).toBeFocused();
+  await main.keyboard.type('Garden');
+  await expect(main.locator('.picker-item.active')).toHaveText('New list "Garden"');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.toast')).toContainText('Moved to Garden');
+  await expect
+    .poll(() => readFile(join(flint, 'Garden.md'), 'utf8').catch(() => ''))
+    .toContain('Fix the gate');
+  expect(await readFile(join(flint, 'Errands.md'), 'utf8')).not.toContain('Fix the gate');
+
+  // The + next to "Lists": a new task list, typed in place, then opened.
+  await main.locator('.add-list').click();
+  await menu.getByText('New task list').click();
+  await main.keyboard.type('Groceries');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('h1')).toHaveText('Groceries · 0 open');
+  await expect.poll(() => readFile(join(flint, 'Groceries.md'), 'utf8')).toContain('mode: tasks');
+
+  // Rename and delete from the list's right-click menu; Undo brings the file back.
+  await main.locator('.nav', { hasText: 'Groceries' }).click({ button: 'right' });
+  await menu.getByText('Rename').click();
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('Shopping');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.nav', { hasText: 'Shopping' })).toBeVisible();
+  await expect
+    .poll(() => readFile(join(flint, 'Shopping.md'), 'utf8').catch(() => ''))
+    .toContain('mode: tasks');
+  await main.locator('.nav', { hasText: 'Shopping' }).click({ button: 'right' });
+  await menu.getByText('Delete list').click();
+  await expect(main.locator('h1')).toHaveText(/^Inbox/);
+  await expect(main.locator('.nav', { hasText: 'Shopping' })).toHaveCount(0);
+  await main.locator('.toast button').click();
+  await expect(main.locator('.nav', { hasText: 'Shopping' })).toBeVisible();
+
+  // A new note, edited as plain text and saved as it is typed (D-64).
+  await main.locator('.add-list').click();
+  await menu.getByText('New note').click();
+  await main.keyboard.type('Scratch');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.note-editor')).toBeVisible();
+  await main.locator('.note-editor').click();
+  await main.keyboard.type('# Standup\nNika: DNS');
+  await expect
+    .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
+    .toMatch(/mode: note\n---\n# Standup\nNika: DNS$/);
+
+  // Every text field keeps Cut / Copy / Paste / Select all, in the page (UI-08, D-64).
+  await main.locator('.note-editor').click({ button: 'right' });
+  await expect(menuItems).toHaveText(['Cut', 'Copy', 'Paste', 'Select all']);
+  await main.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  await popup.locator('#capture').fill('menu check');
+  await popup.locator('#capture').click({ button: 'right' });
+  await expect(popup.locator('.fl-menu .fl-menu-item > span:first-child')).toHaveText([
+    'Cut',
+    'Copy',
+    'Paste',
+    'Select all',
+  ]);
+  await popup.keyboard.press('Escape');
+  await expect(popup.locator('.fl-menu')).toHaveCount(0);
+  await popup.locator('#capture').fill('');
+  await popup.keyboard.press('Escape');
 });
 
 test('reminders fire once, missed ones say so; Done and Snooze change the task (REM-05, D-64)', async () => {

@@ -32,7 +32,13 @@ import {
   type ListInfo,
 } from '@flint/core/shorthand';
 import { fromDate } from '@flint/core/time';
-import type { ChangeOutcome, ListChange, ListSummary, ListView } from '../../shared/ipc.js';
+import type {
+  ChangeOutcome,
+  ListActionOutcome,
+  ListChange,
+  ListSummary,
+  ListView,
+} from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
@@ -107,9 +113,7 @@ interface StepFiles {
 export type ListMode = 'tasks' | 'note';
 
 /** What a list action did, or why it couldn't (shown next to the name being typed). */
-export type ListOutcome =
-  | { readonly ok: true; readonly listId: string; readonly label: string }
-  | { readonly ok: false; readonly problem: string };
+export type ListOutcome = ListActionOutcome;
 
 const NEW_LIST_HEADER = (id: string, mode: ListMode = 'tasks'): string =>
   `---\nflint: 1\nid: ${id}\nmode: ${mode}\n---\n`;
@@ -202,7 +206,14 @@ export class Workspace {
         loaded && info.mode === 'tasks'
           ? listView(loaded.file.document, { ...info, readOnly: null }, now).open
           : 0;
-      return { id: info.id, name: info.name, mode: info.mode, open, inbox: info.id === INBOX_ID };
+      return {
+        id: info.id,
+        name: info.name,
+        mode: info.mode,
+        open,
+        inbox: info.id === INBOX_ID,
+        ...(info.recentRank === undefined ? {} : { recentRank: info.recentRank }),
+      };
     });
   }
 

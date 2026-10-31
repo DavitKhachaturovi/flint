@@ -1,0 +1,63 @@
+/* Right-click menus (UI-08, D-55, docs/09 §8): the floating panel style, tokens only. */
+.fl-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 220px;
+  padding: 5px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-family: var(--fl-font-ui);
+  font-size: 13px;
+  animation: fl-menu-in var(--fl-dur-fast) var(--fl-ease-spring);
+  transform-origin: top left;
+}
+
+.fl-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fl-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.fl-menu-item.active:not(:disabled) {
+  background: var(--fl-ground-tile);
+}
+
+.fl-menu-item:disabled {
+  color: var(--fl-text-faint);
+}
+
+.fl-menu-hint {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-faint);
+}
+
+.fl-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fl-edge-divider);
+}
+
+@keyframes fl-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-menu {
+    animation: none;
+  }
+}

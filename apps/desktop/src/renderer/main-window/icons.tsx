@@ -68,3 +68,6 @@ export const FlagIcon = ({ size = 15 }: IconProps): ReactElement =>
 
 export const HashIcon = ({ size = 15 }: IconProps): ReactElement =>
   svg(size, <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />, 1.9);
+
+export const PlusIcon = ({ size = 13 }: IconProps): ReactElement =>
+  svg(size, <path d="M12 5v14M5 12h14" />, 2);

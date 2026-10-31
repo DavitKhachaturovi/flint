@@ -82,6 +82,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Set reminder | R | Proposed |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |
 | Delete (to Trash, undo toast) | Delete | Proposed |
+| Open the selected task's menu (UI-08) | Shift+F10 or the Menu key | Proposed (D-55) |
 | Temporary sort by priority | via Ctrl+K / list menu | Proposed |
 | Back to Navigate / clear selection | Esc | Proposed |
 
