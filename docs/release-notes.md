@@ -2,6 +2,15 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.3 (31 Oct 2026)
+
+- **Completing a task** plays a short animation before it moves to Completed, instead of just disappearing.
+- **The Undo toast** always sits above the list; task text and hovered rows no longer cover it.
+- **Switching lists** fades the content in, and the sidebar highlight glides to the list you opened.
+- **A bigger taskbar icon**: the leaf now fills the square like other apps' icons. Reminder notifications show the Flint logo larger.
+- **Stack traces** are recognised and highlighted in the capture popup in the common formats (.NET, Java, JavaScript, Python, Go), also when copied without indentation.
+- No more cursor flicker around the composer's text box.
+
 ## 0.4.2 (31 Oct 2026)
 
 - **Right-click menus** on tasks, lists, notes and the sidebar, and Cut / Copy / Paste / Select all in every text field (also in the capture popup). Shift+F10 or the Menu key opens a selected task's menu.
