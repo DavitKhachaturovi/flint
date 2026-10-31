@@ -38,6 +38,7 @@ import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import {
+  appIcon,
   applyStartWithWindows,
   configureAppPaths,
   createTray,
@@ -229,6 +230,7 @@ async function start(): Promise<void> {
     show: false,
     backgroundColor: '#0D0E10',
     title: 'Flint',
+    icon: appIcon(),
     // Frameless like mockup 01; Windows still draws its own caption buttons (snap layouts work).
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#0D0E10', symbolColor: '#7C7F84', height: 40 },

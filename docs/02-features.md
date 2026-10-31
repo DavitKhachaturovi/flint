@@ -526,7 +526,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Milestones: the capture popup's JSON / stack-trace highlighter and rendered task bodies in M4; the CodeMirror theme for all languages in M5 (NOTE-04).
 
 ### UI-07 — App icon sizes and the in-app logo (v1, D-52)
-- The taskbar icon looked noticeably smaller than other apps' icons (fine on the desktop): Flint shipped only a 256 px image that Windows scales down. The app icon becomes a proper `.ico` with hand-tuned small sizes (09 §8).
+- The taskbar icon looked noticeably smaller than other apps' icons (fine on the desktop). Cause, found when building it: the near-black tile disappears against the dark taskbar, so only the leaf (about 60 % of the slot) shows, and the sizes electron-builder downscaled from one 256 px image also lost the tile's rim. The app icon becomes a multi-size `.ico` drawn from the hand-tuned small logos, with a visible rim and a larger leaf (09 §8).
 - The in-app logo and the "Flint" wordmark in the sidebar get slightly bigger.
 - Milestone M4.
 

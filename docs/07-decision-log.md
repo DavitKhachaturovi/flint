@@ -345,6 +345,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - The Settings entry is hidden until Settings exists (APP-11, M8).
   - The app icon gets proper small sizes in a multi-size `.ico`; the in-app logo and wordmark get slightly bigger (UI-07).
 - **Why:** each was a visible rough edge in daily use. Root cause of the small taskbar icon: only a 256 px image was shipped, which Windows scales down (Microsoft asks for at least 16/24/32/48/256 px).
+- **Correction (31 Oct 2026, when UI-07 was built):** electron-builder did put seven sizes into the exe, downscaled from that image. The icon looked small because its near-black tile disappears against the dark taskbar, leaving only the leaf (about 60 % of the slot), and the downscaled sizes lost the tile's rim. Fix: sizes up to 96 px drawn from the hand-tuned small logos (visible rim, leaf enlarged about 15 %), 256 px from the master (09 §8).
 
 ### D-53 — Task bodies: inline when small, a page when large; back/forward
 - **Date:** 31 Oct 2026 · **Status:** Decided (Davit); keys Proposed

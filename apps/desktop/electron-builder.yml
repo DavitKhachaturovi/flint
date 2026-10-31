@@ -34,14 +34,14 @@ extraResources:
     to: .
     filter:
       - tray-*.png
-      - icon-256.png
+      - icon.ico
 # flint:// is registered by the app at runtime (NSIS ignores `protocols`) and removed by installer.nsh.
 win:
   target:
     - target: nsis
       arch:
         - x64
-  icon: resources/icon-256.png
+  icon: resources/icon.ico
 nsis:
   oneClick: true
   perMachine: false

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { Channels, type HotkeyName, type HotkeysView, type RebindOutcome } from '../shared/ipc.js';
 import type { HotkeyRegistry } from './hotkey-registry.js';
+import { appIcon } from './shell.js';
 
 /**
  * The Hotkeys window (APP-08, **Proposed** until the Settings screen, M8): from the tray, and from
@@ -51,6 +52,7 @@ export function hotkeysWindow(
           width: 520,
           height: 340,
           show: false,
+          icon: appIcon(),
           resizable: false,
           minimizable: false,
           maximizable: false,

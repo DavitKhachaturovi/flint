@@ -1,23 +1,66 @@
-// Renders the PNG icons the app needs (tray, window) from the SVG logos in assets/icon (docs/01
-// Brand): Electron can't load SVG images. Usage: node scripts/render-icons.mjs
-import { readFileSync } from 'node:fs';
+// Renders the icons the app needs from the SVG logos in assets/icon (docs/01 Brand): the tray PNGs
+// and the multi-size app icon (UI-07, D-52), since Electron and Windows can't use SVG.
+// Usage: node scripts/render-icons.mjs
+import { Buffer } from 'node:buffer';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const resources = join(root, 'apps', 'desktop', 'resources');
 
 /** [source SVG, CSS size, device scale, output] */
-const ICONS = [
+const TRAY = [
   ['flint-icon-16.svg', 16, 1, 'tray-16.png'],
   ['flint-icon-16.svg', 16, 2, 'tray-32.png'],
   ['flint-icon-24.svg', 24, 2, 'tray-48.png'],
-  ['flint-icon-512.svg', 256, 1, 'icon-256.png'],
 ];
+
+/**
+ * The sizes in `icon.ico`: Windows' title bar, taskbar and Start sizes at 100–400 % scaling
+ * (docs/09 §8). Everything up to 96 px comes from the hand-drawn small logos, whose tile rim stays
+ * visible on the dark taskbar and whose mark fills more of the tile; 256 px from the 512 px master.
+ */
+const ICO = [
+  [16, 'flint-icon-16.svg'],
+  [20, 'flint-icon-24.svg'],
+  [24, 'flint-icon-24.svg'],
+  [30, 'flint-icon-24.svg'],
+  [32, 'flint-icon-24.svg'],
+  [36, 'flint-icon-24.svg'],
+  [40, 'flint-icon-24.svg'],
+  [48, 'flint-icon-24.svg'],
+  [60, 'flint-icon-24.svg'],
+  [64, 'flint-icon-24.svg'],
+  [72, 'flint-icon-24.svg'],
+  [96, 'flint-icon-24.svg'],
+  [256, 'flint-icon-512.svg'],
+];
+
+/** A Windows .ico holding PNG images (supported since Vista), smallest first. */
+function icoFile(images) {
+  const header = Buffer.alloc(6 + images.length * 16);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(images.length, 4);
+  let offset = header.length;
+  images.forEach(({ size, png }, index) => {
+    const entry = 6 + index * 16;
+    header.writeUInt8(size >= 256 ? 0 : size, entry);
+    header.writeUInt8(size >= 256 ? 0 : size, entry + 1);
+    header.writeUInt16LE(1, entry + 4);
+    header.writeUInt16LE(32, entry + 6);
+    header.writeUInt32LE(png.length, entry + 8);
+    header.writeUInt32LE(offset, entry + 12);
+    offset += png.length;
+  });
+  return Buffer.concat([header, ...images.map((image) => image.png)]);
+}
 
 const browser = await chromium.launch();
 try {
-  for (const [svg, size, scale, out] of ICONS) {
+  const render = async (svg, size, scale) => {
     const page = await browser.newPage({
       viewport: { width: size, height: size },
       deviceScaleFactor: scale,
@@ -27,15 +70,24 @@ try {
     await page.setContent(
       `<html><body style="margin:0;background:transparent">${markup.replace('<svg', `<svg width="${size}" height="${size}"`)}</body></html>`,
     );
-    const path = join(root, 'apps', 'desktop', 'resources', out);
-    await page.screenshot({
-      path,
+    const png = await page.screenshot({
       omitBackground: true,
       clip: { x: 0, y: 0, width: size, height: size },
     });
-    console.log(`rendered ${path}`);
     await page.close();
+    return png;
+  };
+
+  for (const [svg, size, scale, out] of TRAY) {
+    const path = join(resources, out);
+    writeFileSync(path, await render(svg, size, scale));
+    console.log(`rendered ${path}`);
   }
+  const images = [];
+  for (const [size, svg] of ICO) images.push({ size, png: await render(svg, size, 1) });
+  const path = join(resources, 'icon.ico');
+  writeFileSync(path, icoFile(images));
+  console.log(`rendered ${path} (${ICO.map(([size]) => size).join(', ')} px)`);
 } finally {
   await browser.close();
 }

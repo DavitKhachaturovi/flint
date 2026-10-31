@@ -133,13 +133,22 @@ export interface TrayHandle {
   setWarning(warning: string | null): void;
 }
 
+/** A file in `apps/desktop/resources` (icons), wherever the build keeps it. */
+export function resourcePath(name: string): string {
+  return join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), name);
+}
+
+/** The window icon (UI-07): the same multi-size icon as the installed exe, also in development. */
+export function appIcon(): string {
+  return resourcePath('icon.ico');
+}
+
 /** APP-01, APP-03: the tray, with the only Quit in the app (Proposed menu, docs/02). */
 export function createTray(actions: TrayActions): TrayHandle {
-  const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources');
-  const icon = nativeImage.createFromPath(join(resources, 'tray-32.png'));
+  const icon = nativeImage.createFromPath(resourcePath('tray-32.png'));
   icon.addRepresentation({
     scaleFactor: 1,
-    buffer: nativeImage.createFromPath(join(resources, 'tray-16.png')).toPNG(),
+    buffer: nativeImage.createFromPath(resourcePath('tray-16.png')).toPNG(),
   });
   const tray = new Tray(icon.resize({ width: 16, height: 16 }));
   const menu = (warning: string | null): Menu =>
