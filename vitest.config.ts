@@ -17,6 +17,7 @@ export default defineConfig({
       'packages/*/src/**/*.test.ts',
       'packages/*/test/**/*.test.ts',
       'apps/desktop/src/main/**/*.test.ts',
+      'apps/desktop/src/shared/**/*.test.ts',
     ],
     // Georgia (UTC+4, no daylight saving) is where Flint is used first. Time tests that need a
     // daylight-saving zone set process.env.TZ themselves.
