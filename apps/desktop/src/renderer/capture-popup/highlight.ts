@@ -1,8 +1,8 @@
 import type { BlockKind } from '@flint/core/shorthand';
 
 /**
- * A small highlighter for what actually gets captured (D-38): JSON (keys, strings, numbers,
- * literals) and stack traces (the exception line bright, frames dim, file:line marked). Other code
+ * A small highlighter for what actually gets captured (D-38), in the grayscale scheme (UI-06, D-63):
+ * JSON (keys, strings, numbers, literals, punctuation) and stack traces (the exception line bright, frames dim, file:line marked). Other code
  * stays plain monospace; a full highlighter would weigh down the pre-warmed popup (CAP-10).
  * Everything is set as text, never as HTML.
  */
@@ -19,21 +19,31 @@ function span(className: string, text: string): HTMLSpanElement {
   return node;
 }
 
+/** Text between JSON tokens: braces, brackets, commas and colons dimmed, the rest as it is. */
+function plain(text: string): Node[] {
+  return text
+    .split(/([{}[\],:]+)/)
+    .filter((part) => part !== '')
+    .map((part) =>
+      /^[{}[\],:]+$/.test(part) ? span('tok-punctuation', part) : document.createTextNode(part),
+    );
+}
+
 function jsonLine(line: string): Node[] {
   const nodes: Node[] = [];
   let last = 0;
   for (const match of line.matchAll(JSON_TOKEN)) {
     const start = match.index;
-    if (start > last) nodes.push(document.createTextNode(line.slice(last, start)));
+    if (start > last) nodes.push(...plain(line.slice(last, start)));
     const [whole, string, colon, number, literal] = match;
     if (string !== undefined) {
       nodes.push(span(colon ? 'tok-key' : 'tok-string', string));
-      if (colon) nodes.push(document.createTextNode(colon));
+      if (colon) nodes.push(...plain(colon));
     } else if (number !== undefined) nodes.push(span('tok-number', number));
     else if (literal !== undefined) nodes.push(span('tok-literal', literal));
     last = start + whole.length;
   }
-  if (last < line.length) nodes.push(document.createTextNode(line.slice(last)));
+  if (last < line.length) nodes.push(...plain(line.slice(last)));
   return nodes;
 }
 
