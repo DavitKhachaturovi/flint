@@ -51,14 +51,18 @@ export interface E2EHooks {
   /** Every non-local request the app attempted (all blocked): must stay empty (APP-09). */
   readonly blockedRequests: string[];
   readonly captured: string[];
+  /** Reminder toasts, recorded instead of shown in tests (`label | title`). */
+  readonly toasts: string[];
   showPopup?: () => void;
+  /** A toast button's activation URL, as Windows would hand it over (REM-05). */
+  activate?: (url: string) => void;
   showHotkeys?: () => void;
 }
 
 export function e2eHooks(): E2EHooks | undefined {
   if (app.isPackaged || process.env.FLINT_E2E !== '1') return undefined;
   const global = globalThis as { __flintE2E?: E2EHooks };
-  global.__flintE2E ??= { blockedRequests: [], captured: [] };
+  global.__flintE2E ??= { blockedRequests: [], captured: [], toasts: [] };
   return global.__flintE2E;
 }
 

@@ -147,6 +147,7 @@ flint/
 ### Reminder scheduler (REM-01, REM-07)
 - Lives in the main process. Do **not** rely on one long `setTimeout` per reminder (sleep/clock changes break them): use a periodic tick (Proposed: every 15–30 s) comparing wall-clock time with due reminders, plus a re-check on system resume (power monitor) and at launch.
 - Reminders due while the PC slept or Flint wasn't running → missed-reminder flow (REM-07).
+- **Built in M4 (D-64):** `apps/desktop/src/main/reminder-service.ts` re-checks at the next due time but at least every 30 s, on resume (`powerMonitor`) and 200 ms after any list change; the pure rules (due, missed after 2 minutes, one summary for more than 3 missed) are in `reminders.ts`. What was shown is kept per task and reminder value in `reminders-state.json`, so a reminder shows once, also across restarts, and again only when its time changes (snooze, an edit).
 - **Focus Assist** suppresses toasts silently; offer Flint's own sound and an in-app alert (REM-06).
 
 ### Clipboard and paste (CAP-06, TASK-09)

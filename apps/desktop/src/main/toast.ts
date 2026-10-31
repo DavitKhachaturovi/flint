@@ -64,6 +64,33 @@ export function reminderToastXml(
   ].join('');
 }
 
+/** The `id` of the missed-reminders summary: never a task ID (`ID_PATTERN` has no `*`). */
+export const MISSED_SUMMARY_ID = '*';
+
+/**
+ * "N reminders you missed" (REM-07 basic, D-64): too many missed at once for a toast each. Open
+ * only; the list with actions per task comes in M6. The titles stay hidden with REM-10.
+ */
+export function missedSummaryXml(
+  summary: { readonly count: number; readonly titles: readonly string[] },
+  { protocol, hideText }: ToastOptions,
+): string {
+  const open = escapeXml(`${protocol}://reminder/open?id=${encodeURIComponent(MISSED_SUMMARY_ID)}`);
+  const shown = summary.titles.slice(0, 3).join(', ');
+  const more = summary.titles.length > 3 ? ', …' : '';
+  return [
+    `<toast launch="${open}" activationType="protocol" scenario="reminder">`,
+    '<visual><binding template="ToastGeneric">',
+    `<text>${summary.count} reminders you missed</text>`,
+    ...(hideText ? [] : [`<text>${escapeXml(shown + more)}</text>`]),
+    '</binding></visual>',
+    '<actions>',
+    `<action content="Open" arguments="${open}" activationType="protocol"/>`,
+    '</actions>',
+    '</toast>',
+  ].join('');
+}
+
 /** Parses `<protocol>://reminder/<action>?id=<id>` from a command line or protocol launch. */
 export function parseActivation(argument: string, protocol: string): ReminderActivation | null {
   if (!argument.startsWith(`${protocol}://`)) return null;

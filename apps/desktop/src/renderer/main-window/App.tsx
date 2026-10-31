@@ -130,6 +130,12 @@ export function App(): ReactElement {
   refreshRef.current = refresh;
   useEffect(() => {
     window.flintMain.onChanged(() => void refreshRef.current());
+    // A reminder's Open: its list, with the task selected once the rows are there.
+    window.flintMain.onReveal(({ listId: id, key }) => {
+      setListId(id);
+      setEditing(null);
+      setSelected(key);
+    });
   }, []);
 
   const openList = useCallback((id: string): void => {

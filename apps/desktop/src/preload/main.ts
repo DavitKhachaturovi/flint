@@ -37,6 +37,12 @@ const main = {
   onChanged(listener: () => void): void {
     ipcRenderer.on(Channels.mainChanged, () => listener());
   },
+  /** A reminder's Open (REM-05): show this task. */
+  onReveal(listener: (target: { readonly listId: string; readonly key: string }) => void): void {
+    ipcRenderer.on(Channels.mainReveal, (_event, target: { listId: string; key: string }) =>
+      listener(target),
+    );
+  },
 };
 
 export type MainBridge = typeof main;

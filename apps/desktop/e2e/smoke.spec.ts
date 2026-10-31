@@ -489,6 +489,57 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
   await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
 });
 
+test('reminders fire once, missed ones say so; Done and Snooze change the task (REM-05, D-64)', async () => {
+  const file = join(dataDirectory, 'Flint', 'Calls.md');
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  const stamp = (date: Date): string =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const clock = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const now = new Date();
+  const hourAgo = new Date(now.getTime() - 60 * 60_000);
+  await writeFile(
+    file,
+    [
+      '---\nflint: 1\nid: cal1\nmode: tasks\n---',
+      `- [ ] Call the bank [reminder:: ${stamp(hourAgo)}] [id:: rem1]`,
+      `- [ ] Call Alex [reminder:: ${stamp(now)}] [id:: rem2]`,
+      `- [x] Old call [reminder:: ${stamp(hourAgo)}] [completion:: ${stamp(hourAgo)}] [id:: rem3]`,
+      '',
+    ].join('\n'),
+  );
+  const toasts = () =>
+    app.evaluate(
+      () => (globalThis as { __flintE2E?: { toasts: string[] } }).__flintE2E?.toasts ?? [],
+    );
+  // The watcher picks the list up and the scheduler shows what is due; the toasts are recorded.
+  await expect
+    .poll(toasts, { timeout: 15_000 })
+    .toEqual(
+      expect.arrayContaining([
+        `Missed reminder · Today ${clock(hourAgo)} · Calls | Call the bank`,
+        `Reminder · Today ${clock(now)} · Calls | Call Alex`,
+      ]),
+    );
+  const shown = (await toasts()).filter((toast) => toast.includes('Call'));
+  expect(shown).toHaveLength(2);
+
+  const activate = (url: string) =>
+    app.evaluate((_electron, argument) => {
+      (globalThis as { __flintE2E?: { activate?: (url: string) => void } }).__flintE2E?.activate?.(
+        argument,
+      );
+    }, url);
+  await activate('flint-dev://reminder/done?id=rem2');
+  await expect.poll(() => readFile(file, 'utf8')).toMatch(/- \[x\] Call Alex \[reminder::/);
+  await activate('flint-dev://reminder/snooze?id=rem1');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .not.toContain(`Call the bank [reminder:: ${stamp(hourAgo)}]`);
+  // Each reminder is shown once: nothing repeats after the changes.
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  expect((await toasts()).filter((toast) => toast.includes('Call'))).toHaveLength(2);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

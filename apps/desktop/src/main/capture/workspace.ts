@@ -22,10 +22,11 @@ import {
   type Op,
   type Where,
 } from '@flint/core';
-import { parseCapture, type CaptureParse, type ListInfo } from '@flint/core/shorthand';
+import { parseCapture, taskLabel, type CaptureParse, type ListInfo } from '@flint/core/shorthand';
 import { fromDate } from '@flint/core/time';
 import type { ChangeOutcome, ListChange, ListSummary, ListView } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
@@ -71,6 +72,9 @@ interface Loaded {
   entry: ListEntry;
   readonly file: ListFile;
 }
+
+/** Snooze 10m on a reminder toast (REM-05). */
+const SNOOZE_MS = 10 * 60_000;
 
 interface UndoEntry {
   readonly label: string;
@@ -307,6 +311,57 @@ export class Workspace {
       listId: this.listId(target.entry),
       listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
     };
+  }
+
+  /** Every task with a reminder, for the scheduler (REM-01). A note's fields are inert (D-29). */
+  reminderTasks(): ReminderTask[] {
+    const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
+    const tasks: ReminderTask[] = [];
+    for (const { entry, file } of this.lists) {
+      if (entry.mode === 'note') continue;
+      const listId = this.listId(entry);
+      for (const { task } of allTasks(file.document)) {
+        const at = task.line.fields.reminder?.value.value;
+        if (!at) continue;
+        tasks.push({
+          id: task.key,
+          listId,
+          listName: names.get(listId) ?? entry.name,
+          title: taskLabel(task.line.title.trim(), getBody(task)),
+          at,
+          done: task.line.status !== ' ',
+        });
+      }
+    }
+    return tasks;
+  }
+
+  /** The list holding a task; task IDs are unique in the Flint folder (D-21, D-29). */
+  locate(taskId: string): { readonly listId: string; readonly key: string } | null {
+    for (const { entry, file } of this.lists)
+      if (findTask(file.document, taskId)) return { listId: this.listId(entry), key: taskId };
+    return null;
+  }
+
+  /** A reminder's Done (REM-05): completes the task if it is still open; undoable. */
+  completeById(taskId: string, now: Date): Promise<string | null> {
+    const found = this.locate(taskId);
+    const list = found ? this.find(found.listId) : undefined;
+    const task = list ? findTask(list.file.document, taskId) : undefined;
+    if (!found || !task || task.task.line.status !== ' ') return Promise.resolve(null);
+    return this.toggleDone(found.listId, taskId, now);
+  }
+
+  /** A reminder's Snooze 10m (REM-05): the reminder moves to 10 minutes from now; undoable. */
+  snoozeById(taskId: string, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const found = this.locate(taskId);
+      const list = found ? this.find(found.listId) : undefined;
+      if (!found || !list) return null;
+      // Reminders are whole minutes: round up, so a snooze is never shorter than 10 minutes.
+      const at = fromDate(new Date(Math.ceil((now.getTime() + SNOOZE_MS) / 60_000) * 60_000));
+      return this.record(list, setReminder(list.file.path, taskId, at), 'Snoozed', now);
+    });
   }
 
   /** Space or the checkbox (TASK-06): completes an open task, reopens a completed one. */

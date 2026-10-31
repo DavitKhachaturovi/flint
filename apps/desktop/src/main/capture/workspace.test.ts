@@ -386,3 +386,41 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
     expect(await workspace.redoLast(now)).toBeNull();
   });
 });
+
+describe('reminders from the lists (REM-01, REM-05; D-64)', () => {
+  const header = '---\nflint: 1\nid: inbox\nmode: tasks\n---\n';
+
+  it('lists the tasks with reminders, labels untitled ones, skips notes', async () => {
+    await writeFile(
+      join(folder, 'Inbox.md'),
+      `${header}- [ ] call Alex [reminder:: 2026-10-29T15:00] [id:: aaa1]\n- [x] old [reminder:: 2026-10-28T09:00] [completion:: 2026-10-28T10:00] [id:: bbb2]\n- [ ] no reminder [id:: ccc3]\n`,
+    );
+    await writeFile(join(folder, 'Notes.md'), '- [ ] inert [reminder:: 2026-10-29T15:00]\n');
+    const workspace = await open();
+    expect(
+      workspace.reminderTasks().map((task) => [task.id, task.title, task.done, task.listName]),
+    ).toEqual([
+      ['aaa1', 'call Alex', false, 'Inbox'],
+      ['bbb2', 'old', true, 'Inbox'],
+    ]);
+    expect(workspace.locate('aaa1')).toEqual({ listId: 'inbox', key: 'aaa1' });
+    expect(workspace.locate('nope')).toBeNull();
+  });
+
+  it('Done completes an open task once; Snooze moves the reminder 10 minutes on, undoably', async () => {
+    const original = `${header}- [ ] call Alex [reminder:: 2026-10-29T14:30] [id:: aaa1]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    const at = new Date(2026, 9, 29, 14, 30, 20);
+    expect(await workspace.snoozeById('aaa1', at)).toBe('Snoozed');
+    expect(await inbox()).toBe(
+      `${header}- [ ] call Alex [reminder:: 2026-10-29T14:41] [id:: aaa1]\n`,
+    );
+    expect(await workspace.undoLast(now)).toBe('Snoozed');
+    expect(await inbox()).toBe(original);
+
+    expect(await workspace.completeById('aaa1', now)).toBe('Completed');
+    expect(await workspace.completeById('aaa1', now)).toBeNull();
+    expect(await workspace.snoozeById('gone', now)).toBeNull();
+  });
+});

@@ -36,6 +36,8 @@ export const Channels = {
   mainChange: 'main:change',
   mainReserveId: 'main:reserve-id',
   mainChanged: 'main:changed',
+  /** Main → main window: show this task (a reminder's Open, REM-05). */
+  mainReveal: 'main:reveal',
 } as const;
 
 /**

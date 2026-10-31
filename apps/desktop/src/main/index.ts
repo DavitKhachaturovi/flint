@@ -22,7 +22,7 @@ import {
 } from '../shared/ipc.js';
 import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
-import { showReminderToast } from './notifications.js';
+import { showMissedSummary, showReminderToast } from './notifications.js';
 import { DraftFile } from './capture/drafts.js';
 import { captureSelection } from './capture/selection.js';
 import { displayAccelerator } from '../shared/accelerator.js';
@@ -33,7 +33,9 @@ import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
 import { APP_SCHEME, contentType, rendererPageUrl, resolveRendererFile } from './renderer-url.js';
-import { prepareFlintFolder } from './storage/flint-folder.js';
+import { INBOX_ID, prepareFlintFolder } from './storage/flint-folder.js';
+import { ReminderService } from './reminder-service.js';
+import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import {
   applyStartWithWindows,
@@ -46,7 +48,12 @@ import {
   STARTED_AT_LOGIN,
   testDataDirectory,
 } from './shell.js';
-import { findActivation, type ReminderActivation } from './toast.js';
+import {
+  findActivation,
+  MISSED_SUMMARY_ID,
+  type ReminderActivation,
+  type ToastOptions,
+} from './toast.js';
 import { VirtualKey } from './win32.js';
 
 /**
@@ -506,12 +513,64 @@ async function start(): Promise<void> {
   tray.setWarning(hotkeyWarning());
   if (hooks) hooks.showHotkeys = () => hotkeysPanel.show();
 
+  // Reminders (REM-01, REM-05, REM-07 basic; D-64): toasts while Flint runs, missed ones once at
+  // the next start or wake. Not in the R-1 benchmark build, which has no toast scheme.
+  const toastOptions = (): ToastOptions | null =>
+    protocol ? { protocol, hideText: settings.hideNotificationText } : null;
+  const showReminders = (plan: ToastPlan): void => {
+    const options = toastOptions();
+    for (const toast of plan.separate) {
+      if (hooks) hooks.toasts.push(`${toast.label} | ${toast.title}`);
+      else if (options) showReminderToast({ ...toast, kind: 'reminder' }, options, log);
+    }
+    if (plan.summary) {
+      if (hooks) hooks.toasts.push(`${plan.summary.count} reminders you missed`);
+      else if (options) showMissedSummary(plan.summary, options, log);
+    }
+  };
+  if (!__FLINT_BENCH_BUILD__) {
+    const reminders = await ReminderService.start({
+      statePath: join(app.getPath('userData'), 'reminders-state.json'),
+      tasks: () => workspace.reminderTasks(),
+      inboxId: INBOX_ID,
+      show: showReminders,
+      log,
+    });
+    // A list changed (a capture, an edit, another program): a new or moved reminder may be sooner.
+    let pending: NodeJS.Timeout | undefined;
+    workspace.onChange(() => {
+      clearTimeout(pending);
+      pending = setTimeout(() => reminders.check(), 200);
+    });
+  }
+
+  /** Open on a reminder toast: the main window, with the task's list open and the task selected. */
+  const reveal = (taskId: string): void => {
+    const found = workspace.locate(taskId);
+    if (!found) return;
+    const send = (): void => mainWindow.webContents.send(Channels.mainReveal, found);
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  };
   const handleActivation = (activation: ReminderActivation | null): void => {
     if (!activation) return;
     log(`toast action "${activation.action}" for task ${activation.id}`);
-    if (activation.action === 'open') showMain();
+    const now = new Date();
+    if (activation.action === 'open') {
+      showMain();
+      if (activation.id !== MISSED_SUMMARY_ID) reveal(activation.id);
+      return;
+    }
+    const run =
+      activation.action === 'done'
+        ? workspace.completeById(activation.id, now)
+        : workspace.snoozeById(activation.id, now);
+    run
+      .then((done) => log(`reminder ${activation.action}: ${done ?? 'nothing to do'}`))
+      .catch((error: unknown) => log(`reminder ${activation.action} failed: ${String(error)}`));
   };
-  /** The R-3 test toast, until reminders exist (M6). Development builds only. */
+  if (hooks) hooks.activate = (url: string) => handleActivation(activationOf([url]));
+  /** The R-3 test toast (`flint-dev://dev/toast`, FLINT_TEST_TOAST). Development builds only. */
   const sendTestToast = (kind: ToastKind, id = 'k3f9'): void => {
     if (BUILD !== 'development' || !protocol) return;
     showReminderToast(

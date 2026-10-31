@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { IDENTITIES } from './identity.js';
-import { findActivation, parseActivation, reminderToastXml } from './toast.js';
+import {
+  findActivation,
+  MISSED_SUMMARY_ID,
+  missedSummaryXml,
+  parseActivation,
+  reminderToastXml,
+} from './toast.js';
 
 const desktop = join(import.meta.dirname, '../..');
 
@@ -56,6 +62,22 @@ describe('reminder toasts (REM-05, R-3)', () => {
     expect(xml.match(/<text>/g)).toHaveLength(1);
     expect(xml).toContain('arguments="flint://reminder/done?id=k3f9"');
     expect(xml).toContain('scenario="reminder"');
+  });
+
+  it('summarizes many missed reminders with Open only, titles hidden with REM-10 (D-64)', () => {
+    const summary = { count: 5, titles: ['one', 'two <b>', 'three', 'four', 'five'] };
+    const xml = missedSummaryXml(summary, { protocol: 'flint', hideText: false });
+    expect(xml).toContain('<text>5 reminders you missed</text>');
+    expect(xml).toContain('<text>one, two &#60;b&#62;, three, …</text>');
+    expect(xml).toContain('arguments="flint://reminder/open?id=*"');
+    expect(xml).not.toContain('reminder/done');
+    expect(parseActivation('flint://reminder/open?id=*', 'flint')).toEqual({
+      action: 'open',
+      id: MISSED_SUMMARY_ID,
+    });
+    const hidden = missedSummaryXml(summary, { protocol: 'flint', hideText: true });
+    expect(hidden).not.toContain('one');
+    expect(hidden.match(/<text>/g)).toHaveLength(1);
   });
 
   it('parses only its own scheme', () => {
