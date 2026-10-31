@@ -660,7 +660,7 @@ h1 .count {
 }
 
 .row.enter {
-  animation: row-in var(--fl-dur-base) var(--fl-ease-spring);
+  animation: row-in var(--fl-dur-state) var(--fl-ease-spring);
 }
 
 @keyframes row-in {
@@ -744,23 +744,63 @@ h1 .count {
   z-index: 60;
 }
 
-/* TASK-06, D-65 (09 §9): a completed row fades and slides away before it moves to Completed. */
+/* TASK-06, D-67 (09 §9): completing, the check fills with a small pop, then the row fades, slides
+   and collapses into Completed; reopening, the row fades and collapses out of Completed and eases
+   back into the open tasks. Non-blocking state changes: --fl-dur-state. */
 .row.leaving {
   pointer-events: none;
-  animation: row-out var(--fl-dur-base) var(--fl-ease-spring) forwards;
+  overflow: hidden;
+  animation: row-out var(--fl-dur-state) ease-in-out forwards;
+}
+
+.row.leaving.reopen {
+  animation-name: row-fade-out;
+}
+
+.row.leaving.complete .check.on {
+  animation: check-pop 180ms var(--fl-ease-press);
+}
+
+@keyframes check-pop {
+  50% {
+    transform: scale(1.15);
+  }
 }
 
 @keyframes row-out {
-  to {
+  0% {
+    max-height: 64px;
+  }
+  35% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
     opacity: 0;
     transform: translateX(10px) scale(0.985);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@keyframes row-fade-out {
+  0% {
+    max-height: 64px;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 
 /* UI-04, D-65: switching lists. The content fades in while rising a few pixels, and the sidebar's
    highlight glides to the open list (one element, like the row selection). */
 .content {
-  animation: view-in 140ms var(--fl-ease-spring);
+  /* D-67: navigation gates the next action: within --fl-dur-base, ease-out. */
+  animation: view-in var(--fl-dur-base) cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 @keyframes view-in {

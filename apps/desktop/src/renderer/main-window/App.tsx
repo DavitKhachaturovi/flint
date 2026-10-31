@@ -54,8 +54,8 @@ import { useInertText } from './inert-text.js';
 
 const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
 const TOAST_MS = 5000;
-/** The completion animation (09 §9), before the task moves to Completed. */
-const COMPLETE_MS = 150;
+/** The completion animation (09 §9, D-67), before the task moves: within the state band. */
+const COMPLETE_MS = 280;
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
 const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
   '1': 'low',
@@ -222,36 +222,50 @@ export function App(): ReactElement {
   }, [rows, selected]);
 
   /** Rows playing the completion animation (TASK-06, 09 §9) before they move to Completed. */
-  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
-  // A row stops leaving once the list shows it completed (or it is gone, or the save failed).
+  const [leaving, setLeaving] = useState<ReadonlyMap<string, 'complete' | 'reopen'>>(new Map());
+  // A row stops leaving once the list shows it moved (or it is gone, or the save failed).
   useEffect(() => {
     setLeaving((current) => {
-      const kept = [...current].filter((key) => rows.some((row) => row.key === key && !row.done));
-      return kept.length === current.size ? current : new Set(kept);
+      const kept = [...current].filter(([key, direction]) =>
+        rows.some((row) => row.key === key && row.done === (direction === 'reopen')),
+      );
+      return kept.length === current.size ? current : new Map(kept);
     });
   }, [rows]);
+  /** Reopened tasks ease back into the open list (D-67), even though their key is known. */
+  const returning = useRef(new Set<string>());
 
   const toggle = useCallback(
     async (key: string): Promise<void> => {
       const index = rows.findIndex((row) => row.key === key);
       const row = rows[index];
-      if (row && !row.done) {
-        // Completing moves the row away: the selection stays in the open tasks, on the next one.
-        const open = (other: TaskRow): boolean =>
-          !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
-        const next = rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
-        if (next) setSelected(next.key);
-        // TASK-06, D-65: the row fades and slides away first, then it moves to Completed.
+      if (row) {
+        const completing = !row.done;
+        if (completing) {
+          // Completing moves the row away: the selection stays in the open tasks, on the next one.
+          const open = (other: TaskRow): boolean =>
+            !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
+          const next =
+            rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
+          if (next) setSelected(next.key);
+        } else returning.current.add(key);
+        // TASK-06, D-67: the check pops and the row fades, slides and collapses first (a
+        // reopened row fades out of Completed); then the task moves. Instant with reduce-motion.
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          setLeaving(
-            (current) => new Set([...current, key, ...row.subtasks.map((sub) => sub.key)]),
-          );
+          const direction = completing ? 'complete' : 'reopen';
+          setLeaving((current) => {
+            const next = new Map(current);
+            for (const item of [key, ...row.subtasks.map((sub) => sub.key)])
+              next.set(item, direction);
+            return next;
+          });
           await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS));
         }
       }
       const done = await window.flintMain.toggle(listId, key);
       if (!done) {
-        setLeaving((current) => new Set([...current].filter((item) => item !== key)));
+        returning.current.delete(key);
+        setLeaving((current) => new Map([...current].filter(([item]) => item !== key)));
         return;
       }
       showToast(done, true);
@@ -639,6 +653,10 @@ export function App(): ReactElement {
   const freshKeys = new Set<string>();
   if (view && known.current.list === view.id)
     for (const row of rows) if (!known.current.keys.has(row.key)) freshKeys.add(row.key);
+  for (const row of rows) if (returning.current.has(row.key) && !row.done) freshKeys.add(row.key);
+  useEffect(() => {
+    for (const row of rows) if (!row.done) returning.current.delete(row.key);
+  }, [rows]);
   useEffect(() => {
     if (view) known.current = { list: view.id, keys: new Set(rows.map((row) => row.key)) };
   }, [view, rows]);
@@ -1141,7 +1159,7 @@ interface RowHandlers {
   /** UI-08: the row's right-click menu. */
   readonly onMenu: (task: TaskRow, at: Point) => void;
   /** Rows playing the completion animation. */
-  readonly leaving: ReadonlySet<string>;
+  readonly leaving: ReadonlyMap<string, 'complete' | 'reopen'>;
   /** REM-12: the bell turns the reminder off or on. */
   readonly onMute: (key: string, muted: boolean) => void;
   /** REM-01, D-68: the time opens the date/time picker for the task. */
@@ -1175,9 +1193,10 @@ function Row(
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
   if (fresh) classes.push('enter');
-  const leaving = !task.done && props.leaving.has(task.key);
-  if (leaving) classes.push('leaving');
-  const checked = task.done || leaving;
+  const direction = props.leaving.get(task.key);
+  const leaving = direction !== undefined;
+  if (leaving) classes.push('leaving', direction);
+  const checked = direction === 'complete' || (task.done && direction !== 'reopen');
   return (
     <div
       data-key={task.key}
@@ -1290,7 +1309,13 @@ function Glide(props: {
     };
     measure();
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    // Rows collapsing or easing in (D-67) move the selected row: follow it.
+    const observer = new ResizeObserver(measure);
+    if (card.current) observer.observe(card.current);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
   }, [card, target, version]);
   if (!box) return null;
   return (
