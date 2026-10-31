@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.4 (31 Oct 2026)
+
+- **Pickers** behind the flag, # and bell buttons, in the composer and in the capture popup: priority (or press 3/2/1/0), a list with search and recent lists, and a date/time picker (type "fri 10", pick a preset, or use the calendar). They fill in the same shorthand you could type, and replace what was there.
+- **Turn a reminder off without deleting it**: click its bell. A line goes through the bell, the time turns faint, and it won't notify you; click again to turn it back on. Also in the task's right-click menu, with Undo.
+- **Overdue reminders** read "Overdue · <time>" in brighter text with a small dot.
+- **Brackets and quotes close themselves**: ( gives (), typing ) steps over it; also [], {}, quotes and backticks.
+- Menus and pickers in the capture popup now always have room to open fully.
+
 ## 0.4.3 (31 Oct 2026)
 
 - **Completing a task** plays a short animation before it moves to Completed, instead of just disappearing.
