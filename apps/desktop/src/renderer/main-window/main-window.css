@@ -589,3 +589,40 @@ h1 .count {
 ::-webkit-scrollbar-button {
   display: none;
 }
+
+/* Inline markdown in titles (LIST-02, D-52). */
+.title.md strong {
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+
+.title.md code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 0.88em;
+}
+
+.title.md s {
+  color: var(--fl-text-muted);
+}
+
+/* The only hand cursor in Flint: a real link (UI-01). */
+.title.md a {
+  color: var(--fl-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--fl-code-underline);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.title.md a:hover {
+  text-decoration-color: var(--fl-accent);
+}
+
+.row.done .title.md strong,
+.row.done .title.md a {
+  color: inherit;
+}

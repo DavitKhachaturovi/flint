@@ -20,6 +20,7 @@ import {
   type PopupSubmit,
   type ToastKind,
 } from '../shared/ipc.js';
+import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
 import { showMissedSummary, showReminderToast } from './notifications.js';
@@ -199,6 +200,12 @@ async function start(): Promise<void> {
   }
   blockNetwork();
   serveRenderer();
+  // No window ever navigates away from Flint's own pages or opens another window: links in titles
+  // go to the browser through mainOpenLink (LIST-02), never into a Flint window.
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-navigate', (event) => event.preventDefault());
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  });
   const settingsFile = new SettingsFile(
     join(app.getPath('userData'), 'settings.json'),
     !app.isPackaged,
@@ -292,6 +299,10 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  ipcMain.on(Channels.mainOpenLink, (event, href: unknown) => {
+    if (owns(event.sender) && typeof href === 'string' && isOpenableLink(href))
+      void shell.openExternal(href);
+  });
   ipcMain.handle(Channels.mainReserveId, (event) =>
     owns(event.sender) ? workspace.reserveId() : null,
   );

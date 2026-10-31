@@ -38,6 +38,8 @@ export const Channels = {
   mainChanged: 'main:changed',
   /** Main → main window: show this task (a reminder's Open, REM-05). */
   mainReveal: 'main:reveal',
+  /** Main window → main: open a link from a title in the browser (LIST-02). */
+  mainOpenLink: 'main:open-link',
 } as const;
 
 /**

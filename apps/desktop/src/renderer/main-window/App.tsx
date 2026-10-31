@@ -27,6 +27,7 @@ import {
   ListIcon,
   NoteIcon,
 } from './icons.js';
+import { titleHtml } from '../../shared/inline-markdown.js';
 import { useInertText } from './inert-text.js';
 
 /**
@@ -702,7 +703,7 @@ function Row(
           {task.code.peek && <span className="code-peek">{task.code.peek}</span>}
         </span>
       ) : (
-        <span className="title">{task.title === '' ? task.label : task.title}</span>
+        <Title task={task} />
       )}
       <span className="ind">
         {task.reminder && !task.done && (
@@ -719,6 +720,36 @@ function Row(
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * A task's title with its inline markdown rendered (LIST-02, D-52); the raw text shows while it is
+ * edited. markdown-it escapes everything that isn't markdown, so the HTML is safe. A click on a
+ * link opens it in the browser and does nothing else.
+ */
+function Title(props: { readonly task: TaskRow }): ReactElement {
+  const { task } = props;
+  if (task.title === '') return <span className="title">{task.label}</span>;
+  const onLink = (event: React.MouseEvent): HTMLAnchorElement | null =>
+    (event.target as HTMLElement).closest('a');
+  return (
+    <span
+      className="title md"
+      dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }}
+      onMouseDown={(event) => {
+        if (onLink(event)) event.stopPropagation();
+      }}
+      onDoubleClick={(event) => {
+        if (onLink(event)) event.stopPropagation();
+      }}
+      onClick={(event) => {
+        const link = onLink(event);
+        if (!link) return;
+        event.preventDefault();
+        window.flintMain.openLink(link.href);
+      }}
+    />
   );
 }
 

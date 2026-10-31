@@ -33,6 +33,10 @@ const main = {
   redo(): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainRedo) as Promise<string | null>;
   },
+  /** A link in a title: the main process opens web and mail links in the browser. */
+  openLink(href: string): void {
+    ipcRenderer.send(Channels.mainOpenLink, href);
+  },
   /** Something changed (a capture, an edit, another program): fetch again. */
   onChanged(listener: () => void): void {
     ipcRenderer.on(Channels.mainChanged, () => listener());

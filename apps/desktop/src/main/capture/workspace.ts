@@ -26,6 +26,7 @@ import { parseCapture, taskLabel, type CaptureParse, type ListInfo } from '@flin
 import { fromDate } from '@flint/core/time';
 import type { ChangeOutcome, ListChange, ListSummary, ListView } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
@@ -327,7 +328,7 @@ export class Workspace {
           id: task.key,
           listId,
           listName: names.get(listId) ?? entry.name,
-          title: taskLabel(task.line.title.trim(), getBody(task)),
+          title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
           at,
           done: task.line.status !== ' ',
         });

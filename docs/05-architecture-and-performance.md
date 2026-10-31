@@ -18,6 +18,7 @@
 | Note editor / task body editor | CodeMirror 6 with an Obsidian-style live-preview layer (Obsidian itself is built on CodeMirror 6) |
 | Drag and drop | dnd-kit (or equivalent) |
 | Spring animations | A spring animation library (e.g. Motion / react-spring), disabled under reduce-motion |
+| Markdown rendering (read-only) | markdown-it 15, raw HTML off and unsafe link schemes refused: inline markdown in task titles from M4 (LIST-02, D-52), rendered task bodies (D-49) |
 | Syntax highlighting | CodeMirror language packages (in editor) |
 | Fuzzy search | A small in-memory fuzzy matcher (data sizes are small) |
 | Shorthand and natural-language time parsing | Small custom parsers in `packages/core`, no library such as chrono-node: they run in the capture popup, which must stay tiny (CAP-10, D-28) |
