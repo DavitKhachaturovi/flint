@@ -49,7 +49,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Discard the draft and close | Shift+Esc | Decided (D-39) |
 | Esc / Shift+Esc anywhere in the popup (also after clicking the card's background) | Esc, Shift+Esc while the popup has the focus; never a global hotkey, so Esc keeps working in other apps while the popup stays open | Decided (D-46) |
 | Close the popup from another window | Ctrl+Shift+Space (cursor back to the popup), then Esc; or the × on the card | Decided (D-46) |
-| Move the popup | Drag the card's background; not remembered | Decided (D-47) |
+| Move the popup | Drag the small grip at the top of the card (not the background, so text never moves the window); not remembered | Decided (D-47, D-68) |
 | Accept the highlighted `##` suggestion, or the option on the close-match / new-list card | Enter: the first Enter only accepts, the next Enter saves | Decided (D-40) |
 | Save with an open card or menu straight away | The save button (D-25 rules apply to the `##` token) | Decided (D-40) |
 | Choose another suggested list | ↑ / ↓ while the `##` suggestion menu is open | Proposed |
@@ -141,8 +141,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Row anatomy (task list)
 - Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), star (only if starred, **Proposed**).
 - Task text renders its inline markdown; the raw syntax shows only while editing (LIST-02, D-52).
-- An overdue reminder reads "Overdue · <time>" in brighter text with a small dot instead of the bell; no red, no badge (REM-11, D-58).
-- The bell is a button: clicking it turns the reminder off (a strike line is drawn through the bell, the time turns faint) and on again (REM-12, D-66).
+- An overdue reminder: the bell with a small dot and the time in brighter text; no "Overdue" word, no red, no badge (REM-11, D-68).
+- The bell is a button: clicking it turns the reminder off (a strike line is drawn through the bell, the time turns faint, an overdue dot goes away) and on again; the bell never moves (REM-12, D-66, D-68). Clicking the **time** opens the date/time picker to change it (REM-01, D-68).
 - Hover never stacks a second rounded background against the selected row (UI-03).
 - Indicators are small, monochrome, and low-contrast until hover/selection.
 - Subtasks are indented one step; no tree lines.
@@ -191,7 +191,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - The **selection highlight** glides to the newly selected row and **new rows** ease in instead of appearing rigidly (UI-04, D-56).
 - **Switching lists or pages:** the content fades in while rising a few pixels, and the sidebar's highlight glides to the new list (UI-04, D-65).
 - The whole composer card is one text target: the I-beam over all of it except its buttons, so the cursor doesn't flicker between arrow and I-beam around the text box (UI-01, D-65).
-- **Nothing slower than ~150 ms.** Motion must never make the user wait.
+- **Durations (D-67, replaces the single ~150 ms ceiling):** up to **~150 ms** for motion that gates the next action (navigation, selection, menus and pickers opening); up to **~250–300 ms** for non-blocking visual state changes (a strike line, a fade, completion feedback). Motion must never make the user wait.
+- **Completion (D-67):** the check fills with a small pop, then the row fades, slides and collapses into Completed. **Un-completing** brings the row back smoothly into the open tasks.
+- **Animation speed (D-67):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).
 

@@ -113,7 +113,8 @@
   --fl-ease-spring:  cubic-bezier(.2, .9, .3, 1.15); /* settle with a small overshoot */
   --fl-ease-press:   cubic-bezier(.2, .9, .3, 1.5);  /* checkbox press rebound */
   --fl-dur-fast:     120ms; /* hover, color */
-  --fl-dur-base:     150ms; /* everything else — hard ceiling */
+  --fl-dur-base:     150ms; /* motion that gates the next action (D-67) */
+  --fl-dur-state:    260ms; /* non-blocking state changes: strike, fade, completion (D-67) */
 }
 
 @media (prefers-reduced-motion: reduce) {

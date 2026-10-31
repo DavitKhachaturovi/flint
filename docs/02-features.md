@@ -13,7 +13,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each list is one markdown file in the Flint folder (see 04).
 - Lists can be created, renamed, reordered in the sidebar, and deleted (deleted lists go to Trash, DATA-02).
 - Lists are the top-level `*.md` files in the Flint folder. A file without Flint frontmatter (e.g. created in VS Code or by Claude) shows up as a note; Flint adds its header only when the user edits the file in Flint (D-23).
-- **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). **D-64:** a new note gets plain monospace editing (like task bodies, D-49) until M5's note editor; existing notes become editable the same way.
+- **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). **D-68:** until the M5 editor, a note is shown as a proper page: its title, a comfortable reading width, aligned with the list views, tokens only. **D-64:** a new note gets plain monospace editing (like task bodies, D-49) until M5's note editor; existing notes become editable the same way.
 - **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
 - **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
 
@@ -105,6 +105,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-43:** the clipboard is restored with every format Electron can read back (all items and types of the async clipboard API); verified with browser/Notepad, Teams chat, a normal terminal and an admin terminal (29 Oct 2026).
 - Implementation: simulates Ctrl+C in the foreground app and reads the clipboard (05). **The user's previous clipboard content must be restored afterwards.**
 - **Known limitation:** Windows blocks simulated input into elevated (administrator) windows, e.g. an admin PowerShell or terminal, when Flint is not elevated. When the copy fails, open the popup empty with a short hint ("Couldn't read selection from an admin window; paste with Ctrl+V") rather than failing silently.
+- **D-68:** when nothing at all was selected, the popup just opens, without a message (the admin-window hint above stays).
 - The same rules as CAP-06 apply to the selection (stack traces/JSON → highlighted code block in the selection area).
 
 ### CAP-08 — Draft persistence (v1)
@@ -127,6 +128,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Date/time picker:** a proper date and time picker (month grid, time, and a natural-language field reading the same grammar as `@`, REM-02). M4 step 5 (D-64).
 - All three pickers have the **same size and visual style** (floating level, 09 §8), are fully **keyboard-accessible** (the buttons are focusable; arrows move, Enter picks, Esc closes back to the text), and insert **the same chip** the shorthand would. The chosen value goes into the title as a live token, so chips, saving and undo behave exactly as with typed shorthand (D-45 live insertion).
 - Milestone: M4 for the composer and the capture popup.
+- **D-68:** every picker list scrolls (thin scrollbar, UI-02) within a sensible maximum height, so every list can be reached. **Date/time flow, everywhere:** pick a day in the calendar, then a **time-of-day view** with common times and a custom time field, keyboard-friendly, with a back button to the calendar; typed input (`fri 15`) and the presets stay.
 - **Built in M4 step 5 (Proposed details):** a picked value replaces the token of its kind already in the text (a second one would stay as text, D-25), and None or the list the text already goes to (the composer's list, Inbox in the popup) removes it. The date/time picker inserts `@YYYY-MM-DD HH:MM` (the chip shows `Tomorrow 10:00`) and offers In 1 hour, Tomorrow morning and Next Monday as presets; only future times can be picked. The list picker is also "Move to…" (TASK-11). In the capture popup the window grows while a picker or menu needs the room.
 
 ---
@@ -245,6 +247,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Every task can have a reminder: press a button (or key), configure the time, done.
 - When due, Flint shows a **Windows notification** and/or **plays a sound** (configurable, REM-06) so the user remembers the task.
 - One reminder per task (**Proposed**). No recurring reminders (Non-goals).
+- **D-68 (pulled into M4):** clicking a task's reminder time opens the date/time picker for that task (CAP-11), also for a reminder that already fired; the bell next to it stays the off/on toggle (REM-12). The task's right-click menu has "Change reminder…", and "Set reminder…" for a task without one (**Proposed**).
 
 ### REM-02 — Natural-language times (v1)
 - Accepted in both the reminder picker and the capture box.
@@ -273,6 +276,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Clicking the toast body behaves like **Open**.
 - Buttons must work while the toast is on screen and from Action Center. Implementation notes in 05.
 - **D-64 (Davit, 31 Oct 2026):** pulled forward to **M4 step 3**, the first item: reminders fire as this toast while Flint runs; a reminder missed while Flint wasn't running or the PC slept is shown once at the next start (or wake) as a toast labelled "Missed". **Proposed:** more than 3 missed at once show as one toast, "N reminders you missed", whose Open shows the main window; the full REM-07 list comes in M6. A shown reminder is remembered in `reminders-state.json` (04 §2), so it is never shown twice.
+- **D-68:** the toast says **"Reminder"** (or "Missed reminder") and the task name, with Done / Snooze 10m / Open: no time, no list name, no large logo image (the small app icon in its header stays).
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
@@ -295,7 +299,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-11 — Overdue reminders (v1, D-58)
 - An open task whose reminder is in the past is **overdue**: noticeable but not alarming.
-- The row's time label becomes **"Overdue · <time>"** (same time format as REM-08, e.g. `Overdue · Today 09:00`, `Overdue · Mon 09:00`) in brighter text, with a **small dot** in place of the bell. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
+- **D-68 (replaces D-58's label):** no "Overdue" word. The bell stays, with a **small dot** on it, and the time (REM-08 format) is in brighter text. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
 - The label turns overdue on its own when the time passes (the view checks every minute, **Proposed**).
 - **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
 - In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
@@ -307,6 +311,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Stored as the field `[muted:: true]` next to the reminder (04 §3). Setting a new reminder time (snooze, the picker, an edit with `@`) turns the reminder back on (**Proposed**).
 - A reminder whose time passes while it is off is not shown later when it is turned back on: turning it on doesn't pop a notification for a time that is already past (**Proposed**).
 - Milestone M4 step 5.
+- **D-68 (0.4.4 feedback):** the bell **always stays in place**. Turning a reminder off strikes the bell and fades the time; turning it on removes the strike just as smoothly (both ~250–300 ms, D-67); nothing else moves.
 
 ---
 
@@ -419,6 +424,7 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-01 — Lives in the tray, starts with Windows (v1)
 - Flint runs as a tray app and starts at login (configurable, default on). The global hotkeys and reminders depend on it running.
+- **D-68:** only the start-with-Windows launch stays hidden in the tray. Starting Flint by hand (Start menu, shortcut, the installer's finish, or starting it again while it runs) shows the main window.
 - Tray menu (**Proposed** items): Open Flint, Quick capture, Mini mode, Settings, Quit.
 
 ### APP-02 — Never destroy windows; only hide them (v1)
@@ -472,6 +478,11 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 
 ### APP-12 — Respect OS reduce-motion (v1)
 - If Windows "show animations" / reduce motion is off, Flint's spring and completion animations turn off automatically.
+- **D-67:** next to it, Settings (M8) gets an **animation speed** setting that scales all motion (APP-11).
+
+### APP-16 — Install and update in one step (v1, D-68)
+- The installer is one-click and per-user (no wizard pages, no admin rights): run it, it installs, and Flint opens with its main window. Installing a newer version over an existing one works the same way and also starts Flint at the end. Settings, drafts and the Flint folder are kept (D-32).
+- Milestone M4 (it is already one-click; Flint opening with its window at the end needs APP-01's manual-start rule).
 
 ### APP-13 — Guidance spotlight (v1, D-61)
 - One shared **spotlight** component for all guidance: a **soft dim** over the window and a **ring** around the target element, with a small card (one or two lines) and **Next / Skip / Skip all**. Used by the walkthrough (APP-10), contextual tips (APP-14) and What's new (APP-15). Visual spec in 09 §8.
@@ -510,6 +521,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 
 ### UI-01 — Cursors like native Windows (v1, D-52)
 - The normal **arrow cursor on all controls**: buttons, checkboxes, the composer's tools, rows, sidebar items, menus. The text cursor in text fields. The **hand only on real links**. No cursor flicker when moving across controls.
+- **D-68:** the I-beam shows **only over text that is editable at that moment**: text fields, a task being edited, the note editor. Everywhere else the arrow, task titles, reminder times, hints and read-only text included.
 - Milestone M4.
 
 ### UI-02 — Thin scrollbar at the window edge (v1, D-52)
@@ -539,12 +551,14 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-07 — App icon sizes and the in-app logo (v1, D-52)
 - The taskbar icon looked noticeably smaller than other apps' icons (fine on the desktop). Cause, found when building it: the near-black tile disappears against the dark taskbar, so only the leaf (about 60 % of the slot) shows, and the sizes electron-builder downscaled from one 256 px image also lost the tile's rim. The app icon becomes a multi-size `.ico` drawn from the hand-tuned small logos, with a visible rim and a larger leaf (09 §8).
 - The in-app logo and the "Flint" wordmark in the sidebar get slightly bigger.
-- **D-65 (0.4.1 feedback):** still too small next to other apps' icons, whose mark fills the square edge to edge. For 16–48 px the mark fills nearly the whole square. The reminder toast also shows Flint's logo larger, as its `appLogoOverride` image (a local file, which Windows supports for desktop apps; in Windows 11 it sits left of the text, while the small header icon stays the app icon).
+- **D-65 (0.4.1 feedback):** still too small next to other apps' icons, whose mark fills the square edge to edge. For 16–48 px the mark fills nearly the whole square. ~~The reminder toast also shows Flint's logo larger, as its `appLogoOverride` image.~~ (Removed again by D-68.)
+- **D-68 (0.4.4 feedback):** the leaf overflowed the dark tile. The tile scales with the leaf: the whole icon fills the square, with the leaf inside the tile, at every small size.
 - Milestone M4.
 
 ### UI-08 — Right-click menus everywhere (v1, D-55)
 - Every object has a right-click menu with relevant actions: tasks, lists and notes in the sidebar, the sidebar's background, the composer.
 - **Every text field** keeps the standard **Cut / Copy / Paste / Select all** menu (Electron shows none by default).
+- **D-68:** the mouse highlights an item only while it is over the menu; leaving the menu clears it. Keyboard navigation keeps its highlight.
 - Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6).
 - **D-64:** menus are drawn **in the page**, with the tokens, **everywhere**, the capture popup included: while a menu is open there, the popup makes room for it (e.g. by enlarging its transparent margin or window). The native dark Windows menu is only a fallback if that genuinely doesn't work, and Davit is told if it comes to that.
 - Milestones: M4; note-specific items (NOTE-02) in M5.
@@ -554,3 +568,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Quotes pair only when **not directly after a letter or digit**, so "don't" works.
 - **Proposed:** Backspace right after an auto-inserted pair removes both; with text selected, typing an opening character wraps the selection. Nothing pairs directly before a letter or digit, so typing `(` in front of a word doesn't add a stray `)` (as most editors do).
 - Milestones: the composer, the capture popup and task editing in M4; the note editor (CodeMirror) in M5.
+
+### UI-10 — A motion pass over everything (v1, D-67)
+- Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (up to ~150 ms for motion that gates the next action, ~250–300 ms for non-blocking state changes). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
+- Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.

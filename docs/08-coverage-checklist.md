@@ -246,3 +246,26 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Clickable bell turns a reminder off without deleting it; strike-line animation; undoable; new field | REM-12 · v1 · M4 step 5 | 04 §3, 03 §4, D-66 |
 | 8 | Full-language highlighting of rendered bodies with the M5 editor's parsers; the popup stays JSON + stack traces | UI-06 · v1 · M5 | D-65 |
 | — | Step-4 choices accepted: trash layout, target-first moves, Shift+F10 / Menu key | TASK-11, TASK-12, UI-08 · Decided | D-65 |
+
+## I. Feedback on 0.4.2 and 0.4.4 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Menu hover highlight clears on mouse-leave; only keyboard keeps it | UI-08 · v1 · M4 step 6 (start) | D-68 |
+| 2 | Every picker list scrolls (thin scrollbar, sensible max height) | CAP-11, UI-02 · v1 · M4 step 6 (start) | D-68 |
+| 3 | I-beam only over editable text; arrow everywhere else | UI-01 · v1 · M4 step 6 (start) | 03 Mouse, D-68 |
+| 4 | The note page looks like a page: title, comfortable width, aligned with the lists | LIST-01 · v1 · M4 step 6 (start) | 09 §8, D-64, D-68 |
+| 5 | Click a reminder time to change it; "Change reminder…" in the menu; the bell stays the toggle | REM-01 · v1 · M4 step 6 (start) | 03 §4, D-68 |
+| 6 | Taskbar icon: the tile scales with the leaf, the leaf inside the tile | UI-07 · v1 · M4 step 6 (start) | 09 §8, D-68 |
+| 7 | One-click per-user installer; installs and opens Flint; updates too | APP-16 · v1 · M4 step 6 (start) | 05 §6, D-68 |
+| 8 | A manual start shows the main window; only start-with-Windows stays in the tray | APP-01 · v1 · M4 step 6 (start) | D-68 |
+| 9 | Reminder notification: "Reminder" + task name; no time, no large logo | REM-05 · v1 · M4 step 6 (start) | D-68 |
+| 10 | Overdue: bell + dot + brighter time, no "Overdue" word; the bell never moves | REM-11, REM-12 · v1 · M4 step 6 (start) | 09 §8, D-68 |
+| 11 | Bell strike slower and smooth in both directions | REM-12 · v1 · M4 step 6 (start) | 09 §9, D-68 |
+| 12 | Motion rule: ≤ ~150 ms gating, ~250–300 ms non-blocking; slower list switching; fuller completion; un-complete animation | UI-04, TASK-06 · v1 · M4 step 6 (start) | 03 §5, 09 §9, D-67 |
+| 13 | Animation-speed setting that scales all motion | APP-11, APP-12 · v1 · M8 | D-67 |
+| 14a | Capture popup: drag only by a grip at the top of the card | CAP-01 · v1 · M4 step 6 (start) | 03 §3, D-47, D-68 |
+| 14b | No "Nothing was selected" message (admin hint stays) | CAP-07 · v1 · M4 step 6 (start) | D-68 |
+| 14c | Focus returns to the window active right before the popup last got focus; none if it had none | CAP-01 · v1 · M4 step 6 (start) | D-41, D-68 |
+| 14d | Date/time picker: day, then a time-of-day view (common times + custom field), back to the calendar | CAP-11 · v1 · M4 step 6 (start) | D-68 |
+| 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · v1 · M8 at the latest | D-67 |
