@@ -279,15 +279,31 @@ const MONTHS = [
   'December',
 ];
 
-const pad = (value: number): string => String(value).padStart(2, '0');
 const sameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
+/** Times offered for a picked day (D-68); today only those still ahead. */
+const COMMON_TIMES = [
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '20:00',
+];
+
 /**
- * Date and time (REM-01, REM-02): a natural-language field reading the same grammar as `@`, a few
- * presets, a month grid and a time field. Only times in the future can be picked.
+ * Date and time (REM-01, REM-02, D-68): a natural-language field reading the same grammar as `@`,
+ * presets, and a month grid. Picking a day opens a time-of-day view: common times and a custom time
+ * field, with a way back to the calendar. Everything works from the keyboard: ↑/↓ and Enter in the
+ * lists, arrow keys in the grid, ← or Backspace from the times back to the calendar. Only times in
+ * the future can be picked.
  */
 export function openTimePicker(
   host: PickerHost,
@@ -300,11 +316,21 @@ export function openTimePicker(
     close();
     onPick(at);
   };
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = current ? toDate(current) : null;
+  let day =
+    start && start.getTime() > now.getTime()
+      ? new Date(start.getFullYear(), start.getMonth(), start.getDate())
+      : today;
+  let month = new Date(day.getFullYear(), day.getMonth(), 1);
 
   const text = element('input', 'fl-picker-search');
   text.placeholder = 'in 2h, fri 10, 2 nov 15:00…';
   text.spellcheck = false;
   const rowsBox = element('div', 'fl-picker-rows');
+
+  // The calendar view.
+  const calendar = element('div', 'fl-cal');
   const head = element('div', 'fl-cal-head');
   const prev = element('button', 'fl-cal-step', '‹');
   const next = element('button', 'fl-cal-step', '›');
@@ -314,30 +340,35 @@ export function openTimePicker(
   const title = element('span', 'fl-cal-title');
   head.append(prev, title, next);
   const grid = element('div', 'fl-cal-grid');
-  const timeRow = element('label', 'fl-cal-time');
+  calendar.append(head, grid);
+
+  // The time-of-day view.
+  const times = element('div', 'fl-times');
+  times.hidden = true;
+  const back = element('button', 'fl-times-back');
+  back.type = 'button';
+  const timeList = element('div', 'fl-picker-rows fl-times-list');
+  timeList.tabIndex = -1;
+  const custom = element('label', 'fl-cal-time');
   const time = element('input', 'fl-cal-time-input');
   time.spellcheck = false;
-  timeRow.append(element('span', '', 'Time'), time);
-  panel.append(text, rowsBox, head, grid, timeRow);
+  time.placeholder = '13:45';
+  custom.append(element('span', '', 'Other time'), time);
+  times.append(back, timeList, custom);
 
-  const start = current ? toDate(current) : null;
-  const initialTime = start ? `${pad(start.getHours())}:${pad(start.getMinutes())}` : '09:00';
-  time.value = initialTime;
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let day = start ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : today;
-  let month = new Date(day.getFullYear(), day.getMonth(), 1);
+  panel.append(text, rowsBox, calendar, times);
 
-  /** The picked day at the time field's time, if it's a valid time in the future. */
-  const atDay = (date: Date): LocalDateTime | null => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(time.value.trim());
+  const at = (date: Date, value: string): LocalDateTime | null => {
+    const match = /^(\d{1,2})[:.]?(\d{2})$/.exec(value.trim());
     if (!match) return null;
     const hours = Number(match[1]);
     const minutes = Number(match[2]);
     if (hours > 23 || minutes > 59) return null;
-    const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes);
-    return at.getTime() > now.getTime() ? fromDate(at) : null;
+    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes);
+    return moment.getTime() > now.getTime() ? fromDate(moment) : null;
   };
 
+  // Presets, or what the typed text means.
   let rows: Row[] = [];
   const active = { index: 0 };
   const paint = (): void =>
@@ -357,14 +388,14 @@ export function openTimePicker(
   const renderRows = (): void => {
     const typed = text.value.trim();
     if (typed === '') {
-      rows = presets().map(({ label, at }) =>
-        makeRow(label, describeTime(fromDate(at), now), () =>
-          choose({ ...fromDate(at), second: 0 }),
+      rows = presets().map(({ label, at: moment }) =>
+        makeRow(label, describeTime(fromDate(moment), now), () =>
+          choose({ ...fromDate(moment), second: 0 }),
         ),
       );
     } else {
-      const at = parseTime(typed, { now });
-      rows = at ? [makeRow(describeTime(at, now), 'Enter', () => choose(at))] : [];
+      const parsed = parseTime(typed, { now });
+      rows = parsed ? [makeRow(describeTime(parsed, now), 'Enter', () => choose(parsed))] : [];
     }
     rowsBox.replaceChildren(...rows.map((row) => row.button));
     if (typed !== '' && rows.length === 0)
@@ -386,8 +417,7 @@ export function openTimePicker(
       month.getFullYear() < today.getFullYear() ||
       (month.getFullYear() === today.getFullYear() && month.getMonth() <= today.getMonth());
     grid.replaceChildren(...WEEKDAY_HEAD.map((name) => element('span', 'fl-cal-weekday', name)));
-    const first = new Date(month);
-    const offset = (first.getDay() + 6) % 7;
+    const offset = (month.getDay() + 6) % 7;
     for (let blank = 0; blank < offset; blank++) grid.append(element('span', 'fl-cal-blank'));
     dayButtons = [];
     const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -400,16 +430,7 @@ export function openTimePicker(
       button.classList.toggle('today', sameDay(value, today));
       button.classList.toggle('on', sameDay(value, day));
       button.addEventListener('mousedown', (event) => event.preventDefault());
-      button.addEventListener('click', () => {
-        day = value;
-        const at = atDay(day);
-        if (at) choose(at);
-        else {
-          renderGrid();
-          time.focus();
-          time.select();
-        }
-      });
+      button.addEventListener('click', () => openTimes(value));
       dayButtons.push({ date: value, button });
       grid.append(button);
     }
@@ -420,6 +441,58 @@ export function openTimePicker(
     if (target.getTime() < today.getTime()) return;
     day = target;
     month = new Date(day.getFullYear(), day.getMonth(), 1);
+    renderGrid();
+    dayButtons.find(({ date }) => sameDay(date, day))?.button.focus();
+  };
+
+  // The time-of-day view for the picked day.
+  let timeRows: Row[] = [];
+  const timeActive = { index: 0 };
+  const paintTimes = (): void =>
+    timeRows.forEach((row, index) =>
+      row.button.classList.toggle('active', index === timeActive.index),
+    );
+  const openTimes = (date: Date): void => {
+    day = date;
+    const label = describeTime(
+      fromDate(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9)),
+      now,
+    );
+    const dayName = label.replace(/ \d\d:\d\d$/, '');
+    back.textContent = `‹  ${dayName}`;
+    back.setAttribute('aria-label', `${dayName}, back to the calendar`);
+    timeRows = COMMON_TIMES.flatMap((value) => {
+      const moment = at(date, value);
+      return moment ? [makeRow(value, null, () => choose(moment))] : [];
+    });
+    timeList.replaceChildren(...timeRows.map((row) => row.button));
+    if (timeRows.length === 0)
+      timeList.append(element('p', 'fl-picker-empty', 'Type a later time below'));
+    timeRows.forEach((row, index) =>
+      row.button.addEventListener('mouseenter', () => {
+        timeActive.index = index;
+        paintTimes();
+      }),
+    );
+    // Changing a reminder on its own day starts from its current time.
+    const was =
+      start && sameDay(start, date)
+        ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+        : '';
+    const wasIndex = timeRows.findIndex((row) => row.button.textContent === was);
+    timeActive.index = was !== '' && wasIndex >= 0 ? wasIndex : 0;
+    paintTimes();
+    timeRows[timeActive.index]?.button.scrollIntoView({ block: 'nearest' });
+    time.value = was !== '' && wasIndex < 0 ? was : '';
+    calendar.hidden = true;
+    rowsBox.hidden = true;
+    times.hidden = false;
+    (timeRows.length > 0 ? timeList : time).focus();
+  };
+  const openCalendar = (): void => {
+    times.hidden = true;
+    calendar.hidden = false;
+    rowsBox.hidden = false;
     renderGrid();
     dayButtons.find(({ date }) => sameDay(date, day))?.button.focus();
   };
@@ -441,19 +514,34 @@ export function openTimePicker(
       moveDay(delta);
     }
   });
-  const keys = rowKeys(() => rows, active, paint);
-  text.addEventListener('input', renderRows);
-  text.addEventListener('keydown', (event) => {
-    if (keys(event)) event.preventDefault();
+  back.addEventListener('mousedown', (event) => event.preventDefault());
+  back.addEventListener('click', openCalendar);
+  const timeKeys = rowKeys(() => timeRows, timeActive, paintTimes);
+  timeList.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
+      event.preventDefault();
+      openCalendar();
+    } else if (timeKeys(event)) event.preventDefault();
   });
   time.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    const at = atDay(day);
-    if (at) choose(at);
+    const moment = at(day, time.value);
+    if (moment) choose(moment);
     else time.classList.add('invalid');
   });
   time.addEventListener('input', () => time.classList.remove('invalid'));
+
+  const keys = rowKeys(() => rows, active, paint);
+  text.addEventListener('input', () => {
+    // Typing always goes back to the typed result, whatever view was open.
+    if (!times.hidden) openCalendar();
+    renderRows();
+    text.focus();
+  });
+  text.addEventListener('keydown', (event) => {
+    if (keys(event)) event.preventDefault();
+  });
 
   renderRows();
   renderGrid();

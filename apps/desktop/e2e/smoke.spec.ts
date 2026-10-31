@@ -777,6 +777,19 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await popup.locator('[data-picker="priority"]').click();
   await popup.keyboard.press('1');
   await expect(popup.locator('#capture')).toHaveValue('check logs !l');
+
+  // D-68: a day from the calendar opens the times of day; ← goes back, the second time picks.
+  await popup.locator('[data-picker="time"]').click();
+  await popup.getByRole('button', { name: 'Next month' }).click();
+  await popup.locator('.fl-cal-day', { hasText: /^15$/ }).click();
+  await expect(popup.locator('.fl-times-list')).toBeFocused();
+  await popup.keyboard.press('ArrowLeft');
+  await expect(popup.locator('.fl-cal-day.on')).toBeFocused();
+  await popup.keyboard.press('Enter');
+  await popup.keyboard.press('ArrowDown');
+  await expect(popup.locator('.fl-times-list .fl-picker-row.active')).toHaveText('10:00');
+  await popup.keyboard.press('Enter');
+  await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 10:00$/);
   await popup.locator('#capture').fill('');
   await popup.keyboard.press('Escape');
 });

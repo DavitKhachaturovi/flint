@@ -257,3 +257,32 @@
     animation: none;
   }
 }
+
+/* D-68: the time-of-day view after a day is picked. */
+.fl-times-back {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fl-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.fl-times-back:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.fl-times-list:focus {
+  outline: none;
+}
+
+.fl-times-list .fl-picker-label {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+}
