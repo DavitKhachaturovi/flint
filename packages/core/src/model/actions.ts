@@ -108,7 +108,18 @@ export function setReminder(list: string, key: string, at: LocalDateTime | null)
     type: 'update',
     list,
     key,
-    changes: { fields: { reminder: at === null ? null : localDateTimeField(at) } },
+    // D-66: a new time turns the reminder back on; removing it removes the muted mark too.
+    changes: { fields: { reminder: at === null ? null : localDateTimeField(at), muted: null } },
+  };
+}
+
+/** REM-12, D-66: turns a reminder off (kept, never fired) or back on. */
+export function setMuted(list: string, key: string, muted: boolean): Op {
+  return {
+    type: 'update',
+    list,
+    key,
+    changes: { fields: { muted: muted ? flintField(true as const) : null } },
   };
 }
 

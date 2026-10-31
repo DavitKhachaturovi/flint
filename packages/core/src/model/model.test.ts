@@ -21,6 +21,7 @@ import {
   outdentTask,
   setBody,
   setPriority,
+  setMuted,
   setReminder,
   setToday,
   uncompleteTask,
@@ -144,6 +145,22 @@ describe('editing (TASK-03, TASK-05, REM-01, TODAY-01)', () => {
     );
     result = apply(result, setReminder('a', 'cccc', null));
     expect(text(result)).toContain('- [ ] C [today:: true] [id:: cccc]\n');
+  });
+
+  it('turns a reminder off and on; a new time turns it back on (REM-12, D-66)', () => {
+    let result = apply(
+      documents,
+      setReminder('a', 'cccc', { ...AT, day: 30, hour: 15, minute: 0 }),
+    );
+    result = apply(result, setMuted('a', 'cccc', true));
+    expect(text(result)).toContain(
+      '- [ ] C [reminder:: 2026-10-30T15:00] [muted:: true] [id:: cccc]\n',
+    );
+    expect(text(apply(result, setMuted('a', 'cccc', false)))).toContain(
+      '- [ ] C [reminder:: 2026-10-30T15:00] [id:: cccc]\n',
+    );
+    result = apply(result, setReminder('a', 'cccc', { ...AT, day: 31, hour: 9, minute: 0 }));
+    expect(text(result)).toContain('- [ ] C [reminder:: 2026-10-31T09:00] [id:: cccc]\n');
   });
 
   it('escapes typed titles', () => {

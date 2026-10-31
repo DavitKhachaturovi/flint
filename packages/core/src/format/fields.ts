@@ -7,7 +7,7 @@ import {
 import { codeSpanRanges, rangeContaining, type Range } from './code-spans.js';
 
 /** Flint's own field keys, in the order Flint writes them (D-21). */
-export const FLINT_KEYS = ['reminder', 'today', 'completion', 'priority', 'id'] as const;
+export const FLINT_KEYS = ['reminder', 'muted', 'today', 'completion', 'priority', 'id'] as const;
 export type FlintKey = (typeof FLINT_KEYS)[number];
 
 export type Priority = 'low' | 'medium' | 'high';
@@ -32,6 +32,8 @@ export interface FieldValue<T> {
 
 export interface FlintFields {
   readonly reminder?: FieldValue<ParsedLocalDateTime>;
+  /** REM-12, D-66: the reminder is turned off (kept, never fired). */
+  readonly muted?: FieldValue<true>;
   readonly today?: FieldValue<true>;
   readonly completion?: FieldValue<ParsedLocalDateTime>;
   readonly priority?: FieldValue<Priority>;
@@ -79,6 +81,7 @@ export function readPriority(value: string): Priority | null {
   }
 }
 
+/** `today` and `muted` (D-66): `true`, any letter case. */
 function readToday(value: string): true | null {
   return /^true$/i.test(value) ? true : null;
 }
@@ -95,6 +98,7 @@ function isValidFlintValue(key: FlintKey, value: string): boolean {
     case 'completion':
       return parseLocalDateTime(value) !== null;
     case 'today':
+    case 'muted':
       return readToday(value) !== null;
     case 'id':
       return readId(value) !== null;
@@ -270,6 +274,7 @@ export function parseTaskContent(text: string): TaskContent {
 
   const fields: {
     reminder?: FieldValue<ParsedLocalDateTime>;
+    muted?: FieldValue<true>;
     today?: FieldValue<true>;
     completion?: FieldValue<ParsedLocalDateTime>;
     priority?: FieldValue<Priority>;
@@ -290,7 +295,8 @@ export function parseTaskContent(text: string): TaskContent {
         break;
       }
       case 'today':
-        fields.today = buildField(candidate, true);
+      case 'muted':
+        fields[key] = buildField(candidate, true);
         break;
       case 'priority': {
         const priority = readPriority(candidate.value);
@@ -312,6 +318,7 @@ function formatFlintValue(key: FlintKey, value: unknown): string {
     case 'completion':
       return formatLocalDateTime((value as ParsedLocalDateTime).value);
     case 'today':
+    case 'muted':
       return 'true';
     case 'priority':
     case 'id':
@@ -446,8 +453,8 @@ function escapeEverything(title: string): string {
 }
 
 /**
- * Writes task content canonically (D-21): title, then Flint's fields in the order `reminder`,
- * `today`, `completion`, `priority`, `id`, then unknown fields, then the block ID.
+ * Writes task content canonically (D-21, D-66): title, then Flint's fields in the order `reminder`,
+ * `muted`, `today`, `completion`, `priority`, `id`, then unknown fields, then the block ID.
  *
  * The written line must read back as the same task. When the title contains text that would then be
  * read as a field (a repeated Flint field that was visible text, say), the least escaping that

@@ -153,6 +153,26 @@ describe('formatTaskContent (D-21 canonical order)', () => {
   });
 });
 
+describe('muted reminders (REM-12, D-66)', () => {
+  it('reads [muted:: true] in any case and position, written after the reminder', () => {
+    const content = parseTaskContent(
+      'Call Alex [MUTED:: True] [priority:: high] [reminder:: 2026-11-02T15:00] [id:: a1b2]',
+    );
+    expect(content.fields.muted?.value).toBe(true);
+    expect(content.title).toBe('Call Alex');
+    // Untouched values keep their raw text; the order is canonical.
+    expect(formatTaskContent(content)).toBe(
+      'Call Alex [reminder:: 2026-11-02T15:00] [MUTED:: True] [priority:: high] [id:: a1b2]',
+    );
+  });
+
+  it('an invalid value stays visible as title text', () => {
+    const content = parseTaskContent('Call Alex [muted:: yes] [id:: a1b2]');
+    expect(content.fields.muted).toBeUndefined();
+    expect(content.title).toBe('Call Alex [muted:: yes]');
+  });
+});
+
 describe('escapeTitle', () => {
   it('escapes text that would read back as a field', () => {
     const title = escapeTitle('Document [id:: abcd] and [note:: x] and [Vec::new]');
