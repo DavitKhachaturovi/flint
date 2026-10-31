@@ -48,18 +48,6 @@ describe('reminder toasts (REM-05, R-3)', () => {
     expect(xml).not.toContain('flint://');
   });
 
-  it('shows the larger Flint logo left of the text when given (D-65)', () => {
-    const xml = reminderToastXml(toast, {
-      protocol: 'flint',
-      hideText: true,
-      logo: 'file:///C:/Program%20Files/Flint/resources/toast-logo.png',
-    });
-    expect(xml).toContain(
-      '<image placement="appLogoOverride" src="file:///C:/Program%20Files/Flint/resources/toast-logo.png" hint-crop="none"/>',
-    );
-    expect(reminderToastXml(toast, { protocol: 'flint', hideText: false })).not.toContain('<image');
-  });
-
   it('a default toast has no scenario', () => {
     expect(
       reminderToastXml({ ...toast, kind: 'default' }, { protocol: 'flint', hideText: false }),

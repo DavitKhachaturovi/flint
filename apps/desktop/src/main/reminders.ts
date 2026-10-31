@@ -1,4 +1,4 @@
-import { describeTime, formatLocalDateTime, toDate, type LocalDateTime } from '@flint/core/time';
+import { formatLocalDateTime, toDate, type LocalDateTime } from '@flint/core/time';
 
 /**
  * Which reminders to show now (REM-01, REM-05, REM-07 basic; D-64). Pure: the service around it
@@ -96,14 +96,11 @@ export interface ToastPlan {
 /**
  * The toasts for what is due: every on-time reminder separately; missed ones separately too, unless
  * there are more than `MAX_SEPARATE_MISSED`, which become one summary (the full list is M6, REM-07).
- * Label: `Reminder · Today 15:00 · Unicorn` (no list name for Inbox), `Missed reminder · …`.
+ * The label says only what it is, `Reminder` or `Missed reminder`, above the task name: no time,
+ * no list (D-68).
  */
-export function planToasts(due: readonly Due[], now: Date, inboxId: string): ToastPlan {
-  const label = ({ task, missed }: Due): string =>
-    [
-      `${missed ? 'Missed reminder' : 'Reminder'} · ${describeTime(task.at, now)}`,
-      ...(task.listId === inboxId ? [] : [task.listName]),
-    ].join(' · ');
+export function planToasts(due: readonly Due[]): ToastPlan {
+  const label = ({ missed }: Due): string => (missed ? 'Missed reminder' : 'Reminder');
   const missed = due.filter((entry) => entry.missed);
   const summarize = missed.length > MAX_SEPARATE_MISSED;
   const separate = (summarize ? due.filter((entry) => !entry.missed) : due).map((entry) => ({

@@ -99,3 +99,13 @@ h1 {
     transition: none !important;
   }
 }
+
+/* UI-01, D-68: the I-beam only over text that can be edited right now; the arrow everywhere else. */
+body {
+  cursor: default;
+}
+
+input:not([readonly], [disabled], [type='checkbox'], [type='radio']),
+textarea:not([readonly], [disabled]) {
+  cursor: text;
+}

@@ -24,7 +24,6 @@ export interface ReminderServiceOptions {
   /** `reminders-state.json` in app data. */
   readonly statePath: string;
   readonly tasks: () => ReminderTask[];
-  readonly inboxId: string;
   readonly show: (plan: ToastPlan) => void;
   readonly log: (message: string) => void;
 }
@@ -67,7 +66,7 @@ export class ReminderService {
     this.fired = fired;
     if (due.length > 0) {
       this.options.log(`reminders due: ${due.map((entry) => entry.task.id).join(', ')}`);
-      this.options.show(planToasts(due, now, this.options.inboxId));
+      this.options.show(planToasts(due));
     }
     if (changed) this.save();
     const next = nextReminderAt(tasks, this.fired, now);

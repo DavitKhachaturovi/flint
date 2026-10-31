@@ -103,18 +103,14 @@ function fromDateMs(date: Date): number {
 }
 
 describe('toasts for due reminders', () => {
-  it('labels on-time and missed reminders, with the list unless it is Inbox', () => {
-    const plan = planToasts(
-      [
-        { task: task('a1', now), missed: false },
-        { task: task('b2', minutes(-120), { listId: 'u1', listName: 'Unicorn' }), missed: true },
-      ],
-      now,
-      'inbox',
-    );
+  it('labels on-time and missed reminders, with nothing else than the task (D-68)', () => {
+    const plan = planToasts([
+      { task: task('a1', now), missed: false },
+      { task: task('b2', minutes(-120), { listId: 'u1', listName: 'Unicorn' }), missed: true },
+    ]);
     expect(plan.separate).toEqual([
-      { id: 'a1', title: 'task a1', label: 'Reminder · Today 15:00' },
-      { id: 'b2', title: 'task b2', label: 'Missed reminder · Today 13:00 · Unicorn' },
+      { id: 'a1', title: 'task a1', label: 'Reminder' },
+      { id: 'b2', title: 'task b2', label: 'Missed reminder' },
     ]);
     expect(plan.summary).toBeNull();
   });
@@ -124,7 +120,7 @@ describe('toasts for due reminders', () => {
       task: task(`m${n}`, minutes(-60 * n)),
       missed: true,
     }));
-    const plan = planToasts([...missed, { task: task('a1', now), missed: false }], now, 'inbox');
+    const plan = planToasts([...missed, { task: task('a1', now), missed: false }]);
     expect(plan.separate.map((toast) => toast.id)).toEqual(['a1']);
     expect(plan.summary).toEqual({
       count: 4,

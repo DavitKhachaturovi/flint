@@ -125,6 +125,7 @@ function rowKeys(rows: () => readonly Row[], active: { index: number }, paint: (
       active.index =
         (active.index + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
       paint();
+      list[active.index]?.button.scrollIntoView({ block: 'nearest' });
       return true;
     }
     if (event.key === 'Enter') {
@@ -203,8 +204,9 @@ export function openPriorityPicker(
 export type ListPick = { readonly list: ListInfo } | { readonly newList: string };
 
 /**
- * A list (CAP-05, TASK-11): a search field, then the most recently used lists or the matches for
- * what is typed (D-25), and "New list" for a name no list has.
+ * A list (CAP-05, TASK-11): a search field, then every task list, the most recently used first,
+ * or the matches for what is typed (D-25), and "New list" for a name no list has. The list
+ * scrolls (D-68).
  */
 export function openListPicker(
   host: PickerHost,
@@ -228,9 +230,7 @@ export function openListPicker(
     rows.forEach((row, index) => row.button.classList.toggle('active', index === active.index));
   const render = (): void => {
     const typed = search.value.trim();
-    const found = suggestLists(typed, lists)
-      .filter((list) => list.id !== options.exclude)
-      .slice(0, typed === '' ? 5 : 6);
+    const found = suggestLists(typed, lists).filter((list) => list.id !== options.exclude);
     rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
     const taken = lists.some((list) => normalizeListName(list.name) === normalizeListName(typed));
     if (typed !== '' && !taken && isValidListName(typed))

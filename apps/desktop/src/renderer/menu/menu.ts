@@ -69,6 +69,8 @@ export function openMenu(
   }
 
   let active = options.keyboard ? buttons.findIndex(({ item }) => !item.disabled) : -1;
+  /** D-68: the mouse highlights only while over the menu; the keyboard's highlight stays. */
+  let byKeyboard = options.keyboard === true;
   const paint = (): void =>
     buttons.forEach(({ button }, index) => button.classList.toggle('active', index === active));
   const pick = (index: number): void => {
@@ -79,6 +81,7 @@ export function openMenu(
   };
   buttons.forEach(({ button }, index) => {
     button.addEventListener('mouseenter', () => {
+      byKeyboard = false;
       active = index;
       paint();
     });
@@ -87,6 +90,11 @@ export function openMenu(
     button.addEventListener('click', () => pick(index));
   });
   paint();
+  menu.addEventListener('mouseleave', () => {
+    if (byKeyboard) return;
+    active = -1;
+    paint();
+  });
 
   menu.style.visibility = 'hidden';
   document.body.append(menu);
@@ -121,9 +129,10 @@ export function openMenu(
     paint();
   };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      byKeyboard = true;
       step(event.key === 'ArrowDown' ? 1 : -1);
-    else if (event.key === 'Enter' || event.key === ' ') pick(active);
+    } else if (event.key === 'Enter' || event.key === ' ') pick(active);
     else if (event.key === 'Escape' || event.key === 'Tab') closeMenu();
     else return;
     event.preventDefault();

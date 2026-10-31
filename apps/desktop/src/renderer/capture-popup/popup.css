@@ -536,3 +536,13 @@ button:focus-visible {
 .previous button:focus-visible {
   outline: 1px solid var(--fl-accent);
 }
+
+/* UI-01, D-68: the I-beam only over text that can be edited right now; the arrow everywhere else. */
+body {
+  cursor: default;
+}
+
+input:not([readonly], [disabled], [type='checkbox'], [type='radio']),
+textarea:not([readonly], [disabled]) {
+  cursor: text;
+}

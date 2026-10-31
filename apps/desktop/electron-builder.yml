@@ -35,7 +35,6 @@ extraResources:
     filter:
       - tray-*.png
       - icon.ico
-      - toast-logo.png
   # The OFL asks for its licence to travel with the fonts (docs/09 §7).
   - from: src/renderer/fonts
     to: licenses/fonts
@@ -49,7 +48,10 @@ win:
         - x64
   icon: resources/icon.ico
 nsis:
+  # APP-16, D-68: one click, per user, no wizard pages; Flint starts when it is done (also when an
+  # update is installed over a running Flint).
   oneClick: true
+  runAfterFinish: true
   perMachine: false
   allowElevation: false
   createStartMenuShortcut: true

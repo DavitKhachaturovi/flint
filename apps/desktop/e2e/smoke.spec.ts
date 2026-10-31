@@ -609,7 +609,6 @@ test('reminders fire once, missed ones say so; Done and Snooze change the task (
   const pad = (value: number): string => String(value).padStart(2, '0');
   const stamp = (date: Date): string =>
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  const clock = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const now = new Date();
   const hourAgo = new Date(now.getTime() - 60 * 60_000);
   await writeFile(
@@ -629,12 +628,7 @@ test('reminders fire once, missed ones say so; Done and Snooze change the task (
   // The watcher picks the list up and the scheduler shows what is due; the toasts are recorded.
   await expect
     .poll(toasts, { timeout: 15_000 })
-    .toEqual(
-      expect.arrayContaining([
-        `Missed reminder · Today ${clock(hourAgo)} · Calls | Call the bank`,
-        `Reminder · Today ${clock(now)} · Calls | Call Alex`,
-      ]),
-    );
+    .toEqual(expect.arrayContaining([`Missed reminder | Call the bank`, `Reminder | Call Alex`]));
   const shown = (await toasts()).filter((toast) => toast.includes('Call'));
   expect(shown).toHaveLength(2);
 

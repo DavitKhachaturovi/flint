@@ -44,6 +44,30 @@
   margin-bottom: 4px;
 }
 
+/* D-68: every list scrolls, so no list is out of reach. */
+.fl-picker-rows {
+  max-height: 264px;
+  overflow-y: auto;
+}
+
+.fl-picker-rows::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fl-picker-rows::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fl-picker-rows::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-scroll-thumb) padding-box;
+}
+
+.fl-picker-rows::-webkit-scrollbar-thumb:hover {
+  background: var(--fl-scroll-thumb-hover) padding-box;
+}
+
 .fl-picker-row {
   display: flex;
   align-items: center;

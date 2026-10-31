@@ -1,7 +1,6 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   app,
   BrowserWindow,
@@ -36,13 +35,12 @@ import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
 import { APP_SCHEME, contentType, rendererPageUrl, resolveRendererFile } from './renderer-url.js';
-import { INBOX_ID, prepareFlintFolder } from './storage/flint-folder.js';
+import { prepareFlintFolder } from './storage/flint-folder.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import {
   appIcon,
-  resourcePath,
   applyStartWithWindows,
   configureAppPaths,
   createTray,
@@ -504,7 +502,8 @@ async function start(): Promise<void> {
           popup.show(hotkeyAt, {
             hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
           });
-        } else popup.show(hotkeyAt, { hint: 'Nothing was selected; paste with Ctrl+V' });
+          // D-68: nothing selected just opens the popup, without a message.
+        } else popup.show(hotkeyAt);
         return undefined;
       })
       .catch((error: unknown) => {
@@ -563,13 +562,7 @@ async function start(): Promise<void> {
   // Reminders (REM-01, REM-05, REM-07 basic; D-64): toasts while Flint runs, missed ones once at
   // the next start or wake. Not in the R-1 benchmark build, which has no toast scheme.
   const toastOptions = (): ToastOptions | null =>
-    protocol
-      ? {
-          protocol,
-          hideText: settings.hideNotificationText,
-          logo: pathToFileURL(resourcePath('toast-logo.png')).href,
-        }
-      : null;
+    protocol ? { protocol, hideText: settings.hideNotificationText } : null;
   const showReminders = (plan: ToastPlan): void => {
     const options = toastOptions();
     for (const toast of plan.separate) {
@@ -585,7 +578,6 @@ async function start(): Promise<void> {
     const reminders = await ReminderService.start({
       statePath: join(app.getPath('userData'), 'reminders-state.json'),
       tasks: () => workspace.reminderTasks(),
-      inboxId: INBOX_ID,
       show: showReminders,
       log,
     });
@@ -656,8 +648,12 @@ async function start(): Promise<void> {
     protocol ? findActivation(argv, protocol) : null;
   app.on('second-instance', (_event, argv) => {
     log(`second launch: ${argv.slice(1).join(' ')}`);
-    handleActivation(activationOf(argv));
+    const activation = activationOf(argv);
+    handleActivation(activation);
     handleDevCommand(argv);
+    // APP-01, D-68: starting Flint again by hand (Start menu, shortcut) shows its window.
+    const devCommand = argv.some((argument) => argument.startsWith(`${protocol}://dev/`));
+    if (!activation && !devCommand && !argv.includes('--hidden')) showMain();
   });
   handleActivation(activationOf(process.argv));
   handleDevCommand(process.argv);
@@ -697,8 +693,9 @@ async function start(): Promise<void> {
         }),
       ),
     );
-  } else if (BUILD === 'development' && !STARTED_AT_LOGIN) {
-    // Development builds open the R-1/R-3 harness; installed builds start in the tray.
+  } else if (!STARTED_AT_LOGIN) {
+    // APP-01, D-68: a manual start (Start menu, shortcut, the installer's finish) shows the main
+    // window; only the start-with-Windows launch (`--hidden`) stays in the tray.
     mainWindow.show();
   }
 
