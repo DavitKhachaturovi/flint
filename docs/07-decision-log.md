@@ -433,6 +433,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - The note page (plain editing until M5, D-64) becomes a proper page: title, comfortable width, aligned with the list views, tokens only.
   - Clicking a task's reminder time opens the date/time picker for it (also for reminders that already fired); the bell stays the off/on toggle; "Change reminder…" in the task's menu (REM-01, pulled into M4).
   - Taskbar icon: the tile scales with the leaf, so the whole icon fills the square with the leaf inside the tile at every small size (UI-07).
+    - **Built (1 Nov 2026):** the tile already fills the whole square, so it grows with the leaf through tighter corners (radius 4 px instead of 5 at 24, 3 instead of 3.5 at 16) while the leaf shrinks slightly (scale 0.076 and 0.05), until both tips sit inside the rim; still larger than in 0.4.1 (09 §8).
   - Install and update in one step, Flint opening at the end (APP-16); a manual start shows the main window, only the start-with-Windows launch stays in the tray (APP-01).
   - Reminder notification: "Reminder" and the task name, with Done / Snooze 10m / Open; no time, no list name and no large logo (the small app icon stays). Supersedes the toast-logo part of D-65 (REM-05).
   - Overdue: no "Overdue" word; the bell with a small dot and brighter time. The bell always stays in place: turning an overdue reminder off strikes the bell, fades the time and removes the dot; nothing else moves (REM-11, REM-12).
