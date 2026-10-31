@@ -804,3 +804,76 @@ h1 .count {
   color: var(--fl-text-body);
   caret-color: var(--fl-accent);
 }
+
+/* UI-01, D-65: the composer is one text target; only its buttons show the arrow. */
+.composer {
+  cursor: text;
+}
+
+.composer .tool {
+  cursor: default;
+}
+
+/* D-65: a toast always sits above the list, its rows and their hover. */
+.toast {
+  z-index: 60;
+}
+
+/* TASK-06, D-65 (09 §9): a completed row fades and slides away before it moves to Completed. */
+.row.leaving {
+  pointer-events: none;
+  animation: row-out var(--fl-dur-base) var(--fl-ease-spring) forwards;
+}
+
+@keyframes row-out {
+  to {
+    opacity: 0;
+    transform: translateX(10px) scale(0.985);
+  }
+}
+
+/* UI-04, D-65: switching lists. The content fades in while rising a few pixels, and the sidebar's
+   highlight glides to the open list (one element, like the row selection). */
+.content {
+  animation: view-in 140ms var(--fl-ease-spring);
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.sidebar {
+  position: relative;
+}
+
+.nav {
+  position: relative;
+  z-index: 1;
+}
+
+.nav.on {
+  background: transparent;
+  box-shadow: none;
+}
+
+.name-field .nav.on {
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+.nav-glide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+  pointer-events: none;
+  transition:
+    transform var(--fl-dur-base) var(--fl-ease-spring),
+    width var(--fl-dur-base) var(--fl-ease-spring),
+    height var(--fl-dur-base) var(--fl-ease-spring);
+}

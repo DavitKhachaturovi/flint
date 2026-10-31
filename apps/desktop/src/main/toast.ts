@@ -39,11 +39,22 @@ export interface ToastOptions {
   readonly protocol: string;
   /** REM-10: show only "Flint reminder", never the task or its time (screen sharing). */
   readonly hideText: boolean;
+  /**
+   * D-65: Flint's logo, larger, as a `file:///` URL: shown left of the text (`appLogoOverride`,
+   * supported for desktop apps); the small header icon stays the app icon.
+   */
+  readonly logo?: string;
+}
+
+function logoXml(logo: string | undefined): string {
+  return logo
+    ? `<image placement="appLogoOverride" src="${escapeXml(logo)}" hint-crop="none"/>`
+    : '';
 }
 
 export function reminderToastXml(
   toast: ReminderToast,
-  { protocol, hideText }: ToastOptions,
+  { protocol, hideText, logo }: ToastOptions,
 ): string {
   const actionUrl = (action: ReminderAction): string =>
     escapeXml(`${protocol}://reminder/${action}?id=${encodeURIComponent(toast.id)}`);
@@ -51,6 +62,7 @@ export function reminderToastXml(
   return [
     `<toast launch="${actionUrl('open')}" activationType="protocol"${scenario}>`,
     '<visual><binding template="ToastGeneric">',
+    logoXml(logo),
     ...(hideText
       ? [`<text>${PRIVATE_TOAST_TEXT}</text>`]
       : [`<text>${escapeXml(toast.label)}</text>`, `<text>${escapeXml(toast.title)}</text>`]),
@@ -73,7 +85,7 @@ export const MISSED_SUMMARY_ID = '*';
  */
 export function missedSummaryXml(
   summary: { readonly count: number; readonly titles: readonly string[] },
-  { protocol, hideText }: ToastOptions,
+  { protocol, hideText, logo }: ToastOptions,
 ): string {
   const open = escapeXml(`${protocol}://reminder/open?id=${encodeURIComponent(MISSED_SUMMARY_ID)}`);
   const shown = summary.titles.slice(0, 3).join(', ');
@@ -81,6 +93,7 @@ export function missedSummaryXml(
   return [
     `<toast launch="${open}" activationType="protocol" scenario="reminder">`,
     '<visual><binding template="ToastGeneric">',
+    logoXml(logo),
     `<text>${summary.count} reminders you missed</text>`,
     ...(hideText ? [] : [`<text>${escapeXml(shown + more)}</text>`]),
     '</binding></visual>',

@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   app,
   BrowserWindow,
@@ -41,6 +42,7 @@ import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import {
   appIcon,
+  resourcePath,
   applyStartWithWindows,
   configureAppPaths,
   createTray,
@@ -561,7 +563,13 @@ async function start(): Promise<void> {
   // Reminders (REM-01, REM-05, REM-07 basic; D-64): toasts while Flint runs, missed ones once at
   // the next start or wake. Not in the R-1 benchmark build, which has no toast scheme.
   const toastOptions = (): ToastOptions | null =>
-    protocol ? { protocol, hideText: settings.hideNotificationText } : null;
+    protocol
+      ? {
+          protocol,
+          hideText: settings.hideNotificationText,
+          logo: pathToFileURL(resourcePath('toast-logo.png')).href,
+        }
+      : null;
   const showReminders = (plan: ToastPlan): void => {
     const options = toastOptions();
     for (const toast of plan.separate) {

@@ -1,5 +1,6 @@
-// Renders the icons the app needs from the SVG logos in assets/icon (docs/01 Brand): the tray PNGs
-// and the multi-size app icon (UI-07, D-52), since Electron and Windows can't use SVG.
+// Renders the icons the app needs from the SVG logos in assets/icon (docs/01 Brand): the tray PNGs,
+// the reminder toast's logo and the multi-size app icon (UI-07, D-52, D-65), since Electron and
+// Windows can't use SVG.
 // Usage: node scripts/render-icons.mjs
 import { Buffer } from 'node:buffer';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -15,6 +16,8 @@ const TRAY = [
   ['flint-icon-16.svg', 16, 1, 'tray-16.png'],
   ['flint-icon-16.svg', 16, 2, 'tray-32.png'],
   ['flint-icon-24.svg', 24, 2, 'tray-48.png'],
+  // The reminder toast's logo (appLogoOverride, D-65): 48 px at 100 %, drawn at 2x.
+  ['flint-icon-24.svg', 48, 2, 'toast-logo.png'],
 ];
 
 /**

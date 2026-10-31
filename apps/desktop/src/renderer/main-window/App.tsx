@@ -44,6 +44,8 @@ import { useInertText } from './inert-text.js';
 
 const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
 const TOAST_MS = 5000;
+/** The completion animation (09 §9), before the task moves to Completed. */
+const COMPLETE_MS = 150;
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
 const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
   '1': 'low',
@@ -133,6 +135,8 @@ export function App(): ReactElement {
   const [naming, setNaming] = useState<Naming | null>(null);
   const [namingProblem, setNamingProblem] = useState<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
+  /** The sidebar's highlight glides to the open list like the row selection (UI-04, D-65). */
+  const sidebar = useRef<HTMLElement>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     const [nextLists, nextView] = await Promise.all([
@@ -193,18 +197,38 @@ export function App(): ReactElement {
     if (gone >= 0) setSelected(rows[Math.min(gone, rows.length - 1)]?.key ?? FIRST_ROW);
   }, [rows, selected]);
 
+  /** Rows playing the completion animation (TASK-06, 09 §9) before they move to Completed. */
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
+  // A row stops leaving once the list shows it completed (or it is gone, or the save failed).
+  useEffect(() => {
+    setLeaving((current) => {
+      const kept = [...current].filter((key) => rows.some((row) => row.key === key && !row.done));
+      return kept.length === current.size ? current : new Set(kept);
+    });
+  }, [rows]);
+
   const toggle = useCallback(
     async (key: string): Promise<void> => {
       const index = rows.findIndex((row) => row.key === key);
       const row = rows[index];
-      const done = await window.flintMain.toggle(listId, key);
-      if (!done) return;
-      // Completing moves the row away: the selection stays in the open tasks, on the next one.
-      if (done === 'Completed' && row) {
+      if (row && !row.done) {
+        // Completing moves the row away: the selection stays in the open tasks, on the next one.
         const open = (other: TaskRow): boolean =>
           !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
         const next = rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
         if (next) setSelected(next.key);
+        // TASK-06, D-65: the row fades and slides away first, then it moves to Completed.
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          setLeaving(
+            (current) => new Set([...current, key, ...row.subtasks.map((sub) => sub.key)]),
+          );
+          await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS));
+        }
+      }
+      const done = await window.flintMain.toggle(listId, key);
+      if (!done) {
+        setLeaving((current) => new Set([...current].filter((item) => item !== key)));
+        return;
       }
       showToast(done, true);
     },
@@ -552,6 +576,7 @@ export function App(): ReactElement {
     onLeaveTask: leaveTask,
     onTab: tab,
     onMenu: (task, at) => taskMenu(task, at),
+    leaving,
   };
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
@@ -612,12 +637,14 @@ export function App(): ReactElement {
   return (
     <div className="app">
       <aside
+        ref={sidebar}
         className="sidebar"
         onContextMenu={(event) => {
           event.preventDefault();
           newListMenu({ x: event.clientX, y: event.clientY });
         }}
       >
+        <Glide card={sidebar} target={listId} version={[lists, naming]} className="nav-glide" />
         <div className="brand">
           <img src={flintIcon} alt="" />
           <span>Flint</span>
@@ -685,7 +712,8 @@ export function App(): ReactElement {
       <main className="main">
         <div className="titlebar" />
         <div className="scroller">
-          <div className="content">
+          {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
+          <div className="content" key={view?.id ?? 'none'}>
             {view && (
               <header className="list-header">
                 <h1>
@@ -803,7 +831,10 @@ function NavItem(props: {
   return (
     <button
       type="button"
+      data-key={list.id}
       className={active ? 'nav on' : 'nav'}
+      // A click opens the list without taking the keyboard: the keys stay with the task list.
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onSelect}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -852,7 +883,17 @@ function Composer(props: {
   };
 
   return (
-    <section className="card composer" aria-label="Add a task">
+    <section
+      className="card composer"
+      aria-label="Add a task"
+      // UI-01, D-65: the whole card is the text box's target (one cursor, no flicker around it).
+      onMouseDown={(event) => {
+        const target = event.target as HTMLElement;
+        if (target === inputRef.current || target.closest('button')) return;
+        event.preventDefault();
+        inputRef.current?.focus();
+      }}
+    >
       <input
         ref={inputRef}
         className="composer-input"
@@ -979,6 +1020,8 @@ interface RowHandlers {
   readonly onTab: (how: 'indent' | 'outdent') => void;
   /** UI-08: the row's right-click menu. */
   readonly onMenu: (task: TaskRow, at: Point) => void;
+  /** Rows playing the completion animation. */
+  readonly leaving: ReadonlySet<string>;
 }
 
 function Row(
@@ -1008,6 +1051,9 @@ function Row(
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
   if (fresh) classes.push('enter');
+  const leaving = !task.done && props.leaving.has(task.key);
+  if (leaving) classes.push('leaving');
+  const checked = task.done || leaving;
   return (
     <div
       data-key={task.key}
@@ -1024,11 +1070,11 @@ function Row(
       {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}
       <button
         type="button"
-        className={task.done ? 'check on' : 'check'}
+        className={checked ? 'check on' : 'check'}
         aria-label={task.done ? 'Reopen task' : 'Complete task'}
-        onClick={() => onToggle(task.key)}
+        onClick={() => !leaving && onToggle(task.key)}
       >
-        {task.done && <CheckIcon />}
+        {checked && <CheckIcon />}
       </button>
       {isEditing ? (
         <EditField
@@ -1076,8 +1122,10 @@ function Glide(props: {
   readonly target: string | null;
   /** Re-measure when the rows change. */
   readonly version: unknown;
+  /** `sel-glide` for rows, `nav-glide` for the sidebar (D-65). */
+  readonly className?: string;
 }): ReactElement | null {
-  const { card, target, version } = props;
+  const { card, target, version, className = 'sel-glide' } = props;
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   useLayoutEffect(() => {
     const measure = (): void => {
@@ -1097,7 +1145,7 @@ function Glide(props: {
   if (!box) return null;
   return (
     <div
-      className="sel-glide"
+      className={className}
       aria-hidden="true"
       style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
     />

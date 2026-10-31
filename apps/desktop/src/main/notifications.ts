@@ -9,14 +9,25 @@ import {
 /** Keeps shown toasts referenced: a garbage-collected Notification can lose its events. */
 const shown = new Set<Notification>();
 
-function show(toastXml: string, what: string, log: (message: string) => void): void {
-  const notification = new Notification({ toastXml });
+/**
+ * Shows a toast. If it fails with the larger logo (D-65), it is shown again without it: a reminder
+ * must never be lost to a picture.
+ */
+function show(
+  xml: (options: ToastOptions) => string,
+  options: ToastOptions,
+  what: string,
+  log: (message: string) => void,
+): void {
+  const notification = new Notification({ toastXml: xml(options) });
   shown.add(notification);
   notification.on('show', () => log(`toast shown for ${what}`));
   notification.on('close', () => shown.delete(notification));
   notification.on('failed', (_event, error) => {
     log(`toast failed for ${what}: ${error}`);
     shown.delete(notification);
+    if (options.logo)
+      show(xml, { protocol: options.protocol, hideText: options.hideText }, what, log);
   });
   notification.show();
 }
@@ -27,7 +38,7 @@ export function showReminderToast(
   options: ToastOptions,
   log: (message: string) => void = () => {},
 ): void {
-  show(reminderToastXml(toast, options), `task ${toast.id}`, log);
+  show((current) => reminderToastXml(toast, current), options, `task ${toast.id}`, log);
 }
 
 /** "N reminders you missed" (REM-07 basic, D-64). */
@@ -36,5 +47,10 @@ export function showMissedSummary(
   options: ToastOptions,
   log: (message: string) => void = () => {},
 ): void {
-  show(missedSummaryXml(summary, options), `${summary.count} missed reminders`, log);
+  show(
+    (current) => missedSummaryXml(summary, current),
+    options,
+    `${summary.count} missed reminders`,
+    log,
+  );
 }
