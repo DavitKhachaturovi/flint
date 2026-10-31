@@ -1,6 +1,7 @@
 @import '../../../../../docs/design/tokens.css';
 @import '../fonts.css';
 @import '../menu/menu.css';
+@import '../pickers/pickers.css';
 
 /* The main window (M4), after docs/design/mockups/01-main-inbox.html; tokens only (docs/09). */
 
@@ -720,73 +721,6 @@ h1 .count {
   margin: 4px 10px 6px 43px;
   font-size: var(--fl-size-meta);
   color: var(--fl-text-secondary);
-}
-
-/* The list picker (CAP-11, D-57, docs/09 §8): "Move to…" now, the composer's # in step 5. */
-.picker-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-}
-
-.picker {
-  position: fixed;
-  width: 280px;
-  padding: 6px;
-  border-radius: var(--fl-radius-row);
-  background: var(--fl-ground-float);
-  box-shadow: var(--fl-shadow-float);
-  animation: fl-menu-in var(--fl-dur-fast) var(--fl-ease-spring);
-}
-
-.picker-search {
-  display: block;
-  width: 100%;
-  margin-bottom: 4px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  outline: none;
-  background: var(--fl-ground-well);
-  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
-  color: var(--fl-text-primary);
-  font: inherit;
-  font-size: 13px;
-}
-
-.picker-search::placeholder {
-  color: var(--fl-text-faint);
-}
-
-.picker-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 5px 8px 5px 5px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--fl-text-body);
-  text-align: left;
-}
-
-.picker-item.active {
-  background: var(--fl-ground-tile);
-  color: var(--fl-text-primary);
-}
-
-.picker-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.picker-empty {
-  margin: 8px 10px;
-  font-size: 13px;
-  color: var(--fl-text-muted);
 }
 
 /* D-64: a note as plain monospace text until the note editor (M5). */

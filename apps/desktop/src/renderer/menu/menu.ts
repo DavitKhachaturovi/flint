@@ -100,7 +100,7 @@ export function openMenu(
       if (at.y - height >= GAP) y = at.y - height;
       else if (options.room && !grown) {
         grown = true;
-        options.room.grow(y + height + GAP - window.innerHeight);
+        options.room.grow(y + height + 3 * GAP - window.innerHeight);
       }
     }
     menu.style.left = `${Math.round(x)}px`;

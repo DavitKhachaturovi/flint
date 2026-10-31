@@ -127,6 +127,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Date/time picker:** a proper date and time picker (month grid, time, and a natural-language field reading the same grammar as `@`, REM-02). M4 step 5 (D-64).
 - All three pickers have the **same size and visual style** (floating level, 09 §8), are fully **keyboard-accessible** (the buttons are focusable; arrows move, Enter picks, Esc closes back to the text), and insert **the same chip** the shorthand would. The chosen value goes into the title as a live token, so chips, saving and undo behave exactly as with typed shorthand (D-45 live insertion).
 - Milestone: M4 for the composer and the capture popup.
+- **Built in M4 step 5 (Proposed details):** a picked value replaces the token of its kind already in the text (a second one would stay as text, D-25), and None or the list the text already goes to (the composer's list, Inbox in the popup) removes it. The date/time picker inserts `@YYYY-MM-DD HH:MM` (the chip shows `Tomorrow 10:00`) and offers In 1 hour, Tomorrow morning and Next Monday as presets; only future times can be picked. The list picker is also "Move to…" (TASK-11). In the capture popup the window grows while a picker or menu needs the room.
 
 ---
 

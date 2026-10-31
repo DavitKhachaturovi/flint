@@ -8,7 +8,14 @@ import {
   type ReactElement,
   type RefObject,
 } from 'react';
-import { parseCapture, type ListInfo } from '@flint/core/shorthand';
+import { parseCapture, type ListInfo, type TokenKind } from '@flint/core/shorthand';
+import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
+import {
+  openListPicker,
+  openPriorityPicker,
+  openTimePicker,
+  type PickerHost,
+} from '../pickers/pickers.js';
 import flintIcon from '../../../../../assets/icon/flint-icon-512.svg';
 import type {
   ChangeOutcome,
@@ -32,7 +39,7 @@ import {
 } from './icons.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
-import { ListPicker, type PickedList } from './ListPicker.js';
+
 import { NoteEditor } from './NoteEditor.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
@@ -65,6 +72,16 @@ interface Point {
 type Naming =
   | { readonly kind: 'new'; readonly mode: 'tasks' | 'note' }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string };
+
+/** The lists as the shorthand and the pickers see them, most recently used ranked (D-25). */
+function listInfos(lists: readonly ListSummary[]): ListInfo[] {
+  return lists.map((list): ListInfo => ({
+    id: list.id,
+    name: list.name,
+    mode: list.mode,
+    ...(list.recentRank === undefined ? {} : { recentRank: list.recentRank }),
+  }));
+}
 
 /** Before a list's rows arrive: select its first row once they do. */
 const FIRST_ROW = '';
@@ -131,8 +148,7 @@ export function App(): ReactElement {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const composer = useRef<HTMLInputElement>(null);
-  /** "Move to…" (TASK-11): the task and where the picker opens. */
-  const [picker, setPicker] = useState<{ key: string; at: Point } | null>(null);
+
   /** A list's name being typed in the sidebar: a new list or note, or a rename (LIST-01). */
   const [naming, setNaming] = useState<Naming | null>(null);
   const [namingProblem, setNamingProblem] = useState<string | null>(null);
@@ -354,8 +370,7 @@ export function App(): ReactElement {
 
   /** TASK-11: to the top of another list, or a new one, with Undo. */
   const moveTask = useCallback(
-    async (key: string, to: PickedList): Promise<void> => {
-      setPicker(null);
+    async (key: string, to: Extract<ListChange, { kind: 'moveTo' }>['to']): Promise<void> => {
       const outcome = await change({ kind: 'moveTo', key, to });
       if (outcome) showToast(outcome.label, true);
     },
@@ -406,7 +421,23 @@ export function App(): ReactElement {
                 },
               ]
             : []),
-          { label: 'Move to…', action: () => setPicker({ key: row.key, at }) },
+          {
+            label: 'Move to…',
+            action: () =>
+              openListPicker(
+                {
+                  anchor: new DOMRect(at.x, at.y, 0, 0),
+                  returnFocus: null,
+                },
+                listInfos(lists),
+                { exclude: listId, placeholder: 'Move to list…' },
+                (pick) =>
+                  void moveTask(
+                    row.key,
+                    'newList' in pick ? { newList: pick.newList } : { list: pick.list.id },
+                  ),
+              ),
+          },
           'divider',
           { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
         ],
@@ -414,7 +445,7 @@ export function App(): ReactElement {
         { keyboard },
       );
     },
-    [change, edit, mute, remove, toggle],
+    [change, edit, mute, remove, toggle, lists, listId, moveTask],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -821,16 +852,6 @@ export function App(): ReactElement {
         </div>
       </main>
 
-      {picker && view && (
-        <ListPicker
-          lists={lists}
-          exclude={view.id}
-          at={picker.at}
-          onPick={(to) => void moveTask(picker.key, to)}
-          onClose={() => setPicker(null)}
-        />
-      )}
-
       {toast && (
         <div className="toast" role="status" key={toast.id}>
           <span>{toast.text}</span>
@@ -888,10 +909,7 @@ function Composer(props: {
   const text = useInertText('', false);
   // UI-09: auto-closing brackets and quotes in the composer.
   useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
-  const infos = useMemo(
-    () => lists.map((list): ListInfo => ({ id: list.id, name: list.name, mode: list.mode })),
-    [lists],
-  );
+  const infos = useMemo(() => listInfos(lists), [lists]);
   const { escaped, value } = text;
   const parsed = useMemo(
     () => (value.trim() === '' ? null : parseCapture(escaped(), { now: new Date(), lists: infos })),
@@ -904,10 +922,31 @@ function Composer(props: {
     chips.push(`→ ${target.list.name}`);
   if (target?.kind === 'new') chips.push(`New list ${target.name}`);
 
-  const insert = (token: string): void => {
-    text.insertLive(token);
+  /**
+   * CAP-11, D-57: a picker's choice becomes the same shorthand typing would give. The token of
+   * that kind already in the text is replaced (never left behind as text, D-25); null removes it.
+   */
+  const replaceToken = (kind: TokenKind, token: string | null): void => {
+    for (let guard = 0; guard < 10; guard++) {
+      const { text: parsedText, toOriginal } = text.mapped();
+      const found = parseCapture(parsedText, { now: new Date(), lists: infos }).tokens.find(
+        (item) => item.kind === kind,
+      );
+      if (!found) break;
+      const current = text.current();
+      let start = toOriginal(found.start);
+      let end = toOriginal(found.end);
+      if (current[end] === ' ') end++;
+      else if (start > 0 && current[start - 1] === ' ') start--;
+      text.change(current.slice(0, start) + current.slice(end));
+    }
+    if (token) text.insertLive(token);
     inputRef.current?.focus();
   };
+  const host = (button: HTMLElement): PickerHost => ({
+    anchor: button.getBoundingClientRect(),
+    returnFocus: inputRef.current,
+  });
 
   return (
     <section
@@ -949,7 +988,11 @@ function Composer(props: {
             type="button"
             className="tool"
             aria-label="Set priority"
-            onClick={() => insert('!h')}
+            onClick={(event) =>
+              openPriorityPicker(host(event.currentTarget), parsed?.priority ?? null, (priority) =>
+                replaceToken('priority', priority ? PRIORITY_TOKENS[priority] : null),
+              )
+            }
           >
             <FlagIcon />
           </button>
@@ -957,7 +1000,23 @@ function Composer(props: {
             type="button"
             className="tool"
             aria-label="Choose list"
-            onClick={() => insert('##')}
+            onClick={(event) =>
+              openListPicker(
+                host(event.currentTarget),
+                infos,
+                { placeholder: 'Add to list…' },
+                (pick) =>
+                  replaceToken(
+                    'list',
+                    'newList' in pick
+                      ? listShorthand(pick.newList)
+                      : // The list the composer is in needs no token.
+                        pick.list.id === listId
+                        ? null
+                        : listShorthand(pick.list.name),
+                  ),
+              )
+            }
           >
             <HashIcon />
           </button>
@@ -965,7 +1024,14 @@ function Composer(props: {
             type="button"
             className="tool"
             aria-label="Set reminder"
-            onClick={() => insert('@')}
+            onClick={(event) =>
+              openTimePicker(
+                host(event.currentTarget),
+                new Date(),
+                parsed?.reminder ?? null,
+                (at) => replaceToken('reminder', timeShorthand(at)),
+              )
+            }
           >
             <BellIcon size={15} />
           </button>

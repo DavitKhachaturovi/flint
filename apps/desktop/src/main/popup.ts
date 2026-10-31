@@ -35,8 +35,11 @@ const CARD_WIDTH = 680;
 const MARGIN = { top: 36, side: 72, bottom: 108 } as const;
 const WIDTH = CARD_WIDTH + 2 * MARGIN.side;
 const HEIGHT = 300;
-/** Room for the selection area and the `##` menu (the window follows the card, CAP-05). */
-const MAX_HEIGHT = 720;
+/**
+ * The window follows the card (CAP-05): room for the selection area, the `##` menu, and a menu or
+ * picker below the card while it is open (D-64, D-65), up to the bottom of the screen.
+ */
+const MIN_HEIGHT = 120;
 /** Ground colour of the window behind the card; the card itself is opaque (docs/09). */
 const TRANSPARENT = '#00000000';
 
@@ -220,7 +223,10 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   ipcMain.on(Channels.popupResize, (event, height: unknown) => {
     if (event.sender !== window.webContents || typeof height !== 'number') return;
     const [width = WIDTH] = window.getSize();
-    window.setSize(width, Math.round(Math.min(Math.max(height, 120), MAX_HEIGHT)));
+    const bounds = window.getBounds();
+    const area = screen.getDisplayMatching(bounds).workArea;
+    const room = area.y + area.height - bounds.y;
+    window.setSize(width, Math.round(Math.min(Math.max(height, MIN_HEIGHT), room)));
   });
 
   ipcMain.on(Channels.popupNoticeAction, (event, action: unknown) => {

@@ -16,6 +16,10 @@ export interface InertText {
   readonly insertLive: (text: string) => void;
   /** What goes to the main process: inert markers escaped. */
   readonly escaped: () => string;
+  /** The escaped text with the way back to positions in the text as shown (for tokens). */
+  readonly mapped: () => { readonly text: string; readonly toOriginal: (index: number) => number };
+  /** The text right now, also between renders. */
+  readonly current: () => string;
   readonly reset: (value: string, inert: boolean) => void;
 }
 
@@ -70,6 +74,8 @@ export function useInertText(initial: string, inert: boolean): InertText {
       [apply],
     ),
     escaped: useCallback(() => escapeInert(current.current, ranges.current).text, []),
+    mapped: useCallback(() => escapeInert(current.current, ranges.current), []),
+    current: useCallback(() => current.current, []),
     reset: useCallback((next: string, nextInert: boolean) => {
       ranges.current = nextInert && next !== '' ? [{ start: 0, end: next.length }] : [];
       current.current = next;

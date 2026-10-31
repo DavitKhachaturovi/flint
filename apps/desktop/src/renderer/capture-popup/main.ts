@@ -14,6 +14,7 @@ import {
   type ListInfo,
   type TextRange,
   type Token,
+  type TokenKind,
 } from '@flint/core/shorthand';
 import flintIcon from '../../../../../assets/icon/flint-icon-16.svg';
 import {
@@ -24,6 +25,13 @@ import {
   type PopupShown,
 } from '../../shared/ipc.js';
 import { enableAutoPair } from '../auto-pair.js';
+import {
+  openListPicker,
+  openPriorityPicker,
+  openTimePicker,
+  type PickerHost,
+} from '../pickers/pickers.js';
+import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
 import { isTextField, openMenu, textFieldMenu } from '../menu/menu.js';
 import { highlightLines } from './highlight.js';
 import {
@@ -561,11 +569,71 @@ input.addEventListener('keydown', (event) => {
 // Losing focus doesn't always close the popup any more (D-41); the draft is saved either way.
 window.addEventListener('blur', () => saveDraft(true));
 
-for (const tool of document.querySelectorAll<HTMLButtonElement>('.tool[data-insert]')) {
+/**
+ * CAP-11, D-57: a picker's choice becomes the shorthand typing would give. The token of that kind
+ * already in the title is replaced (never left behind as text, D-25); null removes it.
+ */
+function replaceToken(kind: TokenKind, token: string | null): void {
+  for (let guard = 0; guard < 10; guard++) {
+    const found = parsed.tokens.find((item) => item.kind === kind);
+    if (!found) break;
+    removeToken(found);
+  }
+  if (token) {
+    input.setSelectionRange(input.value.length, input.value.length);
+    insertToken(token);
+  }
+  input.focus();
+}
+
+/**
+ * A menu or picker that doesn't fit gets room (D-64): the page grows below the card, on top of the
+ * shadow margin (D-42), and the window follows the page (the observer at the end).
+ */
+const room = {
+  grow: (height: number): void => {
+    document.body.style.paddingBottom = '';
+    const margin = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    document.body.style.paddingBottom = `${margin + height}px`;
+  },
+  release: (): void => {
+    document.body.style.paddingBottom = '';
+  },
+};
+
+/** Pickers open under their button and give the keyboard back to the title. */
+const pickerHost = (button: HTMLElement): PickerHost => ({
+  anchor: button.getBoundingClientRect(),
+  returnFocus: input,
+  room,
+});
+
+// The flag, # and bell open the pickers (CAP-11, D-57); they used to type `!h`, `##` and `@`.
+for (const tool of document.querySelectorAll<HTMLButtonElement>('.tool[data-picker]')) {
   tool.addEventListener('mousedown', (event) => event.preventDefault());
   tool.addEventListener('click', () => {
-    const token = tool.dataset.insert;
-    if (token && token !== 'attach') insertToken(token);
+    const host = pickerHost(tool);
+    const kind = tool.dataset.picker;
+    if (kind === 'priority')
+      openPriorityPicker(host, parsed.priority, (priority) =>
+        replaceToken('priority', priority ? PRIORITY_TOKENS[priority] : null),
+      );
+    else if (kind === 'list')
+      openListPicker(host, lists, { placeholder: 'Capture into list…' }, (pick) =>
+        replaceToken(
+          'list',
+          'newList' in pick
+            ? listShorthand(pick.newList)
+            : // Inbox is where a capture goes anyway: no token needed.
+              pick.list.id === 'inbox'
+              ? null
+              : listShorthand(pick.list.name),
+        ),
+      );
+    else if (kind === 'time')
+      openTimePicker(host, new Date(), parsed.reminder, (at) =>
+        replaceToken('reminder', timeShorthand(at)),
+      );
   });
 }
 
@@ -624,7 +692,7 @@ const setInteractive = (next: boolean): void => {
 };
 document.addEventListener('mousemove', (event) => {
   setInteractive(
-    event.target instanceof Element && event.target.closest('.card, .fl-menu') !== null,
+    event.target instanceof Element && event.target.closest('.card, .fl-menu, .fl-picker') !== null,
   );
 });
 document.addEventListener('mouseleave', () => setInteractive(false));
@@ -639,16 +707,7 @@ document.addEventListener('contextmenu', (event) => {
   openMenu(
     textFieldMenu(field, (command) => window.flintPopup.edit(command)),
     { x: event.clientX, y: event.clientY },
-    {
-      room: {
-        grow: (height) => {
-          document.body.style.paddingBottom = `${height}px`;
-        },
-        release: () => {
-          document.body.style.paddingBottom = '';
-        },
-      },
-    },
+    { room },
   );
 });
 
@@ -656,4 +715,5 @@ document.addEventListener('contextmenu', (event) => {
 new ResizeObserver(() => {
   window.flintPopup.resize(Math.ceil(document.body.getBoundingClientRect().height));
   for (const field of blocksBox.querySelectorAll('textarea')) fitHeight(field);
-}).observe(document.body);
+  // The border box: the room for a menu or picker is padding, which the content box doesn't see.
+}).observe(document.body, { box: 'border-box' });

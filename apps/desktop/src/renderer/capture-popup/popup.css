@@ -1,6 +1,7 @@
 @import '../../../../../docs/design/tokens.css';
 @import '../fonts.css';
 @import '../menu/menu.css';
+@import '../pickers/pickers.css';
 
 html,
 body {

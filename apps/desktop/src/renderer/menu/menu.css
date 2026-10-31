@@ -1,4 +1,9 @@
 /* Right-click menus (UI-08, D-55, docs/09 §8): the floating panel style, tokens only. */
+.fl-menu,
+.fl-menu * {
+  box-sizing: border-box;
+}
+
 .fl-menu {
   position: fixed;
   z-index: 100;

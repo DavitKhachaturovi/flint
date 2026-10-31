@@ -532,9 +532,9 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Delete',
   ]);
   await menu.getByText('Move to…').click();
-  await expect(main.locator('.picker-search')).toBeFocused();
+  await expect(main.locator('.fl-picker-search')).toBeFocused();
   await main.keyboard.type('Garden');
-  await expect(main.locator('.picker-item.active')).toHaveText('New list "Garden"');
+  await expect(main.locator('.fl-picker-row.active')).toHaveText('New list "Garden"');
   await main.keyboard.press('Enter');
   await expect(main.locator('.toast')).toContainText('Moved to Garden');
   await expect
@@ -710,6 +710,66 @@ test('auto-closing brackets and quotes in the composer and the popup (UI-09, D-5
   await popup.locator('#capture').fill('');
   await popup.keyboard.type('say "hi');
   await expect(popup.locator('#capture')).toHaveValue('say "hi"');
+  await popup.locator('#capture').fill('');
+  await popup.keyboard.press('Escape');
+});
+
+test('pickers: priority, list and date/time insert the shorthand, replacing the old token (CAP-11, D-57)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Inbox/);
+  const composer = main.locator('.composer-input');
+  await main.keyboard.press('Control+n');
+  await expect(composer).toBeFocused();
+  await main.keyboard.type('Plan the rollout');
+
+  // Priority: 3 picks High; picking again replaces it instead of leaving "!h" behind as text.
+  await main.getByRole('button', { name: 'Set priority' }).click();
+  await expect(main.locator('.fl-picker')).toBeVisible();
+  await main.keyboard.press('3');
+  await expect(composer).toHaveValue('Plan the rollout !h');
+  await expect(composer).toBeFocused();
+  await main.getByRole('button', { name: 'Set priority' }).click();
+  await main.keyboard.press('2');
+  await expect(composer).toHaveValue('Plan the rollout !m');
+
+  // List: search and Enter.
+  await main.getByRole('button', { name: 'Choose list' }).click();
+  await main.keyboard.type('erra');
+  await expect(main.locator('.fl-picker-row.active')).toHaveText('Errands');
+  await main.keyboard.press('Enter');
+  await expect(composer).toHaveValue('Plan the rollout !m ##Errands');
+
+  // Date and time: natural language, then Enter.
+  await main.getByRole('button', { name: 'Set reminder' }).click();
+  await main.keyboard.type('tomorrow 10');
+  await expect(main.locator('.fl-picker-row.active')).toContainText('Tomorrow 10:00');
+  await main.keyboard.press('Enter');
+  await expect(composer).toHaveValue(/^Plan the rollout !m ##Errands @\d{4}-\d{2}-\d{2} 10:00$/);
+  await expect(main.locator('.composer-chips .chip')).toHaveText([
+    'Medium',
+    '→ Errands',
+    'Tomorrow 10:00',
+  ]);
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.toast')).toContainText('Added to Errands');
+  await expect
+    .poll(() => readFile(join(dataDirectory, 'Flint', 'Errands.md'), 'utf8'))
+    .toMatch(
+      /- \[ \] Plan the rollout \[reminder:: \d{4}-\d{2}-\d{2}T10:00\] \[priority:: medium\]/,
+    );
+
+  // The capture popup has the same pickers.
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  await popup.locator('#capture').fill('check logs');
+  await popup.locator('[data-picker="priority"]').click();
+  await popup.keyboard.press('1');
+  await expect(popup.locator('#capture')).toHaveValue('check logs !l');
   await popup.locator('#capture').fill('');
   await popup.keyboard.press('Escape');
 });

@@ -1,0 +1,235 @@
+/* The pickers (CAP-11, D-57, docs/09 §8): one floating panel style, tokens only. */
+.fl-picker,
+.fl-picker * {
+  box-sizing: border-box;
+}
+
+.fl-picker {
+  position: fixed;
+  z-index: 95;
+  width: 280px;
+  padding: 6px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-family: var(--fl-font-ui);
+  font-size: 13px;
+  color: var(--fl-text-body);
+  animation: fl-picker-in var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+.fl-picker:focus {
+  outline: none;
+}
+
+.fl-picker-search,
+.fl-cal-time-input {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  color: var(--fl-text-primary);
+  font: inherit;
+}
+
+.fl-picker-search::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.fl-picker-search {
+  margin-bottom: 4px;
+}
+
+.fl-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.fl-picker-row.active {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.fl-picker-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fl-picker-hint {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-faint);
+}
+
+.fl-picker-tile {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-heading-soft);
+}
+
+.fl-picker-stripe {
+  width: 4px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+}
+
+.fl-picker-stripe.p-high {
+  background: var(--fl-pri-high-color);
+}
+
+.fl-picker-stripe.p-medium {
+  width: var(--fl-pri-med-width);
+  background: var(--fl-pri-med-color);
+}
+
+.fl-picker-stripe.p-low {
+  width: var(--fl-pri-low-width);
+  background: var(--fl-pri-low-color);
+}
+
+.fl-picker-stripe.p-none {
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+
+.fl-picker-empty {
+  margin: 8px 10px;
+  color: var(--fl-text-muted);
+}
+
+/* Date and time */
+.fl-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 2px 4px;
+}
+
+.fl-cal-title {
+  font-weight: 500;
+  color: var(--fl-text-primary);
+}
+
+.fl-cal-step {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--fl-text-muted);
+  font: inherit;
+  font-size: 16px;
+  cursor: default;
+}
+
+.fl-cal-step:hover:not(:disabled) {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.fl-cal-step:disabled {
+  opacity: 0.3;
+}
+
+.fl-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.fl-cal-weekday {
+  padding: 4px 0;
+  text-align: center;
+  font-size: var(--fl-size-label);
+  color: var(--fl-text-faint);
+}
+
+.fl-cal-day {
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fl-text-body);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  cursor: default;
+}
+
+.fl-cal-day:hover:not(:disabled) {
+  background: var(--fl-ground-tile);
+}
+
+.fl-cal-day.today {
+  color: var(--fl-text-highlight);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+
+.fl-cal-day.on {
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+}
+
+.fl-cal-day:disabled {
+  color: var(--fl-text-faint);
+  opacity: 0.45;
+}
+
+.fl-cal-day:focus-visible,
+.fl-cal-step:focus-visible {
+  outline: 1px solid var(--fl-accent);
+}
+
+.fl-cal-time {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--fl-text-muted);
+}
+
+.fl-cal-time-input {
+  width: 90px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+}
+
+.fl-cal-time-input.invalid {
+  box-shadow: inset 0 0 0 1px var(--fl-text-secondary);
+}
+
+@keyframes fl-picker-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-picker {
+    animation: none;
+  }
+}
