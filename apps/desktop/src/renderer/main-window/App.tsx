@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -355,6 +356,20 @@ export function App(): ReactElement {
 
   const taskLists = lists.filter((list) => !list.inbox);
   const inbox = lists.find((list) => list.inbox);
+  // UI-04: rows that appear in the list being looked at ease in; opening a list doesn't animate.
+  const known = useRef<{ list: string; keys: ReadonlySet<string> }>({ list: '', keys: new Set() });
+  const freshKeys = new Set<string>();
+  if (view && known.current.list === view.id)
+    for (const row of rows) if (!known.current.keys.has(row.key)) freshKeys.add(row.key);
+  useEffect(() => {
+    if (view) known.current = { list: view.id, keys: new Set(rows.map((row) => row.key)) };
+  }, [view, rows]);
+  // UI-04: one selection highlight per card glides between rows; a row being edited shows its own.
+  const tasksCard = useRef<HTMLElement>(null);
+  const completedCard = useRef<HTMLElement>(null);
+  const glideTarget = editing ? null : selected;
+  const glideVersion = [rows, completedOpen];
+
   const rowProps: RowHandlers = {
     selected,
     editing,
@@ -395,9 +410,24 @@ export function App(): ReactElement {
           </p>,
         );
       else {
-        cardRows.push(<Row key={item.task.key} task={item.task} {...rowProps} />);
+        cardRows.push(
+          <Row
+            key={item.task.key}
+            task={item.task}
+            fresh={freshKeys.has(item.task.key)}
+            {...rowProps}
+          />,
+        );
         for (const subtask of item.task.subtasks) {
-          cardRows.push(<Row key={subtask.key} task={subtask} subtask {...rowProps} />);
+          cardRows.push(
+            <Row
+              key={subtask.key}
+              task={subtask}
+              subtask
+              fresh={freshKeys.has(subtask.key)}
+              {...rowProps}
+            />,
+          );
           placeNew(subtask.key, true);
         }
         placeNew(item.task.key, false);
@@ -468,7 +498,8 @@ export function App(): ReactElement {
                   />
                 )}
 
-                <section className="card tasks" aria-label="Tasks">
+                <section className="card tasks" aria-label="Tasks" ref={tasksCard}>
+                  <Glide card={tasksCard} target={glideTarget} version={glideVersion} />
                   {view.items.length === 0 && (
                     <p className="empty">
                       Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
@@ -479,7 +510,8 @@ export function App(): ReactElement {
                 </section>
 
                 {view.completed.length > 0 && (
-                  <section className="card completed" aria-label="Completed">
+                  <section className="card completed" aria-label="Completed" ref={completedCard}>
+                    <Glide card={completedCard} target={glideTarget} version={glideVersion} />
                     <button
                       type="button"
                       className="completed-head"
@@ -494,7 +526,12 @@ export function App(): ReactElement {
                     </button>
                     {completedOpen &&
                       view.completed.map((task) => (
-                        <Row key={task.key} task={task} {...rowProps} />
+                        <Row
+                          key={task.key}
+                          task={task}
+                          fresh={freshKeys.has(task.key)}
+                          {...rowProps}
+                        />
                       ))}
                   </section>
                 )}
@@ -653,7 +690,12 @@ interface RowHandlers {
 }
 
 function Row(
-  props: RowHandlers & { readonly task: TaskRow; readonly subtask?: boolean },
+  props: RowHandlers & {
+    readonly task: TaskRow;
+    readonly subtask?: boolean;
+    /** Just appeared in the list being looked at: it eases in (UI-04). */
+    readonly fresh?: boolean;
+  },
 ): ReactElement {
   const {
     task,
@@ -665,6 +707,7 @@ function Row(
     onEdit,
     onLeaveTask,
     onTab,
+    fresh = false,
   } = props;
   const isEditing = editing?.kind === 'task' && editing.key === task.key;
   const classes = ['row'];
@@ -672,8 +715,10 @@ function Row(
   if (subtask) classes.push('subtask');
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
+  if (fresh) classes.push('enter');
   return (
     <div
+      data-key={task.key}
       className={classes.join(' ')}
       onMouseDown={() => onSelect(task.key)}
       onDoubleClick={() => !task.done && onEdit(task.key)}
@@ -720,6 +765,44 @@ function Row(
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * The selection highlight (UI-04, D-56): one element per card that moves to the selected row with
+ * the spring curve, instead of the highlight jumping from row to row. Off with reduce-motion, like
+ * all motion (the move is then instant).
+ */
+function Glide(props: {
+  readonly card: RefObject<HTMLElement | null>;
+  readonly target: string | null;
+  /** Re-measure when the rows change. */
+  readonly version: unknown;
+}): ReactElement | null {
+  const { card, target, version } = props;
+  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      const row = target
+        ? card.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(target)}"]`)
+        : null;
+      setBox(
+        row
+          ? { x: row.offsetLeft, y: row.offsetTop, w: row.offsetWidth, h: row.offsetHeight }
+          : null,
+      );
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [card, target, version]);
+  if (!box) return null;
+  return (
+    <div
+      className="sel-glide"
+      aria-hidden="true"
+      style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
+    />
   );
 }
 

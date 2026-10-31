@@ -626,3 +626,44 @@ h1 .count {
 .row.done .title.md a {
   color: inherit;
 }
+
+/* Motion (UI-04, D-56, docs/09 §9): the selection glides, new rows ease in. */
+.card.tasks,
+.card.completed {
+  position: relative;
+}
+
+.row {
+  z-index: 1;
+}
+
+.row.sel,
+.row.sel:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+.sel-glide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+  pointer-events: none;
+  transition:
+    transform var(--fl-dur-base) var(--fl-ease-spring),
+    width var(--fl-dur-base) var(--fl-ease-spring),
+    height var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.row.enter {
+  animation: row-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
