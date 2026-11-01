@@ -2,6 +2,15 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.9 (1 Nov 2026)
+
+- **Pickers and menus open with nothing highlighted**; the arrow keys or typing show the highlight, and Enter only acts on what you see highlighted. Clicking a picker's button again closes it. Pickers grow out of their button, and switching between pickers morphs from one to the next.
+- **Time wheels**: a touchpad scrolls them freely and they settle on the nearest value; a mouse wheel moves one value per notch. Click a value (or type a digit) to type it: 4_ then 47, any minute.
+- **Editing a task**: click a selected task again to edit it, like renaming a file. The dark field fades in and slides along when you move to the next task.
+- **Bodies** keep their line breaks, show lists of links as text instead of code, and fence pasted JSON, code and stack traces. They open under the task in a soft box; a long one shows its first lines with "Open as page". Editing a body no longer moves anything.
+- **Task pages**: a lighter title that wraps while you edit it, the back arrow lined up with the first line, and the task's subtasks with "Add subtask" (also in the task's right-click menu).
+- **Motion**: completing a task is a bit quicker, switching lists a bit slower; new tasks open up their place, reopened tasks come back from the left, pages slide in. Switching to a note no longer makes the text jump.
+
 ## 0.4.8 (1 Nov 2026)
 
 - **Task bodies.** Click the lines icon on a task (or press →) to see its body: a short one opens right under the task, a long one as its own page. Bodies show formatting, highlighted JSON and stack traces, and screenshots. ← or the icon closes it again.
