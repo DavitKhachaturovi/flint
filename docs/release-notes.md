@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.10 (1 Nov 2026)
+
+- **Select several tasks**: Shift+click or Shift+↑/↓ for a range, Ctrl+click for single ones, Ctrl+A for all. A bar at the bottom then offers Select all, Move, Priority and Delete; Space, 1/2/3/0 and Delete work on all of them too, and one Ctrl+Z undoes the whole action. Esc clears the selection.
+- **Duplicate** a task (right-click): the copy appears right below it, without the reminder. Lists and notes can be duplicated too ("Name copy").
+- **Convert** a task list into a note, or a note into a task list (right-click it in the sidebar). Plain bullets become tasks; everything else stays.
+- **Delete several lists at once**: Ctrl+click or Shift+click them in the sidebar, then right-click. One Ctrl+Z brings them all back.
+
 ## 0.4.9 (1 Nov 2026)
 
 - **Pickers and menus open with nothing highlighted**; the arrow keys or typing show the highlight, and Enter only acts on what you see highlighted. Clicking a picker's button again closes it. Pickers grow out of their button, and switching between pickers morphs from one to the next.
