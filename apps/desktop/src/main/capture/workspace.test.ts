@@ -315,7 +315,9 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
       { kind: 'list', id: 'al01' },
       { kind: 'group', id: group, name: 'Work', lists: ['be01'] },
     ]);
-    const saved = JSON.parse(await readFile(join(folder, '.flint', 'sidebar.json'), 'utf8'));
+    const saved = JSON.parse(await readFile(join(folder, '.flint', 'sidebar.json'), 'utf8')) as {
+      items: unknown;
+    };
     expect(saved.items).toEqual([{ list: 'al01' }, { group, name: 'Work', lists: ['be01'] }]);
     // A duplicate goes right below its original, in its group.
     await workspace.duplicateList('be01', now);
