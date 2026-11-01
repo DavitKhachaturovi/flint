@@ -2336,7 +2336,7 @@ function Glide(props: {
     /** D-78: the same target, moved by the layout (a body folding above it): follow at once. */
     follow: boolean;
   } | null>(null);
-  const measured = useRef<string | null>(null);
+  const measured = useRef<{ target: string | null; at: number }>({ target: null, at: 0 });
   const node = useRef<HTMLDivElement>(null);
   // D-76: editing that starts on another row appears there (fading in) instead of gliding over;
   // from one editing row to the next it glides.
@@ -2374,8 +2374,12 @@ function Glide(props: {
       const row = found?.parentElement?.classList.contains('row-group')
         ? found.parentElement
         : found;
-      const follow = measured.current === target;
-      measured.current = target;
+      // D-79: following the layout at once must never cut short a glide to a new target (that
+      // made list switching lose its motion): within a glide's time, keep gliding.
+      const now = performance.now();
+      const settled = now - measured.current.at > durationMs('--fl-dur-base', 200);
+      const follow = measured.current.target === target && settled;
+      if (measured.current.target !== target) measured.current = { target, at: now };
       setBox(
         row
           ? {

@@ -409,13 +409,48 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
     window.showInactive();
   });
 
+  // D-79: motion must not silently disappear. Animation and transition events are recorded, and
+  // the list switch must play the page's arrival and the sidebar highlight's glide to their ends.
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { motion: string[] }).motion = seen;
+    for (const type of ['animationend', 'transitionend', 'transitioncancel'])
+      document.addEventListener(
+        type,
+        (event) => {
+          const target = event.target as Element;
+          const name =
+            event instanceof AnimationEvent
+              ? event.animationName
+              : (event as TransitionEvent).propertyName;
+          seen.push(`${type} ${target.classList[0] ?? ''} ${name}`);
+        },
+        true,
+      );
+  });
+  const motion = (): Promise<string[]> =>
+    main.evaluate(() => [...(window as unknown as { motion: string[] }).motion]);
+  const resetMotion = (): Promise<unknown> =>
+    main.evaluate(() => (window as unknown as { motion: string[] }).motion.splice(0));
+
   // The watcher picks the new list up.
   await main.locator('.nav', { hasText: 'Errands' }).click();
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
+  await expect
+    .poll(motion)
+    .toEqual(
+      expect.arrayContaining(['animationend content view-in', 'transitionend nav-glide transform']),
+    );
+  expect(await motion()).not.toContain('transitioncancel nav-glide transform');
   // D-77: nothing is selected when a list opens; the first ↓ selects the first row.
   await expect(main.locator('.row.sel')).toHaveCount(0);
   await main.keyboard.press('ArrowDown');
   await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
+  // The row highlight glides to the next row and gets there.
+  await resetMotion();
+  await main.keyboard.press('ArrowDown');
+  await expect.poll(motion).toEqual(expect.arrayContaining(['transitionend sel-glide transform']));
+  await main.keyboard.press('ArrowUp');
 
   // D-75: the task is completed at once; a ghost of its row plays out where it was. Ghosts live
   // for a moment only, so a MutationObserver records the ones that appear.
