@@ -334,7 +334,11 @@ async function start(): Promise<void> {
         ? workspace.newList(request.name, request.mode, now)
         : request.kind === 'rename'
           ? workspace.renameList(request.id, request.name, now)
-          : workspace.deleteList(request.id, now);
+          : request.kind === 'duplicate'
+            ? workspace.duplicateList(request.id, now)
+            : request.kind === 'convert'
+              ? workspace.convertList(request.id, request.mode, now)
+              : workspace.deleteList(request.id, now);
     return run.catch((error: unknown) => {
       log(`list action failed: ${String(error)}`);
       return { ok: false, problem: 'Flint could not change the file' } as const;

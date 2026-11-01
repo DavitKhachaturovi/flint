@@ -72,6 +72,38 @@ function neighbourMarker(document: FlintDocument, where: Where): TaskLine['marke
   return document.blocks.find((block): block is TaskNode => block.kind === 'task')?.line.marker;
 }
 
+/**
+ * TASK-16, D-72, D-74: a copy of a task right below it, open, with new IDs (`newId` gives each),
+ * keeping its title, body, priority and subtasks, but not its reminder (a copy must not fire it
+ * twice), its Today star, its completion or its Obsidian block ID.
+ */
+export function duplicateTask(
+  document: FlintDocument,
+  list: string,
+  key: string,
+  newId: () => string,
+): Op | null {
+  const found = locate(document, key);
+  if (!found) return null;
+  const copy = (node: TaskNode): TaskNode => {
+    const id = newId();
+    const { priority } = node.line.fields;
+    return {
+      ...node,
+      key: id,
+      raw: null,
+      line: {
+        ...node.line,
+        status: ' ',
+        fields: { ...(priority ? { priority } : {}), id: flintField(id) },
+        blockId: null,
+      },
+      children: node.children.map((child) => (child.kind === 'task' ? copy(child) : child)),
+    };
+  };
+  return { type: 'insert', list, task: copy(found.task), where: { at: 'after', key } };
+}
+
 /** Adds a task; captures go to the top of Inbox (CAP-02, D-22). */
 export function addTask(
   document: FlintDocument,

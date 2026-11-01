@@ -12,6 +12,7 @@ import {
   bulk,
   completeTask,
   deleteTask,
+  duplicateTask,
   editTitle,
   indentTask,
   moveDown,
@@ -27,7 +28,7 @@ import {
   uncompleteTask,
 } from './actions.js';
 import { getBody } from './body.js';
-import { convertToNote, convertToTasks } from './convert.js';
+import { convertToNote, convertToTasks, duplicateDocument } from './convert.js';
 import { applyOp, rebase, type Documents, type Op } from './ops.js';
 import { locate } from './tree.js';
 
@@ -145,6 +146,18 @@ describe('editing (TASK-03, TASK-05, REM-01, TODAY-01)', () => {
     );
     result = apply(result, setReminder('a', 'cccc', null));
     expect(text(result)).toContain('- [ ] C [today:: true] [id:: cccc]\n');
+  });
+
+  it('duplicates a task below it, open, with new IDs and without its reminder (TASK-16, D-74)', () => {
+    const source = `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [today:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Next [id:: cccc]\n`;
+    const ids = ['new1', 'new2'];
+    const result = apply(
+      docs({ a: source }),
+      duplicateTask(only(docs({ a: source })), 'a', 'aaaa', () => ids.shift() ?? 'none'),
+    );
+    expect(text(result)).toBe(
+      `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [today:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Ship it [priority:: high] [id:: new1]\n    Notes here.\n    - [ ] Sub [id:: new2]\n- [ ] Next [id:: cccc]\n`,
+    );
   });
 
   it('turns a reminder off and on; a new time turns it back on (REM-12, D-66)', () => {
@@ -334,6 +347,17 @@ describe('deleting and moving between lists (TASK-11, TASK-12)', () => {
 });
 
 describe('mode conversion (LIST-04, D-22)', () => {
+  it('duplicates a list with new IDs and without reminders (LIST-01, D-74)', () => {
+    const source =
+      '---\nflint: 1\nid: l7c2\nmode: tasks\n---\n# Plan\n- [ ] A [reminder:: 2026-10-30T09:00] [muted:: true] [priority:: low] [id:: aaaa] [owner:: me]\n    - [ ] A1 [id:: bbbb]\n- [x] Z [completion:: 2026-10-28T14:03] [id:: zzzz]\n';
+    const ids = ['n1', 'n2', 'n3'];
+    expect(
+      duplicateDocument(parseDocument(source, { keySeed: 'a' }), 'cop1', () => ids.shift() ?? 'x'),
+    ).toBe(
+      '---\nflint: 1\nid: cop1\nmode: tasks\n---\n# Plan\n- [ ] A [priority:: low] [id:: n1] [owner:: me]\n    - [ ] A1 [id:: n2]\n- [x] Z [completion:: 2026-10-28T14:03] [id:: n3]\n',
+    );
+  });
+
   it('task list → note → task list is lossless', () => {
     const documents = docs({ a: LIST });
     const note = apply(documents, convertToNote(only(documents), 'a'));

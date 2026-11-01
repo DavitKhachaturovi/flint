@@ -205,6 +205,12 @@ export type ListChange =
   | { readonly kind: 'edit'; readonly key: string; readonly text: string }
   /** TASK-05, D-49: a task's body, as typed in its plain field. */
   | { readonly kind: 'body'; readonly key: string; readonly body: string }
+  /** TASK-16, D-74: a copy right below the task, open, without its reminder. */
+  | { readonly kind: 'duplicate'; readonly key: string }
+  /** TASK-07: completes or reopens a task (a bulk action); nothing if it already is. */
+  | { readonly kind: 'complete'; readonly key: string; readonly done: boolean }
+  /** TASK-07, D-59: several changes as one step, undone together. */
+  | { readonly kind: 'many'; readonly label: string; readonly changes: readonly ListChange[] }
   | {
       readonly kind: 'priority';
       readonly key: string;
@@ -253,7 +259,11 @@ export type EditCommand = 'cut' | 'copy' | 'paste' | 'selectAll';
 export type ListAction =
   | { readonly kind: 'new'; readonly name: string; readonly mode: 'tasks' | 'note' }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
-  | { readonly kind: 'delete'; readonly id: string };
+  | { readonly kind: 'delete'; readonly id: string }
+  /** D-72, D-74: "<name> copy" right below it, new IDs, no reminders. */
+  | { readonly kind: 'duplicate'; readonly id: string }
+  /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list. */
+  | { readonly kind: 'convert'; readonly id: string; readonly mode: 'tasks' | 'note' };
 
 /** What a list action did, or why it couldn't (shown next to the name being typed). */
 export type ListActionOutcome =

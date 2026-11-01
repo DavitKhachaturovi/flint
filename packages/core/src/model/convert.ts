@@ -3,7 +3,9 @@ import {
   parseDocument,
   serializeDocument,
   type FlintDocument,
+  type TaskNode,
 } from '../format/document.js';
+import { flintField } from '../format/fields.js';
 import { indentWidth, isBlank, joinLines, stripColumns, type Line } from '../format/lines.js';
 import {
   fenceOpen,
@@ -95,4 +97,38 @@ export function convertToTasks(document: FlintDocument, list: string): Op {
     };
   });
   return { type: 'setText', list, text: serializeDocument({ ...first, blocks }) };
+}
+
+/**
+ * LIST-01, D-72, D-74: a list or note copied for "Duplicate": the list gets `listId` and every
+ * task a new ID from `newId`; reminders (and `muted`) are left out, so a copy never fires the same
+ * reminder twice, and so are Obsidian block IDs. Everything else is copied as it is.
+ */
+export function duplicateDocument(
+  document: FlintDocument,
+  listId: string,
+  newId: () => string,
+): string {
+  const renew = (node: TaskNode): TaskNode => {
+    const id = newId();
+    const { today, completion, priority } = node.line.fields;
+    return {
+      ...node,
+      key: id,
+      raw: null,
+      line: {
+        ...node.line,
+        fields: {
+          ...(today ? { today } : {}),
+          ...(completion ? { completion } : {}),
+          ...(priority ? { priority } : {}),
+          id: flintField(id),
+        },
+        blockId: null,
+      },
+      children: node.children.map((child) => (child.kind === 'task' ? renew(child) : child)),
+    };
+  };
+  const blocks = document.blocks.map((block) => (block.kind === 'task' ? renew(block) : block));
+  return serializeDocument(setFrontmatterValues({ ...document, blocks }, { id: listId }));
 }

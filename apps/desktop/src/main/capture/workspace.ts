@@ -5,7 +5,12 @@ import {
   allTasks,
   bulk,
   completeTask,
+  convertToNote,
+  convertToTasks,
   deleteTask,
+  documentMode,
+  duplicateDocument,
+  duplicateTask,
   editTitle,
   findTask,
   generateId,
@@ -259,6 +264,29 @@ export class Workspace {
     return label;
   }
 
+  /** The undo steps recorded since `start` become one, labelled `label`; false if there were none. */
+  private mergeSince(start: number, label: string): boolean {
+    const entries = this.undoStack.splice(start);
+    if (entries.length === 0) return false;
+    this.undoStack.push(this.together(label, entries));
+    return true;
+  }
+
+  /** Steps run as one: newest first, and the steps they return the same way again. */
+  private together(label: string, entries: readonly UndoEntry[]): UndoEntry {
+    return {
+      label,
+      run: async (now) => {
+        const opposite: UndoEntry[] = [];
+        for (const entry of [...entries].reverse()) {
+          const back = await entry.run(now);
+          if (back) opposite.push(back);
+        }
+        return opposite.length > 0 ? this.together(label, opposite) : null;
+      },
+    };
+  }
+
   private remember(entry: UndoEntry): void {
     this.undoStack.push(entry);
     if (this.undoStack.length > 100) this.undoStack.shift();
@@ -300,98 +328,124 @@ export class Workspace {
    * title). Text arrives with selected or pasted stretches already escaped (D-45).
    */
   change(id: string, change: ListChange, now: Date): Promise<ChangeOutcome | null> {
-    return this.serial(async () => {
-      const list = this.find(id);
-      if (!list || list.entry.mode === 'note') return null;
-      const document = list.file.document;
-      const path = list.file.path;
-      const outcome = (label: string, key: string | null, target = list): ChangeOutcome => ({
-        label,
-        key,
-        listId: this.listId(target.entry),
-        listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
-      });
-      switch (change.kind) {
-        case 'add':
-          return this.add(list, change, now);
-        case 'edit': {
-          const found = findTask(document, change.key);
-          if (!found) return null;
-          const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
-          const ops: Op[] = [];
-          // D-45: an empty task line is fine with a body; without one, emptying it changes nothing.
-          const title = parsed.title.trim();
-          const hasBody = getBody(found.task).trim() !== '';
-          if (title !== found.task.line.title.trim() && (title !== '' || hasBody))
-            ops.push(editTitle(path, change.key, parsed.title));
-          if (parsed.priority) ops.push(setPriority(path, change.key, parsed.priority));
-          if (parsed.reminder) ops.push(setReminder(path, change.key, parsed.reminder));
-          const op = bulk(ops);
-          return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
-        }
-        case 'body': {
-          // TASK-05, D-49: the body as typed; a `- [ ]` line in it becomes a subtask (04 §3).
-          const found = findTask(document, change.key);
-          if (!found || change.body.trim() === getBody(found.task).trim()) return null;
-          const op = setBody(path, change.key, change.body.trim());
-          return outcome(await this.record(list, op, 'Edited', now), change.key);
-        }
-        case 'priority': {
-          const op = setPriority(path, change.key, change.priority);
-          const label = change.priority ? `Priority ${change.priority}` : 'No priority';
-          return outcome(await this.record(list, op, label, now), change.key);
-        }
-        case 'move': {
-          const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
-          return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
-        }
-        case 'reminder': {
-          if (!findTask(document, change.key)) return null;
-          return outcome(
-            await this.record(list, setReminder(path, change.key, change.at), 'Reminder set', now),
-            change.key,
-          );
-        }
-        case 'mute': {
-          const found = findTask(document, change.key);
-          if (!found?.task.line.fields.reminder) return null;
-          const label = change.muted ? 'Reminder off' : 'Reminder on';
-          return outcome(
-            await this.record(list, setMuted(path, change.key, change.muted), label, now),
-            change.key,
-          );
-        }
-        case 'delete': {
-          // TASK-12, D-50: the task goes to Trash storage first, so it is never only in memory.
-          const found = findTask(document, change.key);
-          if (!found) return null;
-          const name = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
-          const trash = {
-            path: join(trashFolder(this.folder), `${stamp(now)}-task-${change.key}.md`),
-            text: trashedTaskText(found.task, { id: this.listId(list.entry), name }, now),
-          };
-          await this.writeTrash(trash.path, trash.text);
-          for (const { task } of allTasks({ ...document, blocks: [found.task] }))
-            this.trashed.add(task.key);
-          const label = await this.record(list, deleteTask(path, change.key), 'Deleted', now, {
-            trash,
-          });
-          return outcome(label, change.key);
-        }
-        case 'moveTo':
-          return this.moveTo(list, change.key, change.to, now);
-        case 'indent':
-        case 'outdent': {
-          const op = (change.kind === 'indent' ? indentTask : outdentTask)(
-            document,
-            path,
-            change.key,
-          );
-          const label = change.kind === 'indent' ? 'Indented' : 'Outdented';
-          return op ? outcome(await this.record(list, op, label, now), change.key) : null;
-        }
-      }
+    return this.serial(() => this.changeNow(id, change, now));
+  }
+
+  private async changeNow(
+    id: string,
+    change: ListChange,
+    now: Date,
+  ): Promise<ChangeOutcome | null> {
+    const list = this.find(id);
+    if (!list || list.entry.mode === 'note') return null;
+    const document = list.file.document;
+    const path = list.file.path;
+    const outcome = (label: string, key: string | null, target = list): ChangeOutcome => ({
+      label,
+      key,
+      listId: this.listId(target.entry),
+      listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
     });
+    switch (change.kind) {
+      case 'add':
+        return this.add(list, change, now);
+      case 'many': {
+        // TASK-07, D-59: each change as usual, then their undo steps as one.
+        const start = this.undoStack.length;
+        let last: ChangeOutcome | null = null;
+        for (const each of change.changes)
+          if (each.kind !== 'many') last = (await this.changeNow(id, each, now)) ?? last;
+        if (!this.mergeSince(start, change.label)) return null;
+        return last && { ...last, label: change.label };
+      }
+      case 'duplicate': {
+        const op = duplicateTask(document, path, change.key, () => generateId(this.isTaken));
+        const key = op?.type === 'insert' ? op.task.key : null;
+        return op ? outcome(await this.record(list, op, 'Duplicated', now), key) : null;
+      }
+      case 'complete': {
+        const found = findTask(document, change.key);
+        if (!found || (found.task.line.status !== ' ') === change.done) return null;
+        const label = await this.toggleNow(id, change.key, now);
+        return label ? outcome(label, change.key) : null;
+      }
+      case 'edit': {
+        const found = findTask(document, change.key);
+        if (!found) return null;
+        const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
+        const ops: Op[] = [];
+        // D-45: an empty task line is fine with a body; without one, emptying it changes nothing.
+        const title = parsed.title.trim();
+        const hasBody = getBody(found.task).trim() !== '';
+        if (title !== found.task.line.title.trim() && (title !== '' || hasBody))
+          ops.push(editTitle(path, change.key, parsed.title));
+        if (parsed.priority) ops.push(setPriority(path, change.key, parsed.priority));
+        if (parsed.reminder) ops.push(setReminder(path, change.key, parsed.reminder));
+        const op = bulk(ops);
+        return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
+      }
+      case 'body': {
+        // TASK-05, D-49: the body as typed; a `- [ ]` line in it becomes a subtask (04 §3).
+        const found = findTask(document, change.key);
+        if (!found || change.body.trim() === getBody(found.task).trim()) return null;
+        const op = setBody(path, change.key, change.body.trim());
+        return outcome(await this.record(list, op, 'Edited', now), change.key);
+      }
+      case 'priority': {
+        const op = setPriority(path, change.key, change.priority);
+        const label = change.priority ? `Priority ${change.priority}` : 'No priority';
+        return outcome(await this.record(list, op, label, now), change.key);
+      }
+      case 'move': {
+        const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
+        return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
+      }
+      case 'reminder': {
+        if (!findTask(document, change.key)) return null;
+        return outcome(
+          await this.record(list, setReminder(path, change.key, change.at), 'Reminder set', now),
+          change.key,
+        );
+      }
+      case 'mute': {
+        const found = findTask(document, change.key);
+        if (!found?.task.line.fields.reminder) return null;
+        const label = change.muted ? 'Reminder off' : 'Reminder on';
+        return outcome(
+          await this.record(list, setMuted(path, change.key, change.muted), label, now),
+          change.key,
+        );
+      }
+      case 'delete': {
+        // TASK-12, D-50: the task goes to Trash storage first, so it is never only in memory.
+        const found = findTask(document, change.key);
+        if (!found) return null;
+        const name = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
+        const trash = {
+          path: join(trashFolder(this.folder), `${stamp(now)}-task-${change.key}.md`),
+          text: trashedTaskText(found.task, { id: this.listId(list.entry), name }, now),
+        };
+        await this.writeTrash(trash.path, trash.text);
+        for (const { task } of allTasks({ ...document, blocks: [found.task] }))
+          this.trashed.add(task.key);
+        const label = await this.record(list, deleteTask(path, change.key), 'Deleted', now, {
+          trash,
+        });
+        return outcome(label, change.key);
+      }
+      case 'moveTo':
+        return this.moveTo(list, change.key, change.to, now);
+      case 'indent':
+      case 'outdent': {
+        const op = (change.kind === 'indent' ? indentTask : outdentTask)(
+          document,
+          path,
+          change.key,
+        );
+        const label = change.kind === 'indent' ? 'Indented' : 'Outdented';
+        return op ? outcome(await this.record(list, op, label, now), change.key) : null;
+      }
+    }
   }
 
   /**
@@ -731,27 +785,29 @@ export class Workspace {
 
   /** Space or the checkbox (TASK-06): completes an open task, reopens a completed one. */
   toggleDone(id: string, key: string, now: Date): Promise<string | null> {
-    return this.serial(async () => {
-      const list = this.find(id);
-      const found = list ? findTask(list.file.document, key) : undefined;
-      if (!list || !found) return null;
-      const document = list.file.document;
-      const path = list.file.path;
-      const done = found.task.line.status !== ' ';
-      if (!done) {
-        const completion = completeTask(document, path, key, fromDate(now));
-        if (!completion) return null;
-        this.completedAfter.set(`${path}:${key}`, completion.completedAfter);
-        return this.record(list, completion.op, 'Completed', now);
-      }
-      const op = uncompleteTask(
-        document,
-        path,
-        key,
-        (task) => this.completedAfter.get(`${path}:${task}`) ?? null,
-      );
-      return op ? this.record(list, op, 'Reopened', now) : null;
-    });
+    return this.serial(() => this.toggleNow(id, key, now));
+  }
+
+  private async toggleNow(id: string, key: string, now: Date): Promise<string | null> {
+    const list = this.find(id);
+    const found = list ? findTask(list.file.document, key) : undefined;
+    if (!list || !found) return null;
+    const document = list.file.document;
+    const path = list.file.path;
+    const done = found.task.line.status !== ' ';
+    if (!done) {
+      const completion = completeTask(document, path, key, fromDate(now));
+      if (!completion) return null;
+      this.completedAfter.set(`${path}:${key}`, completion.completedAfter);
+      return this.record(list, completion.op, 'Completed', now);
+    }
+    const op = uncompleteTask(
+      document,
+      path,
+      key,
+      (task) => this.completedAfter.get(`${path}:${task}`) ?? null,
+    );
+    return op ? this.record(list, op, 'Reopened', now) : null;
   }
 
   /** Undoes the newest change made in the main window; resolves to what was undone. */
@@ -933,14 +989,18 @@ export class Workspace {
   /** Only a list that is exactly what a capture created is removed; anything added since stays. */
   private async dropIfEmpty(list: Loaded): Promise<void> {
     const id = list.entry.id ?? '';
-    if (
-      serializeDocument(list.file.document) ===
-      NEW_LIST_HEADER(id, list.entry.mode === 'note' ? 'note' : 'tasks')
-    ) {
-      await unlink(list.file.path);
-      this.lists.splice(this.lists.indexOf(list), 1);
-      await this.forgetRecent(id);
-    }
+    await this.dropIfUnchanged(
+      list,
+      NEW_LIST_HEADER(id, list.entry.mode === 'note' ? 'note' : 'tasks'),
+    );
+  }
+
+  /** Removes a list Flint made (a new list, a duplicate) if it is still exactly as made. */
+  private async dropIfUnchanged(list: Loaded, text: string): Promise<void> {
+    if (serializeDocument(list.file.document) !== text) return;
+    await unlink(list.file.path);
+    this.lists.splice(this.lists.indexOf(list), 1);
+    await this.forgetRecent(list.entry.id ?? '');
   }
 
   private async applyAndSave(list: Loaded, op: Op, now: Date): Promise<Applied> {
@@ -949,13 +1009,74 @@ export class Workspace {
     const applied = list.file.apply(op);
     if (!applied) throw new Error(`could not change ${list.entry.name}`);
     await list.file.save({ now: fromDate(now), isTaken: this.isTaken });
+    // A conversion (LIST-04), or undoing one, changes the list's mode.
+    list.entry = { ...list.entry, mode: documentMode(list.file.document) };
     return applied;
+  }
+
+  /**
+   * LIST-01, D-72, D-74: a copy of a list or note as "<name> copy" ("<name> copy 2"…), with new IDs
+   * and without reminders; undoable while the copy is unchanged.
+   */
+  duplicateList(id: string, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list) return { ok: false, problem: 'That list is gone' };
+      const base = `${list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name} copy`;
+      let name = base;
+      for (let count = 2; this.sameName(name); count++) name = `${base} ${count}`;
+      if (listNameProblem(name)) return { ok: false, problem: 'The copy needs a shorter name' };
+      const copyId = generateId(this.isTaken);
+      const text = duplicateDocument(list.file.document, copyId, () => generateId(this.isTaken));
+      const mode = list.entry.mode === 'note' ? 'note' : 'tasks';
+      await this.createList(name, mode, copyId, text);
+      const label = `Duplicated as ${name}`;
+      const created = (): UndoEntry => ({
+        label,
+        run: async () => {
+          const copy = this.find(copyId);
+          if (!copy) return null;
+          await this.dropIfUnchanged(copy, text);
+          if (this.find(copyId)) return null;
+          return {
+            label,
+            run: async () => {
+              if (this.find(copyId) || this.sameName(name)) return null;
+              await this.createList(name, mode, copyId, text);
+              return created();
+            },
+          };
+        },
+      });
+      this.remember(created());
+      void now;
+      return { ok: true, listId: copyId, label };
+    });
+  }
+
+  /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list; undoable. */
+  convertList(id: string, mode: 'tasks' | 'note', now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list || list.entry.id === INBOX_ID)
+        return { ok: false, problem: 'Inbox stays a task list' };
+      if (list.entry.mode === mode) return { ok: true, listId: id, label: '' };
+      const op = (mode === 'note' ? convertToNote : convertToTasks)(
+        list.file.document,
+        list.file.path,
+      );
+      const label = mode === 'note' ? 'Converted to a note' : 'Converted to a task list';
+      await this.record(list, op, label, now);
+      return { ok: true, listId: this.listId(list.entry), label };
+    });
   }
 
   private async createList(
     name: string,
     mode: ListMode = 'tasks',
     listId?: string,
+    /** The file's text (a duplicate); a new list's header otherwise. */
+    text?: string,
   ): Promise<Loaded> {
     const path = join(this.folder, `${name}.md`);
     const id = listId ?? generateId(this.isTaken);
@@ -966,7 +1087,7 @@ export class Workspace {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    await writeFileAtomic(path, NEW_LIST_HEADER(id, mode), {
+    await writeFileAtomic(path, text ?? NEW_LIST_HEADER(id, mode), {
       tempDirectory: tempDirectoryFor(path),
     });
     const entry: ListEntry = { path, name, id, mode, created: Date.now() };

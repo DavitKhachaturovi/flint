@@ -292,6 +292,79 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
           : [],
       ) ?? [];
 
+  it('runs several changes as one step, undone together (TASK-07, D-59)', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n- [ ] three [id:: ccc3]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    const outcome = await workspace.change(
+      'inbox',
+      {
+        kind: 'many',
+        label: '2 tasks: priority high',
+        changes: [
+          { kind: 'priority', key: 'aaa1', priority: 'high' },
+          { kind: 'priority', key: 'ccc3', priority: 'high' },
+          { kind: 'complete', key: 'bbb2', done: true },
+          { kind: 'complete', key: 'bbb2', done: true },
+        ],
+      },
+      now,
+    );
+    expect(outcome?.label).toBe('2 tasks: priority high');
+    expect(await inbox()).toContain('- [ ] one [priority:: high] [id:: aaa1]');
+    expect(await inbox()).toContain('- [x] two [completion:: ');
+    expect(await workspace.undoLast(now)).toBe('2 tasks: priority high');
+    expect(await inbox()).toBe(original);
+    expect(await workspace.redoLast(now)).toBe('2 tasks: priority high');
+    expect(await inbox()).toContain('- [ ] three [priority:: high] [id:: ccc3]');
+  });
+
+  it('duplicates a task below it without its reminder (TASK-16, D-74)', async () => {
+    await writeFile(
+      join(folder, 'Inbox.md'),
+      `${header}- [ ] call [reminder:: 2026-10-30T09:00] [priority:: low] [id:: aaa1]\n- [ ] next [id:: bbb2]\n`,
+    );
+    const workspace = await open();
+    const outcome = await workspace.change('inbox', { kind: 'duplicate', key: 'aaa1' }, now);
+    expect(outcome?.label).toBe('Duplicated');
+    expect(await inbox()).toMatch(
+      new RegExp(
+        `^${header.replace(/[-]/g, '\\-')}- \\[ \\] call \\[reminder:: 2026-10-30T09:00\\] \\[priority:: low\\] \\[id:: aaa1\\]\\n- \\[ \\] call \\[priority:: low\\] \\[id:: ${outcome?.key ?? 'x'}\\]\\n- \\[ \\] next`,
+      ),
+    );
+  });
+
+  it('duplicates and converts lists, undoably (LIST-01, LIST-04, D-72)', async () => {
+    await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] one [id:: aaa1]\n`);
+    await writeFile(
+      join(folder, 'Plan.md'),
+      '---\nflint: 1\nid: pla1\nmode: note\n---\n# Plan\n- ship it\n- [ ] test it [id:: ttt1]\n',
+    );
+    const workspace = await open();
+    const copy = await workspace.duplicateList('pla1', now);
+    expect(copy).toMatchObject({ ok: true, label: 'Duplicated as Plan copy' });
+    const copied = await readFile(join(folder, 'Plan copy.md'), 'utf8');
+    expect(copied).toMatch(
+      /^---\nflint: 1\nid: \w+\nmode: note\n---\n# Plan\n- ship it\n- \[ \] test it \[id:: \w+\]\n$/,
+    );
+    expect(copied).not.toContain('pla1');
+    expect(copied).not.toContain('ttt1');
+    expect((await workspace.duplicateList('pla1', now)).ok).toBe(true);
+    expect(workspace.summaries(now).map((list) => list.name)).toContain('Plan copy 2');
+    await workspace.undoLast(now);
+    await workspace.undoLast(now);
+    await expect(readFile(join(folder, 'Plan copy.md'), 'utf8')).rejects.toThrow();
+
+    expect(await workspace.convertList('pla1', 'tasks', now)).toMatchObject({ ok: true });
+    expect(workspace.view('pla1', now)?.mode).toBe('tasks');
+    expect(await readFile(join(folder, 'Plan.md'), 'utf8')).toMatch(
+      /mode: tasks\n---\n# Plan\n- \[ \] ship it/,
+    );
+    await workspace.undoLast(now);
+    expect(workspace.view('pla1', now)?.mode).toBe('note');
+    expect(await workspace.convertList('inbox', 'note', now)).toMatchObject({ ok: false });
+  });
+
   it('saves a body under its task, before the subtasks; undo restores it (TASK-05, D-49)', async () => {
     const original = `${header}- [ ] one [id:: aaa1]\n    - [ ] sub [id:: bbb2]\n`;
     await writeFile(join(folder, 'Inbox.md'), original);
