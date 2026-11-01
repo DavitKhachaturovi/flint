@@ -2,6 +2,15 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.11 (1 Nov 2026)
+
+- **Pickers switch reliably**: flag, # and bell pickers (and a reminder's picker) hand over to each other smoothly instead of disappearing or opening at the bottom of the window. They open more visibly and fade out when closed.
+- **Expanded tasks are one card**: the title and its body together, with code and stack traces in their own small card with a copy button. A long body opens its page when you click it; short ones are edited in place.
+- **Selection**: nothing is selected when you open a list (↓ selects the first task, so a click never starts editing by surprise). Ctrl+A selects the open tasks only. Selected tasks next to each other form one highlight, and opening any list clears the selection.
+- **Motion**: deleting and duplicating (and undoing them) animate like completing; the Undo message fades out; Completed folds away smoothly; the editing box arrives more noticeably.
+- **Notes to task lists**: every line of a note becomes a task; headings stay as labels, and code or quotes go under the task above them.
+- Switching to a note no longer flashes a scrollbar. In the time wheels, clicking a value after typing goes straight to it.
+
 ## 0.4.10 (1 Nov 2026)
 
 - **Select several tasks**: Shift+click or Shift+↑/↓ for a range, Ctrl+click for single ones, Ctrl+A for all. A bar at the bottom then offers Select all, Move, Priority and Delete; Space, 1/2/3/0 and Delete work on all of them too, and one Ctrl+Z undoes the whole action. Esc clears the selection.

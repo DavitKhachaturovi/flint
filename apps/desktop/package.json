@@ -1,7 +1,7 @@
 {
   "name": "@flint/desktop",
   "productName": "Flint",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "private": true,
   "description": "Flint desktop app: Electron main process, preload bridge and renderers (docs/05).",
   "author": "Davit Khachaturovi",
