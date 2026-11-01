@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.8 (1 Nov 2026)
+
+- **Task bodies.** Click the lines icon on a task (or press →) to see its body: a short one opens right under the task, a long one as its own page. Bodies show formatting, highlighted JSON and stack traces, and screenshots. ← or the icon closes it again.
+- **Edit a body** by clicking it: it turns into a plain text box (the full editor comes later). Esc or clicking elsewhere saves.
+- **Open any task as a page** with Shift+Enter or "Open as page" in its menu: the title (click to edit), the body, and a back arrow. Esc goes back to the list.
+- **Back and forward** with Alt+← / Alt+→ or the mouse's side buttons, through the lists and pages you opened.
+
 ## 0.4.7 (1 Nov 2026)
 
 - **Nothing waits for an animation any more.** Completing a task saves it at once (you can undo right away); the animation plays on where the row was. Animations are a little fuller: the selection, menus and pickers take about 0.2 s, switching lists about 0.3 s, completing about 0.4 s. Tell me if they feel slow.
