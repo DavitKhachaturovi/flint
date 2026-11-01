@@ -11,6 +11,10 @@ describe('task bodies rendered (TASK-05, D-49)', () => {
     );
   });
 
+  it('keeps single line breaks (D-76)', () => {
+    expect(bodyHtml('first line\nsecond line')).toBe('<p>first line<br />\nsecond line</p>\n');
+  });
+
   it('marks code blocks with their language for the highlighter', () => {
     expect(bodyHtml('```json\n{"a": 1}\n```')).toBe(
       '<pre class="body-code" data-lang="json"><code>{&quot;a&quot;: 1}</code></pre>\n',

@@ -9,7 +9,8 @@ import MarkdownIt from 'markdown-it';
  */
 export const MEDIA_ORIGIN = 'app://media';
 
-const md = new MarkdownIt('commonmark', { html: false, linkify: true }).enable([
+// D-76: a single line break stays a line break, as in Obsidian.
+const md = new MarkdownIt('commonmark', { html: false, linkify: true, breaks: true }).enable([
   'linkify',
   'strikethrough',
   'table',

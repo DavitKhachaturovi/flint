@@ -50,6 +50,15 @@ describe('paste-to-capture (CAP-06)', () => {
     expect(classifyPaste('42')).toBe('text');
   });
 
+  it('keeps markdown notes as text, even when their lines end in links (D-76)', () => {
+    const links =
+      '- [Runbook](https://wiki/run)\n- [Dashboard](https://grafana/d)\n- [Alerts](https://pd/a)';
+    expect(classifyPaste(links)).toBe('text');
+    const steps = '## Steps\n1. Open the app (Ctrl+Shift+Space)\n2. Paste the trace (Ctrl+V)';
+    expect(classifyPaste(steps)).toBe('text');
+    expect(classifyPaste('> quoted (one)\n> quoted (two)\n> quoted (three)')).toBe('text');
+  });
+
   it('titles a paste with its exception message', () => {
     // 86 characters: cut to 80 with an ellipsis.
     expect(titleFromPaste(dotnet)).toBe(

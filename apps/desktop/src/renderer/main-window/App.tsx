@@ -43,7 +43,7 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
-import { BodyEditor, BodyView, bodyFits } from './Body.js';
+import { BodyBlock } from './Body.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
 
@@ -122,6 +122,9 @@ type Editing =
     };
 
 type NewEditing = Extract<Editing, { kind: 'new' }>;
+
+/** The new row's key for the editing highlight (D-76): it has no task yet. */
+const NEW_ROW = 'new-row';
 
 const newRow = (after: string): NewEditing => ({
   kind: 'new',
@@ -288,7 +291,13 @@ export function App(): ReactElement {
     places: [{ list: 'inbox', page: null }],
     at: 0,
   });
-  const show = useCallback((place: Place, select: string | null = null): void => {
+  /** D-76: pages slide in from the right, and back from the left; lists just fade in. */
+  const [heading, setHeading] = useState<'forward' | 'back' | null>(null);
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const show = useCallback((place: Place, select: string | null = null, back = false): void => {
+    const pages = place.page !== null || pageRef.current !== null;
+    setHeading(!pages ? null : back || !place.page ? 'back' : 'forward');
     setListId(place.list);
     setPage(place.page);
     setSelected(select ?? FIRST_ROW);
@@ -317,7 +326,7 @@ export function App(): ReactElement {
       if (!to) return;
       trail.at += step;
       // Back from a task's page selects that task in its list.
-      show(to, from?.page && !to.page && to.list === from.list ? from.page : null);
+      show(to, from?.page && !to.page && to.list === from.list ? from.page : null, step < 0);
     },
     [show],
   );
@@ -335,23 +344,36 @@ export function App(): ReactElement {
     [go, listId],
   );
 
+  /** Inline bodies closing: shown a moment longer, playing their closing animation (D-76). */
+  const [closingBodies, setClosingBodies] = useState<ReadonlySet<string>>(new Set());
   /**
-   * TASK-05, D-53: the body indicator, a code row or →: a small body opens inline under its row, a
-   * larger one as the task's page (its only view); shown inline, it closes again.
+   * TASK-05, D-76: the body indicator, a code row or → opens the body inline under its row (a long
+   * one cut off, with "Open as page"); shown inline, it closes again.
    */
   const showBody = useCallback(
-    async (task: TaskRow): Promise<void> => {
-      if (expanded.has(task.key)) {
-        setExpanded((current) => new Set([...current].filter((key) => key !== task.key)));
+    (task: TaskRow): void => {
+      const without = (keys: ReadonlySet<string>): Set<string> =>
+        new Set([...keys].filter((key) => key !== task.key));
+      if (!expanded.has(task.key)) {
+        setExpanded((current) => new Set([...current, task.key]));
+        setClosingBodies(without);
         return;
       }
-      const column = content.current;
-      if (column && (await bodyFits(task.body, column)))
-        setExpanded((current) => new Set([...current, task.key]));
-      else openPage(task.key);
+      setExpanded(without);
+      setEditingBody((current) => (current === task.key ? null : current));
+      if (reducedMotion()) return;
+      setClosingBodies((current) => new Set([...current, task.key]));
+      window.setTimeout(() => setClosingBodies(without), durationMs('--fl-dur-base', 200));
     },
-    [expanded, openPage],
+    [expanded],
   );
+
+  /** TASK-04, D-76: a new row under the task's last subtask (or as its first subtask). */
+  const addSubtask = useCallback((task: TaskRow): void => {
+    const last = task.subtasks.at(-1);
+    setSelected(task.key);
+    setEditing(last ? newRow(last.key) : { ...newRow(task.key), level: 'in' });
+  }, []);
 
   // NAV-04: the mouse's back and forward buttons.
   useEffect(() => {
@@ -600,6 +622,9 @@ export function App(): ReactElement {
         [
           ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
           { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
+          ...(open && view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
+            ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
+            : []),
           {
             label: open ? 'Complete' : 'Reopen',
             hint: 'Space',
@@ -794,10 +819,10 @@ export function App(): ReactElement {
       if (event.altKey) return;
       if (event.key === 'ArrowRight' && row && hasBody(row)) {
         event.preventDefault();
-        if (!expanded.has(row.key)) void showBody(row);
+        if (!expanded.has(row.key)) showBody(row);
       } else if (event.key === 'ArrowLeft' && row && expanded.has(row.key)) {
         event.preventDefault();
-        void showBody(row);
+        showBody(row);
       } else if (event.key === 'Enter' && event.shiftKey && row) {
         // TASK-05, D-53: any task opens as a page.
         event.preventDefault();
@@ -863,18 +888,21 @@ export function App(): ReactElement {
   const inbox = lists.find((list) => list.inbox);
   // UI-04: rows that appear in the list being looked at ease in; opening a list doesn't animate.
   const known = useRef<{ list: string; keys: ReadonlySet<string> }>({ list: '', keys: new Set() });
-  const freshKeys = new Set<string>();
+  const freshKeys = new Map<string, 'new' | 'return'>();
   if (view && known.current.list === view.id)
-    for (const row of rows) if (!known.current.keys.has(row.key)) freshKeys.add(row.key);
-  // D-75: a task that just completed or reopened eases in at its new place.
-  for (const key of moved) freshKeys.add(key);
+    for (const row of rows) if (!known.current.keys.has(row.key)) freshKeys.set(row.key, 'new');
+  // D-75, D-76: a task that just completed eases into Completed; a reopened one returns.
+  for (const key of moved)
+    freshKeys.set(key, rows.find((row) => row.key === key)?.done === false ? 'return' : 'new');
   useEffect(() => {
     if (view) known.current = { list: view.id, keys: new Set(rows.map((row) => row.key)) };
   }, [view, rows]);
   // UI-04: one selection highlight per card glides between rows; a row being edited shows its own.
   const tasksCard = useRef<HTMLElement>(null);
+  const pageCard = useRef<HTMLElement>(null);
   const completedCard = useRef<HTMLElement>(null);
-  const glideTarget = editing ? null : selected;
+  // D-76: the highlight is also the editing field, gliding between editing rows.
+  const glideTarget = editing ? (editing.kind === 'task' ? editing.key : NEW_ROW) : selected;
   const glideVersion = [rows, completedOpen];
 
   const rowProps: RowHandlers = {
@@ -889,28 +917,57 @@ export function App(): ReactElement {
     onMute: (key, muted) => void mute(key, muted),
     onReminder: (task, anchor) => changeReminder(task, anchor),
     expanded,
-    onBody: (task) => void showBody(task),
+    onBody: (task) => showBody(task),
   };
   const saveBody = (key: string, body: string): void => {
     setEditingBody(null);
     void change({ kind: 'body', key, body });
   };
-  /** A small body shown inline under its row (D-53), rendered or being edited (D-49). */
-  const bodyRows = (task: TaskRow, subtask: boolean): ReactElement[] =>
-    expanded.has(task.key) && hasBody(task)
-      ? [
-          <div key={`body-${task.key}`} className={subtask ? 'row-body subtask' : 'row-body'}>
-            {editingBody === task.key ? (
-              <BodyEditor initial={task.body} onDone={(body) => saveBody(task.key, body)} />
-            ) : (
-              <BodyView
-                body={task.body}
-                onEdit={() => !view?.readOnly && setEditingBody(task.key)}
-              />
-            )}
-          </div>,
-        ]
-      : [];
+  /** A body shown inline under its row (D-76), rendered or being edited (D-49). */
+  const bodyRows = (task: TaskRow, subtask: boolean): ReactElement[] => {
+    const open = expanded.has(task.key);
+    if ((!open && !closingBodies.has(task.key)) || !hasBody(task)) return [];
+    const classes = ['row-body'];
+    if (subtask) classes.push('subtask');
+    if (!open) classes.push('closing');
+    return [
+      <div key={`body-${task.key}`} className={classes.join(' ')}>
+        <BodyBlock
+          body={task.body}
+          inline
+          editing={open && editingBody === task.key}
+          editable={!view?.readOnly}
+          onEdit={() => setEditingBody(task.key)}
+          onDone={(body) => saveBody(task.key, body)}
+          onOpenPage={() => openPage(task.key)}
+        />
+      </div>,
+    ];
+  };
+
+  // TASK-05, D-76: the page's subtasks, with a new row where Add subtask or Enter opened one.
+  const pageRows: ReactElement[] = [];
+  if (pageTask) {
+    const fresh = editing?.kind === 'new' ? editing : null;
+    const keys = [pageTask.key, ...pageTask.subtasks.map((sub) => sub.key)];
+    const anchor = fresh
+      ? [fresh.after, ...fresh.added].filter((key) => keys.includes(key)).at(-1)
+      : undefined;
+    const placeNew = (after: string): void => {
+      if (fresh && after === anchor)
+        pageRows.push(
+          <NewRow key={`new-${fresh.seq}`} subtask={false} onLeave={leaveNew} onTab={tab} />,
+        );
+    };
+    placeNew(pageTask.key);
+    for (const sub of pageTask.subtasks) {
+      pageRows.push(
+        <Row key={sub.key} task={sub} fresh={freshKeys.get(sub.key)} {...rowProps} />,
+        ...bodyRows(sub, false),
+      );
+      placeNew(sub.key);
+    }
+  }
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
   // the tasks it adds appear above it. It sits below the newest of its tasks already shown.
@@ -947,7 +1004,7 @@ export function App(): ReactElement {
           <Row
             key={item.task.key}
             task={item.task}
-            fresh={freshKeys.has(item.task.key)}
+            fresh={freshKeys.get(item.task.key)}
             {...rowProps}
           />,
           ...bodyRows(item.task, false),
@@ -959,7 +1016,7 @@ export function App(): ReactElement {
               key={subtask.key}
               task={subtask}
               subtask
-              fresh={freshKeys.has(subtask.key)}
+              fresh={freshKeys.get(subtask.key)}
               {...rowProps}
             />,
             ...bodyRows(subtask, true),
@@ -1054,7 +1111,12 @@ export function App(): ReactElement {
           {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
           <div
             ref={content}
-            className={view?.mode === 'note' ? 'content note-page' : 'content'}
+            className={[
+              'content',
+              view?.mode === 'note' ? 'note-page' : '',
+              pageTask ? 'task-page' : '',
+              heading ?? '',
+            ].join(' ')}
             key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}`}
           >
             {view && pageTask && (
@@ -1065,7 +1127,24 @@ export function App(): ReactElement {
                 onBack={leavePage}
                 onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
                 onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
-              />
+                onAddSubtask={() => addSubtask(pageTask)}
+              >
+                {pageRows.length > 0 && (
+                  <section
+                    className="card tasks page-subtasks"
+                    aria-label="Subtasks"
+                    ref={pageCard}
+                  >
+                    <Glide
+                      card={pageCard}
+                      target={glideTarget}
+                      version={[pageTask, editing]}
+                      editing={editing !== null}
+                    />
+                    {pageRows}
+                  </section>
+                )}
+              </TaskPage>
             )}
 
             {view && !pageTask && (
@@ -1108,7 +1187,12 @@ export function App(): ReactElement {
                 )}
 
                 <section className="card tasks" aria-label="Tasks" ref={tasksCard}>
-                  <Glide card={tasksCard} target={glideTarget} version={glideVersion} />
+                  <Glide
+                    card={tasksCard}
+                    target={glideTarget}
+                    version={glideVersion}
+                    editing={editing !== null}
+                  />
                   {view.items.length === 0 && (
                     <p className="empty">
                       Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
@@ -1121,7 +1205,12 @@ export function App(): ReactElement {
                 {(view.completed.length > 0 ||
                   ghosts.some((ghost) => ghost.direction === 'reopen')) && (
                   <section className="card completed" aria-label="Completed" ref={completedCard}>
-                    <Glide card={completedCard} target={glideTarget} version={glideVersion} />
+                    <Glide
+                      card={completedCard}
+                      target={glideTarget}
+                      version={glideVersion}
+                      editing={editing !== null}
+                    />
                     <button
                       type="button"
                       className="completed-head"
@@ -1140,7 +1229,7 @@ export function App(): ReactElement {
                         <Row
                           key={task.key}
                           task={task}
-                          fresh={freshKeys.has(task.key)}
+                          fresh={freshKeys.get(task.key)}
                           {...rowProps}
                         />,
                         ...bodyRows(task, false),
@@ -1431,8 +1520,51 @@ interface RowHandlers {
 }
 
 /**
- * A task as a page (TASK-05, D-53, 09 §8): it replaces the list, with a back arrow, the title (a
- * click edits it) and the body, rendered, with plain editing until the note editor (D-49, M5).
+ * A task's title edited on its page (D-76): it wraps in the title's own type. Enter, Esc and
+ * leaving the field save; the title stays one line in the file, so line breaks become spaces.
+ */
+function TitleField(props: {
+  readonly initial: string;
+  readonly onLeave: (text: string, empty: boolean) => void;
+}): ReactElement {
+  const { initial, onLeave } = props;
+  const text = useInertText(initial, true);
+  const left = useRef(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const length = field.current?.value.length ?? 0;
+    field.current?.setSelectionRange(length, length);
+  }, []);
+  const leave = (): void => {
+    if (left.current) return;
+    left.current = true;
+    onLeave(text.escaped(), text.value.trim() === '');
+  };
+  return (
+    <textarea
+      ref={field}
+      className="page-title-input"
+      aria-label="Title"
+      autoFocus
+      rows={1}
+      value={text.value}
+      spellCheck={false}
+      onChange={(event) => text.change(event.target.value.replace(/\r?\n/g, ' '))}
+      onPaste={text.paste}
+      onBlur={leave}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== 'Escape') return;
+        event.preventDefault();
+        leave();
+      }}
+    />
+  );
+}
+
+/**
+ * A task as a page (TASK-05, D-53, D-76, 09 §8): it replaces the list, with a back arrow, the title
+ * (a click edits it), the body (rendered, with plain editing until the note editor, D-49, M5), and
+ * the subtasks with "Add subtask".
  */
 function TaskPage(props: {
   readonly task: TaskRow;
@@ -1440,8 +1572,11 @@ function TaskPage(props: {
   readonly onBack: () => void;
   readonly onTitle: (text: string) => void;
   readonly onBody: (body: string) => void;
+  readonly onAddSubtask: () => void;
+  /** The subtasks' card. */
+  readonly children?: ReactElement | false;
 }): ReactElement {
-  const { task, readOnly, onBack, onTitle, onBody } = props;
+  const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, children } = props;
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingBody, setEditingBody] = useState(false);
   const editable = !readOnly && !task.done;
@@ -1452,17 +1587,13 @@ function TaskPage(props: {
           <BackIcon />
         </button>
         {editingTitle ? (
-          <div className="page-title-edit">
-            <EditField
-              initial={task.title}
-              inert
-              onLeave={(text, empty) => {
-                setEditingTitle(false);
-                if (!empty || hasBody(task)) onTitle(text);
-              }}
-              onTab={() => undefined}
-            />
-          </div>
+          <TitleField
+            initial={task.title}
+            onLeave={(text, empty) => {
+              setEditingTitle(false);
+              if (!empty || hasBody(task)) onTitle(text);
+            }}
+          />
         ) : (
           <h1
             className="page-title"
@@ -1482,23 +1613,31 @@ function TaskPage(props: {
           </h1>
         )}
       </header>
-      {editingBody ? (
-        <BodyEditor
-          initial={task.body}
+      {editingBody || hasBody(task) ? (
+        <BodyBlock
+          body={task.body}
+          inline={false}
+          editing={editingBody}
+          editable={editable}
           placeholder="Notes, code, links…"
+          onEdit={() => setEditingBody(true)}
           onDone={(body) => {
             setEditingBody(false);
             onBody(body);
           }}
         />
-      ) : hasBody(task) ? (
-        <BodyView body={task.body} onEdit={() => editable && setEditingBody(true)} />
       ) : (
         editable && (
           <button type="button" className="page-add-body" onClick={() => setEditingBody(true)}>
             Add notes, code or links
           </button>
         )
+      )}
+      {children}
+      {editable && (
+        <button type="button" className="page-add-body" onClick={onAddSubtask}>
+          Add subtask
+        </button>
       )}
     </>
   );
@@ -1537,8 +1676,8 @@ function Row(
   props: RowHandlers & {
     readonly task: TaskRow;
     readonly subtask?: boolean;
-    /** Just appeared in the list being looked at: it eases in (UI-04). */
-    readonly fresh?: boolean;
+    /** Just appeared in the list being looked at, or reopened: it eases in (UI-04, D-76). */
+    readonly fresh?: 'new' | 'return' | undefined;
     /** D-75: a ghost playing the completion animation where the task was. */
     readonly ghost?: 'complete' | 'reopen';
   },
@@ -1553,7 +1692,7 @@ function Row(
     onEdit,
     onLeaveTask,
     onTab,
-    fresh = false,
+    fresh,
     ghost,
   } = props;
   const isEditing = !ghost && editing?.kind === 'task' && editing.key === task.key;
@@ -1562,7 +1701,9 @@ function Row(
   if (subtask) classes.push('subtask');
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
-  if (fresh) classes.push('enter');
+  if (fresh) classes.push('enter', fresh);
+  /** D-76: a second single click on an already-selected row edits it, like renaming in Explorer. */
+  const wasSelected = useRef(false);
   if (ghost) classes.push('leaving', ghost);
   const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
   return (
@@ -1570,7 +1711,15 @@ function Row(
       data-key={ghost ? undefined : task.key}
       aria-hidden={ghost ? true : undefined}
       className={classes.join(' ')}
-      onMouseDown={() => onSelect(task.key)}
+      onMouseDown={() => {
+        wasSelected.current = task.key === selected && !isEditing;
+        onSelect(task.key);
+      }}
+      onClick={(event) => {
+        if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;
+        if ((event.target as Element).closest('button, a, input, textarea')) return;
+        onEdit(task.key);
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1676,9 +1825,33 @@ function Glide(props: {
   readonly version: unknown;
   /** `sel-glide` for rows, `nav-glide` for the sidebar (D-65). */
   readonly className?: string;
+  /** D-76: the target is being edited: the highlight is the dark editing field. */
+  readonly editing?: boolean;
 }): ReactElement | null {
-  const { card, target, version, className = 'sel-glide' } = props;
+  const { card, target, version, className = 'sel-glide', editing = false } = props;
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const node = useRef<HTMLDivElement>(null);
+  // D-76: editing that starts on another row appears there (fading in) instead of gliding over;
+  // from one editing row to the next it glides.
+  const jump = useRef(false);
+  const last = useRef({ target, editing });
+  if (last.current.target !== target || last.current.editing !== editing) {
+    if (editing && !last.current.editing && target !== last.current.target) jump.current = true;
+    last.current = { target, editing };
+  }
+  useLayoutEffect(() => {
+    const element = node.current;
+    if (!element || !jump.current) return;
+    jump.current = false;
+    element.style.transition = 'none';
+    void element.offsetWidth;
+    element.style.transition = '';
+    if (!reducedMotion())
+      element.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: durationMs('--fl-dur-base', 200),
+        easing: 'ease-out',
+      });
+  }, [box]);
   useLayoutEffect(() => {
     const measure = (): void => {
       const row = target
@@ -1703,7 +1876,8 @@ function Glide(props: {
   if (!box) return null;
   return (
     <div
-      className={className}
+      ref={node}
+      className={editing ? `${className} editing` : className}
       aria-hidden="true"
       style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
     />
@@ -1790,6 +1964,7 @@ function Title(props: {
         const link = onLink(event);
         if (link) {
           event.preventDefault();
+          event.stopPropagation();
           window.flintMain.openLink(link.href);
           return;
         }
@@ -1797,7 +1972,10 @@ function Title(props: {
         if (!onEditAt || event.ctrlKey || event.shiftKey || event.detail > 1) return;
         const span = event.currentTarget;
         const at = textOffsetAt(span, event.clientX, event.clientY);
-        if (at !== null) onEditAt(rawOffset(task.title, span.textContent ?? '', at));
+        if (at === null) return;
+        // Not also the row's second click (D-76).
+        event.stopPropagation();
+        onEditAt(rawOffset(task.title, span.textContent ?? '', at));
       }}
     />
   );
@@ -1839,7 +2017,7 @@ function NewRow(props: {
     void id.then((value) => onLeave(text, empty, how, value));
   };
   return (
-    <div className={subtask ? 'row sel editing subtask' : 'row sel editing'}>
+    <div className={subtask ? 'row sel editing subtask' : 'row sel editing'} data-key={NEW_ROW}>
       <span className="check" aria-hidden="true" />
       <EditField
         initial=""

@@ -13,6 +13,9 @@ export type PasteKind = 'json' | 'stack-trace' | 'code' | 'text';
 const FRAME_LINES = FRAME_LINE;
 const TRACEBACK = /^Traceback \(most recent call last\):\s*$/m;
 
+/** A markdown list item, heading or quote: never code on its own (D-76). */
+const MARKDOWN_LINE = /^ {0,3}(?:[-*+] |\d{1,3}[.)] |#{1,6} |>)/;
+
 function lines(text: string): string[] {
   return text.split(/\r\n|\r|\n/);
 }
@@ -31,6 +34,9 @@ export function classifyPaste(text: string): PasteKind {
   if (all.some((line) => TRACE_HEADER.test(line))) return 'stack-trace';
   const frames = all.filter((line) => FRAME_LINES.some((pattern) => pattern.test(line))).length;
   if (frames >= 2) return 'stack-trace';
+  // D-76: markdown (lists, headings, quotes) stays text, even with lines ending in a link's `)`.
+  const markdown = all.filter((line) => MARKDOWN_LINE.test(line)).length;
+  if (markdown / all.length >= 0.5) return 'text';
   if (all.length >= 3) {
     const codeLike = all.filter(
       (line) => /^(\t| {2,})\S/.test(line) || /[;{}()]\s*$/.test(line) || /^\s*[}\])]/.test(line),

@@ -895,9 +895,12 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect.poll(() => readFile(file, 'utf8')).toContain('    ```\n    More.\n- [ ] Long body');
   await expect(inline.locator('p').last()).toHaveText('More.');
 
-  // A large body opens as a page; Esc goes back to the list with the task selected.
+  // D-76: a long body opens inline cut off, with Open as page; Esc goes back from the page to
+  // the list with the task selected.
   await main.locator('.row', { hasText: 'Long body' }).click({ position: { x: 600, y: 10 } });
   await main.keyboard.press('ArrowRight');
+  await expect(main.locator('.body-block.long')).toBeVisible();
+  await main.getByRole('button', { name: 'Open as page' }).click();
   await expect(main.locator('.page-title')).toHaveText('Long body');
   await expect(main.locator('.body-view')).toContainText('line 30');
   await main.keyboard.press('Escape');
@@ -922,8 +925,26 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
   await mouseButton(4);
   await expect(main.locator('.page-title')).toHaveText('Shot');
+  // The page lists the subtasks; Add subtask opens a new row there (D-76).
+  await main.getByRole('button', { name: 'Add subtask' }).click();
+  await main.keyboard.type('Crop it');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.page-subtasks .row .title')).toHaveText(['Crop it']);
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(
+      /- \[ \] Shot \[id:: b3\]\n {4}!\[dot\]\(attachments\/dot\.png\)\n {4}- \[ \] Crop it/,
+    );
   await main.locator('.page-back').click();
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
+
+  // D-76: a second single click on a selected row (beside its text) edits it.
+  await short.click({ position: { x: 600, y: 10 } });
+  await expect(main.locator('.row.sel .title')).toHaveText('Short body');
+  await main.waitForTimeout(600);
+  await short.click({ position: { x: 600, y: 10 } });
+  await expect(main.locator('.title-input')).toHaveValue('Short body');
+  await main.keyboard.press('Escape');
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

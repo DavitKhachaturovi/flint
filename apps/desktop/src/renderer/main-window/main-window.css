@@ -186,6 +186,8 @@ button:focus-visible {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* D-76: the scrollbar's place is always kept, so nothing shifts when one appears (a note). */
+  scrollbar-gutter: stable;
 }
 
 .content {
@@ -639,10 +641,16 @@ h1 .count {
   box-shadow: none;
 }
 
-/* TASK-02, D-74 (09 §8): a row in Edit state is a dark input field, like the composer, clearly not
-   the selected-row look (docs/03 §2). */
+/* TASK-02, D-74, D-76 (09 §8): a row in Edit state is a dark input field, like the composer,
+   clearly not the selected-row look (docs/03 §2). The field is the card's highlight (.sel-glide
+   .editing): it fades in where editing starts and glides from one editing row to the next. */
 .row.editing,
 .row.editing:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+.sel-glide.editing {
   background: var(--fl-ground-well);
   box-shadow: inset 0 0 0 1px var(--fl-edge-card);
 }
@@ -658,17 +666,43 @@ h1 .count {
   transition:
     transform var(--fl-dur-base) var(--fl-ease-spring),
     width var(--fl-dur-base) var(--fl-ease-spring),
-    height var(--fl-dur-base) var(--fl-ease-spring);
+    height var(--fl-dur-base) var(--fl-ease-spring),
+    background-color var(--fl-dur-base) ease,
+    box-shadow var(--fl-dur-base) ease;
 }
 
+/* UI-04, D-76: a new task opens up its place; a reopened one returns from the left. */
 .row.enter {
   animation: row-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.row.enter.return {
+  animation-name: row-return;
 }
 
 @keyframes row-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    max-height: 64px;
+  }
+}
+
+@keyframes row-return {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    max-height: 64px;
   }
 }
 
@@ -808,6 +842,7 @@ h1 .count {
   }
   100% {
     opacity: 0;
+    transform: translateY(-8px);
     max-height: 0;
     padding-top: 0;
     padding-bottom: 0;
@@ -819,6 +854,28 @@ h1 .count {
 .content {
   /* D-75: --fl-dur-page, ease-out; the new content takes input at once. */
   animation: view-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.content.forward {
+  animation-name: view-in-forward;
+}
+
+.content.back {
+  animation-name: view-in-back;
+}
+
+@keyframes view-in-forward {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes view-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
 }
 
 @keyframes view-in {
@@ -1076,41 +1133,104 @@ textarea:not([readonly], [disabled]) {
   font-style: italic;
 }
 
-/* The inline body, aligned with the title's text (after the check). */
+/* TASK-05, D-76 (09 §8): a body in its place: inline under its row in a subtle well aligned with
+   the title's text, or in full on the task's page. Its plain field (until M5) takes exactly the
+   rendered text's place, padding and type. */
 .row-body {
-  padding: 2px 16px 12px 48px;
+  padding: 0 12px 10px 48px;
+  overflow: hidden;
+  animation: body-in var(--fl-dur-base) ease-out;
 }
 
 .row-body.subtask {
   padding-left: 80px;
 }
 
-/* Measuring a body before choosing inline or page (D-53): laid out like the inline body. */
-.body-probe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  /* The content column less its padding, the card's and the inline body's. */
-  width: calc(100% - 156px);
-  visibility: hidden;
+.row-body.closing {
   pointer-events: none;
+  animation: body-out var(--fl-dur-base) ease-in forwards;
 }
 
-/* A body in its plain monospace field until the M5 editor (D-49), like a task in Edit state. */
+@keyframes body-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding-bottom: 0;
+  }
+  to {
+    max-height: 320px;
+  }
+}
+
+@keyframes body-out {
+  from {
+    max-height: 320px;
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    padding-bottom: 0;
+  }
+}
+
+.body-block {
+  padding: 10px 14px;
+  border-radius: var(--fl-radius-row);
+  transition:
+    background-color var(--fl-dur-base) ease,
+    box-shadow var(--fl-dur-base) ease;
+}
+
+.body-block.inline,
+.body-block.editing {
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+/* On the page, the text lines up with the title. */
+.body-block.full {
+  margin: 0 -10px;
+}
+
+.body-block.inline .body-clip {
+  font-size: var(--fl-size-note);
+  max-height: calc(1.7em * 8);
+  overflow: hidden;
+}
+
+.body-block.long .body-clip {
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
+}
+
+.body-open-page {
+  margin-top: 6px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border-radius: 8px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.body-open-page:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
 .body-editor {
   display: block;
   width: 100%;
-  min-height: 96px;
-  padding: 10px 12px;
+  min-height: 1.7em;
+  padding: 0;
   border: 0;
-  border-radius: var(--fl-radius-row);
   outline: none;
   resize: none;
   field-sizing: content;
-  background: var(--fl-ground-well);
-  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
-  font-family: var(--fl-font-mono);
-  font-size: 13.5px;
+  background: transparent;
+  font-family: var(--fl-font-ui);
+  font-size: var(--fl-size-note);
   line-height: 1.7;
   color: var(--fl-text-body);
   caret-color: var(--fl-accent);
@@ -1138,9 +1258,11 @@ textarea:not([readonly], [disabled]) {
 }
 
 /* The task page (09 §8): a back-arrow tile left of the title, the body below. */
+/* The task page (09 §8, D-76): a back-arrow tile on the title's first line, a lighter title that
+   wraps, also while it is edited. */
 .page-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   padding: 0 4px 6px;
 }
@@ -1149,6 +1271,8 @@ textarea:not([readonly], [disabled]) {
   flex: none;
   width: 30px;
   height: 30px;
+  /* Centred on the title's first line (27 px × 1.3). */
+  margin-top: 2.5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1165,26 +1289,40 @@ textarea:not([readonly], [disabled]) {
   color: var(--fl-text-primary);
 }
 
-.page-title {
+.page-title,
+.page-title-input {
   flex: 1;
   min-width: 0;
-  font-size: 32px;
+  margin: 0;
+  font-family: var(--fl-font-ui);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: var(--fl-text-highlight);
   overflow-wrap: anywhere;
 }
 
-.page-title-edit {
-  flex: 1;
-  min-width: 0;
-}
-
-.page-title-edit .title-input {
-  width: 100%;
-  padding: 4px 10px;
-  border-radius: var(--fl-radius-row);
+/* Editing keeps the title's place: the well's padding is taken back by its margin. */
+.page-title-input {
+  display: block;
+  padding: 0 8px;
+  margin: 0 -8px;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  resize: none;
+  field-sizing: content;
   background: var(--fl-ground-well);
   box-shadow: inset 0 0 0 1px var(--fl-edge-card);
-  font-size: 26px;
-  font-weight: 700;
+  caret-color: var(--fl-accent);
+  animation: fade-in var(--fl-dur-base) ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0.4;
+  }
 }
 
 .page-add-body {
@@ -1200,10 +1338,4 @@ textarea:not([readonly], [disabled]) {
 .page-add-body:hover {
   background: var(--fl-ground-hover);
   color: var(--fl-text-primary);
-}
-
-.content > .body-view,
-.content > .body-editor {
-  padding-left: 4px;
-  padding-right: 4px;
 }
