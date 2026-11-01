@@ -505,12 +505,12 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
   const caret = (): Promise<number | null> =>
     field.evaluate((input: HTMLInputElement) => input.selectionStart);
   const lawn = main.locator('.row', { hasText: 'Mow the lawn' });
-  const lawnText = (await lawn.locator('.title').evaluate((span) => {
+  const lawnText = await lawn.locator('.title').evaluate((span) => {
     const range = document.createRange();
     range.selectNodeContents(span);
     const rect = range.getBoundingClientRect();
     return { left: rect.left, right: rect.right, y: rect.top + rect.height / 2 };
-  }))!;
+  });
   await main.mouse.click(lawnText.left + 1, lawnText.y);
   await expect(field).toBeFocused();
   await expect(field).toHaveValue('Mow the lawn');
