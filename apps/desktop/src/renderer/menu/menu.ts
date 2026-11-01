@@ -88,8 +88,11 @@ export function openMenu(
       button.classList.toggle('active', index === level.active),
     );
   const closeFrom = (depth: number): void => {
-    for (const level of levels.splice(depth)) level.menu.remove();
+    for (const level of levels.splice(depth)) fadeOut(level.menu);
   };
+  // D-79, menu aim: the pointer's last place, and a move toward an open submenu waits a moment.
+  let pointer = { x: at.x, y: at.y };
+  let aiming: number | undefined;
   const pick = (depth: number, index: number, byKeyboard: boolean): void => {
     const chosen = levels[depth]?.buttons[index];
     if (!chosen || chosen.item.disabled) return;
@@ -140,16 +143,39 @@ export function openMenu(
     // A submenu opened from the keyboard starts on its first item.
     const level: Level = { menu, buttons, active: byKeyboard ? 0 : -1, byKeyboard };
     buttons.forEach(({ button, item }, index) => {
-      button.addEventListener('mouseenter', () => {
+      const enter = (): void => {
         level.byKeyboard = false;
         level.active = index;
         paint(level);
-        if (item.submenu && !item.disabled) openLevel(item.submenu, depth + 1, button, false);
-        else closeFrom(depth + 1);
+        if (item.submenu && !item.disabled) {
+          if (levels[depth + 1]?.menu.dataset['from'] !== String(index))
+            openLevel(item.submenu, depth + 1, button, false);
+        } else closeFrom(depth + 1);
+      };
+      button.addEventListener('mouseenter', (event) => {
+        window.clearTimeout(aiming);
+        const child = levels[depth + 1];
+        const to = { x: event.clientX, y: event.clientY };
+        // Crossing this item on the way to the open submenu doesn't close it; if the pointer
+        // stays here, it switches after the grace delay.
+        if (child && towards(pointer, to, child.menu.getBoundingClientRect())) {
+          aiming = window.setTimeout(() => {
+            if (levels[depth + 1] === child && child.menu.matches(':hover')) return;
+            enter();
+          }, AIM_GRACE_MS);
+        } else enter();
+        pointer = to;
       });
       // Mouse down keeps the focus (and the text selection) where it was.
       button.addEventListener('mousedown', (event) => event.preventDefault());
       button.addEventListener('click', () => pick(depth, index, false));
+    });
+    menu.addEventListener('mousemove', (event) => {
+      pointer = { x: event.clientX, y: event.clientY };
+    });
+    menu.addEventListener('mouseenter', () => {
+      // Reaching a submenu keeps it, and its item, as they are.
+      if (depth > 0) window.clearTimeout(aiming);
     });
     menu.addEventListener('mouseleave', (event) => {
       // Into its own submenu, the item stays highlighted.
@@ -158,6 +184,10 @@ export function openMenu(
       paint(level);
     });
     paint(level);
+    if (beside)
+      menu.dataset['from'] = String(
+        levels[depth - 1]?.buttons.findIndex((b) => b.button === beside) ?? -1,
+      );
     menu.style.visibility = 'hidden';
     document.body.append(menu);
     levels[depth] = level;
@@ -244,6 +274,7 @@ export function openMenu(
   window.addEventListener('resize', onResize);
   close = () => {
     close = null;
+    window.clearTimeout(aiming);
     closeFrom(0);
     stopFollowing();
     document.removeEventListener('keydown', onKey, true);
@@ -252,6 +283,53 @@ export function openMenu(
     window.removeEventListener('resize', onResize);
     if (grown) options.room?.release();
   };
+}
+
+/** D-79: how long a move toward a submenu may cross other items before they take over. */
+const AIM_GRACE_MS = 300;
+
+/**
+ * D-79, menu aim: whether the pointer, moving from `from` to `to`, heads into `target` (a submenu
+ * beside the item): `to` lies in the triangle between `from` and the submenu's near edge.
+ */
+function towards(
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  target: DOMRect,
+): boolean {
+  const edge = target.left >= from.x ? target.left : target.right;
+  const a = { x: edge, y: target.top - 8 };
+  const b = { x: edge, y: target.bottom + 8 };
+  const side = (p: typeof from, q: typeof from, r: typeof from): number =>
+    (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const d1 = side(from, a, to);
+  const d2 = side(a, b, to);
+  const d3 = side(b, from, to);
+  const negative = d1 < 0 || d2 < 0 || d3 < 0;
+  const positive = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(negative && positive);
+}
+
+/** D-79: a menu (or submenu) fades out, then goes; nothing waits for it. */
+function fadeOut(menu: HTMLElement): void {
+  menu.style.pointerEvents = 'none';
+  // No longer a menu for lookups, only its look.
+  menu.classList.replace('fl-menu', 'fl-menu-ghost');
+  menu.classList.replace('fl-submenu', 'fl-submenu-ghost');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    menu.remove();
+    return;
+  }
+  menu
+    .animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 140,
+      easing: 'ease-in',
+      fill: 'forwards',
+    })
+    .finished.then(
+      () => menu.remove(),
+      () => menu.remove(),
+    );
 }
 
 /** Text fields (inputs, text areas): what is selected decides Cut and Copy. */

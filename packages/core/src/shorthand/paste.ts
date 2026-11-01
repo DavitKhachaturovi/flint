@@ -13,6 +13,9 @@ export type PasteKind = 'json' | 'stack-trace' | 'code' | 'text';
 const FRAME_LINES = FRAME_LINE;
 const TRACEBACK = /^Traceback \(most recent call last\):\s*$/m;
 
+const MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})/m;
+const MARKDOWN_IMAGE = /!\[[^\]]*\]\([^)\s]+\)/;
+
 /** A markdown list item, heading or quote: never code on its own (D-76). */
 const MARKDOWN_LINE = /^ {0,3}(?:[-*+] |\d{1,3}[.)] |#{1,6} |>)/;
 
@@ -22,6 +25,8 @@ function lines(text: string): string[] {
 
 export function classifyPaste(text: string): PasteKind {
   const trimmed = text.trim();
+  // D-79: markdown already (a fenced block, an image link) stays markdown; only raw code is fenced.
+  if (MARKDOWN_FENCE.test(trimmed) || MARKDOWN_IMAGE.test(trimmed)) return 'text';
   if (/^[[{]/.test(trimmed)) {
     try {
       const value: unknown = JSON.parse(trimmed);

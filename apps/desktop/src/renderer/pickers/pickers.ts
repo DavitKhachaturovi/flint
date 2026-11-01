@@ -200,9 +200,10 @@ function fadeOut(panel: HTMLElement): void {
     .animate(
       [
         { opacity: 1, transform: 'none' },
-        { opacity: 0, transform: 'scale(0.94)' },
+        { opacity: 0, transform: 'translateY(-4px) scale(0.95)' },
       ],
-      { duration: durationOf('--fl-dur-fast', 120) * 1.25, easing: 'ease-in', fill: 'forwards' },
+      // D-79: long enough to read as closing.
+      { duration: durationOf('--fl-dur-fast', 120) * 1.5, easing: 'ease-in', fill: 'forwards' },
     )
     .finished.then(
       () => panel.remove(),

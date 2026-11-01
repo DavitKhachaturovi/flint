@@ -634,6 +634,13 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Low',
     'None',
   ]);
+  // D-79: a diagonal move across the next items to the submenu keeps it open (menu aim).
+  const priorityBox = await menu.getByText('Priority', { exact: true }).boundingBox();
+  const lowBox = await main.locator('.fl-submenu').getByText('Low').boundingBox();
+  if (!priorityBox || !lowBox) throw new Error('no menu boxes');
+  await main.mouse.move(priorityBox.x + 20, priorityBox.y + priorityBox.height / 2);
+  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 12 });
+  await expect(main.locator('.fl-submenu .fl-menu-item.active')).toHaveText(/Low/);
   await menu.getByText('Move to…').click();
   await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
   await main.keyboard.type('Garden');

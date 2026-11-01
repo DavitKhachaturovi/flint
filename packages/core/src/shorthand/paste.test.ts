@@ -50,6 +50,15 @@ describe('paste-to-capture (CAP-06)', () => {
     expect(classifyPaste('42')).toBe('text');
   });
 
+  it('keeps pasted markdown as markdown: fenced blocks and image links (D-79)', () => {
+    const fenced = 'Repro:\n```js\nconst a = 1;\nfoo();\n```\n![shot](attachments/shot.png)';
+    expect(classifyPaste(fenced)).toBe('text');
+    expect(classifyPaste('```\n{"a": 1}\n```')).toBe('text');
+    expect(classifyPaste('![](attachments/a.png)')).toBe('text');
+    // Raw code is still fenced.
+    expect(classifyPaste(code)).toBe('code');
+  });
+
   it('keeps markdown notes as text, even when their lines end in links (D-76)', () => {
     const links =
       '- [Runbook](https://wiki/run)\n- [Dashboard](https://grafana/d)\n- [Alerts](https://pd/a)';

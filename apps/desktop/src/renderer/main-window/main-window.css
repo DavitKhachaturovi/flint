@@ -1227,7 +1227,8 @@ textarea:not([readonly], [disabled]) {
 }
 
 .body-block.inline.long .body-clip:hover {
-  background: var(--fl-ground-hover);
+  /* D-79: a much subtler tone that belongs to the card. */
+  background: color-mix(in srgb, var(--fl-ground-float), var(--fl-text-primary) 3%);
 }
 
 .body-block.long .body-clip {
@@ -1517,7 +1518,8 @@ textarea:not([readonly], [disabled]) {
    the priority stripe runs its full height. */
 .row-group {
   position: relative;
-  margin: 2px 0;
+  /* D-79: the card's outline adds no space: the same rhythm as between rows. */
+  margin: 0;
   border-radius: 14px;
   background: var(--fl-ground-float);
   box-shadow: var(--fl-shadow-selected);
@@ -1619,8 +1621,9 @@ textarea:not([readonly], [disabled]) {
   display: block;
   width: 100%;
   min-height: 1.6em;
-  margin: -6px 0 8px;
-  padding: 0 10px;
+  /* D-79: under the title, never clipped. */
+  margin: 0 0 8px;
+  padding: 2px 10px 0;
   border: 0;
   outline: none;
   resize: none;

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { blockFor, classifyPaste, fencedBlock, type BlockKind } from '@flint/core/shorthand';
 import { bodyHtml } from '../../shared/body-markdown.js';
+import { codeLanguage } from '../../shared/code-language.js';
 import { highlightLines } from '../highlight/highlight.js';
 
 const COPY_ICON =
@@ -24,8 +25,8 @@ function highlightCode(root: HTMLElement): void {
     head.className = 'code-head';
     const label = document.createElement('span');
     label.className = 'code-kind';
-    label.textContent =
-      kind === 'stack-trace' ? 'stack trace' : kind === 'json' ? 'json' : lang || 'code';
+    // D-79: the detected language (yaml, json, stack trace…), never just "code" when it can tell.
+    label.textContent = codeLanguage(text, lang);
     const copy = document.createElement('button');
     copy.type = 'button';
     copy.className = 'code-copy';

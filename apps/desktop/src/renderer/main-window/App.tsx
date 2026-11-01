@@ -8,7 +8,13 @@ import {
   type ReactElement,
   type RefObject,
 } from 'react';
-import { parseCapture, type ListInfo, type TokenKind } from '@flint/core/shorthand';
+import {
+  classifyPaste,
+  fencedBlock,
+  parseCapture,
+  type ListInfo,
+  type TokenKind,
+} from '@flint/core/shorthand';
 import { parseLocalDateTime } from '@flint/core/time';
 import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
 import {
@@ -823,6 +829,39 @@ export function App(): ReactElement {
             ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
             : []),
           ...(open ? [{ label: 'Add notes', action: () => openNotes(row.key) }] : []),
+          // D-79: Shift+Tab and Tab, made findable.
+          ...(open
+            ? [
+                view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
+                  ? {
+                      label: 'Indent',
+                      hint: 'Tab',
+                      action: () => void change({ kind: 'indent', key: row.key }),
+                    }
+                  : {
+                      label: 'Outdent',
+                      hint: 'Shift+Tab',
+                      action: () => void change({ kind: 'outdent', key: row.key }),
+                    },
+              ]
+            : []),
+          // D-79: fencing a body's unfenced code or JSON on purpose (never by itself on render).
+          ...(open && hasBody(row) && !/^ {0,3}(```|~~~)/m.test(row.body)
+            ? [
+                {
+                  label: 'Format as code',
+                  action: () =>
+                    void change({
+                      kind: 'body',
+                      key: row.key,
+                      body: fencedBlock(
+                        row.body.trim(),
+                        classifyPaste(row.body) === 'json' ? 'json' : '',
+                      ),
+                    }),
+                },
+              ]
+            : []),
           {
             label: open ? 'Complete' : 'Reopen',
             hint: 'Space',
