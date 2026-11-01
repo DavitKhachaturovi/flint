@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import {
+  blockFor,
   classifyPaste,
   fencedBlock,
   parseCapture,
@@ -1773,6 +1774,50 @@ function Composer(props: {
     focusNotes.current = false;
     notesRef.current?.focus();
   }, [notes]);
+  /** D-79: a block (fenced code, an image link) goes to the end of the notes, which open. */
+  const addToNotes = (block: string): void => {
+    focusNotes.current = true;
+    setNotes((current) => (current?.trim() ? `${current.replace(/\s+$/, '')}\n\n` : '') + block);
+  };
+  /**
+   * D-79, CAP-06 in the composer: a pasted image is saved to attachments/ and linked in the notes;
+   * pasted code, JSON or a stack trace goes into the notes fenced; other text is typed as usual.
+   */
+  const pasteRules = (event: React.ClipboardEvent, field: HTMLTextAreaElement | null): boolean => {
+    const image = [...event.clipboardData.items]
+      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      ?.getAsFile();
+    if (image) {
+      event.preventDefault();
+      void image
+        .arrayBuffer()
+        .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
+        .then((link) => {
+          if (!link) return;
+          if (field) insertAt(field, `![](${link})`);
+          else addToNotes(`![](${link})`);
+        });
+      return true;
+    }
+    const pasted = event.clipboardData.getData('text/plain');
+    const kind = classifyPaste(pasted);
+    if (kind === 'text') return false;
+    event.preventDefault();
+    const block = fencedBlock(blockFor(pasted).text, kind === 'json' ? 'json' : '');
+    if (field) insertAt(field, block);
+    else addToNotes(block);
+    return true;
+  };
+  /** A block at the notes' caret, on lines of its own. */
+  const insertAt = (field: HTMLTextAreaElement, block: string): void => {
+    const before = field.value.slice(0, field.selectionStart);
+    const after = field.value.slice(field.selectionEnd);
+    const lead =
+      before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+    const trail = after === '' || after.startsWith('\n') ? '' : '\n';
+    field.setRangeText(lead + block + trail, field.selectionStart, field.selectionEnd, 'end');
+    setNotes(field.value);
+  };
   const submit = (): void => {
     const typed = text.escaped();
     if (typed.trim() === '') return;
@@ -1843,7 +1888,9 @@ function Composer(props: {
         value={value}
         spellCheck={false}
         onChange={(event) => text.change(event.target.value)}
-        onPaste={text.paste}
+        onPaste={(event) => {
+          if (!pasteRules(event, null)) text.paste();
+        }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Enter' && event.shiftKey) {
@@ -1869,6 +1916,7 @@ function Composer(props: {
           value={notes}
           spellCheck={false}
           onChange={(event) => setNotes(event.target.value)}
+          onPaste={(event) => void pasteRules(event, event.currentTarget)}
           onKeyDown={(event) => {
             const field = event.currentTarget;
             if (event.key === 'Enter' && !event.shiftKey) {

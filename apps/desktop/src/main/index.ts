@@ -347,6 +347,14 @@ async function start(): Promise<void> {
       return { ok: false, problem: 'Flint could not change the file' } as const;
     });
   });
+  ipcMain.handle(Channels.mainAttach, (event, bytes: unknown, type: unknown) =>
+    owns(event.sender) && bytes instanceof Uint8Array && typeof type === 'string'
+      ? workspace.saveImage(bytes, type, new Date()).catch((error: unknown) => {
+          log(`could not save the image: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
   ipcMain.handle(Channels.mainSidebar, (event) =>
     owns(event.sender) ? workspace.sidebar() : null,
   );

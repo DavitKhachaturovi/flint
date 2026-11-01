@@ -28,7 +28,8 @@ interface Slot {
 
 const EMPTY: CaptureDraft = { title: '', blocks: [] };
 
-const IMAGE_TYPES: Readonly<Record<string, string>> = {
+/** The image types Flint attaches (CAP-06, MEDIA-02), with their file extensions. */
+export const IMAGE_TYPES: Readonly<Record<string, string>> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/gif': 'gif',

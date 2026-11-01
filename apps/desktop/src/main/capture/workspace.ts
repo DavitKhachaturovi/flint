@@ -52,6 +52,7 @@ import type {
   ListView,
 } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import { IMAGE_TYPES } from './drafts.js';
 import {
   EMPTY_SIDEBAR,
   addGroup,
@@ -141,6 +142,9 @@ export type ListMode = 'tasks' | 'note';
 /** What a list action did, or why it couldn't (shown next to the name being typed). */
 export type ListOutcome = ListActionOutcome;
 
+/** Pasted images bigger than this aren't attached (MEDIA-03 warns about large files later). */
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+
 const NEW_LIST_HEADER = (id: string, mode: ListMode = 'tasks'): string =>
   `---\nflint: 1\nid: ${id}\nmode: ${mode}\n---\n`;
 
@@ -193,6 +197,20 @@ export class Workspace {
       await readFile(workspace.sidebarPath, 'utf8').catch(() => null),
     );
     return workspace;
+  }
+
+  /**
+   * D-79: an image pasted into the main window (the composer), saved to `attachments/` (MEDIA-02);
+   * resolves to its relative link, or null for a type Flint doesn't attach.
+   */
+  async saveImage(bytes: Uint8Array, type: string, now: Date): Promise<string | null> {
+    const extension = IMAGE_TYPES[type];
+    if (!extension || bytes.byteLength > MAX_IMAGE_BYTES) return null;
+    await mkdir(join(this.folder, 'attachments'), { recursive: true });
+    const name = `${stamp(now)}-${generateId(this.isTaken)}.${extension}`;
+    const path = join(this.folder, 'attachments', name);
+    await writeFileAtomic(path, bytes, { tempDirectory: tempDirectoryFor(path) });
+    return `attachments/${name}`;
   }
 
   /** LIST-05, D-73: the sidebar's groups and manual order, from `.flint/sidebar.json`. */

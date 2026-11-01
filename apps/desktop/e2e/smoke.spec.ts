@@ -983,6 +983,39 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect
     .poll(() => readFile(file, 'utf8'))
     .toMatch(/- \[ \] With notes \[id:: \w+\]\n {4}first line\n/);
+  // D-79, CAP-06 in the composer: pasted JSON goes into the notes fenced, a pasted image is saved
+  // to attachments/ and linked there; pasted markdown stays as it is.
+  await main.keyboard.type('Pasted');
+  await main.evaluate(
+    ([json, image]) => {
+      const field = document.activeElement;
+      const paste = (data: DataTransfer): void => {
+        field?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+      };
+      const text = new DataTransfer();
+      text.setData('text/plain', json);
+      paste(text);
+      const picture = new DataTransfer();
+      const bytes = Uint8Array.from(atob(image), (char) => char.charCodeAt(0));
+      picture.items.add(new File([bytes], 'clip.png', { type: 'image/png' }));
+      paste(picture);
+    },
+    [
+      '{"b": 2}',
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    ] as const,
+  );
+  const notes = main.locator('.composer-notes');
+  await expect(notes).toHaveValue(
+    /^```json\n\{"b": 2\}\n```\n\n!\[\]\(attachments\/[\w-]+\.png\)$/,
+  );
+  await expect(main.locator('.composer-input')).toHaveValue('Pasted');
+  await main.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(
+      /- \[ \] Pasted \[id:: \w+\]\n {4}```json\n {4}\{"b": 2\}\n {4}```\n\s*\n {4}!\[\]\(attachments/,
+    );
   await main.keyboard.press('Escape');
 
   // A small body opens inline, rendered and highlighted; a click edits it, Esc saves.

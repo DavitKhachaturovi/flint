@@ -40,6 +40,10 @@ const main = {
     return ipcRenderer.invoke(Channels.mainRedo) as Promise<string | null>;
   },
 
+  /** D-79: a pasted image saved to the Flint folder's attachments/; its relative link. */
+  attach(bytes: Uint8Array, type: string): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainAttach, bytes, type) as Promise<string | null>;
+  },
   /** LIST-05, LIST-06: the sidebar's groups and order. */
   sidebar(): Promise<SidebarView | null> {
     return ipcRenderer.invoke(Channels.mainSidebar) as Promise<SidebarView | null>;

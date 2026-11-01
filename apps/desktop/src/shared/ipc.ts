@@ -35,6 +35,8 @@ export const Channels = {
   mainToggle: 'main:toggle',
   mainUndo: 'main:undo',
   mainRedo: 'main:redo',
+  /** Main window → main: a pasted image saved to attachments/ (D-79). */
+  mainAttach: 'main:attach',
   /** Main window → main: the sidebar's groups and order, and changes to them (LIST-05, LIST-06). */
   mainSidebar: 'main:sidebar',
   mainSidebarAction: 'main:sidebar-action',

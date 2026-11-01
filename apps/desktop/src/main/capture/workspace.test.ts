@@ -242,6 +242,15 @@ describe('drafts (CAP-08)', () => {
     expect(restored.attachments).toEqual([]);
     await expect(readFile(first.file)).rejects.toThrow();
   });
+
+  it('save an image pasted into the main window to attachments/ (D-79)', async () => {
+    const workspace = await open();
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 4, 5, 6]);
+    expect(await workspace.saveImage(png, 'text/html', now)).toBeNull();
+    const link = await workspace.saveImage(png, 'image/png', now);
+    expect(link).toMatch(/^attachments\/2026-10-29-143000-\w+\.png$/);
+    expect(new Uint8Array(await readFile(join(folder, link ?? '')))).toEqual(png);
+  });
 });
 
 describe('the main window: complete, undo, views (M4, TASK-06)', () => {
