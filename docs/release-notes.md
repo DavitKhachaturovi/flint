@@ -2,6 +2,18 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.13 (1 Nov 2026)
+
+- **Switching lists and pages animates again** (it had stopped in 0.4.12); a test now catches it if it ever stops.
+- **Submenus are easier to reach**: moving the mouse diagonally towards an open submenu no longer closes it on the way.
+- **Menus and pickers fade out** when they close, also when their task scrolls out of view.
+- **Expanded tasks** keep the same spacing above and below as every other row. A long body's hover is a quiet tone of its card.
+- **Code cards name their language** (json, yaml, stack trace, sql, shell, powershell, python, c#, typescript…). Right-click a task with unfenced code in its body for **Format as code**.
+- **Pasting in the task box at the top** works like the capture popup: code, JSON and stack traces go into the notes as a code block, and a pasted screenshot is saved to `attachments/` and linked there. Pasted markdown (code blocks, image links) stays as it is.
+- **Images**: a task shows an image icon when its body has images (and the body icon when it has text). Expanded tasks show small thumbnails; the task's page shows them full size. Click an image or the image icon to view it large; ← and → go through the task's images, Esc closes.
+- **Indent and Outdent** are in a task's right-click menu.
+- The notes field under the task box is no longer cut off at the top.
+
 ## 0.4.12 (1 Nov 2026)
 
 - **Menus and pickers stay with their task or button** while you scroll, and close when it scrolls out of view.
