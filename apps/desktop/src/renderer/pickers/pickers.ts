@@ -4,7 +4,14 @@ import {
   suggestLists,
   type ListInfo,
 } from '@flint/core/shorthand';
-import { describeTime, fromDate, parseTime, toDate, type LocalDateTime } from '@flint/core/time';
+import {
+  DEFAULT_HOUR,
+  describeTime,
+  fromDate,
+  parseTime,
+  toDate,
+  type LocalDateTime,
+} from '@flint/core/time';
 import { closeMenu, type MenuOptions } from '../menu/menu.js';
 
 /**
@@ -392,15 +399,19 @@ export function openTimePicker(
   // Presets, or what the typed text means.
   const highlight = rowList(rowsBox);
   const presets = (): { label: string; at: Date }[] => {
-    const inHour = new Date(Math.ceil((now.getTime() + 3_600_000) / 60_000) * 60_000);
-    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 9, 0);
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + ((8 - today.getDay()) % 7 || 7));
-    monday.setHours(9, 0, 0, 0);
+    // D-69: whole minutes, rounded up, so "in 10 minutes" is never less.
+    const inMinutes = (minutes: number): Date =>
+      new Date(Math.ceil((now.getTime() + minutes * 60_000) / 60_000) * 60_000);
+    const tomorrow = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + 1,
+      DEFAULT_HOUR,
+    );
     return [
-      { label: 'In 1 hour', at: inHour },
-      { label: 'Tomorrow morning', at: tomorrow },
-      { label: 'Next Monday', at: monday },
+      { label: 'In 10 minutes', at: inMinutes(10) },
+      { label: 'In 1 hour', at: inMinutes(60) },
+      { label: 'Tomorrow 10:00', at: tomorrow },
     ];
   };
   const renderRows = (): void => {

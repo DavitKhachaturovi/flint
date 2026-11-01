@@ -8,6 +8,7 @@ import {
   type ListChange,
   type ListSummary,
   type ListView,
+  type UndoPreview,
 } from '../shared/ipc.js';
 
 /** The main window's only way to the OS (docs/05 §2): its lists, and changing them (M4). */
@@ -35,6 +36,10 @@ const main = {
   },
   redo(): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainRedo) as Promise<string | null>;
+  },
+  /** D-69: the task the next undo or redo completes or reopens, to animate it first. */
+  peek(which: 'undo' | 'redo'): Promise<UndoPreview | null> {
+    return ipcRenderer.invoke(Channels.mainPeek, which) as Promise<UndoPreview | null>;
   },
   /** LIST-01: new, rename or delete a list or note. */
   listAction(action: ListAction): Promise<ListActionOutcome | null> {

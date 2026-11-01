@@ -63,6 +63,16 @@ function pad(value: number, length = 2): string {
   return String(value).padStart(length, '0');
 }
 
+/** The time of a reminder that gives only a day, typed (`tomorrow`) or read (`2026-11-02`): 10:00 (D-69, Q-02). */
+export const DEFAULT_HOUR = 10;
+
+/** A read date-time as a moment: a date-only reminder means its day at the default time (04 §3). */
+export function atDefaultTime(parsed: ParsedLocalDateTime): LocalDateTime {
+  return parsed.dateOnly
+    ? { ...parsed.value, hour: DEFAULT_HOUR, minute: 0, second: 0 }
+    : parsed.value;
+}
+
 /** Writes `YYYY-MM-DDTHH:MM`, the form Flint always writes (seconds are dropped). */
 export function formatLocalDateTime(value: LocalDateTime): string {
   return `${pad(value.year, 4)}-${pad(value.month)}-${pad(value.day)}T${pad(value.hour)}:${pad(value.minute)}`;

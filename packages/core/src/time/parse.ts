@@ -1,4 +1,4 @@
-import { fromDate, toDate, type LocalDateTime } from './local-datetime.js';
+import { DEFAULT_HOUR, fromDate, toDate, type LocalDateTime } from './local-datetime.js';
 
 /**
  * Natural-language reminder times (REM-02), used by the capture shorthand (`@…`, CAP-03) and the
@@ -9,11 +9,11 @@ import { fromDate, toDate, type LocalDateTime } from './local-datetime.js';
  * - days: `today`, `tomorrow`, `mon`…`sun` and full names, `next fri`, each with an optional time
  * - dates: `2026-11-02`, `2.11`, `02.11.2026` (day.month), `2 nov`, `nov 2`, with an optional time
  *
- * A day without a time means the default time, 09:00 (Q-02). Anything in the past is not a time.
+ * A day without a time means the default time, 10:00 (D-69, Q-02). Anything in the past is not a time.
  */
 export interface TimeContext {
   readonly now: Date;
-  /** Hour used when only a day is given (Q-02: 09:00). */
+  /** Hour used when only a day is given (D-69: 10:00). */
   readonly defaultHour?: number;
 }
 
@@ -178,7 +178,7 @@ function parsePhrase(phrase: string, context: TimeContext): LocalDateTime | null
   const now = context.now;
   const nowLocal = fromDate(now);
   const today: Day = { year: nowLocal.year, month: nowLocal.month, day: nowLocal.day };
-  const defaultClock: Clock = { hour: context.defaultHour ?? 9, minute: 0 };
+  const defaultClock: Clock = { hour: context.defaultHour ?? DEFAULT_HOUR, minute: 0 };
 
   // Relative: 20m, 2h, 3d, 1h30m, in 20m, in 2 hours.
   const relative = /^(?:in\s+)?(\d+)\s*([a-z]+)(?:\s*(\d+)\s*([a-z]+))?$/.exec(phrase);

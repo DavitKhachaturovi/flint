@@ -6,7 +6,13 @@ import {
   type TaskNode,
 } from '@flint/core';
 import { classifyPaste, taskLabel } from '@flint/core/shorthand';
-import { describeTime, formatLocalDateTime, toDate, type LocalDateTime } from '@flint/core/time';
+import {
+  atDefaultTime,
+  describeTime,
+  formatLocalDateTime,
+  toDate,
+  type LocalDateTime,
+} from '@flint/core/time';
 import type { ListItem, ListView, TaskRow } from '../shared/ipc.js';
 
 /**
@@ -55,7 +61,7 @@ function taskRow(task: TaskNode, now: Date): TaskRow {
   const { line } = task;
   const body = getBody(task);
   const title = line.title.trim();
-  const reminder = line.fields.reminder?.value.value ?? null;
+  const reminder = line.fields.reminder ? atDefaultTime(line.fields.reminder.value) : null;
   const completion = line.fields.completion?.value.value ?? null;
   const done = isCompletedStatus(line.status);
   const muted = line.fields.muted !== undefined;

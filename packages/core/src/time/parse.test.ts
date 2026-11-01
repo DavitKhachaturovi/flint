@@ -24,8 +24,8 @@ describe('parseTime: relative (REM-02)', () => {
     ['in 2 hours', local(10, 29, 16, 30)],
     ['1h30m', local(10, 29, 16, 0)],
     ['1h 30m', local(10, 29, 16, 0)],
-    ['3d', local(11, 1, 9)],
-    ['in 3 days', local(11, 1, 9)],
+    ['3d', local(11, 1, 10)],
+    ['in 3 days', local(11, 1, 10)],
   ])('%s', (text, expected) => {
     expect(parseTime(text, context)).toEqual(expected);
   });
@@ -59,30 +59,35 @@ describe('parseTime: clock times take the next occurrence', () => {
   });
 });
 
-describe('parseTime: days, with the default time 09:00 (Q-02)', () => {
+describe('parseTime: days, with the default time 10:00 (D-69)', () => {
   it.each([
-    ['tomorrow', local(10, 30, 9)],
+    ['tomorrow', local(10, 30, 10)],
     ['Tomorrow 10', local(10, 30, 10)],
     ['tomorrow at 10:30', local(10, 30, 10, 30)],
     ['tmrw 3pm', local(10, 30, 15)],
     ['today 18:00', local(10, 29, 18)],
-    ['fri', local(10, 30, 9)],
+    ['fri', local(10, 30, 10)],
     ['friday 3pm', local(10, 30, 15)],
     ['3pm fri', local(10, 30, 15)],
-    ['next fri', local(10, 30, 9)],
+    ['next fri', local(10, 30, 10)],
     ['next fri at 9:30 am', local(10, 30, 9, 30)],
-    ['mon', local(11, 2, 9)],
+    ['mon', local(11, 2, 10)],
   ])('%s', (text, expected) => {
     expect(parseTime(text, context)).toEqual(expected);
   });
 
   it('a weekday never means today', () => {
-    expect(parseTime('thu', context)).toEqual(local(11, 5, 9));
+    expect(parseTime('thu', context)).toEqual(local(11, 5, 10));
   });
 
   it('a day whose time has passed is not a time', () => {
     expect(parseTime('today', context)).toBeNull();
     expect(parseTime('today 10', context)).toBeNull();
+  });
+
+  it('today without a time is valid only before 10:00', () => {
+    expect(parseTime('today', { now: new Date(2026, 9, 29, 9, 30) })).toEqual(local(10, 29, 10));
+    expect(parseTime('today', { now: new Date(2026, 9, 29, 10, 0) })).toBeNull();
   });
 
   it('uses another default hour when given', () => {
@@ -92,15 +97,15 @@ describe('parseTime: days, with the default time 09:00 (Q-02)', () => {
 
 describe('parseTime: dates', () => {
   it.each([
-    ['2026-11-02', local(11, 2, 9)],
+    ['2026-11-02', local(11, 2, 10)],
     ['2026-11-02 10:00', local(11, 2, 10)],
-    ['2.11', local(11, 2, 9)],
+    ['2.11', local(11, 2, 10)],
     ['02.11.2026 10:00', local(11, 2, 10)],
-    ['2 nov', local(11, 2, 9)],
+    ['2 nov', local(11, 2, 10)],
     ['nov 2 15:00', local(11, 2, 15)],
     ['2 November at 3pm', local(11, 2, 15)],
-    ['28.10', local(10, 28, 9, 0, 2027)],
-    ['1 jan', local(1, 1, 9, 0, 2027)],
+    ['28.10', local(10, 28, 10, 0, 2027)],
+    ['1 jan', local(1, 1, 10, 0, 2027)],
   ])('%s', (text, expected) => {
     expect(parseTime(text, context)).toEqual(expected);
   });
@@ -143,9 +148,9 @@ describe('describeTime: chip labels (CAP-04)', () => {
   it.each([
     ['15:00', 'Today 15:00'],
     ['tomorrow 10', 'Tomorrow 10:00'],
-    ['3d', 'Sun 09:00'],
-    ['thu', '5 Nov 09:00'],
-    ['28.10', '28 Oct 2027 09:00'],
+    ['3d', 'Sun 10:00'],
+    ['thu', '5 Nov 10:00'],
+    ['28.10', '28 Oct 2027 10:00'],
   ])('%s → %s', (text, label) => {
     expect(parsed(text)).toBe(label);
   });

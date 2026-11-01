@@ -1,0 +1,6 @@
+/* UI-11, D-69: Flint's own text selection instead of Windows blue, in text fields and selectable
+   text alike (09 §8). Every window imports it after the tokens. */
+::selection {
+  background: var(--fl-selection);
+  color: var(--fl-selection-text);
+}

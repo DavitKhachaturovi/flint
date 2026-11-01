@@ -1,5 +1,6 @@
 @import '../../../../../docs/design/tokens.css';
 @import '../fonts.css';
+@import '../selection.css';
 
 /* APP-08: the Hotkeys window (Proposed; part of Settings in M8). */
 html,

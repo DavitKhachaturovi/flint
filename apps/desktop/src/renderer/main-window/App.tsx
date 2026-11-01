@@ -235,53 +235,72 @@ export function App(): ReactElement {
   /** Reopened tasks ease back into the open list (D-67), even though their key is known. */
   const returning = useRef(new Set<string>());
 
-  const toggle = useCallback(
-    async (key: string): Promise<void> => {
+  /**
+   * TASK-06, D-67: before a task is completed or reopened, the check pops and the row fades, slides
+   * and collapses (a reopened row fades out of Completed); then it moves. Space, the checkbox,
+   * undo and redo alike (D-69). Instant with reduce-motion.
+   */
+  const animateToggle = useCallback(
+    async (key: string, completing: boolean): Promise<void> => {
       const index = rows.findIndex((row) => row.key === key);
       const row = rows[index];
-      if (row) {
-        const completing = !row.done;
-        if (completing) {
-          // Completing moves the row away: the selection stays in the open tasks, on the next one.
-          const open = (other: TaskRow): boolean =>
-            !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
-          const next =
-            rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
-          if (next) setSelected(next.key);
-        } else returning.current.add(key);
-        // TASK-06, D-67: the check pops and the row fades, slides and collapses first (a
-        // reopened row fades out of Completed); then the task moves. Instant with reduce-motion.
-        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          const direction = completing ? 'complete' : 'reopen';
-          setLeaving((current) => {
-            const next = new Map(current);
-            for (const item of [key, ...row.subtasks.map((sub) => sub.key)])
-              next.set(item, direction);
-            return next;
-          });
-          await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS));
-        }
-      }
+      if (!row || row.done === completing) return;
+      if (completing) {
+        // Completing moves the row away: the selection stays in the open tasks, on the next one.
+        const open = (other: TaskRow): boolean =>
+          !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
+        const next = rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
+        if (next) setSelected(next.key);
+      } else returning.current.add(key);
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const direction = completing ? 'complete' : 'reopen';
+      setLeaving((current) => {
+        const next = new Map(current);
+        for (const item of [key, ...row.subtasks.map((sub) => sub.key)]) next.set(item, direction);
+        return next;
+      });
+      await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS));
+    },
+    [rows],
+  );
+  /** The change didn't happen after all: the row comes back. */
+  const cancelToggle = useCallback((key: string): void => {
+    returning.current.delete(key);
+    setLeaving((current) => new Map([...current].filter(([item]) => item !== key)));
+  }, []);
+
+  const toggle = useCallback(
+    async (key: string): Promise<void> => {
+      const row = rows.find((item) => item.key === key);
+      if (row) await animateToggle(key, !row.done);
       const done = await window.flintMain.toggle(listId, key);
       if (!done) {
-        returning.current.delete(key);
-        setLeaving((current) => new Map([...current].filter(([item]) => item !== key)));
+        cancelToggle(key);
         return;
       }
       showToast(done, true);
     },
-    [listId, rows, showToast],
+    [listId, rows, showToast, animateToggle, cancelToggle],
   );
 
-  const undo = useCallback(async (): Promise<void> => {
-    const undone = await window.flintMain.undo();
-    showToast(undone ? `Undid: ${undone}` : 'Nothing to undo', false);
-  }, [showToast]);
-
-  const redo = useCallback(async (): Promise<void> => {
-    const redone = await window.flintMain.redo();
-    showToast(redone ? `Redid: ${redone}` : 'Nothing to redo', false);
-  }, [showToast]);
+  /**
+   * Undo or redo (DATA-03). One that completes or reopens a task in this list animates it first,
+   * like Space (D-69).
+   */
+  const step = useCallback(
+    async (which: 'undo' | 'redo'): Promise<void> => {
+      const pending = await window.flintMain.peek(which);
+      const animated = pending?.listId === listId ? pending : null;
+      if (animated) await animateToggle(animated.key, animated.completes);
+      const label = await (which === 'undo' ? window.flintMain.undo() : window.flintMain.redo());
+      if (!label && animated) cancelToggle(animated.key);
+      if (which === 'undo') showToast(label ? `Undid: ${label}` : 'Nothing to undo', false);
+      else showToast(label ? `Redid: ${label}` : 'Nothing to redo', false);
+    },
+    [listId, showToast, animateToggle, cancelToggle],
+  );
+  const undo = useCallback(() => step('undo'), [step]);
+  const redo = useCallback(() => step('redo'), [step]);
 
   const edit = useCallback((key: string): void => {
     setSelected(key);
@@ -1270,7 +1289,7 @@ function Row(
                 props.onReminder(task, event.currentTarget.getBoundingClientRect());
               }}
             >
-              {task.reminder}
+              <MorphText text={task.reminder} />
             </button>
           </span>
         )}
@@ -1328,6 +1347,47 @@ function Glide(props: {
       aria-hidden="true"
       style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
     />
+  );
+}
+
+/**
+ * Text that changes in place, like a reminder time (D-69, 09 §9): the old text fades out over the
+ * new one while the box's width eases from the old width to the new, in --fl-dur-state. Instant
+ * with reduce-motion.
+ */
+function MorphText(props: { readonly text: string }): ReactElement {
+  const { text } = props;
+  const box = useRef<HTMLSpanElement>(null);
+  const last = useRef({ text, width: 0 });
+  const [old, setOld] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const width = element.getBoundingClientRect().width;
+    const before = last.current;
+    last.current = { text, width };
+    if (before.text === text || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      return;
+    setOld(before.text);
+    const duration = parseFloat(
+      getComputedStyle(element).getPropertyValue('--fl-dur-state') || '260',
+    );
+    element.animate([{ width: `${before.width}px` }, { width: `${width}px` }], {
+      duration,
+      easing: 'ease',
+    });
+  }, [text]);
+  return (
+    <span className="morph" ref={box}>
+      {old !== null && (
+        <span className="morph-old" aria-hidden="true" onAnimationEnd={() => setOld(null)}>
+          {old}
+        </span>
+      )}
+      <span key={text} className={old !== null ? 'morph-new in' : 'morph-new'}>
+        {text}
+      </span>
+    </span>
   );
 }
 

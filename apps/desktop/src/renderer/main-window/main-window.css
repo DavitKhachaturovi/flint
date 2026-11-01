@@ -1,5 +1,6 @@
 @import '../../../../../docs/design/tokens.css';
 @import '../fonts.css';
+@import '../selection.css';
 @import '../menu/menu.css';
 @import '../pickers/pickers.css';
 
@@ -857,8 +858,8 @@ h1 .count {
 
 /* REM-01, REM-11, REM-12 (D-66, D-68): the bell is the off/on toggle and never moves; the time
    next to it opens the date/time picker. Off: a strike line draws through the bell (in both
-   directions, --fl-dur-state) and the time fades. Overdue: a small dot on the bell and brighter
-   time; turning it off removes the dot. */
+   directions, --fl-dur-state) and the time fades. Overdue: a small dot on the bell; the time keeps
+   the bell's tone (D-69). Turning it off removes the dot. */
 .reminder {
   display: inline-flex;
   align-items: center;
@@ -900,10 +901,6 @@ h1 .count {
   color: var(--fl-text-faint);
 }
 
-.reminder.overdue .reminder-time {
-  color: var(--fl-text-primary);
-}
-
 .overdue-dot {
   position: absolute;
   top: 1px;
@@ -923,6 +920,39 @@ h1 .count {
 .reminder.overdue .overdue-dot {
   opacity: 1;
   transform: none;
+}
+
+/* D-69 (09 §9): text that changes in place crossfades, the old text fading out over the new one
+   while the box's width eases (MorphText). */
+.morph {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.morph-old {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: morph-out var(--fl-dur-state) ease forwards;
+}
+
+.morph-new.in {
+  animation: morph-in var(--fl-dur-state) ease;
+}
+
+@keyframes morph-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes morph-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* UI-01, D-68: the I-beam only over text that can be edited right now; the arrow everywhere else. */

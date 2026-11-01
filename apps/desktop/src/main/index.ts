@@ -346,6 +346,9 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  ipcMain.handle(Channels.mainPeek, (event, which: unknown) =>
+    owns(event.sender) && (which === 'undo' || which === 'redo') ? workspace.peek(which) : null,
+  );
   ipcMain.handle(Channels.mainRedo, (event) =>
     owns(event.sender)
       ? workspace.redoLast(new Date()).catch((error: unknown) => {
