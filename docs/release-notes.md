@@ -2,6 +2,17 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.6 (1 Nov 2026)
+
+- **Click a task's text to edit it**, with the cursor right where you clicked. Clicking beside the text only selects the task; double-click anywhere edits; Esc goes back.
+- **A new time picker**: after you pick a day, two wheels for hours and minutes (5-minute steps). Scroll, drag or click them, or use the arrow keys and type digits; Tab switches between hours and minutes; Enter or the Set button sets it. Type exact minutes (`14:37`, `3pm`) in the field above as before.
+- **Quick reminders**: In 10 minutes, In 1 hour, Tomorrow 10:00. A day without a time (tomorrow, fri) now means 10:00.
+- **Undo plays the animation too**: undoing a completion brings the task back the same way un-checking does.
+- **A changed reminder time** fades into the new one instead of jumping. Overdue reminders keep the white dot on the bell, without brighter text.
+- **Selected text** is Flint's soft gray instead of Windows blue.
+- **Fixes:** the text cursor no longer flickers over the task box and notes; pickers drop the mouse's highlight when the mouse leaves; today in the calendar no longer turns gray on hover; right-clicking empty space in the sidebar opens Flint's menu (New task list, New note) instead of Windows' window menu.
+- The taskbar icon follows one rule now: the dark tile fills the whole square with Windows' corner rounding, and the leaf sits inside it in proportion.
+
 ## 0.4.5 (1 Nov 2026)
 
 - **Completing a task** is easier to see: the check fills with a small pop, then the row fades, slides and folds away into Completed. **Reopening** one folds it out of Completed and back into your tasks. Switching lists is a little calmer.
