@@ -15,7 +15,7 @@
   font-family: var(--fl-font-ui);
   font-size: 13px;
   color: var(--fl-text-body);
-  animation: fl-picker-in var(--fl-dur-fast) var(--fl-ease-spring);
+  animation: fl-picker-in var(--fl-dur-base) var(--fl-ease-spring);
 }
 
 .fl-picker:focus {

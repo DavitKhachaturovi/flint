@@ -414,16 +414,25 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
   await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
 
+  // D-75: the task is completed at once; a ghost of its row plays out where it was.
   await main.keyboard.press('Space');
   await expect(main.locator('h1')).toHaveText('Errands · 1 open');
+  await expect(main.locator('.tasks .row.leaving.complete .title')).toHaveText(
+    'Renew the parking permit',
+  );
+  await expect(main.locator('.row.leaving')).toHaveCount(0);
   await expect(main.locator('.toast')).toContainText('Completed');
   await expect(main.locator('.completed .row .title')).toHaveText(['Renew the parking permit']);
   expect(await readFile(file, 'utf8')).toMatch(
     /^- \[ \] Book the dentist \[id:: e2\]\n\n## Completed\n- \[x\] Renew the parking permit \[completion:: [0-9T:-]+\] \[priority:: medium\] \[id:: e1\]\n$/m,
   );
 
+  // Undo reopens it the same way (D-69, D-75).
   await main.keyboard.press('Control+z');
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
+  await expect(main.locator('.completed .row.leaving.reopen .title')).toHaveText(
+    'Renew the parking permit',
+  );
   await expect.poll(() => readFile(file, 'utf8')).toBe(original);
 });
 

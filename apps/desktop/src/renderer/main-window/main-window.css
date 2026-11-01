@@ -760,13 +760,13 @@ h1 .count {
   z-index: 60;
 }
 
-/* TASK-06, D-67 (09 §9): completing, the check fills with a small pop, then the row fades, slides
-   and collapses into Completed; reopening, the row fades and collapses out of Completed and eases
-   back into the open tasks. Non-blocking state changes: --fl-dur-state. */
+/* TASK-06, D-67, D-75 (09 §9): the task has already moved; a ghost of its row plays out where it
+   was. Completing: the check fills with a small pop, then the ghost fades, slides and collapses;
+   reopening: it fades and collapses out of Completed. The whole sequence: --fl-dur-complete. */
 .row.leaving {
   pointer-events: none;
   overflow: hidden;
-  animation: row-out var(--fl-dur-state) ease-in-out forwards;
+  animation: row-out var(--fl-dur-complete) ease-in-out forwards;
 }
 
 .row.leaving.reopen {
@@ -815,14 +815,14 @@ h1 .count {
 /* UI-04, D-65: switching lists. The content fades in while rising a few pixels, and the sidebar's
    highlight glides to the open list (one element, like the row selection). */
 .content {
-  /* D-67: navigation gates the next action: within --fl-dur-base, ease-out. */
-  animation: view-in var(--fl-dur-base) cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* D-75: --fl-dur-page, ease-out; the new content takes input at once. */
+  animation: view-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
 }
 

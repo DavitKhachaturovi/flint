@@ -279,23 +279,6 @@ describe('the main window: complete, undo, views (M4, TASK-06)', () => {
         ?.items.map((item) => (item.kind === 'task' ? item.task.title : '')),
     ).toEqual(['one', 'two', 'three']);
   });
-
-  it('tells which task the next undo or redo reopens or completes, to animate it (D-69)', async () => {
-    await writeFile(
-      join(folder, 'Inbox.md'),
-      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n',
-    );
-    const workspace = await open();
-    expect(workspace.peek('undo')).toBeNull();
-    await workspace.toggleDone('inbox', 'aaa1', now);
-    expect(workspace.peek('undo')).toEqual({ listId: 'inbox', key: 'aaa1', completes: false });
-    await workspace.undoLast(now);
-    expect(workspace.peek('redo')).toEqual({ listId: 'inbox', key: 'aaa1', completes: true });
-    await workspace.redoLast(now);
-    expect(workspace.peek('undo')).toEqual({ listId: 'inbox', key: 'aaa1', completes: false });
-    await workspace.change('inbox', { kind: 'priority', key: 'bbb2', priority: 'high' }, now);
-    expect(workspace.peek('undo')).toBeNull();
-  });
 });
 
 describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04, docs/03 §2)', () => {

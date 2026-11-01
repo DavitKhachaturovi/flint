@@ -54,8 +54,7 @@ import { useInertText } from './inert-text.js';
 
 const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
 const TOAST_MS = 5000;
-/** The completion animation (09 §9, D-67), before the task moves: within the state band. */
-const COMPLETE_MS = 280;
+
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
 const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
   '1': 'low',
@@ -132,6 +131,71 @@ const newRow = (after: string): NewEditing => ({
 
 /** How a text field was left. */
 type Leave = 'enter' | 'escape' | 'blur' | 'indent' | 'outdent';
+
+/** A duration token in ms (09 §9), so JS timings follow the motion tokens (and the M8 speed). */
+function durationMs(token: string, fallback: number): number {
+  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * D-75: a copy of a row that has just been completed or reopened, playing the completion animation
+ * where the row was, while the task itself is already in its new place. Not interactive.
+ */
+interface Ghost {
+  readonly id: number;
+  readonly task: TaskRow;
+  readonly subtask: boolean;
+  readonly direction: 'complete' | 'reopen';
+  /** The row it follows in its section (the open tasks, or Completed); null: the first. */
+  readonly after: string | null;
+}
+
+let ghostSeq = 0;
+
+const withSubtasks = (tasks: readonly TaskRow[]): TaskRow[] =>
+  tasks.flatMap((task) => [task, ...task.subtasks]);
+
+/**
+ * The rows that changed sides between two views of a list, by any cause (Space, undo, redo, a
+ * reminder's Done): a ghost where each was, and the keys that now ease in at their new place.
+ */
+function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: string[] } {
+  const openTasks = (view: ListView): TaskRow[] =>
+    view.items.flatMap((item) => (item.kind === 'task' ? [item.task] : []));
+  const nowOpen = new Set(withSubtasks(openTasks(after)).map((row) => row.key));
+  const nowDone = new Set(withSubtasks(after.completed).map((row) => row.key));
+  const ghosts: Ghost[] = [];
+  const moved: string[] = [];
+  for (const [tasks, direction, there, here] of [
+    [openTasks(before), 'complete', nowDone, nowOpen],
+    [before.completed, 'reopen', nowOpen, nowDone],
+  ] as const) {
+    const rows = withSubtasks(tasks);
+    for (const task of tasks) {
+      // The task (its subtasks go with it), or a subtask that moved on its own.
+      const went = there.has(task.key) ? [task] : task.subtasks.filter((sub) => there.has(sub.key));
+      for (const row of went) {
+        const index = rows.indexOf(row);
+        const previous = rows
+          .slice(0, index)
+          .reverse()
+          .find((other) => here.has(other.key));
+        ghosts.push({
+          id: ++ghostSeq,
+          task: row,
+          subtask: row !== task,
+          direction,
+          after: previous?.key ?? null,
+        });
+        moved.push(row.key, ...(row === task ? task.subtasks.map((sub) => sub.key) : []));
+      }
+    }
+  }
+  return { ghosts, moved };
+}
 
 /** The rows the keyboard moves through, top to bottom (Navigate state, docs/03 §2). */
 function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
@@ -227,83 +291,62 @@ export function App(): ReactElement {
     if (gone >= 0) setSelected(rows[Math.min(gone, rows.length - 1)]?.key ?? FIRST_ROW);
   }, [rows, selected]);
 
-  /** Rows playing the completion animation (TASK-06, 09 §9) before they move to Completed. */
-  const [leaving, setLeaving] = useState<ReadonlyMap<string, 'complete' | 'reopen'>>(new Map());
-  // A row stops leaving once the list shows it moved (or it is gone, or the save failed).
-  useEffect(() => {
-    setLeaving((current) => {
-      const kept = [...current].filter(([key, direction]) =>
-        rows.some((row) => row.key === key && row.done === (direction === 'reopen')),
-      );
-      return kept.length === current.size ? current : new Map(kept);
-    });
-  }, [rows]);
-  /** Reopened tasks ease back into the open list (D-67), even though their key is known. */
-  const returning = useRef(new Set<string>());
-
   /**
-   * TASK-06, D-67: before a task is completed or reopened, the check pops and the row fades, slides
-   * and collapses (a reopened row fades out of Completed); then it moves. Space, the checkbox,
-   * undo and redo alike (D-69). Instant with reduce-motion.
+   * TASK-06, D-75: a completed or reopened task moves at once, by whatever means (Space, undo,
+   * redo, a reminder's Done); a ghost of its row plays the completion animation where it was, and
+   * the task eases in at its new place. Nothing waits for the animation. Instant with reduce-motion.
    */
-  const animateToggle = useCallback(
-    async (key: string, completing: boolean): Promise<void> => {
+  const [ghosts, setGhosts] = useState<readonly Ghost[]>([]);
+  const [moved, setMoved] = useState<ReadonlySet<string>>(new Set());
+  const lastView = useRef<ListView | null>(null);
+  useLayoutEffect(() => {
+    const before = lastView.current;
+    lastView.current = view;
+    if (!before || !view || before.id !== view.id) {
+      setGhosts([]);
+      setMoved(new Set());
+      return;
+    }
+    if (view.mode !== 'tasks' || reducedMotion()) return;
+    const found = departed(before, view);
+    if (found.ghosts.length === 0) return;
+    setGhosts((current) => [...current, ...found.ghosts]);
+    setMoved((current) => new Set([...current, ...found.moved]));
+    const ids = new Set(found.ghosts.map((ghost) => ghost.id));
+    window.setTimeout(
+      () => {
+        setGhosts((current) => current.filter((ghost) => !ids.has(ghost.id)));
+        setMoved((current) => new Set([...current].filter((key) => !found.moved.includes(key))));
+      },
+      durationMs('--fl-dur-complete', 400),
+    );
+  }, [view]);
+
+  const toggle = useCallback(
+    async (key: string): Promise<void> => {
       const index = rows.findIndex((row) => row.key === key);
       const row = rows[index];
-      if (!row || row.done === completing) return;
-      if (completing) {
+      if (row && !row.done) {
         // Completing moves the row away: the selection stays in the open tasks, on the next one.
         const open = (other: TaskRow): boolean =>
           !other.done && other.key !== key && !row.subtasks.some((sub) => sub.key === other.key);
         const next = rows.slice(index + 1).find(open) ?? rows.slice(0, index).reverse().find(open);
         if (next) setSelected(next.key);
-      } else returning.current.add(key);
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const direction = completing ? 'complete' : 'reopen';
-      setLeaving((current) => {
-        const next = new Map(current);
-        for (const item of [key, ...row.subtasks.map((sub) => sub.key)]) next.set(item, direction);
-        return next;
-      });
-      await new Promise((resolve) => setTimeout(resolve, COMPLETE_MS));
-    },
-    [rows],
-  );
-  /** The change didn't happen after all: the row comes back. */
-  const cancelToggle = useCallback((key: string): void => {
-    returning.current.delete(key);
-    setLeaving((current) => new Map([...current].filter(([item]) => item !== key)));
-  }, []);
-
-  const toggle = useCallback(
-    async (key: string): Promise<void> => {
-      const row = rows.find((item) => item.key === key);
-      if (row) await animateToggle(key, !row.done);
-      const done = await window.flintMain.toggle(listId, key);
-      if (!done) {
-        cancelToggle(key);
-        return;
       }
-      showToast(done, true);
+      const done = await window.flintMain.toggle(listId, key);
+      if (done) showToast(done, true);
     },
-    [listId, rows, showToast, animateToggle, cancelToggle],
+    [listId, rows, showToast],
   );
 
-  /**
-   * Undo or redo (DATA-03). One that completes or reopens a task in this list animates it first,
-   * like Space (D-69).
-   */
+  /** Undo or redo (DATA-03); a task it completes or reopens animates like Space (D-69, D-75). */
   const step = useCallback(
     async (which: 'undo' | 'redo'): Promise<void> => {
-      const pending = await window.flintMain.peek(which);
-      const animated = pending?.listId === listId ? pending : null;
-      if (animated) await animateToggle(animated.key, animated.completes);
       const label = await (which === 'undo' ? window.flintMain.undo() : window.flintMain.redo());
-      if (!label && animated) cancelToggle(animated.key);
       if (which === 'undo') showToast(label ? `Undid: ${label}` : 'Nothing to undo', false);
       else showToast(label ? `Redid: ${label}` : 'Nothing to redo', false);
     },
-    [listId, showToast, animateToggle, cancelToggle],
+    [showToast],
   );
   const undo = useCallback(() => step('undo'), [step]);
   const redo = useCallback(() => step('redo'), [step]);
@@ -678,10 +721,8 @@ export function App(): ReactElement {
   const freshKeys = new Set<string>();
   if (view && known.current.list === view.id)
     for (const row of rows) if (!known.current.keys.has(row.key)) freshKeys.add(row.key);
-  for (const row of rows) if (returning.current.has(row.key) && !row.done) freshKeys.add(row.key);
-  useEffect(() => {
-    for (const row of rows) if (!row.done) returning.current.delete(row.key);
-  }, [rows]);
+  // D-75: a task that just completed or reopened eases in at its new place.
+  for (const key of moved) freshKeys.add(key);
   useEffect(() => {
     if (view) known.current = { list: view.id, keys: new Set(rows.map((row) => row.key)) };
   }, [view, rows]);
@@ -700,7 +741,6 @@ export function App(): ReactElement {
     onLeaveTask: leaveTask,
     onTab: tab,
     onMenu: (task, at) => taskMenu(task, at),
-    leaving,
     onMute: (key, muted) => void mute(key, muted),
     onReminder: (task, anchor) => changeReminder(task, anchor),
   };
@@ -721,6 +761,7 @@ export function App(): ReactElement {
         <NewRow key={`new-${fresh.seq}`} subtask={nested} onLeave={leaveNew} onTab={tab} />,
       );
     };
+    cardRows.push(...ghostRows(ghosts, 'complete', null, rowProps));
     view.items.forEach((item, index) => {
       if (item.kind === 'heading')
         cardRows.push(
@@ -743,6 +784,7 @@ export function App(): ReactElement {
             {...rowProps}
           />,
         );
+        cardRows.push(...ghostRows(ghosts, 'complete', item.task.key, rowProps));
         for (const subtask of item.task.subtasks) {
           cardRows.push(
             <Row
@@ -753,6 +795,7 @@ export function App(): ReactElement {
               {...rowProps}
             />,
           );
+          cardRows.push(...ghostRows(ghosts, 'complete', subtask.key, rowProps));
           placeNew(subtask.key, true);
         }
         placeNew(item.task.key, false);
@@ -894,7 +937,8 @@ export function App(): ReactElement {
                   {cardRows}
                 </section>
 
-                {view.completed.length > 0 && (
+                {(view.completed.length > 0 ||
+                  ghosts.some((ghost) => ghost.direction === 'reopen')) && (
                   <section className="card completed" aria-label="Completed" ref={completedCard}>
                     <Glide card={completedCard} target={glideTarget} version={glideVersion} />
                     <button
@@ -909,15 +953,17 @@ export function App(): ReactElement {
                       <span>Completed</span>
                       <span className="chip">{view.completed.length}</span>
                     </button>
+                    {completedOpen && ghostRows(ghosts, 'reopen', null, rowProps)}
                     {completedOpen &&
-                      view.completed.map((task) => (
+                      view.completed.flatMap((task) => [
                         <Row
                           key={task.key}
                           task={task}
                           fresh={freshKeys.has(task.key)}
                           {...rowProps}
-                        />
-                      ))}
+                        />,
+                        ...ghostRows(ghosts, 'reopen', task.key, rowProps),
+                      ])}
                   </section>
                 )}
               </>
@@ -1188,12 +1234,40 @@ interface RowHandlers {
   readonly onTab: (how: 'indent' | 'outdent') => void;
   /** UI-08: the row's right-click menu. */
   readonly onMenu: (task: TaskRow, at: Point) => void;
-  /** Rows playing the completion animation. */
-  readonly leaving: ReadonlyMap<string, 'complete' | 'reopen'>;
+
   /** REM-12: the bell turns the reminder off or on. */
   readonly onMute: (key: string, muted: boolean) => void;
   /** REM-01, D-68: the time opens the date/time picker for the task. */
   readonly onReminder: (task: TaskRow, anchor: DOMRect) => void;
+}
+
+/** The ghosts of a section that follow row `after` (null: the section's first rows), D-75. */
+function ghostRows(
+  ghosts: readonly Ghost[],
+  direction: Ghost['direction'],
+  after: string | null,
+  handlers: RowHandlers,
+): ReactElement[] {
+  return ghosts
+    .filter((ghost) => ghost.direction === direction && ghost.after === after)
+    .flatMap((ghost) => [
+      <Row
+        key={`ghost-${ghost.id}`}
+        task={ghost.task}
+        subtask={ghost.subtask}
+        ghost={direction}
+        {...handlers}
+      />,
+      ...(ghost.subtask ? [] : ghost.task.subtasks).map((sub) => (
+        <Row
+          key={`ghost-${ghost.id}-${sub.key}`}
+          task={sub}
+          subtask
+          ghost={direction}
+          {...handlers}
+        />
+      )),
+    ]);
 }
 
 function Row(
@@ -1202,6 +1276,8 @@ function Row(
     readonly subtask?: boolean;
     /** Just appeared in the list being looked at: it eases in (UI-04). */
     readonly fresh?: boolean;
+    /** D-75: a ghost playing the completion animation where the task was. */
+    readonly ghost?: 'complete' | 'reopen';
   },
 ): ReactElement {
   const {
@@ -1215,21 +1291,21 @@ function Row(
     onLeaveTask,
     onTab,
     fresh = false,
+    ghost,
   } = props;
-  const isEditing = editing?.kind === 'task' && editing.key === task.key;
+  const isEditing = !ghost && editing?.kind === 'task' && editing.key === task.key;
   const classes = ['row'];
-  if (task.key === selected && editing?.kind !== 'new') classes.push('sel');
+  if (!ghost && task.key === selected && editing?.kind !== 'new') classes.push('sel');
   if (subtask) classes.push('subtask');
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
   if (fresh) classes.push('enter');
-  const direction = props.leaving.get(task.key);
-  const leaving = direction !== undefined;
-  if (leaving) classes.push('leaving', direction);
-  const checked = direction === 'complete' || (task.done && direction !== 'reopen');
+  if (ghost) classes.push('leaving', ghost);
+  const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
   return (
     <div
-      data-key={task.key}
+      data-key={ghost ? undefined : task.key}
+      aria-hidden={ghost ? true : undefined}
       className={classes.join(' ')}
       onMouseDown={() => onSelect(task.key)}
       onContextMenu={(event) => {
@@ -1246,7 +1322,7 @@ function Row(
         type="button"
         className={checked ? 'check on' : 'check'}
         aria-label={task.done ? 'Reopen task' : 'Complete task'}
-        onClick={() => !leaving && onToggle(task.key)}
+        onClick={() => !ghost && onToggle(task.key)}
       >
         {checked && <CheckIcon />}
       </button>

@@ -35,8 +35,7 @@ export const Channels = {
   mainToggle: 'main:toggle',
   mainUndo: 'main:undo',
   mainRedo: 'main:redo',
-  /** Main window → main: the task the next undo or redo completes or reopens (D-69). */
-  mainPeek: 'main:peek',
+
   mainChange: 'main:change',
   mainReserveId: 'main:reserve-id',
   mainChanged: 'main:changed',
@@ -247,13 +246,6 @@ export interface ChangeOutcome {
 
 /** A text field's menu command, run by the main process on the sender (UI-08). */
 export type EditCommand = 'cut' | 'copy' | 'paste' | 'selectAll';
-
-/** D-69: an undo or redo that completes or reopens a task, animated first like Space. */
-export interface UndoPreview {
-  readonly listId: string;
-  readonly key: string;
-  readonly completes: boolean;
-}
 
 /** LIST-01, D-52, D-55: what the sidebar asks of a list. */
 export type ListAction =

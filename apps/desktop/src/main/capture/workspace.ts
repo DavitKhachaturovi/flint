@@ -39,7 +39,6 @@ import type {
   ListChange,
   ListSummary,
   ListView,
-  UndoPreview,
 } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import { titlePlain } from '../../shared/inline-markdown.js';
@@ -102,15 +101,6 @@ const SNOOZE_MS = 10 * 60_000;
 interface UndoEntry {
   readonly label: string;
   readonly run: (now: Date) => Promise<UndoEntry | null>;
-  /** The task whose completion it flips, so the main window can animate that first (D-69). */
-  readonly toggles?: Toggled;
-}
-
-interface Toggled {
-  readonly path: string;
-  readonly key: string;
-  /** Running the step completes the task (or reopens it). */
-  readonly completes: boolean;
 }
 
 /** What an operation step also does to files: a created list, a deleted task's trash file. */
@@ -260,18 +250,10 @@ export class Workspace {
     label: string,
     now: Date,
     files: StepFiles = {},
-    toggled?: { readonly key: string; readonly completed: boolean },
   ): Promise<string> {
     const applied = await this.applyAndSave(list, op, now);
-    const path = list.entry.path;
     this.remember(
-      this.opsStep(
-        label,
-        [{ path, inverse: applied.inverse }],
-        true,
-        files,
-        toggled && { path, key: toggled.key, completes: !toggled.completed },
-      ),
+      this.opsStep(label, [{ path: list.entry.path, inverse: applied.inverse }], true, files),
     );
     return label;
   }
@@ -288,11 +270,9 @@ export class Workspace {
     parts: readonly { readonly path: string; readonly inverse: Op }[],
     undoing: boolean,
     files: StepFiles,
-    toggles?: Toggled,
   ): UndoEntry {
     return {
       label,
-      ...(toggles && { toggles }),
       run: async (now) => {
         const next: { path: string; inverse: Op }[] = [];
         for (const part of parts) {
@@ -308,13 +288,7 @@ export class Workspace {
         const created = files.createdList;
         const list = created ? this.lists.find(({ entry }) => entry.path === created) : undefined;
         if (undoing && list) await this.dropIfEmpty(list);
-        return this.opsStep(
-          label,
-          next,
-          !undoing,
-          files,
-          toggles && { ...toggles, completes: !toggles.completes },
-        );
+        return this.opsStep(label, next, !undoing, files);
       },
     };
   }
@@ -760,7 +734,7 @@ export class Workspace {
         const completion = completeTask(document, path, key, fromDate(now));
         if (!completion) return null;
         this.completedAfter.set(`${path}:${key}`, completion.completedAfter);
-        return this.record(list, completion.op, 'Completed', now, {}, { key, completed: true });
+        return this.record(list, completion.op, 'Completed', now);
       }
       const op = uncompleteTask(
         document,
@@ -768,20 +742,8 @@ export class Workspace {
         key,
         (task) => this.completedAfter.get(`${path}:${task}`) ?? null,
       );
-      return op ? this.record(list, op, 'Reopened', now, {}, { key, completed: false }) : null;
+      return op ? this.record(list, op, 'Reopened', now) : null;
     });
-  }
-
-  /**
-   * D-69: the task the next undo or redo completes or reopens, if that is what it does, so the
-   * main window plays the same animation as Space before it happens (TASK-06).
-   */
-  peek(which: 'undo' | 'redo'): UndoPreview | null {
-    const stack = which === 'undo' ? this.undoStack : this.redoStack;
-    const toggles = stack.at(-1)?.toggles;
-    const list = toggles && this.lists.find(({ entry }) => entry.path === toggles.path);
-    if (!toggles || !list) return null;
-    return { listId: this.listId(list.entry), key: toggles.key, completes: toggles.completes };
   }
 
   /** Undoes the newest change made in the main window; resolves to what was undone. */
