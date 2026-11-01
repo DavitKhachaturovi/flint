@@ -153,6 +153,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Proposed:** Enter anywhere in the wheels sets the time; a current time off the 5-minute grid (14:37) is an extra stop on the minutes wheel, so Set never changes it silently; the next rounded time is the next quarter hour today and 10:00 on another day (REM-02); two digits typed within a second make one value (`1`, `4` → 14); for today, a time that has passed disables Set ("Pick a later time").
   - **D-74:** touchpad scrolling adds up its small pixel deltas (honouring `deltaMode`) and moves one stop per threshold, keeping the rest; a mouse notch stays exactly one stop.
 - **D-74 (replaces D-69's highlight rule): the highlight follows the last input used.** When the mouse leaves a picker's rows, no row is highlighted (as in the menus); an arrow key or typing brings the highlight back, starting from the row the mouse was last on. Enter acts on the keyboard's row.
+- **D-76 (replaces "Enter acts on the keyboard's row"):** pickers and menus **open with nothing highlighted**. The first arrow key reveals the highlight (on the current value's row where there is one, else the first row), typing in a search field highlights the top match, and **Enter acts only on a visible highlight**. Pressing a picker's button while its picker is open closes it. Pickers open with a short scale and fade from their button; switching from one picker to another morphs the panel (size, place, crossfaded content).
+- **D-76, wheels:** each column scrolls **freely and pixel-precisely** (touchpad), settling on the nearest value once the movement, inertia included, has stopped; a mouse-wheel notch moves exactly one value, smoothly. A click on a value (or a digit typed in a column) makes it editable: the first digit shows as `4_`, the second completes it (`47`); any minute 00–59 is allowed (it joins the 5-minute stops); Tab or Enter commits, Esc cancels.
 
 ---
 
@@ -169,7 +171,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
 - Full keymap, including the navigate/edit state model that makes these keys safe, is in 03.
 - Drag-and-drop works too; the keyboard is faster for power users.
-- **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2). **D-74:** clicking another task's text goes straight into editing on that row, without the selection gliding there first; the row being edited looks like a dark input field (09 §8), clearly different from a selected row.
+- **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2). **D-74:** clicking another task's text goes straight into editing on that row, without the selection gliding there first; the row being edited looks like a dark input field (09 §8), clearly different from a selected row. **D-76:** a second single click on an already-selected row (not on its text) also edits, like renaming in Explorer; the field eases in when editing starts and glides when editing moves to another row.
 
 ### TASK-03 — Priority: low / medium / high, shown by color, not text (v1)
 - Each task can have priority **low, medium, high**, or **none**.
@@ -179,6 +181,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - No priority text label is added to the row. Visual spec in 03.
 
 ### TASK-04 — One level of subtasks, max (v1)
+- **D-76:** "Add subtask" in a task's right-click menu and on the task's page opens a new row under the task's last subtask.
 - **Tab** indents a task once, making it a subtask of the task above. **Shift+Tab** outdents.
 - Only one level is allowed; unlimited nesting is where simplicity dies.
 - **Proposed:** subtasks move with their parent when dragged or moved to another list; completing a parent completes its open subtasks (undoable).
@@ -195,7 +198,9 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - A **larger body opens as a full page**; for it, the page is the only way to read it.
   - **"Open as page"** is available for every task (right-click menu, and **Shift+Enter** in Navigate state, **Proposed**).
   - In v1 the **page replaces the list view** with a **back arrow** (no tabs, NAV-05). Back also works with the mouse's back button and Alt+← (NAV-04). The page shows the editable title and the body, rendered, with D-49's plain editing until M5.
-- **Built in M4 step 6 (1 Nov 2026, Proposed details):** the body indicator is a button on every task with a body, completed ones included; it (or →, or a click on an untitled code row) opens a small body inline and a larger one as the page, measured with images loaded; ← or the indicator closes it again. A click on a rendered body (not on a link, not while selecting text) turns it into the plain monospace field; Esc or leaving the field saves, Enter is a new line. On the page, a click on the title edits it, an empty body offers "Add notes, code or links", and Esc goes back to the list with the task selected. Code blocks are highlighted like the popup (JSON and stack traces, UI-06); images load from the Flint folder only (05 §3, `app://media`); other images show their text.
+- **D-76 (0.4.8 feedback, supersedes "a larger body opens as a full page"):** the indicator (or →, or a click on an untitled code row) always opens the body **inline**, in a subtle well aligned with the title. A body longer than about 8 rendered lines shows only its top lines, fading out, with an **"Open as page"** control; ← or the indicator closes it. Single line breaks stay line breaks (as in Obsidian) in bodies and pages, and in notes once they render (M5). JSON, code and stack traces pasted into a body field are fenced and highlighted, as in the capture popup (CAP-06). Until the M5 editor, the plain field uses the rendered text's place, padding and type, so starting to edit doesn't shift anything (supersedes D-49's monospace field); image paste and live markdown come with M5.
+- **D-76, the task page:** the title is white, weight 600, about 27 px; the back arrow lines up with its first line; editing the title keeps it wrapped in the same type (Enter saves; the title stays one line in the file). The page lists the task's **subtasks**, with **"Add subtask"**. "Add subtask" is also in the task's right-click menu.
+- **Built in M4 step 6 (1 Nov 2026, Proposed details):** the body indicator is a button on every task with a body, completed ones included; ← or the indicator closes an inline body. A click on a rendered body (not on a link, not while selecting text) turns it into the plain monospace field; Esc or leaving the field saves, Enter is a new line. On the page, a click on the title edits it, an empty body offers "Add notes, code or links", and Esc goes back to the list with the task selected. Code blocks are highlighted like the popup (JSON and stack traces, UI-06); images load from the Flint folder only (05 §3, `app://media`); other images show their text.
 
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
 - Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
@@ -572,6 +577,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 
 ### UI-02 — Thin scrollbar at the window edge (v1, D-52)
 - A thin scrollbar designed in the tokens (09 §8), at the **right edge of the window**, not next to the content column. No arrows, no visible track.
+- **D-76:** the scrollbar's place is always reserved (a stable gutter), so a page that gains or loses a scrollbar (a task list → a note) never shifts.
 - Milestone M4.
 
 ### UI-03 — Row hover and selection (v1, D-52)
@@ -584,6 +590,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - **D-65:** switching lists or pages: the content fades in while rising a few pixels (~120–150 ms), and the sidebar's highlight glides to the new list like the row selection. Off with reduce-motion.
 - Milestone M4 (the switching transition and completion animation at the start of step 5).
 - **D-75 (supersedes the ~150 ms limits above and D-67's bands): motion never delays input.** Every action takes effect at once; animations are interruptible and retarget smoothly on new input; nothing waits for an animation to finish. With that, fuller defaults: selection ~200 ms, list and page switching ~280 ms, completion ~400 ms in all (03 §5, 09 §9).
+- **D-76 (tuning):** completion ~360 ms, list and page switching ~320 ms. Animated as well: a new task appearing (it opens up its place), un-completing (the row leaves Completed with one animation and enters the open tasks with another), menus (a subtle fade) and pickers (scale and fade from their button), inline bodies opening and closing, pages opening and closing, and editing starting and ending.
 
 ### UI-05 — Fonts: Onest, FiraGO for Georgian, Geist Mono (v1, D-60)
 - **Onest** for UI and text. **FiraGO** for Georgian, applied only to Georgian characters (`unicode-range`), so Latin and Cyrillic stay Onest. **Geist Mono** for times, counts, chips, keycaps and code.

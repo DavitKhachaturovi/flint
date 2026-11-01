@@ -308,3 +308,25 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | — | Sidebar: groups and ungrouped lists in one manual order; groups keep positions under sorts | LIST-05, LIST-06 · v1 · M4 step 8 | 02, 04 §2, D-74 |
 | — | Duplicated task without its reminder; "<name> copy" for lists | TASK-16, LIST-01 · v1 · M4 step 7 | 02, D-74 |
 | — | Wheels: touchpad scrolling adds up deltas, one stop per threshold | CAP-11 · v1 · M4 step 6 (0.4.6 fixes) | 02, D-74 |
+
+## L. Feedback on 0.4.8 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Confirmed: selection animation, icon, highlight follows the last input; step-6 details accepted | Done | D-76 |
+| — | Enter only on a visible highlight; nothing highlighted at open; typing highlights the top match | CAP-11, UI-08 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-76 |
+| 1 | Pickers and menus open without a highlight | CAP-11, UI-08 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-76 |
+| 2 | A picker's button closes its open picker | CAP-11 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-76 |
+| 3 | Picker scale+fade from the button, menu fade, picker-to-picker morph | UI-10 · v1 · M4 step 6 (0.4.8 fixes) | 09 §9, D-76 |
+| 4 | Slow second click on a selected row edits | TASK-02 · v1 · M4 step 6 (0.4.8 fixes) | 03 §2, D-76 |
+| 5 | The editing field eases in and glides between rows | TASK-02, UI-04 · v1 · M4 step 6 (0.4.8 fixes) | 03 §2, 09 §9, D-76 |
+| 6 | Completion ~360 ms, pages ~320 ms; new-task and un-complete animations | UI-04, TASK-06 · v1 · M4 step 6 (0.4.8 fixes) | 03 §5, 09 §9, tokens.css, D-76 |
+| 7 | Stable scrollbar gutter: no shift from a list to a note | UI-02 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-76 |
+| 8 | Wheels: free pixel scrolling with an inertia-aware snap; a notch is one value | CAP-11 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-70, D-76 |
+| 9 | Wheels: click or type to edit a value (`4_` → `47`), any minute, Tab/Enter commits | CAP-11 · v1 · M4 step 6 (0.4.8 fixes) | 02, D-76 |
+| 10 | "Add subtask" in the task menu | TASK-04 · v1 · M4 step 6 (0.4.8 fixes) | 02, 03 §3, D-76 |
+| 11 | Bodies: line breaks kept, markdown renders (bug), pasted code fenced and highlighted | TASK-05, CAP-06 · v1 · M4 step 6 (0.4.8 fixes); notes M5 | 02, D-76 |
+| 12 | Inline bodies in a well; long ones show their top lines with "Open as page" | TASK-05 · v1 · M4 step 6 (0.4.8 fixes) | 02, 09 §8, D-76 (supersedes part of D-53) |
+| 13 | Task page: lighter title, back arrow on the first line, wrapped title editing, subtasks with Add subtask | TASK-05, TASK-04 · v1 · M4 step 6 (0.4.8 fixes) | 02, 09 §8, D-76 |
+| 14 | The plain body field doesn't shift the layout | TASK-05 · v1 · M4 step 6 (0.4.8 fixes); real editor M5 | 02, D-49, D-76 |
+| 15 | Animations: inline body open/close, page open/close, editing start/end | UI-04, UI-10 · v1 · M4 step 6 (0.4.8 fixes) | 09 §9, D-76 |

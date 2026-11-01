@@ -116,9 +116,9 @@
   --fl-ease-press:   cubic-bezier(.2, .9, .3, 1.5);  /* checkbox press rebound */
   --fl-dur-fast:     120ms; /* hover, color */
   --fl-dur-base:     200ms; /* selection, menus and pickers opening, wheels settling (D-75) */
-  --fl-dur-page:     280ms; /* list and page switching (D-75) */
+  --fl-dur-page:     320ms; /* list and page switching (D-75, D-76) */
   --fl-dur-state:    260ms; /* small state changes: strike, fade, crossfade */
-  --fl-dur-complete: 400ms; /* the whole completion sequence (D-75) */
+  --fl-dur-complete: 360ms; /* the whole completion sequence (D-75, D-76) */
 }
 
 @media (prefers-reduced-motion: reduce) {
