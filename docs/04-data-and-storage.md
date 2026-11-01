@@ -144,7 +144,7 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 
 ### Sidebar groups in `.flint/sidebar.json` (LIST-05, LIST-06, D-73, Proposed format)
 - One file for the sidebar's groups and its manual order, kept in the Flint folder so it travels with the lists. Groups are not folders: the list files stay flat (D-23).
-- Shape: `{ "flint": 1, "items": [ { "group": "g-k3f9", "name": "Work", "lists": ["unicorn", "standup"] }, { "list": "errands" } ] }`. `items` is the manual order of groups and ungrouped lists, `lists` the order inside a group. Lists are named by their frontmatter `id`, or by file name for a file without a Flint header (D-23).
+- Shape: `{ "flint": 1, "items": [ { "group": "g-k3f9", "name": "Work", "lists": ["unicorn", "standup"] }, { "list": "errands" } ] }`. `items` is the one manual order of groups and ungrouped lists together, so a group can sit between lists (D-74); `lists` is the order inside a group. Under a non-manual sort the groups keep these positions (LIST-06). Lists are named by their frontmatter `id`, or by file name for a file without a Flint header (D-23).
 - Tolerant reader: unknown IDs are skipped, a list that isn't mentioned shows ungrouped at the end, unknown keys are kept. Written atomically (DATA-01).
 - Losing the file loses only the grouping and the manual order, never a list (the bookkeeping rule above). Which groups are collapsed and the sort choice are machine UI state in `ui-state.json`.
 

@@ -421,7 +421,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Considered:** `reminderOff` (camel case, unlike the other keys), `remind:: off` (a second reminder-like key next to `reminder` is confusing), `paused` (suggests it resumes by itself).
 
 ### D-67 — Motion: two duration bands, a fuller completion, an animation-speed setting
-- **Date:** 1 Nov 2026 · **Status:** Decided (Davit)
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); the duration bands are superseded by D-75
 - **Decision:** The single ~150 ms ceiling (03 §5, 09 §9, D-17) becomes two bands: **up to ~150 ms** for motion that gates the next action (navigation, selection, menus and pickers opening) and **up to ~250–300 ms** for non-blocking visual state changes (strike, fade, completion feedback). Applied now: slightly slower list/page switching (150 ms, ease-out); a more visible completion (the check fills with a small pop, then the row fades, slides and collapses into Completed); an un-complete animation (the row returns smoothly). Settings (M8) gets an animation-speed setting that scales all motion, next to reduce-motion (APP-11). A motion pass over every button, menu, picker, popup and row action follows the same rule (UI-10, M8 at the latest).
 
 ### D-68 — Feedback on 0.4.2 and 0.4.4
@@ -477,3 +477,23 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Sorting (LIST-06):** a small sort menu with Manual (default, custom order), Recently edited and Created, applied within each group and the ungrouped area. In Manual, lists, notes and groups reorder with Alt+↑/↓ and the same locked-axis drag as tasks (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
   - The manual sidebar order moves from `ui-state.json` (D-54, never built) to `.flint/sidebar.json`.
 - **Milestones:** groups, the sort menu and Alt+↑/↓ in M4 step 8; dragging into, out of and within groups with the rest of drag in M4 step 9.
+
+### D-74 — Feedback on 0.4.6; answers to the Proposed group and duplicate details
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed working:** no cursor flicker (the leftover while the popup is open without focus is fine for now), today in the calendar, the sidebar's + menu on right-click, undo animations, the overdue tone and the time crossfade, the presets, the wheels (mouse wheel and drag), the selection colour, click-to-edit.
+- **Decision (fixed first in the rest of M4 step 6):**
+  - Picker highlight (Move to, priority, list, reminder presets): **the highlight follows the last input used.** The mouse leaving the rows leaves no highlight, as in the right-click menus; an arrow key or typing brings it back, starting from the row the mouse was last on; Enter acts on the keyboard's row (CAP-11, UI-08; replaces D-69's return to the keyboard's row).
+  - Click to edit: a click on another task's text goes straight into editing on that row, without the selection gliding there first; the editing row looks like a dark input field like the composer (well background, subtle edge), clearly different from a selected row (TASK-02, 03 §2, D-71).
+  - App icon: the tile keeps the **corner proportions of the master logo** (`flint-icon-512.svg`) at every size, full-bleed with its rim; size / 24 had made it nearly square at taskbar sizes. The leaf at taskbar and tray sizes is about 10 % smaller (from 72 % to 65 % of the diagonal). The in-app logos stay as they are (UI-07; replaces D-69's corner radius and leaf size).
+  - Wheels: touchpad scrolling adds up small pixel deltas (honouring `deltaMode`) and moves one stop per threshold; a mouse notch stays one stop (CAP-11, D-70).
+- **Answers to the Proposed details of D-72 and D-73:**
+  - Sidebar order: groups and ungrouped lists share **one manual order**, so a group can sit between lists (like Microsoft To Do); Inbox stays pinned at the top. Under a non-manual sort, groups keep their manual positions and lists are sorted within each group and among the ungrouped ones (LIST-05, LIST-06; replaces "groups first").
+  - `.flint/sidebar.json` keyed by list ID with the file name as fallback: accepted.
+  - Recently edited / Created from the files' times, newest first: accepted.
+  - A duplicated list is "<name> copy": accepted.
+  - A duplicated task copies the title, body and priority, **not the reminder**, so it doesn't fire twice (TASK-16).
+
+### D-75 — Motion never delays input
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit) · supersedes the duration limits of D-67 (and of D-17, D-56, D-65)
+- **Decision:** the guiding rule is **"motion never delays input"**. Every action takes effect immediately, animations are interruptible and retarget smoothly on new input (springs), and nothing waits for an animation to finish. With that, fuller default durations: selection movement ~200 ms, menus and pickers opening ~200 ms, list and page switching ~280 ms (the old fade was barely noticeable), the completion sequence ~400 ms in all. **Exception:** the capture popup still appears instantly and takes typing from the first frame; it may fade in but never delays input. The animation-speed setting (M8, D-67) scales everything; reduce-motion still turns it off. If the defaults feel too slow in daily use, Davit asks to dial them back. Updates 03 §5 and 09 §9.
+- **Consequence for completion:** the task is completed (saved, undoable) the moment Space is pressed; the row's animation plays on from where it was, instead of the save waiting for the animation as in 0.4.3 to 0.4.6.

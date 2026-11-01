@@ -17,7 +17,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
 - **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
 - **D-73:** the manual order is kept in `.flint/sidebar.json` with the groups (LIST-05), not in `ui-state.json`; Alt+↑/↓ reorders the selected list, note or group too (LIST-06).
-- **D-72:** "Duplicate" in the menu of lists and notes: "<name> copy" (then "<name> copy 2"…) right below the original, every task with a new ID (**Proposed** naming). **D-69:** right-clicking empty sidebar space opens the same menu as the **+** (New task list, New note, New group); only the title-bar strip at the top drags the window.
+- **D-72, D-74:** "Duplicate" in the menu of lists and notes: "<name> copy" (then "<name> copy 2"…) right below the original, every task with a new ID. **D-69:** right-clicking empty sidebar space opens the same menu as the **+** (New task list, New note, New group); only the title-bar strip at the top drags the window.
 
 ### LIST-02 — Markdown by default (v1)
 - All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
@@ -41,13 +41,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Groups are **not folders**: the list files stay flat in the Flint folder (04 §2). Membership and order live in `.flint/sidebar.json` (user data, travels with the folder); which groups are collapsed is machine UI state (`ui-state.json`).
 - **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
 - Lists and notes move into or out of a group by drag (M4 step 9) and the right-click menu ("Move to group ▸", "Remove from group").
-- **Proposed:** Inbox stays first, outside any group; groups come first in their own order, then the ungrouped lists; a group header shows a chevron, the name and the number of lists; empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
+- **D-74:** Inbox stays pinned at the top, outside any group. **Groups and ungrouped lists share one manual order**, so a group can sit between lists (like Microsoft To Do). Under a non-manual sort, groups keep their manual positions and lists are sorted within each group and among the ungrouped ones (LIST-06).
+- **Proposed:** a group header shows a chevron, the name and the number of lists; empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
 - Milestones: M4 step 8; dragging in M4 step 9.
 
 ### LIST-06 — Sidebar sorting (v1, D-73)
 - A small sort menu in the sidebar: **Manual** (default, the custom order), **Recently edited**, **Created**. It applies within each group and within the ungrouped lists.
 - In Manual, lists, notes and groups reorder with **Alt+↑/↓** and the locked-axis drag (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
-- **Proposed:** the menu is a small sort button next to the **+**; Recently edited uses the file's modification time and Created its creation time, both newest first; groups keep their manual order under every sort; the choice is machine UI state.
+- **D-74 (accepted):** Recently edited uses the file's modification time and Created its creation time, both newest first; groups keep their manual positions under every sort. **Proposed:** the menu is a small sort button next to the **+**; the choice is machine UI state.
 - Milestone M4 step 8.
 
 ---
@@ -150,6 +151,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-69:** the presets are **In 10 minutes**, **In 1 hour** and **Tomorrow 10:00**. Hovering a picker row highlights it only while the mouse is over the picker, as in the menus (UI-08).
 - **D-70 (supersedes D-68's time-of-day list):** after a day is picked, a **wheels** time picker (mockup 08): two columns, hours 00–23 and minutes in 5-minute steps, snapping to a highlighted centre band; mouse wheel or drag per column, ↑/↓ and typed digits, Tab between the columns; a **Set · <day, time>** button; back to the calendar via the header (and ←). It starts at the reminder's current time, or the next rounded time for a new one. The typed field above it stays for exact minutes (`14:37`, `3pm`). The same picker in the composer, the popup and "Change reminder…".
   - **Proposed:** Enter anywhere in the wheels sets the time; a current time off the 5-minute grid (14:37) is an extra stop on the minutes wheel, so Set never changes it silently; the next rounded time is the next quarter hour today and 10:00 on another day (REM-02); two digits typed within a second make one value (`1`, `4` → 14); for today, a time that has passed disables Set ("Pick a later time").
+  - **D-74:** touchpad scrolling adds up its small pixel deltas (honouring `deltaMode`) and moves one stop per threshold, keeping the rest; a mouse notch stays exactly one stop.
+- **D-74 (replaces D-69's highlight rule): the highlight follows the last input used.** When the mouse leaves a picker's rows, no row is highlighted (as in the menus); an arrow key or typing brings the highlight back, starting from the row the mouse was last on. Enter acts on the keyboard's row.
 
 ---
 
@@ -166,7 +169,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
 - Full keymap, including the navigate/edit state model that makes these keys safe, is in 03.
 - Drag-and-drop works too; the keyboard is faster for power users.
-- **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2).
+- **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2). **D-74:** clicking another task's text goes straight into editing on that row, without the selection gliding there first; the row being edited looks like a dark input field (09 §8), clearly different from a selected row.
 
 ### TASK-03 — Priority: low / medium / high, shown by color, not text (v1)
 - Each task can have priority **low, medium, high**, or **none**.
@@ -240,7 +243,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### TASK-16 — Duplicate a task (v1, D-72)
 - "Duplicate" in a task's right-click menu.
-- **Proposed:** the copy appears right below the original, open, with a new ID and everything else copied (title, priority, reminder including `muted`, body, subtasks with new IDs), and is selected. Undoable. Milestone M4 step 7.
+- **D-74:** the copy has the title, body and priority, but **not the reminder** (a duplicate must not fire the same reminder twice). **Proposed:** it appears right below the original, open, with a new ID (subtasks copied with new IDs), and is selected. Undoable. Milestone M4 step 7.
 
 ### TASK-13 — Stale-task fading (Later)
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
@@ -578,6 +581,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - **D-65:** completing a task plays the specified completion animation (09 §9: fade and slide, then it moves to Completed) instead of the row just disappearing.
 - **D-65:** switching lists or pages: the content fades in while rising a few pixels (~120–150 ms), and the sidebar's highlight glides to the new list like the row selection. Off with reduce-motion.
 - Milestone M4 (the switching transition and completion animation at the start of step 5).
+- **D-75 (supersedes the ~150 ms limits above and D-67's bands): motion never delays input.** Every action takes effect at once; animations are interruptible and retarget smoothly on new input; nothing waits for an animation to finish. With that, fuller defaults: selection ~200 ms, list and page switching ~280 ms, completion ~400 ms in all (03 §5, 09 §9).
 
 ### UI-05 — Fonts: Onest, FiraGO for Georgian, Geist Mono (v1, D-60)
 - **Onest** for UI and text. **FiraGO** for Georgian, applied only to Georgian characters (`unicode-range`), so Latin and Cyrillic stay Onest. **Geist Mono** for times, counts, chips, keycaps and code.
@@ -595,13 +599,14 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - **D-65 (0.4.1 feedback):** still too small next to other apps' icons, whose mark fills the square edge to edge. For 16–48 px the mark fills nearly the whole square. ~~The reminder toast also shows Flint's logo larger, as its `appLogoOverride` image.~~ (Removed again by D-68.)
 - **D-68 (0.4.4 feedback):** the leaf overflowed the dark tile. The tile scales with the leaf: the whole icon fills the square, with the leaf inside the tile, at every small size.
 - **D-69 (0.4.5 feedback), one rule instead of more back and forth:** the dark tile fills the **entire icon square** (full-bleed), with the corner radius Windows uses for app icons (2 px at 48 px, i.e. size / 24, per Microsoft's icon grid) and a 1-pixel rim on its edge so it stays visible on the dark taskbar; the leaf sits **proportionally** inside it, its tips and outline spanning 72 % of the tile's diagonal, at every size from 16 to 96 px. The 256 px image stays the master logo. Details in 09 §8.
+- **D-74 (0.4.6 feedback, replaces the corner radius of D-69):** size / 24 made the tile nearly square at taskbar sizes and lost the logo's rounded corners. The tile keeps **the corner proportions of the master logo** (`flint-icon-512.svg`: 108 / 480, about 22.5 % of the side) at every size, still full-bleed with its rim, and the leaf at taskbar and tray sizes is **about 10 % smaller** (65 % of the diagonal), so it doesn't look like it touches the edge from a normal laptop distance. The in-app logos stay as they are.
 - Milestone M4.
 
 ### UI-08 — Right-click menus everywhere (v1, D-55)
 - Every object has a right-click menu with relevant actions: tasks, lists and notes in the sidebar, the sidebar's background, the composer.
 - **Every text field** keeps the standard **Cut / Copy / Paste / Select all** menu (Electron shows none by default).
 - **D-68:** the mouse highlights an item only while it is over the menu; leaving the menu clears it. Keyboard navigation keeps its highlight.
-- **D-69:** the same in every picker (Move to, priority, list, the reminder presets), which still kept the mouse's highlight.
+- **D-69:** the same in every picker (Move to, priority, list, the reminder presets), which still kept the mouse's highlight. **D-74:** the highlight follows the last input used: leaving with the mouse leaves no highlight; an arrow key or typing brings it back from the row the mouse was last on.
 - **D-72:** "Duplicate" for tasks, lists and notes; "Convert to note" / "Convert to task list" for lists and notes (LIST-04).
 - Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6).
 - **D-64:** menus are drawn **in the page**, with the tokens, **everywhere**, the capture popup included: while a menu is open there, the popup makes room for it (e.g. by enlarging its transparent margin or window). The native dark Windows menu is only a fallback if that genuinely doesn't work, and Davit is told if it comes to that.
@@ -614,7 +619,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Milestones: the composer, the capture popup and task editing in M4; the note editor (CodeMirror) in M5.
 
 ### UI-10 — A motion pass over everything (v1, D-67)
-- Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (up to ~150 ms for motion that gates the next action, ~250–300 ms for non-blocking state changes). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
+- Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (D-75: motion never delays input; fuller default durations). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
 - Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.
 
 ### UI-11 — Flint's own text selection colour (v1, D-69)

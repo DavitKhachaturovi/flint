@@ -26,6 +26,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 
 - **Enter** → Edit state. **Esc** → back to Navigate (with the same row selected).
 - **Mouse (D-71, replaces click-to-select-then-click-to-edit):** clicking a task's **title text** enters Edit directly, with the caret where you clicked, and the row stays highlighted; clicking **empty row space** only selects; **double-click** anywhere on the row edits; Esc returns to the selected row. **Proposed:** the caret lands at the matching place in the raw text (markup characters such as `**` counted); clicking a link in a title still opens it; Ctrl/Shift+click selects (TASK-07); a press that becomes a drag never edits.
+- **D-74:** a click on another task's text goes **straight into editing** on that row: no selection glide first. The **editing row looks like a dark input field**, like the composer (`--fl-ground-well` with a subtle edge), so Edit is clearly different from a selected row (09 §8).
 - The **selected** row and the **row being edited** must look visibly different (e.g. selection = subtle background; editing = caret + slightly stronger outline).
 - This is the same model as Things 3 and Vim, so it feels familiar to developers.
 
@@ -196,9 +197,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - The **selection highlight** glides to the newly selected row and **new rows** ease in instead of appearing rigidly (UI-04, D-56).
 - **Switching lists or pages:** the content fades in while rising a few pixels, and the sidebar's highlight glides to the new list (UI-04, D-65).
 - The whole composer card is one text target: the I-beam over all of it except its buttons, so the cursor doesn't flicker between arrow and I-beam around the text box (UI-01, D-65).
-- **Durations (D-67, replaces the single ~150 ms ceiling):** up to **~150 ms** for motion that gates the next action (navigation, selection, menus and pickers opening); up to **~250–300 ms** for non-blocking visual state changes (a strike line, a fade, completion feedback). Motion must never make the user wait.
+- **Motion never delays input (D-75, supersedes D-67's ~150 / ~250–300 ms limits).** Every action takes effect immediately; animations are interruptible and retarget smoothly on new input (springs); nothing waits for an animation to finish (a completed task is saved and its row can be undone at once, while the animation plays on). Default durations: **selection** movement ~200 ms; **menus and pickers** opening ~200 ms; **list and page switching** ~280 ms; the **completion** sequence ~400 ms in all; small state changes (a strike line, a fade) ~260 ms; hover and colour ~120 ms. **Exception:** the capture popup appears instantly and takes typing from its first frame; it may fade in, but never delays input (CAP-10).
 - **Completion (D-67):** the check fills with a small pop, then the row fades, slides and collapses into Completed. **Un-completing** brings the row back smoothly into the open tasks.
-- **Animation speed (D-67):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour.
+- **Animation speed (D-67, D-75):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour. If the defaults feel slow in daily use, they are dialled back.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).
 

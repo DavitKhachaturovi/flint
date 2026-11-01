@@ -294,3 +294,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · v1 · M4 step 8 (drag in step 9) | 01, 02, 04 §2, D-73 |
 | 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · v1 · M4 step 8 (drag in step 9) | 02, 03 §3, D-73 |
 | 22 | Temporary sort by reminder time and date added, next to priority | TASK-08 · v1 · M4 step 10 | 02, D-72 |
+
+## K. Feedback on 0.4.6 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Confirmed: flicker gone, calendar today, sidebar + menu, undo animations, overdue tone, time crossfade, presets, wheels, selection colour, click-to-edit | Done | D-74 |
+| 1 | Picker highlight follows the last input: none after the mouse leaves; keys bring it back from the mouse's last row | CAP-11, UI-08 · v1 · M4 step 6 (0.4.6 fixes) | 02, D-74 |
+| 2a | Click another task's text: straight into editing, no glide first | TASK-02 · v1 · M4 step 6 (0.4.6 fixes) | 03 §2, D-74 |
+| 2b | The editing row looks like a dark input field (well, subtle edge) | TASK-02 · v1 · M4 step 6 (0.4.6 fixes) | 03 §2, 09 §8, D-74 |
+| 3 | Icon: the master logo's corner proportions at every size; leaf ~10 % smaller at taskbar/tray sizes; in-app logos unchanged | UI-07 · v1 · M4 step 6 (0.4.6 fixes) | 09 §8, D-74 |
+| 4 | Motion never delays input; fuller durations (selection ~200, menus ~200, pages ~280, completion ~400 ms); popup instant | UI-04, UI-10 · v1 · M4 step 6 (0.4.6 fixes); speed setting M8 | 03 §5, 09 §9, tokens.css, D-75 |
+| — | Sidebar: groups and ungrouped lists in one manual order; groups keep positions under sorts | LIST-05, LIST-06 · v1 · M4 step 8 | 02, 04 §2, D-74 |
+| — | Duplicated task without its reminder; "<name> copy" for lists | TASK-16, LIST-01 · v1 · M4 step 7 | 02, D-74 |
+| — | Wheels: touchpad scrolling adds up deltas, one stop per threshold | CAP-11 · v1 · M4 step 6 (0.4.6 fixes) | 02, D-74 |
