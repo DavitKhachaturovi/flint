@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isOpenableLink, titleHtml, titlePlain } from './inline-markdown.js';
+import { isOpenableLink, rawOffset, titleHtml, titlePlain } from './inline-markdown.js';
 
 describe('inline markdown in titles (LIST-02, D-52)', () => {
   it('renders bold, italic, strikethrough, code and links', () => {
@@ -43,5 +43,21 @@ describe('inline markdown in titles (LIST-02, D-52)', () => {
     expect(isOpenableLink('file:///C:/Windows/system32/calc.exe')).toBe(false);
     expect(isOpenableLink('flint://reminder/done?id=x')).toBe(false);
     expect(isOpenableLink('not a url')).toBe(false);
+  });
+});
+
+describe('rawOffset: a click in the shown title, in the raw text (D-71)', () => {
+  it.each([
+    ['plain text', 'plain text', 3, 3],
+    ['**bold** move', 'bold move', 2, 4],
+    ['**bold** move', 'bold move', 0, 0],
+    ['**bold** move', 'bold move', 6, 10],
+    ['see [docs](https://x.dev/a) now', 'see docs now', 6, 7],
+    ['see [docs](https://x.dev/a) now', 'see docs now', 10, 29],
+    ['a \\*literal\\* star', 'a *literal* star', 3, 4],
+    ['`code` here', 'code here', 9, 11],
+    ['short', 'short', 99, 5],
+  ])('%s at %i', (raw, shown, offset, expected) => {
+    expect(rawOffset(raw, shown, offset)).toBe(expected);
   });
 });

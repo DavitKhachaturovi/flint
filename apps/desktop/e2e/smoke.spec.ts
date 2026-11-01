@@ -498,6 +498,37 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
     'Fix the gate',
   ]);
   await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
+
+  // D-71: a click on the title text edits with the caret there; beside the text only selects;
+  // a double-click anywhere edits; Esc goes back to the selected row.
+  const field = main.locator('.title-input');
+  const caret = (): Promise<number | null> =>
+    field.evaluate((input: HTMLInputElement) => input.selectionStart);
+  const lawn = main.locator('.row', { hasText: 'Mow the lawn' });
+  const lawnText = (await lawn.locator('.title').evaluate((span) => {
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const rect = range.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, y: rect.top + rect.height / 2 };
+  }))!;
+  await main.mouse.click(lawnText.left + 1, lawnText.y);
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('Mow the lawn');
+  expect(await caret()).toBe(0);
+  await expect(main.locator('.row.editing')).toHaveClass(/\bsel\b/);
+  await main.keyboard.press('Escape');
+  await expect(field).toHaveCount(0);
+  await main.mouse.click(lawnText.right - 1, lawnText.y);
+  expect(await caret()).toBe('Mow the lawn'.length);
+  await main.keyboard.press('Escape');
+  await main.locator('.row', { hasText: 'Fix the gate' }).click();
+  await main.mouse.click(lawnText.right + 60, lawnText.y);
+  await expect(field).toHaveCount(0);
+  await expect(main.locator('.row.sel .title')).toHaveText('Mow the lawn');
+  await main.mouse.dblclick(lawnText.right + 60, lawnText.y);
+  await expect(field).toHaveValue('Mow the lawn');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.row.sel .title')).toHaveText('Mow the lawn');
 });
 
 test('menus, delete to trash, move between lists, list and note actions (M4 step 4: UI-08, TASK-11, TASK-12, LIST-01, D-64)', async () => {

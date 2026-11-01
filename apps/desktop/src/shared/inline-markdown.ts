@@ -25,6 +25,20 @@ export function titlePlain(title: string): string {
   return text;
 }
 
+/**
+ * D-71: where a point in the shown title lands in its raw markdown, for the caret when a click
+ * starts editing. The raw text is walked along with the shown text, skipping what isn't shown:
+ * markup such as `**`, `[`, `](url)` and escapes.
+ */
+export function rawOffset(raw: string, shown: string, offset: number): number {
+  let at = 0;
+  for (let index = 0; index < Math.min(offset, shown.length); index++) {
+    while (at < raw.length && raw[at] !== shown[index]) at++;
+    if (at < raw.length) at++;
+  }
+  return at;
+}
+
 /** Links Flint opens in the browser; anything else stays unopened. */
 export function isOpenableLink(href: string): boolean {
   try {

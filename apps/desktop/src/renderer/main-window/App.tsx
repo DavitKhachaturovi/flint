@@ -38,7 +38,7 @@ import {
   PlusIcon,
   ReminderBellIcon,
 } from './icons.js';
-import { titleHtml } from '../../shared/inline-markdown.js';
+import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
@@ -105,7 +105,13 @@ interface Toast {
  * while a save is in flight is lost, and the field is never moved (moving it would drop focus).
  */
 type Editing =
-  | { readonly kind: 'task'; readonly key: string; readonly seq: number }
+  | {
+      readonly kind: 'task';
+      readonly key: string;
+      readonly seq: number;
+      /** D-71: where the caret starts, in the raw title; the end when not given. */
+      readonly caret?: number;
+    }
   | {
       readonly kind: 'new';
       readonly after: string;
@@ -302,9 +308,9 @@ export function App(): ReactElement {
   const undo = useCallback(() => step('undo'), [step]);
   const redo = useCallback(() => step('redo'), [step]);
 
-  const edit = useCallback((key: string): void => {
+  const edit = useCallback((key: string, caret?: number): void => {
     setSelected(key);
-    setEditing({ kind: 'task', key, seq: ++seq });
+    setEditing({ kind: 'task', key, seq: ++seq, ...(caret !== undefined && { caret }) });
   }, []);
 
   // The new row reads the latest Edit state when a key arrives, before React has re-rendered.
@@ -1176,7 +1182,8 @@ interface RowHandlers {
   readonly editing: Editing | null;
   readonly onSelect: (key: string) => void;
   readonly onToggle: (key: string) => void;
-  readonly onEdit: (key: string) => void;
+  /** Edit state, with the caret at `caret` in the raw title (D-71) or at the end. */
+  readonly onEdit: (key: string, caret?: number) => void;
   readonly onLeaveTask: (key: string, text: string, how: Leave) => void;
   readonly onTab: (how: 'indent' | 'outdent') => void;
   /** UI-08: the row's right-click menu. */
@@ -1231,7 +1238,8 @@ function Row(
         onSelect(task.key);
         props.onMenu(task, { x: event.clientX, y: event.clientY });
       }}
-      onDoubleClick={() => !task.done && onEdit(task.key)}
+      // D-71: double-click anywhere edits; inside the field it is the field's own (word selection).
+      onDoubleClick={() => !task.done && !isEditing && onEdit(task.key)}
     >
       {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}
       <button
@@ -1246,6 +1254,7 @@ function Row(
         <EditField
           key={editing.seq}
           initial={task.title}
+          {...(editing.caret !== undefined && { caret: editing.caret })}
           inert
           onLeave={(text, _empty, how) => onLeaveTask(task.key, text, how)}
           onTab={onTab}
@@ -1258,7 +1267,10 @@ function Row(
           {task.code.peek && <span className="code-peek">{task.code.peek}</span>}
         </span>
       ) : (
-        <Title task={task} />
+        <Title
+          task={task}
+          {...(!task.done && { onEditAt: (caret: number) => onEdit(task.key, caret) })}
+        />
       )}
       <span className="ind">
         {task.reminder && !task.done && (
@@ -1394,10 +1406,15 @@ function MorphText(props: { readonly text: string }): ReactElement {
 /**
  * A task's title with its inline markdown rendered (LIST-02, D-52); the raw text shows while it is
  * edited. markdown-it escapes everything that isn't markdown, so the HTML is safe. A click on a
- * link opens it in the browser and does nothing else.
+ * link opens it in the browser and does nothing else; a click on the text edits the task with the
+ * caret there (D-71); a click beside the text only selects the row.
  */
-function Title(props: { readonly task: TaskRow }): ReactElement {
-  const { task } = props;
+function Title(props: {
+  readonly task: TaskRow;
+  /** D-71: editing starts with the caret at this offset in the raw title. */
+  readonly onEditAt?: (caret: number) => void;
+}): ReactElement {
+  const { task, onEditAt } = props;
   if (task.title === '') return <span className="title">{task.label}</span>;
   const onLink = (event: React.MouseEvent): HTMLAnchorElement | null =>
     (event.target as HTMLElement).closest('a');
@@ -1413,12 +1430,34 @@ function Title(props: { readonly task: TaskRow }): ReactElement {
       }}
       onClick={(event) => {
         const link = onLink(event);
-        if (!link) return;
-        event.preventDefault();
-        window.flintMain.openLink(link.href);
+        if (link) {
+          event.preventDefault();
+          window.flintMain.openLink(link.href);
+          return;
+        }
+        // Ctrl/Shift+click select (TASK-07); the second click of a double-click is the field's.
+        if (!onEditAt || event.ctrlKey || event.shiftKey || event.detail > 1) return;
+        const span = event.currentTarget;
+        const at = textOffsetAt(span, event.clientX, event.clientY);
+        if (at !== null) onEditAt(rawOffset(task.title, span.textContent ?? '', at));
       }}
     />
   );
+}
+
+/** D-71: the offset in `element`'s text under a point, or null when the point is beside the text. */
+function textOffsetAt(element: HTMLElement, x: number, y: number): number | null {
+  const text = document.createRange();
+  text.selectNodeContents(element);
+  const onText = [...text.getClientRects()].some(
+    (rect) => x >= rect.left && x <= rect.right + 2 && y >= rect.top && y <= rect.bottom,
+  );
+  const position = onText ? document.caretPositionFromPoint(x, y) : null;
+  if (!position || !element.contains(position.offsetNode)) return null;
+  const before = document.createRange();
+  before.setStart(element, 0);
+  before.setEnd(position.offsetNode, position.offset);
+  return before.toString().length;
 }
 
 /**
@@ -1463,6 +1502,8 @@ function NewRow(props: {
  */
 function EditField(props: {
   readonly initial: string;
+  /** D-71: the caret's starting place; the end when not given. */
+  readonly caret?: number;
   readonly inert: boolean;
   readonly placeholder?: string;
   readonly repeat?: boolean;
@@ -1475,6 +1516,10 @@ function EditField(props: {
   const field = useRef<HTMLInputElement>(null);
   // UI-09: auto-closing brackets and quotes while editing a task.
   useEffect(() => (field.current ? enableAutoPair(field.current) : undefined), []);
+  useEffect(() => {
+    if (props.caret !== undefined) field.current?.setSelectionRange(props.caret, props.caret);
+    // Only where editing starts.
+  }, []);
   const leave = (how: Leave): void => {
     if (left.current) return;
     const empty = text.value.trim() === '';
