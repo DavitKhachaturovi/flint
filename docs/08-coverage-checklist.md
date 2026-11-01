@@ -392,18 +392,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | — | Accepted: lightbox on the solid ground, Alt+↑/↓ by keyboard focus, the drag rules; open questions keep their defaults | 09 §8, LIST-06, TASK-01, LIST-05 · Done | 02, 06 §4, D-80 |
-| — | Format tests check the parsed structure (tasks, subtasks, bodies), not only round-trips | DATA, 04 §3 · v1 · 0.4.15 | D-80 |
-| 1 | Composer: a pasted image is a thumbnail chip | CAP-06, TASK-05 · v1 · 0.4.15 | 02, D-80 |
-| 2 | Composer: pasted code is a code card preview (language, background) | CAP-06, TASK-05 · v1 · 0.4.15 | 02, D-80 |
-| 3 | Body icon for any body (images only too); image icon in addition; thumbnails on expand | TASK-05, MEDIA-01 · v1 · 0.4.15 | 02, 09 §8, D-80 |
-| 4 | Trash button on code cards and body images, fold animation and undo toast; image link only | TASK-05, MEDIA-01 · v1 · 0.4.15 | 02, 09 §8, D-80 |
-| 5 | Deleting an expanded task collapses it first, then animates | TASK-12 · v1 · 0.4.15 | 02, D-80 |
-| 6 | Groups as soft cards per mockup 10; collapsed "N lists" | LIST-05 · v1 · 0.4.15 | 02, 09 §8, mockup 10, D-80 |
-| 7 | New groups at the top of Lists | LIST-05, LIST-06 · v1 · 0.4.15 | 02, D-80 |
-| 8 | Group motion: create, rename, delete, expand/collapse, move in/out, sort | LIST-05, LIST-06, UI-10 · v1 · 0.4.15 | 02, 09 §8, D-80 |
-| 9 | Drag into a group: lit group, "Drop to add", indented drop line, lifted row; drop on a collapsed header (pulse) | LIST-05 · v1 · 0.4.15 | 02, 09 §8, D-80 |
-| 10 | Stable scrollbar gutter in the sidebar | UI-02 · v1 · 0.4.15 | 09 §8, D-80 |
-| 11 | Sidebar highlight stays while a task is dragged | TASK-01 · v1 · 0.4.15 | 02, D-80 |
-| 12 | Every dragged task keeps its selection highlight | TASK-01 · v1 · 0.4.15 | 02, D-80 |
-| 13 | Animated fold and unfold of bodies and subtasks while dragging | TASK-01 · v1 · 0.4.15 | 02, D-80 |
+| — | Format tests check the parsed structure (tasks, subtasks, bodies), not only round-trips | DATA, 04 §3 · Done (0.4.15) | D-80 |
+| 1 | Composer: a pasted image is a thumbnail chip | CAP-06, TASK-05 · Done (0.4.15) | 02, D-80 |
+| 2 | Composer: pasted code is a code card preview (language, background) | CAP-06, TASK-05 · Done (0.4.15) | 02, D-80 |
+| 3 | Body icon for any body (images only too); image icon in addition; thumbnails on expand | TASK-05, MEDIA-01 · Done (0.4.15) | 02, 09 §8, D-80 |
+| 4 | Trash button on code cards and body images, fold animation and undo toast; image link only | TASK-05, MEDIA-01 · Done (0.4.15) | 02, 09 §8, D-80 |
+| 5 | Deleting an expanded task collapses it first, then animates | TASK-12 · Done (0.4.15) | 02, D-80 |
+| 6 | Groups as soft cards per mockup 10; collapsed "N lists" | LIST-05 · Done (0.4.15) | 02, 09 §8, mockup 10, D-80 |
+| 7 | New groups at the top of Lists | LIST-05, LIST-06 · Done (0.4.15) | 02, D-80 |
+| 8 | Group motion: create, rename, delete, expand/collapse, move in/out, sort | LIST-05, LIST-06, UI-10 · Done (0.4.15) | 02, 09 §8, D-80 |
+| 9 | Drag into a group: lit group, "Drop to add", indented drop line, lifted row; drop on a collapsed header (pulse) | LIST-05 · Done (0.4.15) | 02, 09 §8, D-80 |
+| 10 | Stable scrollbar gutter in the sidebar | UI-02 · Done (0.4.15) | 09 §8, D-80 |
+| 11 | Sidebar highlight stays while a task is dragged | TASK-01 · Done (0.4.15) | 02, D-80 |
+| 12 | Every dragged task keeps its selection highlight | TASK-01 · Done (0.4.15) | 02, D-80 |
+| 13 | Animated fold and unfold of bodies and subtasks while dragging | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 14 | Settings: Keyboard shortcuts section, global hotkeys rebound there, `?` shows the same list | APP-11, APP-08, NAV-02 · v1 · M8 | 02, 06 §2, D-80 |

@@ -2,6 +2,19 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.15 (2 Nov 2026)
+
+- **Pasting into the task box at the top** looks like the capture popup: code, JSON and stack traces show as a small code card (language, line count, the first lines; the chevron shows all, × removes it), a screenshot as a thumbnail chip. On Enter they become the task's notes. Nothing shows as raw `![](attachments/…)` or ``` text any more.
+- **Every task with notes shows the notes icon**, also when the notes are only pictures; the picture icon shows as well when there are pictures. The notes icon opens the task with its thumbnails.
+- **Delete a code block or a picture from a task's notes** with the small trash button in its corner (in the list and on the task's page). It folds away, and the message at the bottom has Undo. A deleted picture's file stays in `attachments/`.
+- **Deleting an opened task** first closes it, then it goes.
+- **Groups are cards** (as in the new mockup): a folder tile and the name, the lists inside on a faint line; folded, one row that says "3 lists".
+- **New groups appear at the top of Lists**, ready to name.
+- **The sidebar moves smoothly**: new, renamed and deleted groups, folding, Move to group and Remove from group, and changing the sort all animate to the new places.
+- **Dragging a list into a group shows where it lands**: the group lights up and says "Drop to add", a line marks the spot, and the group's card makes room. Drop a list on a folded group to add it there; the group pulses.
+- The sidebar no longer shifts when its scrollbar appears.
+- **Dragging a task**: the sidebar keeps its highlight, the dragged task keeps its own, and a task with notes or subtasks folds them away smoothly while it moves and opens them again after.
+
 ## 0.4.14 (2 Nov 2026)
 
 - **Groups in the sidebar**: New group from the + (or right-click the sidebar). Click a group's header to fold it. Right-click a list for **Move to group** (with New group at the end) or **Remove from group**; right-click a group to rename or delete it (its lists stay, and Ctrl+Z brings the group back).
