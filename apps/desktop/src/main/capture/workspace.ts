@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import { copyFile, mkdir, readFile, rename, unlink } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
@@ -41,12 +42,30 @@ import {
 import { atDefaultTime, fromDate } from '@flint/core/time';
 import type {
   ChangeOutcome,
+  SidebarAction,
+  SidebarOutcome,
+  SidebarSort,
+  SidebarView,
   ListActionOutcome,
   ListChange,
   ListSummary,
   ListView,
 } from '../../shared/ipc.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import {
+  EMPTY_SIDEBAR,
+  addGroup,
+  arrange,
+  deleteGroup,
+  fromItems,
+  moveStep,
+  moveTo as moveInSidebar,
+  readSidebar,
+  renameGroup,
+  writeSidebar,
+  type SidebarFile,
+  type SidebarList,
+} from '../sidebar.js';
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
@@ -169,7 +188,167 @@ export class Workspace {
     } catch {
       uiState = {};
     }
-    return new Workspace(folder, lists, uiStatePath, uiState, await trashedIds(folder));
+    const workspace = new Workspace(folder, lists, uiStatePath, uiState, await trashedIds(folder));
+    workspace.sidebarFile = readSidebar(
+      await readFile(workspace.sidebarPath, 'utf8').catch(() => null),
+    );
+    return workspace;
+  }
+
+  /** LIST-05, D-73: the sidebar's groups and manual order, from `.flint/sidebar.json`. */
+  private sidebarFile: SidebarFile = EMPTY_SIDEBAR;
+
+  private get sidebarPath(): string {
+    return join(this.folder, '.flint', 'sidebar.json');
+  }
+
+  private get sidebarSort(): SidebarSort {
+    const sort = this.uiState.sidebarSort;
+    return sort === 'edited' || sort === 'created' ? sort : 'manual';
+  }
+
+  private get collapsedGroups(): string[] {
+    const value = this.uiState.collapsedGroups;
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  }
+
+  /** The lists the sidebar places (Inbox stays pinned above it), with their file times. */
+  private sidebarLists(): SidebarList[] {
+    return this.lists
+      .filter(({ entry }) => entry.id !== INBOX_ID)
+      .map(({ entry }) => {
+        let edited = entry.created;
+        try {
+          edited = statSync(entry.path).mtimeMs;
+        } catch {
+          // Gone meanwhile: the watcher will drop it.
+        }
+        return { id: this.listId(entry), edited, created: entry.created };
+      });
+  }
+
+  /** LIST-05, LIST-06, D-73, D-74: the sidebar as shown: groups, order, sort, folded groups. */
+  sidebar(): SidebarView {
+    return {
+      sort: this.sidebarSort,
+      collapsed: this.collapsedGroups,
+      items: arrange(this.sidebarFile, this.sidebarLists(), this.sidebarSort),
+    };
+  }
+
+  /**
+   * LIST-05, LIST-06: a change to the sidebar's groups or order. Groups and order are undoable
+   * (the file before and after); the sort and folded groups are this machine's (ui-state.json).
+   */
+  sidebarAction(action: SidebarAction, now: Date): Promise<SidebarOutcome> {
+    return this.serial(async () => {
+      void now;
+      if (action.kind === 'sort') {
+        await this.saveUiState({ sidebarSort: action.sort });
+        this.notify();
+        return { ok: true, label: '' };
+      }
+      if (action.kind === 'collapse') {
+        const others = this.collapsedGroups.filter((id) => id !== action.id);
+        await this.saveUiState({
+          collapsedGroups: action.collapsed ? [...others, action.id] : others,
+        });
+        this.notify();
+        return { ok: true, label: '' };
+      }
+      // Reordering follows the manual order; under a sort it would be invisible (D-73).
+      if ((action.kind === 'move' || action.kind === 'step') && this.sidebarSort !== 'manual')
+        return { ok: false, problem: 'Switch the sort to Manual to reorder' };
+      const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+      const groups = items.filter((item) => item.kind === 'group');
+      const nameProblem = (name: string, id?: string): string | null => {
+        const trimmed = name.trim();
+        if (trimmed === '') return 'A group needs a name';
+        if (trimmed.length > 60) return 'That name is too long';
+        const taken = groups.some(
+          (group) => group.id !== id && group.name.toLowerCase() === trimmed.toLowerCase(),
+        );
+        return taken ? 'A group with that name exists' : null;
+      };
+      let next: typeof items | null = null;
+      let label = '';
+      let id: string | undefined;
+      switch (action.kind) {
+        case 'newGroup': {
+          const problem = nameProblem(action.name);
+          if (problem) return { ok: false, problem };
+          id = `g-${generateId((candidate) => groups.some((group) => group.id === `g-${candidate}`))}`;
+          next = addGroup(items, id, action.name.trim());
+          label = `Created group ${action.name.trim()}`;
+          break;
+        }
+        case 'renameGroup': {
+          const problem = nameProblem(action.name, action.id);
+          if (problem) return { ok: false, problem };
+          next = renameGroup(items, action.id, action.name.trim());
+          label = `Renamed to ${action.name.trim()}`;
+          break;
+        }
+        case 'deleteGroup': {
+          const group = groups.find((item) => item.id === action.id);
+          if (!group) return { ok: false, problem: 'That group is gone' };
+          next = deleteGroup(items, action.id);
+          label = `Deleted group ${group.name}`;
+          break;
+        }
+        case 'move':
+          next = moveInSidebar(items, action.id, action.to);
+          label = 'Moved';
+          break;
+        case 'step':
+          next = moveStep(items, action.id, action.direction);
+          label = 'Moved';
+          break;
+      }
+      if (!next) return { ok: false, problem: '' };
+      const before = this.sidebarFile;
+      const after = fromItems(next, before.extra);
+      await this.saveSidebar(after);
+      this.remember(this.sidebarStep(label, before, after));
+      return { ok: true, label, ...(id ? { id } : {}) };
+    });
+  }
+
+  /** Undo and redo of a sidebar change: the file as it was, and back. */
+  private sidebarStep(label: string, from: SidebarFile, to: SidebarFile): UndoEntry {
+    return {
+      label,
+      run: async () => {
+        await this.saveSidebar(from);
+        return this.sidebarStep(label, to, from);
+      },
+    };
+  }
+
+  private async saveSidebar(file: SidebarFile): Promise<void> {
+    this.sidebarFile = file;
+    await mkdir(join(this.folder, '.flint'), { recursive: true });
+    await writeFileAtomic(this.sidebarPath, writeSidebar(file), {
+      tempDirectory: tempDirectoryFor(this.sidebarPath),
+    });
+    this.notify();
+  }
+
+  /** D-74: a new list (a duplicate) right below another, in its group if it has one. */
+  private async placeAfter(id: string, after: string): Promise<void> {
+    const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+    const group = items.find((item) => item.kind === 'group' && item.lists.includes(after));
+    const index =
+      group?.kind === 'group'
+        ? group.lists.indexOf(after) + 1
+        : items.findIndex((item) => item.id === after) + 1;
+    if (!group && index === 0) return;
+    await this.saveSidebar(
+      fromItems(
+        moveInSidebar(items, id, { group: group?.id ?? null, index }),
+        this.sidebarFile.extra,
+      ),
+    );
   }
 
   /**
@@ -1043,6 +1222,7 @@ export class Workspace {
       const text = duplicateDocument(list.file.document, copyId, () => generateId(this.isTaken));
       const mode = list.entry.mode === 'note' ? 'note' : 'tasks';
       await this.createList(name, mode, copyId, text);
+      await this.placeAfter(copyId, this.listId(list.entry));
       const label = `Duplicated as ${name}`;
       const created = (): UndoEntry => ({
         label,

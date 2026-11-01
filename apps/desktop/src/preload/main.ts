@@ -8,6 +8,9 @@ import {
   type ListChange,
   type ListSummary,
   type ListView,
+  type SidebarAction,
+  type SidebarOutcome,
+  type SidebarView,
 } from '../shared/ipc.js';
 
 /** The main window's only way to the OS (docs/05 §2): its lists, and changing them (M4). */
@@ -37,6 +40,13 @@ const main = {
     return ipcRenderer.invoke(Channels.mainRedo) as Promise<string | null>;
   },
 
+  /** LIST-05, LIST-06: the sidebar's groups and order. */
+  sidebar(): Promise<SidebarView | null> {
+    return ipcRenderer.invoke(Channels.mainSidebar) as Promise<SidebarView | null>;
+  },
+  sidebarAction(action: SidebarAction): Promise<SidebarOutcome | null> {
+    return ipcRenderer.invoke(Channels.mainSidebarAction, action) as Promise<SidebarOutcome | null>;
+  },
   /** LIST-01: new, rename or delete a list or note. */
   listAction(action: ListAction): Promise<ListActionOutcome | null> {
     return ipcRenderer.invoke(Channels.mainListAction, action) as Promise<ListActionOutcome | null>;

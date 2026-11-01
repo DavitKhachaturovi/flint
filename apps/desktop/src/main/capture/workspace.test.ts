@@ -292,6 +292,51 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
           : [],
       ) ?? [];
 
+  it('keeps sidebar groups and order in .flint/sidebar.json, undoably (LIST-05, LIST-06, D-73)', async () => {
+    await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] one [id:: aaa1]\n`);
+    for (const [name, id] of [
+      ['Alpha', 'al01'],
+      ['Beta', 'be01'],
+    ])
+      await writeFile(join(folder, `${name}.md`), `---\nflint: 1\nid: ${id}\nmode: tasks\n---\n`);
+    const workspace = await open();
+    expect(workspace.sidebar().items).toEqual([
+      { kind: 'list', id: 'al01' },
+      { kind: 'list', id: 'be01' },
+    ]);
+    const made = await workspace.sidebarAction({ kind: 'newGroup', name: 'Work' }, now);
+    expect(made).toMatchObject({ ok: true, label: 'Created group Work' });
+    const group = made.ok ? (made.id ?? '') : '';
+    expect(await workspace.sidebarAction({ kind: 'newGroup', name: 'work' }, now)).toMatchObject({
+      ok: false,
+    });
+    await workspace.sidebarAction({ kind: 'move', id: 'be01', to: { group, index: 0 } }, now);
+    expect(workspace.sidebar().items).toEqual([
+      { kind: 'list', id: 'al01' },
+      { kind: 'group', id: group, name: 'Work', lists: ['be01'] },
+    ]);
+    const saved = JSON.parse(await readFile(join(folder, '.flint', 'sidebar.json'), 'utf8'));
+    expect(saved.items).toEqual([{ list: 'al01' }, { group, name: 'Work', lists: ['be01'] }]);
+    // A duplicate goes right below its original, in its group.
+    await workspace.duplicateList('be01', now);
+    const inGroup = workspace.sidebar().items[1];
+    expect(inGroup?.kind === 'group' && inGroup.lists.length).toBe(2);
+    await workspace.undoLast(now);
+    // Under a sort, reordering is refused; folding is this machine's.
+    await workspace.sidebarAction({ kind: 'sort', sort: 'created' }, now);
+    expect(await workspace.sidebarAction({ kind: 'step', id: 'al01', direction: 1 }, now)).toEqual({
+      ok: false,
+      problem: 'Switch the sort to Manual to reorder',
+    });
+    await workspace.sidebarAction({ kind: 'collapse', id: group, collapsed: true }, now);
+    expect(workspace.sidebar()).toMatchObject({ sort: 'created', collapsed: [group] });
+    await workspace.sidebarAction({ kind: 'sort', sort: 'manual' }, now);
+    await workspace.sidebarAction({ kind: 'deleteGroup', id: group }, now);
+    expect(workspace.sidebar().items.map((item) => item.id)).toEqual(['al01', 'be01']);
+    expect(await workspace.undoLast(now)).toBe('Deleted group Work');
+    expect(workspace.sidebar().items[1]).toMatchObject({ kind: 'group', lists: ['be01'] });
+  });
+
   it('runs several changes as one step, undone together (TASK-07, D-59)', async () => {
     const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n- [ ] three [id:: ccc3]\n`;
     await writeFile(join(folder, 'Inbox.md'), original);

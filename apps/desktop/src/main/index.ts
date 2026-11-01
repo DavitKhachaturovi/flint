@@ -15,6 +15,7 @@ import {
   Channels,
   epochNow,
   type ListAction,
+  type SidebarAction,
   type ListChange,
   type PopupNotice,
   type PopupShown,
@@ -344,6 +345,16 @@ async function start(): Promise<void> {
     return run.catch((error: unknown) => {
       log(`list action failed: ${String(error)}`);
       return { ok: false, problem: 'Flint could not change the file' } as const;
+    });
+  });
+  ipcMain.handle(Channels.mainSidebar, (event) =>
+    owns(event.sender) ? workspace.sidebar() : null,
+  );
+  ipcMain.handle(Channels.mainSidebarAction, (event, action: unknown) => {
+    if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
+    return workspace.sidebarAction(action as SidebarAction, new Date()).catch((error: unknown) => {
+      log(`sidebar change failed: ${String(error)}`);
+      return { ok: false, problem: 'Flint could not change the sidebar' } as const;
     });
   });
   ipcMain.handle(Channels.mainSaveNote, (event, id: unknown, text: unknown) =>

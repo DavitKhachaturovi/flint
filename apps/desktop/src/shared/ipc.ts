@@ -35,6 +35,9 @@ export const Channels = {
   mainToggle: 'main:toggle',
   mainUndo: 'main:undo',
   mainRedo: 'main:redo',
+  /** Main window → main: the sidebar's groups and order, and changes to them (LIST-05, LIST-06). */
+  mainSidebar: 'main:sidebar',
+  mainSidebarAction: 'main:sidebar-action',
 
   mainChange: 'main:change',
   mainReserveId: 'main:reserve-id',
@@ -266,6 +269,46 @@ export type ListAction =
   | { readonly kind: 'duplicate'; readonly id: string }
   /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list. */
   | { readonly kind: 'convert'; readonly id: string; readonly mode: 'tasks' | 'note' };
+
+/** LIST-06, D-73: the sidebar's order. */
+export type SidebarSort = 'manual' | 'edited' | 'created';
+
+/** The sidebar as shown (LIST-05, D-73, D-74): Inbox stays pinned above it. */
+export type SidebarItem =
+  | {
+      readonly kind: 'group';
+      readonly id: string;
+      readonly name: string;
+      readonly lists: readonly string[];
+    }
+  | { readonly kind: 'list'; readonly id: string };
+
+export interface SidebarView {
+  readonly sort: SidebarSort;
+  /** Groups folded away on this machine (ui-state.json). */
+  readonly collapsed: readonly string[];
+  readonly items: readonly SidebarItem[];
+}
+
+/** Changes to the sidebar's groups and order (LIST-05, LIST-06). */
+export type SidebarAction =
+  | { readonly kind: 'newGroup'; readonly name: string }
+  | { readonly kind: 'renameGroup'; readonly id: string; readonly name: string }
+  | { readonly kind: 'deleteGroup'; readonly id: string }
+  /** A list into, within or out of a group (`group: null`), or a group among the top level. */
+  | {
+      readonly kind: 'move';
+      readonly id: string;
+      readonly to: { readonly group: string | null; readonly index: number };
+    }
+  /** Alt+↑/↓ in the manual order. */
+  | { readonly kind: 'step'; readonly id: string; readonly direction: -1 | 1 }
+  | { readonly kind: 'sort'; readonly sort: SidebarSort }
+  | { readonly kind: 'collapse'; readonly id: string; readonly collapsed: boolean };
+
+export type SidebarOutcome =
+  | { readonly ok: true; readonly label: string; readonly id?: string }
+  | { readonly ok: false; readonly problem: string };
 
 /** What a list action did, or why it couldn't (shown next to the name being typed). */
 export type ListActionOutcome =

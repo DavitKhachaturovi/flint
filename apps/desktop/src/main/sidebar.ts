@@ -21,7 +21,9 @@ export interface SidebarFile {
   readonly extra: Readonly<Record<string, unknown>>;
 }
 
-export type SidebarSort = 'manual' | 'edited' | 'created';
+import type { SidebarItem, SidebarSort } from '../shared/ipc.js';
+
+export type { SidebarItem, SidebarSort };
 
 /** What the sidebar needs of a list to place and sort it. */
 export interface SidebarList {
@@ -30,16 +32,6 @@ export interface SidebarList {
   readonly edited: number;
   readonly created: number;
 }
-
-/** The sidebar as shown: Inbox is not in it (it stays pinned at the top). */
-export type SidebarItem =
-  | {
-      readonly kind: 'group';
-      readonly id: string;
-      readonly name: string;
-      readonly lists: readonly string[];
-    }
-  | { readonly kind: 'list'; readonly id: string };
 
 export const EMPTY_SIDEBAR: SidebarFile = { items: [], extra: {} };
 
