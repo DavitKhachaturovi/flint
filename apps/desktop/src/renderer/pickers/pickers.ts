@@ -40,7 +40,8 @@ const TRIGGERS = '[data-picker], [data-picker-trigger]';
 
 const WIDTH = 280;
 const GAP = 6;
-let closeOpen: (() => void) | null = null;
+/** Closes the open picker: fading out, or at once when another picker takes its place. */
+let closeOpen: ((instant?: boolean) => void) | null = null;
 let openPanelElement: HTMLElement | null = null;
 let openTrigger: HTMLElement | null = null;
 
@@ -73,7 +74,8 @@ function openPanel(
     closePicker();
     return null;
   }
-  // Another picker morphs into this one: its place and look are kept for the animation.
+  // D-76, D-77: another picker gives way to this one: a copy of it stays for the animation (it
+  // morphs into this one when they are close, or fades out where it is).
   const previous =
     closeOpen && openPanelElement && !reducedMotion()
       ? {
@@ -82,10 +84,9 @@ function openPanel(
         }
       : null;
   // Pickers and menus never stack.
-  closePicker();
+  closeOpen?.(true);
   closeMenu();
   const panel = element('div', 'fl-picker');
-  if (previous) panel.classList.add('morph');
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', label);
   panel.style.visibility = 'hidden';
@@ -103,6 +104,9 @@ function openPanel(
       else if (host.room && !grown) {
         grown = true;
         host.room.grow(y + height + 3 * GAP - window.innerHeight);
+      } else {
+        // D-77: no room above or below: as close to the button as the window allows.
+        y = window.innerHeight - GAP - height;
       }
     }
     panel.style.left = `${Math.round(x)}px`;
@@ -125,33 +129,75 @@ function openPanel(
     event.stopPropagation();
     close();
   };
-  const close = (): void => {
+  const close = (instant = false): void => {
     if (closeOpen !== close) return;
     closeOpen = null;
     openPanelElement = null;
     openTrigger = null;
-    panel.remove();
     document.removeEventListener('mousedown', onPointer, true);
     document.removeEventListener('keydown', onKey, true);
-    window.removeEventListener('blur', close);
+    window.removeEventListener('blur', onBlur);
     window.removeEventListener('resize', place);
     if (grown) host.room?.release();
-    host.returnFocus?.focus();
+    if (!instant) host.returnFocus?.focus({ preventScroll: true });
+    // D-77: it fades out; nothing waits for that (it takes no input any more).
+    if (instant || reducedMotion()) panel.remove();
+    else fadeOut(panel);
   };
+  const onBlur = (): void => close();
   closeOpen = close;
   openPanelElement = panel;
   openTrigger = host.trigger ?? null;
   document.addEventListener('mousedown', onPointer, true);
   document.addEventListener('keydown', onKey, true);
-  window.addEventListener('blur', close);
+  window.addEventListener('blur', onBlur);
   window.addEventListener('resize', place);
   // Placed once its content is in, then focused: a hidden element can't take the focus.
   const show = (focus: HTMLElement): void => {
     place();
-    if (previous) morph(previous.rect, previous.ghost, panel);
-    focus.focus();
+    if (previous) {
+      const to = panel.getBoundingClientRect();
+      // Neighbouring pickers morph; one far away fades out while this one opens from its button.
+      if (Math.hypot(previous.rect.left - to.left, previous.rect.top - to.top) <= MORPH_REACH) {
+        panel.classList.add('fl-morph');
+        morph(previous.rect, previous.ghost, panel);
+      } else {
+        previous.ghost.style.left = `${previous.rect.left}px`;
+        previous.ghost.style.top = `${previous.rect.top}px`;
+        document.body.append(previous.ghost);
+        fadeOut(previous.ghost);
+      }
+    }
+    focus.focus({ preventScroll: true });
   };
-  return { panel, close, show };
+  return { panel, close: () => close(), show };
+}
+
+/** D-77: pickers further apart than this don't morph into each other (px). */
+const MORPH_REACH = 240;
+
+/** A closing picker (or the copy of one) fades and shrinks out, then goes. */
+function fadeOut(panel: HTMLElement): void {
+  // No longer a picker for lookups (.fl-picker), only its look.
+  panel.classList.replace('fl-picker', 'fl-picker-ghost');
+  panel.setAttribute('aria-hidden', 'true');
+  panel
+    .animate(
+      [
+        { opacity: 1, transform: 'none' },
+        { opacity: 0, transform: 'scale(0.94)' },
+      ],
+      { duration: durationOf('--fl-dur-fast', 120) * 1.25, easing: 'ease-in', fill: 'forwards' },
+    )
+    .finished.then(
+      () => panel.remove(),
+      () => panel.remove(),
+    );
+}
+
+function durationOf(token: string, fallback: number): number {
+  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token));
+  return Number.isFinite(value) ? value : fallback;
 }
 
 const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -162,11 +208,11 @@ const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion:
  */
 function morph(from: DOMRect, ghost: HTMLElement, panel: HTMLElement): void {
   const to = panel.getBoundingClientRect();
-  const duration =
-    parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-base')) || 200;
+  const duration = durationOf('--fl-dur-base', 200);
   const options: KeyframeAnimationOptions = { duration, easing: 'cubic-bezier(.2, .9, .3, 1)' };
   const shift = (x: number, y: number): string => `translate(${x}px, ${y}px)`;
-  ghost.classList.add('morph', 'fl-picker-ghost');
+  ghost.classList.replace('fl-picker', 'fl-picker-ghost');
+  ghost.classList.add('fl-morph');
   ghost.setAttribute('aria-hidden', 'true');
   ghost.style.left = `${from.left}px`;
   ghost.style.top = `${from.top}px`;

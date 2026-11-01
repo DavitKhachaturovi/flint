@@ -590,9 +590,9 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Delete',
   ]);
   await menu.getByText('Move to…').click();
-  await expect(main.locator('.fl-picker-search')).toBeFocused();
+  await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
   await main.keyboard.type('Garden');
-  await expect(main.locator('.fl-picker-row.active')).toHaveText('New list "Garden"');
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toHaveText('New list "Garden"');
   await main.keyboard.press('Enter');
   await expect(main.locator('.toast')).toContainText('Moved to Garden');
   await expect
@@ -793,10 +793,31 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   // (None), Enter acts only on a visible highlight, and its own button closes it.
   await main.getByRole('button', { name: 'Set priority' }).click();
   await expect(main.locator('.fl-picker')).toBeVisible();
-  await expect(main.locator('.fl-picker-row.active')).toHaveCount(0);
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toHaveCount(0);
   await main.keyboard.press('ArrowDown');
-  await expect(main.locator('.fl-picker-row.active')).toHaveText(/None/);
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toHaveText(/None/);
   await main.getByRole('button', { name: 'Set priority' }).click();
+  await expect(main.locator('.fl-picker')).toHaveCount(0);
+
+  // D-77: switching pickers leaves one picker, under its own button, every time.
+  for (const name of [
+    'Set priority',
+    'Choose list',
+    'Set reminder',
+    'Set priority',
+    'Set reminder',
+  ]) {
+    const button = main.getByRole('button', { name });
+    await button.click();
+    await expect(main.locator('.fl-picker')).toHaveCount(1);
+    await main.waitForTimeout(300);
+    const box = await main.locator('.fl-picker').boundingBox();
+    const anchor = await button.boundingBox();
+    expect(box && anchor && box.y >= anchor.y + anchor.height && box.y - anchor.y < 60, name).toBe(
+      true,
+    );
+  }
+  await main.keyboard.press('Escape');
   await expect(main.locator('.fl-picker')).toHaveCount(0);
 
   // Priority: 3 picks High; picking again replaces it instead of leaving "!h" behind as text.
@@ -812,14 +833,14 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   // List: search and Enter.
   await main.getByRole('button', { name: 'Choose list' }).click();
   await main.keyboard.type('erra');
-  await expect(main.locator('.fl-picker-row.active')).toHaveText('Errands');
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toHaveText('Errands');
   await main.keyboard.press('Enter');
   await expect(composer).toHaveValue('Plan the rollout !m ##Errands');
 
   // Date and time: natural language, then Enter.
   await main.getByRole('button', { name: 'Set reminder' }).click();
   await main.keyboard.type('tomorrow 10');
-  await expect(main.locator('.fl-picker-row.active')).toContainText('Tomorrow 10:00');
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toContainText('Tomorrow 10:00');
   await main.keyboard.press('Enter');
   await expect(composer).toHaveValue(/^Plan the rollout !m ##Errands @\d{4}-\d{2}-\d{2} 10:00$/);
   await expect(main.locator('.composer-chips .chip')).toHaveText([
@@ -850,12 +871,14 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   // calendar; ↓/↑ move a wheel, digits type a value (37 joins the 5-minute stops), Enter sets.
   await popup.locator('[data-picker="time"]').click();
   await popup.getByRole('button', { name: 'Next month' }).click();
-  await popup.locator('.fl-cal-day', { hasText: /^15$/ }).click();
+  await popup.locator('.fl-picker .fl-cal-day', { hasText: /^15$/ }).click();
   const hours = popup.getByRole('listbox', { name: 'Hours' });
   await expect(hours).toBeFocused();
-  await expect(popup.locator('.fl-wheels-set')).toHaveText(/^Set · \w{3} 15 \w{3}, 10:00$/);
+  await expect(popup.locator('.fl-picker .fl-wheels-set')).toHaveText(
+    /^Set · \w{3} 15 \w{3}, 10:00$/,
+  );
   await popup.keyboard.press('ArrowLeft');
-  await expect(popup.locator('.fl-cal-day.on')).toBeFocused();
+  await expect(popup.locator('.fl-picker .fl-cal-day.on')).toBeFocused();
   await popup.keyboard.press('Enter');
   await expect(hours).toBeFocused();
   await popup.keyboard.press('ArrowDown');
@@ -865,11 +888,11 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await expect(popup.getByRole('listbox', { name: 'Minutes' })).toBeFocused();
   // D-76: typing edits the value: 3_ then 37; Enter commits it, the next Enter sets the time.
   await popup.keyboard.type('3');
-  await expect(popup.locator('.fl-wheel-item.editing')).toHaveText('3_');
+  await expect(popup.locator('.fl-picker .fl-wheel-item.editing')).toHaveText('3_');
   await popup.keyboard.type('7');
-  await expect(popup.locator('.fl-wheel-item.editing')).toHaveText('37');
+  await expect(popup.locator('.fl-picker .fl-wheel-item.editing')).toHaveText('37');
   await popup.keyboard.press('Enter');
-  await expect(popup.locator('.fl-wheels-set')).toHaveText(/, 11:37$/);
+  await expect(popup.locator('.fl-picker .fl-wheels-set')).toHaveText(/, 11:37$/);
   await popup.keyboard.press('Enter');
   await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 11:37$/);
   await popup.locator('#capture').fill('');

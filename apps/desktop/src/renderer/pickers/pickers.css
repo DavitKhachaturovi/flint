@@ -1,10 +1,13 @@
 /* The pickers (CAP-11, D-57, docs/09 §8): one floating panel style, tokens only. */
 .fl-picker,
-.fl-picker * {
+.fl-picker *,
+.fl-picker-ghost,
+.fl-picker-ghost * {
   box-sizing: border-box;
 }
 
-.fl-picker {
+.fl-picker,
+.fl-picker-ghost {
   position: fixed;
   z-index: 95;
   width: 280px;
@@ -23,7 +26,8 @@
 }
 
 /* A view of the picker that isn't showing (the calendar or the wheels). */
-.fl-picker [hidden] {
+.fl-picker [hidden],
+.fl-picker-ghost [hidden] {
   display: none;
 }
 
@@ -237,11 +241,12 @@
 @keyframes fl-picker-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.92) translateY(-4px);
   }
 }
 
-.fl-picker.morph {
+.fl-picker.fl-morph,
+.fl-picker-ghost.fl-morph {
   overflow: hidden;
   animation: none;
 }
