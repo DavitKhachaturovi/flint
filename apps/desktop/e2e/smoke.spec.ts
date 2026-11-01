@@ -1186,6 +1186,109 @@ test('multi-select, bulk actions, duplicate and convert (TASK-07, TASK-16, LIST-
   await expect(main.locator('.nav', { hasText: /^Bulk/ })).toHaveCount(2);
 });
 
+test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, LIST-06, D-73, D-79)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  for (const [name, id] of [
+    ['Garage', 'grg1'],
+    ['Studio', 'std1'],
+  ] as const)
+    await writeFile(join(flint, `${name}.md`), `---\nflint: 1\nid: ${id}\nmode: tasks\n---\n`);
+  await expect
+    .poll(() => app.windows().some((page) => page.url().includes('main-window')))
+    .toBe(true);
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const sidebarFile = (): Promise<string> =>
+    readFile(join(flint, '.flint', 'sidebar.json'), 'utf8').catch(() => '');
+  const head = main.locator('.nav-group-head');
+  // Alt+↑/↓ as an in-page event (never a real Alt press, D-79 test rule).
+  const altArrow = (key: 'ArrowUp' | 'ArrowDown'): Promise<void> =>
+    main.evaluate((which) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: which, altKey: true }));
+    }, key);
+  await expect(main.locator('.nav', { hasText: 'Studio' })).toHaveCount(1);
+
+  // A new group from the + menu goes at the end.
+  await main.locator('.add-list').click();
+  await main.locator('.fl-menu').getByText('New group').click();
+  await main.keyboard.type('Home');
+  await main.keyboard.press('Enter');
+  await expect(head).toHaveText(/Home\s*0/i);
+  await expect.poll(sidebarFile).toContain('"name": "Home"');
+
+  // A list moves into it from its menu (Move to group ›), and out again.
+  await main.locator('.nav', { hasText: 'Garage' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Move to group', { exact: true }).hover();
+  await main.locator('.fl-submenu').getByText('Home').click();
+  await expect(main.locator('.nav-group .nav')).toHaveText([/Garage/]);
+  await expect(head).toHaveText(/Home\s*1/i);
+  // "New group" in the submenu makes a group with the list in it.
+  await main.locator('.nav', { hasText: 'Studio' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Move to group', { exact: true }).hover();
+  await main.locator('.fl-submenu').getByText('New group').click();
+  await main.keyboard.type('Work');
+  await main.keyboard.press('Enter');
+  await expect(head).toHaveText([/Home\s*1/i, /Work\s*1/i]);
+  await main.locator('.nav', { hasText: 'Studio' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Remove from group').click();
+  await expect(head.last()).toHaveText(/Work\s*0/i);
+
+  // The header folds the group; its lists stay in the file.
+  await head.first().click();
+  await expect(head.first()).toHaveAttribute('aria-expanded', 'false');
+  await expect(main.locator('.group-lists').first()).not.toHaveClass(/open/);
+  await head.first().click();
+  await expect(head.first()).toHaveAttribute('aria-expanded', 'true');
+
+  // D-79: with the group picked in the sidebar, Alt+↓ moves the group; Ctrl+Z puts it back.
+  const order = (): Promise<string[]> =>
+    main
+      .locator('.sidebar > .nav-group, .sidebar > .nav')
+      .evaluateAll((items) =>
+        items.map((item) =>
+          (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),
+        ),
+      );
+  const before = await order();
+  await altArrow('ArrowDown');
+  await expect.poll(order).not.toEqual(before);
+  const at = (await order()).indexOf('Home');
+  expect(at).toBe(before.indexOf('Home') + 1);
+  await main.keyboard.press('Control+z');
+  await expect.poll(order).toEqual(before);
+  // Picking a list in the sidebar moves the keyboard there from the group.
+  await main.locator('.nav', { hasText: 'Garage' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Garage/);
+
+  // LIST-06: the sort menu; under a sort, reordering shows the hint.
+  await main.locator('.sort-lists').click();
+  await expect(main.locator('.fl-menu [aria-checked="true"]')).toHaveText('Manual');
+  await main.locator('.fl-menu').getByText('Created').click();
+  await expect(main.locator('.sort-lists')).toHaveAttribute('title', 'Sort: Created');
+  await head.first().click();
+  await altArrow('ArrowDown');
+  await expect(main.locator('.toast')).toContainText(
+    'Sorted by Created · switch to Manual to reorder',
+  );
+  await main.locator('.sort-lists').click();
+  await main.locator('.fl-menu').getByText('Manual').click();
+  await expect(main.locator('.sort-lists')).toHaveAttribute('title', 'Sort: Manual');
+  await head.first().click();
+
+  // Rename and delete a group; its lists stay.
+  await head.first().click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Rename group').click();
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('House');
+  await main.keyboard.press('Enter');
+  await expect(head.first()).toHaveText(/House/i);
+  await head.first().click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Delete group').click();
+  await expect(main.locator('.toast')).toContainText('Deleted group House · its lists stay');
+  await expect(head).toHaveCount(1);
+  await expect(main.locator('.sidebar > .nav', { hasText: 'Garage' })).toHaveCount(1);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

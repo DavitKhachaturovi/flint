@@ -50,6 +50,11 @@
   color: var(--fl-text-faint);
 }
 
+.fl-menu-check {
+  display: flex;
+  color: var(--fl-text-secondary);
+}
+
 .fl-menu-divider {
   height: 1px;
   margin: 4px 6px;

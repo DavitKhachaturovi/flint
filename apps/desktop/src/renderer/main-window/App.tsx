@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import {
@@ -31,6 +32,11 @@ import type {
   ListChange,
   ListSummary,
   ListView,
+  SidebarAction,
+  SidebarItem,
+  SidebarOutcome,
+  SidebarSort,
+  SidebarView,
   TaskRow,
 } from '../../shared/ipc.js';
 import {
@@ -48,6 +54,7 @@ import {
   NoteIcon,
   PlusIcon,
   ReminderBellIcon,
+  SortIcon,
 } from './icons.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
@@ -85,7 +92,19 @@ interface Point {
 /** A list's name being typed in the sidebar (LIST-01). */
 type Naming =
   | { readonly kind: 'new'; readonly mode: 'tasks' | 'note' }
-  | { readonly kind: 'rename'; readonly id: string; readonly name: string };
+  | { readonly kind: 'rename'; readonly id: string; readonly name: string }
+  /** LIST-05: a new group, at the end (D-79), with a list to move into it (`Move to group ›`). */
+  | { readonly kind: 'newGroup'; readonly list?: string }
+  | { readonly kind: 'renameGroup'; readonly id: string; readonly name: string };
+
+type SidebarGroup = Extract<SidebarItem, { kind: 'group' }>;
+
+/** LIST-06: the sidebar's sorts, as the sort menu names them. */
+const SORT_LABELS: Readonly<Record<SidebarSort, string>> = {
+  manual: 'Manual',
+  edited: 'Recently edited',
+  created: 'Created',
+};
 
 /** The lists as the shorthand and the pickers see them, most recently used ranked (D-25). */
 function listInfos(lists: readonly ListSummary[]): ListInfo[] {
@@ -262,6 +281,13 @@ function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
 
 export function App(): ReactElement {
   const [lists, setLists] = useState<readonly ListSummary[]>([]);
+  /** LIST-05, LIST-06: the sidebar's groups, order, sort and folded groups. */
+  const [sidebarView, setSidebarView] = useState<SidebarView | null>(null);
+  /**
+   * D-79: the list or group picked in the sidebar while the keyboard is there (Alt+↑/↓ moves it);
+   * null when the keyboard is in the task list.
+   */
+  const [sidebarFocus, setSidebarFocus] = useState<string | null>(null);
   const [listId, setListId] = useState('inbox');
   const [view, setView] = useState<ListView | null>(null);
   // D-77: nothing is selected when a list opens; the first ↓ selects its first row.
@@ -300,12 +326,14 @@ export function App(): ReactElement {
   const sidebar = useRef<HTMLElement>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
-    const [nextLists, nextView] = await Promise.all([
+    const [nextLists, nextView, nextSidebar] = await Promise.all([
       window.flintMain.lists(),
       window.flintMain.view(listId),
+      window.flintMain.sidebar(),
     ]);
     setLists(nextLists);
     setView(nextView);
+    setSidebarView(nextSidebar);
   }, [listId]);
 
   useEffect(() => {
@@ -944,14 +972,131 @@ export function App(): ReactElement {
       [
         { label: 'New task list', hint: 'Ctrl+Shift+N', action: () => start('tasks') },
         { label: 'New note', action: () => start('note') },
+        'divider',
+        {
+          label: 'New group',
+          action: () => {
+            setNamingProblem(null);
+            setNaming({ kind: 'newGroup' });
+          },
+        },
       ],
       at,
     );
   }, []);
 
+  /** LIST-05, LIST-06: a change to the sidebar; a problem shows in the toast. */
+  const sidebarChange = useCallback(
+    async (action: SidebarAction): Promise<SidebarOutcome | null> => {
+      const outcome = await window.flintMain.sidebarAction(action);
+      if (outcome && !outcome.ok && outcome.problem) showToast(outcome.problem, false);
+      return outcome;
+    },
+    [showToast],
+  );
+
+  /** D-73: reordering only happens in the manual order; under a sort, a hint says so. */
+  const reorderable = useCallback((): boolean => {
+    const sort = sidebarView?.sort ?? 'manual';
+    if (sort === 'manual') return true;
+    showToast(`Sorted by ${SORT_LABELS[sort]} · switch to Manual to reorder`, false);
+    return false;
+  }, [sidebarView, showToast]);
+
+  /** LIST-06, D-73: the sort button next to the +. */
+  const sortMenu = useCallback(
+    (at: Point): void => {
+      const current = sidebarView?.sort ?? 'manual';
+      openMenu(
+        (Object.keys(SORT_LABELS) as SidebarSort[]).map((sort) => ({
+          label: SORT_LABELS[sort],
+          checked: sort === current,
+          action: () => void sidebarChange({ kind: 'sort', sort }),
+        })),
+        at,
+      );
+    },
+    [sidebarView, sidebarChange],
+  );
+
+  /** LIST-05: a group folds away or opens; this machine remembers it. */
+  const toggleGroup = useCallback(
+    (id: string): void => {
+      setSidebarFocus(id);
+      const collapsed = !(sidebarView?.collapsed.includes(id) ?? false);
+      setSidebarView(
+        (current) =>
+          current && {
+            ...current,
+            collapsed: collapsed
+              ? [...current.collapsed, id]
+              : current.collapsed.filter((other) => other !== id),
+          },
+      );
+      void sidebarChange({ kind: 'collapse', id, collapsed });
+    },
+    [sidebarView, sidebarChange],
+  );
+
+  /** LIST-05: a group's right-click menu. */
+  const groupMenu = useCallback(
+    (group: SidebarGroup, at: Point): void => {
+      setSidebarFocus(group.id);
+      openMenu(
+        [
+          {
+            label: 'Rename group',
+            action: () => {
+              setNamingProblem(null);
+              setNaming({ kind: 'renameGroup', id: group.id, name: group.name });
+            },
+          },
+          {
+            label: 'New group',
+            action: () => {
+              setNamingProblem(null);
+              setNaming({ kind: 'newGroup' });
+            },
+          },
+          'divider',
+          {
+            label: 'Delete group',
+            action: () =>
+              void sidebarChange({ kind: 'deleteGroup', id: group.id }).then((outcome) => {
+                if (outcome?.ok) showToast(`${outcome.label} · its lists stay`, true);
+              }),
+          },
+        ],
+        at,
+      );
+    },
+    [sidebarChange, showToast],
+  );
+
   const submitName = useCallback(
     async (name: string): Promise<void> => {
       if (!naming) return;
+      if (naming.kind === 'newGroup' || naming.kind === 'renameGroup') {
+        const outcome = await window.flintMain.sidebarAction(
+          naming.kind === 'newGroup'
+            ? { kind: 'newGroup', name }
+            : { kind: 'renameGroup', id: naming.id, name },
+        );
+        if (!outcome) return;
+        if (!outcome.ok) {
+          setNamingProblem(outcome.problem);
+          return;
+        }
+        setNaming(null);
+        setNamingProblem(null);
+        if (naming.kind === 'newGroup' && naming.list && outcome.id)
+          await sidebarChange({
+            kind: 'move',
+            id: naming.list,
+            to: { group: outcome.id, index: 0 },
+          });
+        return;
+      }
       const outcome = await window.flintMain.listAction(
         naming.kind === 'new'
           ? { kind: 'new', name, mode: naming.mode }
@@ -967,7 +1112,7 @@ export function App(): ReactElement {
       if (naming.kind === 'new') openList(outcome.listId);
       if (outcome.label) showToast(outcome.label, true);
     },
-    [naming, openList, showToast],
+    [naming, openList, showToast, sidebarChange],
   );
 
   /** D-55: a list's right-click menu; Inbox has none (LIST-03). */
@@ -998,6 +1143,47 @@ export function App(): ReactElement {
         return;
       }
       const other = list.mode === 'note' ? 'tasks' : 'note';
+      // LIST-05: into a group, or out of one.
+      const groups = (sidebarView?.items ?? []).filter(
+        (item): item is SidebarGroup => item.kind === 'group',
+      );
+      const inGroup = groups.find((group) => group.lists.includes(list.id));
+      const intoGroup = (to: { group: string | null; index: number }): void => {
+        if (reorderable()) void sidebarChange({ kind: 'move', id: list.id, to });
+      };
+      const grouping: MenuEntry[] = [
+        {
+          label: 'Move to group',
+          submenu: [
+            ...groups
+              .filter((group) => group !== inGroup)
+              .map((group) => ({
+                label: group.name,
+                action: () => intoGroup({ group: group.id, index: group.lists.length }),
+              })),
+            ...(groups.length > (inGroup ? 1 : 0) ? ['divider' as const] : []),
+            {
+              label: 'New group',
+              action: () => {
+                setNamingProblem(null);
+                setNaming({ kind: 'newGroup', list: list.id });
+              },
+            },
+          ],
+        },
+        ...(inGroup
+          ? [
+              {
+                label: 'Remove from group',
+                action: () => {
+                  // Right below its group, at the top level.
+                  const at = (sidebarView?.items ?? []).indexOf(inGroup) + 1;
+                  intoGroup({ group: null, index: at });
+                },
+              },
+            ]
+          : []),
+      ];
       openMenu(
         [
           {
@@ -1020,6 +1206,8 @@ export function App(): ReactElement {
                 .then(done),
           },
           'divider',
+          ...grouping,
+          'divider',
           {
             label: list.mode === 'note' ? 'Delete note' : 'Delete list',
             action: () =>
@@ -1034,13 +1222,22 @@ export function App(): ReactElement {
         at,
       );
     },
-    [listId, openList, showToast, markedLists],
+    [listId, openList, showToast, markedLists, sidebarView, sidebarChange, reorderable],
   );
+
+  /** The sidebar's lists in the order shown (Inbox first), for Shift+click ranges. */
+  const sidebarOrder = useMemo((): string[] => {
+    const placed = (sidebarView?.items ?? []).flatMap((item) =>
+      item.kind === 'group' ? item.lists : [item.id],
+    );
+    return placed.length > 0 ? placed : lists.filter((list) => !list.inbox).map((list) => list.id);
+  }, [sidebarView, lists]);
 
   /** LIST-01, D-59: a list in the sidebar; Ctrl/Shift+click marks lists and notes instead. */
   const sidebarSelect = useCallback(
     (id: string, how: { readonly ctrl: boolean; readonly shift: boolean }): void => {
-      const order = lists.filter((list) => !list.inbox).map((list) => list.id);
+      const order = sidebarOrder;
+      setSidebarFocus(id);
       if (how.shift) {
         const from = listAnchor.current ?? listId;
         const a = order.indexOf(from);
@@ -1064,8 +1261,13 @@ export function App(): ReactElement {
       setMarkedLists(NOTHING);
       openList(id);
     },
-    [lists, listId, openList],
+    [sidebarOrder, listId, openList],
   );
+
+  // D-79: the keyboard is in the task list once a task is selected there.
+  useEffect(() => {
+    if (selected !== null) setSidebarFocus(null);
+  }, [selected]);
 
   // UI-08: every text field keeps Cut / Copy / Paste / Select all; elsewhere Electron shows nothing.
   useEffect(() => {
@@ -1115,6 +1317,24 @@ export function App(): ReactElement {
         if (view?.mode !== 'tasks' || page) return;
         event.preventDefault();
         selectAll();
+        return;
+      }
+      // D-79: Alt+↑/↓ with the keyboard in the sidebar moves the list or group picked there; with
+      // it in the task list, the selected task (below); with nothing picked, nothing.
+      if (
+        sidebarFocus &&
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        (key === 'arrowup' || key === 'arrowdown')
+      ) {
+        event.preventDefault();
+        if (reorderable())
+          void sidebarChange({
+            kind: 'step',
+            id: sidebarFocus,
+            direction: key === 'arrowdown' ? 1 : -1,
+          });
         return;
       }
       if (event.ctrlKey || event.metaKey || view?.mode !== 'tasks') return;
@@ -1219,6 +1439,9 @@ export function App(): ReactElement {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [
+    sidebarFocus,
+    reorderable,
+    sidebarChange,
     rows,
     selected,
     marked,
@@ -1248,6 +1471,45 @@ export function App(): ReactElement {
     page && view?.mode === 'tasks' && view.id === listId ? findRow(view, page) : null;
   const taskLists = lists.filter((list) => !list.inbox);
   const inbox = lists.find((list) => list.inbox);
+  /** A list in the sidebar: its row, or its name field while it is renamed. */
+  const navList = (list: ListSummary): ReactElement =>
+    naming?.kind === 'rename' && naming.id === list.id ? (
+      <NameField
+        key={list.id}
+        initial={list.name}
+        icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+        problem={namingProblem}
+        onSubmit={(name) => void submitName(name)}
+        onCancel={() => setNaming(null)}
+      />
+    ) : (
+      <NavItem
+        key={list.id}
+        list={list}
+        active={listId === list.id}
+        icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+        marked={markedLists.size > 1 && markedLists.has(list.id)}
+        onSelect={(how) => sidebarSelect(list.id, how)}
+        onMenu={(at) => listMenu(list, at)}
+      />
+    );
+  const listById = new Map(taskLists.map((list) => [list.id, list]));
+  // LIST-05, D-74: groups and ungrouped lists in one order; before the sidebar file is read, the
+  // lists as they come.
+  const sidebarItems: readonly SidebarItem[] =
+    sidebarView?.items ?? taskLists.map((list) => ({ kind: 'list', id: list.id }));
+  const groupNameField = (initial: string, key: string): ReactElement => (
+    <NameField
+      key={key}
+      initial={initial}
+      placeholder="Group name"
+      icon={<ChevronIcon size={12} />}
+      group
+      problem={namingProblem}
+      onSubmit={(name) => void submitName(name)}
+      onCancel={() => setNaming(null)}
+    />
+  );
   // UI-04: rows that appear in the list being looked at ease in; opening a list doesn't animate.
   const known = useRef<{ list: string; keys: ReadonlySet<string> }>({ list: '', keys: new Set() });
   const freshKeys = new Map<string, 'new' | 'return'>();
@@ -1452,7 +1714,12 @@ export function App(): ReactElement {
           newListMenu({ x: event.clientX, y: event.clientY });
         }}
       >
-        <Glide card={sidebar} target={listId} version={[lists, naming]} className="nav-glide" />
+        <Glide
+          card={sidebar}
+          target={listId}
+          version={[lists, naming, sidebarView]}
+          className="nav-glide"
+        />
         <div className="brand">
           <img src={flintIcon} alt="" />
           <span>Flint</span>
@@ -1469,6 +1736,18 @@ export function App(): ReactElement {
         <div className="section-label lists-label">
           <span>Lists</span>
           <button
+            type="button"
+            className="sort-lists"
+            aria-label="Sort lists"
+            title={`Sort: ${SORT_LABELS[sidebarView?.sort ?? 'manual']}`}
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect();
+              sortMenu({ x: box.left, y: box.bottom + 4 });
+            }}
+          >
+            <SortIcon />
+          </button>
+          <button
             ref={addButton}
             type="button"
             className="add-list"
@@ -1482,28 +1761,34 @@ export function App(): ReactElement {
             <PlusIcon />
           </button>
         </div>
-        {taskLists.map((list) =>
-          naming?.kind === 'rename' && naming.id === list.id ? (
-            <NameField
-              key={list.id}
-              initial={list.name}
-              icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-              problem={namingProblem}
-              onSubmit={(name) => void submitName(name)}
-              onCancel={() => setNaming(null)}
-            />
-          ) : (
-            <NavItem
-              key={list.id}
-              list={list}
-              active={listId === list.id}
-              icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-              marked={markedLists.size > 1 && markedLists.has(list.id)}
-              onSelect={(how) => sidebarSelect(list.id, how)}
-              onMenu={(at) => listMenu(list, at)}
-            />
-          ),
-        )}
+        {sidebarItems.map((item) => {
+          if (item.kind === 'list') {
+            const list = listById.get(item.id);
+            return list ? navList(list) : null;
+          }
+          const collapsed = sidebarView?.collapsed.includes(item.id) ?? false;
+          return (
+            <NavGroup
+              key={item.id}
+              group={item}
+              collapsed={collapsed}
+              focused={sidebarFocus === item.id}
+              header={
+                naming?.kind === 'renameGroup' && naming.id === item.id
+                  ? groupNameField(item.name, `rename-${item.id}`)
+                  : null
+              }
+              onToggle={() => toggleGroup(item.id)}
+              onMenu={(at) => groupMenu(item, at)}
+            >
+              {item.lists.map((id) => {
+                const list = listById.get(id);
+                return list ? navList(list) : null;
+              })}
+            </NavGroup>
+          );
+        })}
+        {naming?.kind === 'newGroup' && groupNameField('', 'new-group')}
         {naming?.kind === 'new' && (
           <NameField
             key={`new-${naming.mode}`}
@@ -1736,6 +2021,52 @@ export function App(): ReactElement {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * LIST-05, D-73, D-74: a group in the sidebar: a header that folds it (chevron, name, number of
+ * lists) and its lists, indented under it. Folding animates; folded lists stay rendered, inert.
+ */
+function NavGroup(props: {
+  readonly group: SidebarGroup;
+  readonly collapsed: boolean;
+  /** D-79: picked in the sidebar: Alt+↑/↓ moves it. */
+  readonly focused: boolean;
+  /** The header's name field while the group is renamed. */
+  readonly header: ReactElement | null;
+  readonly onToggle: () => void;
+  readonly onMenu: (at: Point) => void;
+  readonly children: ReactNode;
+}): ReactElement {
+  const { group, collapsed, focused, header, onToggle, onMenu, children } = props;
+  return (
+    <div className="nav-group">
+      {header ?? (
+        <button
+          type="button"
+          data-key={group.id}
+          className={focused ? 'nav-group-head focus' : 'nav-group-head'}
+          aria-expanded={!collapsed}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onToggle}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onMenu({ x: event.clientX, y: event.clientY });
+          }}
+        >
+          <span className={collapsed ? 'group-chevron' : 'group-chevron open'}>
+            <ChevronIcon size={12} />
+          </span>
+          <span className="group-name">{group.name}</span>
+          <span className="nav-count">{group.lists.length}</span>
+        </button>
+      )}
+      <div className={collapsed ? 'group-lists' : 'group-lists open'} inert={collapsed}>
+        <div className="group-inner">{children}</div>
+      </div>
     </div>
   );
 }
@@ -2049,14 +2380,16 @@ function NameField(props: {
   readonly initial: string;
   readonly placeholder?: string;
   readonly icon: ReactElement;
+  /** LIST-05: a group's name, in the group header's style. */
+  readonly group?: boolean;
   readonly problem: string | null;
   readonly onSubmit: (name: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const { initial, placeholder, icon, problem, onSubmit, onCancel } = props;
+  const { initial, placeholder, icon, group = false, problem, onSubmit, onCancel } = props;
   const [name, setName] = useState(initial);
   return (
-    <div className="name-field">
+    <div className={group ? 'name-field group' : 'name-field'}>
       <div className="nav on">
         <span className="tile">{icon}</span>
         <input
@@ -2065,6 +2398,7 @@ function NameField(props: {
           value={name}
           placeholder={placeholder}
           spellCheck={false}
+          maxLength={group ? 60 : undefined}
           onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => setName(event.target.value)}
           onBlur={onCancel}
@@ -2499,9 +2833,11 @@ function Glide(props: {
         ? card.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(target)}"]`)
         : null;
       // D-77: an expanded task is one card with its body; the highlight covers all of it.
-      const row = found?.parentElement?.classList.contains('row-group')
+      const grouped = found?.parentElement?.classList.contains('row-group')
         ? found.parentElement
         : found;
+      // LIST-05: a list in a folded group has no highlight.
+      const row = grouped?.closest('.group-lists:not(.open)') ? null : grouped;
       // D-79: following the layout at once must never cut short a glide to a new target (that
       // made list switching lose its motion): within a glide's time, keep gliding.
       const now = performance.now();
@@ -2525,6 +2861,9 @@ function Glide(props: {
     // Rows collapsing or easing in (D-67) move the selected row: follow it.
     const observer = new ResizeObserver(measure);
     if (card.current) observer.observe(card.current);
+    // LIST-05: and sidebar groups folding above it.
+    for (const group of card.current?.querySelectorAll('.group-inner') ?? [])
+      observer.observe(group);
     return () => {
       window.removeEventListener('resize', measure);
       observer.disconnect();

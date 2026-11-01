@@ -54,6 +54,10 @@ export const BellIcon = ({ size = 12 }: IconProps): ReactElement =>
     <path key="b" d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />,
   ]);
 
+/** LIST-06: the sidebar's sort button. */
+export const SortIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, <path d="M4 7h16M7 12h10M10 17h4" />);
+
 /** D-79: a task's body has images. */
 export const ImageIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [

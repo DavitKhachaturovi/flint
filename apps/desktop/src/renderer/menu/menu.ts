@@ -11,12 +11,17 @@ export interface MenuItem {
   /** A key shown on the right, e.g. `Del`. */
   readonly hint?: string;
   readonly disabled?: boolean;
+  /** LIST-06: the current choice among several (the sort menu), shown with a check on the right. */
+  readonly checked?: boolean;
   /** What the item does; an item with a submenu opens that instead (D-78). */
   readonly action?: () => void;
   readonly submenu?: readonly MenuEntry[];
 }
 
 export type MenuEntry = MenuItem | 'divider';
+
+const CHECK_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>';
 
 export interface MenuOptions {
   /**
@@ -136,6 +141,16 @@ export function openMenu(
           }),
         );
       if (entry.submenu) button.setAttribute('aria-haspopup', 'menu');
+      if (entry.checked !== undefined) {
+        button.setAttribute('role', 'menuitemradio');
+        button.setAttribute('aria-checked', String(entry.checked));
+        if (entry.checked) {
+          const check = document.createElement('span');
+          check.className = 'fl-menu-check';
+          check.innerHTML = CHECK_ICON;
+          button.append(check);
+        }
+      }
       buttons.push({ button, item: entry });
       menu.append(button);
     }

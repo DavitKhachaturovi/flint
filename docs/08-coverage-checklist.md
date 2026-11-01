@@ -291,8 +291,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 17 | Duplicate for tasks, lists and notes; Convert to note / task list in M4 | TASK-16, LIST-01, LIST-04 · v1 · M4 step 7 | 02, D-72 |
 | 18 | Note right-click menu: trimmed Obsidian-style submenus incl. `==highlight==` | NOTE-02 · v1 · M5 | 02, D-72 |
 | 19 | Ctrl+F find bar: task lists highlight and jump (no filter); notes CodeMirror search restyled | NAV-06 · v1 · M4 step 10 (lists, else M5), M5 (notes) | 03 §3, 09 §8, D-72 |
-| 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · v1 · M4 step 8 (drag in step 9) | 01, 02, 04 §2, D-73 |
-| 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · v1 · M4 step 8 (drag in step 9) | 02, 03 §3, D-73 |
+| 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · Done (0.4.14; drag next in step 8) | 01, 02, 04 §2, D-73 |
+| 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · Done (0.4.14; drag next in step 8) | 02, 03 §3, D-73 |
 | 22 | Temporary sort by reminder time and date added, next to priority | TASK-08 · v1 · M4 step 10 | 02, D-72 |
 
 ## K. Feedback on 0.4.6 (1 Nov 2026)
@@ -305,7 +305,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2b | The editing row looks like a dark input field (well, subtle edge) | TASK-02 · v1 · M4 step 6 (0.4.6 fixes) | 03 §2, 09 §8, D-74 |
 | 3 | Icon: the master logo's corner proportions at every size; leaf ~10 % smaller at taskbar/tray sizes; in-app logos unchanged | UI-07 · v1 · M4 step 6 (0.4.6 fixes) | 09 §8, D-74 |
 | 4 | Motion never delays input; fuller durations (selection ~200, menus ~200, pages ~280, completion ~400 ms); popup instant | UI-04, UI-10 · v1 · M4 step 6 (0.4.6 fixes); speed setting M8 | 03 §5, 09 §9, tokens.css, D-75 |
-| — | Sidebar: groups and ungrouped lists in one manual order; groups keep positions under sorts | LIST-05, LIST-06 · v1 · M4 step 8 | 02, 04 §2, D-74 |
+| — | Sidebar: groups and ungrouped lists in one manual order; groups keep positions under sorts | LIST-05, LIST-06 · Done (0.4.14) | 02, 04 §2, D-74 |
 | — | Duplicated task without its reminder; "<name> copy" for lists | TASK-16, LIST-01 · v1 · M4 step 7 | 02, D-74 |
 | — | Wheels: touchpad scrolling adds up deltas, one stop per threshold | CAP-11 · v1 · M4 step 6 (0.4.6 fixes) | 02, D-74 |
 
@@ -383,6 +383,6 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | Body and image indicators; lightbox from the icon or a thumbnail | TASK-05, MEDIA-01 · Done (0.4.13) | 02, D-79 |
 | 10 | Thumbnails in expanded bodies, full size on the page | TASK-05, MEDIA-01 · Done (0.4.13) | 02, D-79 |
 | 11 | Indent and Outdent in the task menu | TASK-04, UI-08 · Done (0.4.13) | 03 §3, D-79 |
-| — | Alt+↑/↓ by keyboard focus (task list or sidebar) | LIST-06, TASK-02 · v1 · M4 step 8 | 02, 03 §3, D-79 |
+| — | Alt+↑/↓ by keyboard focus (task list or sidebar) | LIST-06, TASK-02 · Done (0.4.14) | 02, 03 §3, D-79 |
 | 12 | Two-finger touchpad swipe back/forward with an arrow | NAV-04 · v1 · M4 step 9 | 02, 03 §3, D-79 |
 | — | The M5 editor before step 9; handoff note after step 8 | NOTE-01, TASK-05 · v1 | 06, D-79 |

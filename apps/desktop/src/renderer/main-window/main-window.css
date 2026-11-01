@@ -715,7 +715,8 @@ h1 .count {
   padding-right: 6px;
 }
 
-.add-list {
+.add-list,
+.sort-lists {
   width: 22px;
   height: 22px;
   display: flex;
@@ -728,12 +729,14 @@ h1 .count {
     color var(--fl-dur-fast);
 }
 
-.add-list:hover {
+.add-list:hover,
+.sort-lists:hover {
   background: var(--fl-ground-tile);
   color: var(--fl-text-primary);
 }
 
-.add-list svg {
+.add-list svg,
+.sort-lists svg {
   display: block;
 }
 
@@ -1788,4 +1791,92 @@ textarea:not([readonly], [disabled]) {
 
 .composer-notes::placeholder {
   color: var(--fl-text-faint);
+}
+
+/* LIST-05, D-73 (09 §8): a group header in the section-label style with a chevron and the list
+   count; its lists indented under it; folding animates like Completed. */
+.lists-label {
+  gap: 2px;
+}
+
+.lists-label > span {
+  flex: 1;
+}
+
+.nav-group-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 10px 6px 9px;
+  border-radius: var(--fl-radius-row);
+  text-align: left;
+  font-size: var(--fl-size-label);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
+  transition: color var(--fl-dur-fast);
+}
+
+.nav-group-head:hover,
+.nav-group-head.focus {
+  color: var(--fl-text-secondary);
+}
+
+.group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-group-head .nav-count {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.group-chevron {
+  display: flex;
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.group-chevron.open {
+  transform: rotate(90deg);
+}
+
+.group-lists {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity var(--fl-dur-state) ease;
+}
+
+.group-lists.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.group-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 8px;
+}
+
+.name-field.group .nav.on {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.name-field.group .tile {
+  width: 16px;
+  background: none;
+  box-shadow: none;
 }

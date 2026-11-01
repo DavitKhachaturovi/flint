@@ -42,7 +42,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **One level** of collapsible groups in the sidebar, each holding task lists and notes. No nesting.
 - Groups are **not folders**: the list files stay flat in the Flint folder (04 §2). Membership and order live in `.flint/sidebar.json` (user data, travels with the folder); which groups are collapsed is machine UI state (`ui-state.json`).
 - **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
-- Lists and notes move into or out of a group by drag (M4 step 9) and the right-click menu ("Move to group ▸", "Remove from group").
+- Lists and notes move into or out of a group by drag (M4 step 8, D-78) and the right-click menu ("Move to group ▸", "Remove from group").
+- **Proposed (built in step 8):** "Move to group ▸" lists the other groups and ends with **New group**, which names a new group (at the end) with the list already in it. "Remove from group" puts the list right below its group. A click on a group's header folds or opens it (this machine remembers it) and picks the group for Alt+↑/↓. Deleting a group says "Deleted group Work · its lists stay" with Undo; its lists take its place in the order. Under a non-manual sort, moving a list into or out of a group is reordering too, so it shows the same hint.
 - **D-74:** Inbox stays pinned at the top, outside any group. **Groups and ungrouped lists share one manual order**, so a group can sit between lists (like Microsoft To Do). Under a non-manual sort, groups keep their manual positions and lists are sorted within each group and among the ungrouped ones (LIST-06).
 - **Proposed:** a group header shows a chevron, the name and the number of lists; empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
 - Milestones: M4 step 8; dragging in M4 step 9.
@@ -51,6 +52,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - A small sort menu in the sidebar: **Manual** (default, the custom order), **Recently edited**, **Created**. It applies within each group and within the ungrouped lists.
 - In Manual, lists, notes and groups reorder with **Alt+↑/↓** and the locked-axis drag (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
 - **D-79, Alt+↑/↓ follows the keyboard focus:** with the focus in the task list it moves the selected task; with the focus in the sidebar (a selected list or group) it moves that list or group; with nothing selected, nothing moves (never the open list as a fallback).
+- **Proposed (how "the focus is in the sidebar" works):** a click on a list in the sidebar or on a group's header (or its right-click menu) puts the keyboard there, on that list or group; selecting a task (a click, or ↓ in the opened list) puts it back in the task list. A list opened from the sidebar has no task selected (D-77), so Alt+↑/↓ right after picking it moves the list. A picked group's header shows in `--fl-text-secondary`.
 - **D-79:** new groups go at the end; group names are unique (ignoring case) and up to 60 characters (accepted).
 - **D-74 (accepted):** Recently edited uses the file's modification time and Created its creation time, both newest first; groups keep their manual positions under every sort. **Proposed:** the menu is a small sort button next to the **+**; the choice is machine UI state.
 - Milestone M4 step 8.
