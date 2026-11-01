@@ -5,7 +5,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test';
+import {
+  _electron as electron,
+  expect,
+  test,
+  type ElectronApplication,
+  type Locator,
+} from '@playwright/test';
 
 /**
  * Smoke test (docs/05 §6): the app starts, its windows exist, a capture reaches the main process,
@@ -762,7 +768,10 @@ test('reminders fire once, missed ones say so; Done and Snooze change the task (
 test('an overdue reminder, and the bell that turns it off and on (REM-11, REM-12, D-66)', async () => {
   const file = join(dataDirectory, 'Flint', 'Calls.md');
   const pad = (value: number): string => String(value).padStart(2, '0');
-  const hourAgo = new Date(Date.now() - 60 * 60_000);
+  // Up to an hour ago, but still today (just after midnight: midnight).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const hourAgo = new Date(Math.max(today.getTime(), Date.now() - 60 * 60_000));
   const stamp = `${hourAgo.getFullYear()}-${pad(hourAgo.getMonth() + 1)}-${pad(hourAgo.getDate())}T${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`;
   await writeFile(
     file,
@@ -1287,6 +1296,85 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   await expect(main.locator('.toast')).toContainText('Deleted group House · its lists stay');
   await expect(head).toHaveCount(1);
   await expect(main.locator('.sidebar > .nav', { hasText: 'Garage' })).toHaveCount(1);
+});
+
+test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK-01, LIST-05, D-54, D-78)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const file = join(flint, 'Drag.md');
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: drg1\nmode: tasks\n---\n- [ ] one [id:: d1]\n- [ ] two [id:: d2]\n    - [ ] two-a [id:: d2a]\n    - [ ] two-b [id:: d2b]\n- [ ] three [id:: d3]\n',
+  );
+  await expect
+    .poll(() => app.windows().some((page) => page.url().includes('main-window')))
+    .toBe(true);
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Drag' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Drag/);
+  const row = (name: string) => main.locator('.tasks .row', { hasText: new RegExp(`^${name}$`) });
+  // A press, a move past the threshold, then to the target in steps, and the release.
+  const drag = async (from: Locator, toY: number): Promise<void> => {
+    const box = await from.boundingBox();
+    if (!box) throw new Error('nothing to drag');
+    const x = box.x + box.width * 0.6;
+    const y = box.y + box.height / 2;
+    await main.mouse.move(x, y);
+    await main.mouse.down();
+    await main.mouse.move(x, y + (toY > y ? 6 : -6), { steps: 2 });
+    await main.mouse.move(x, toY, { steps: 10 });
+    await main.mouse.up();
+  };
+  const top = async (locator: Locator): Promise<number> =>
+    (await locator.boundingBox())?.y ?? Number.NaN;
+
+  // A task dragged to the top; the others slide; the click that ends it doesn't edit.
+  await drag(row('three'), (await top(row('one'))) + 2);
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(/- \[ \] three \[id:: d3\]\n- \[ \] one \[id:: d1\]\n- \[ \] two \[id:: d2\]\n/);
+  await expect(main.locator('.title-input')).toHaveCount(0);
+  await expect(main.locator('.drag-lift, .drag-peer')).toHaveCount(0);
+  // A subtask moves among its siblings only, even when dragged far.
+  await drag(row('two-b'), (await top(row('three'))) - 40);
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toContain('- [ ] two [id:: d2]\n    - [ ] two-b [id:: d2b]\n    - [ ] two-a [id:: d2a]\n');
+
+  // A list dragged just below an open group's header joins the group.
+  await main.locator('.add-list').click();
+  await main.locator('.fl-menu').getByText('New group').click();
+  await main.keyboard.type('Dragged');
+  await main.keyboard.press('Enter');
+  const group = main.locator('.nav-group', { hasText: 'Dragged' });
+  await expect(group).toHaveCount(1);
+  const head = group.locator('.nav-group-head');
+  const headBox = await head.boundingBox();
+  if (!headBox) throw new Error('no group header');
+  await drag(main.locator('.sidebar > .nav', { hasText: 'Drag' }), headBox.y + headBox.height + 4);
+  await expect(group.locator('.nav')).toHaveText([/Drag/]);
+  // The whole group dragged up one place.
+  const order = (): Promise<string[]> =>
+    main
+      .locator('.sidebar > .nav-group, .sidebar > .nav')
+      .evaluateAll((items) =>
+        items.map((item) =>
+          (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),
+        ),
+      );
+  const before = await order();
+  const above = main
+    .locator('.sidebar > *')
+    .nth(
+      (await main
+        .locator('.sidebar > *')
+        .evaluateAll((items) =>
+          items.findIndex((item) => item.querySelector('.group-name')?.textContent === 'Dragged'),
+        )) - 1,
+    );
+  await drag(head, (await top(above)) + 2);
+  await expect.poll(order).not.toEqual(before);
+  expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') - 1);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

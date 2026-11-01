@@ -222,6 +222,12 @@ export type ListChange =
       readonly priority: 'high' | 'medium' | 'low' | null;
     }
   | { readonly kind: 'move'; readonly key: string; readonly direction: 'up' | 'down' }
+  /** TASK-01, D-54: a drop, before or after another task at the same level. */
+  | {
+      readonly kind: 'place';
+      readonly key: string;
+      readonly where: { readonly at: 'before' | 'after'; readonly key: string };
+    }
   | { readonly kind: 'indent' | 'outdent'; readonly key: string }
   /** REM-01, D-68: a new reminder time from the date/time picker (turns the reminder on). */
   | {

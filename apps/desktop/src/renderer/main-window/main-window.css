@@ -1880,3 +1880,67 @@ textarea:not([readonly], [disabled]) {
   background: none;
   box-shadow: none;
 }
+
+/* TASK-01, LIST-05, D-54: the locked, springy drag. The lifted item is raised and follows the
+   pointer; the others slide out of its way with the spring; the highlights wait until the drop. */
+.fl-dragging,
+.fl-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.fl-dragging .sel-glide,
+.fl-dragging .nav-glide {
+  opacity: 0;
+}
+
+.fl-dragging .group-inner {
+  overflow: visible;
+}
+
+.drag-lift {
+  position: relative;
+  z-index: 5;
+}
+
+.row.drag-lift,
+.nav.drag-lift,
+.nav-group.drag-lift {
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+}
+
+.row-group.drag-lift {
+  box-shadow: var(--fl-shadow-float);
+}
+
+.drag-peer,
+.drag-drop {
+  transition: transform var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+/* An expanded task folds while it is dragged and opens again after the drop. */
+.row-group.drag-folded > :not(.row) {
+  display: none;
+}
+
+/* Where a dragged list will land: indented into a group, or flush out of one. */
+.nav.drag-lift {
+  transition: padding-left var(--fl-dur-fast) ease;
+}
+
+.nav.drag-indent {
+  padding-left: 15px;
+}
+
+.group-inner .nav.drag-outdent {
+  margin-left: -8px;
+  width: calc(100% + 8px);
+}
+
+.nav.drag-drop {
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    padding-left var(--fl-dur-fast) ease;
+}

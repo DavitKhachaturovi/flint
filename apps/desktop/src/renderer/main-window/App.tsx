@@ -62,6 +62,7 @@ import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/me
 import { NoteEditor } from './NoteEditor.js';
 import { BodyBlock, type ShowImage } from './Body.js';
 import { Lightbox } from './Lightbox.js';
+import { watchDrag, type DragUnit } from './drag.js';
 import { bodyHasText, bodyImages } from '../../shared/body-markdown.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
@@ -1525,6 +1526,160 @@ export function App(): ReactElement {
   const tasksCard = useRef<HTMLElement>(null);
   const pageCard = useRef<HTMLElement>(null);
   const completedCard = useRef<HTMLElement>(null);
+
+  /**
+   * TASK-01, D-54, D-78: a task row dragged within its list, among the tasks at its level (with its
+   * subtasks); an expanded one folds while it is dragged. Not while anything is edited.
+   */
+  const startRowDrag = (event: React.MouseEvent, card: HTMLElement | null): void => {
+    if (event.button !== 0 || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!card || !view || view.readOnly !== null || editing || editingBody) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, .body-block')) return;
+    const row = target.closest<HTMLElement>('.row[data-key]');
+    if (!row || row.matches('.done, .leaving')) return;
+    const units = rowDragUnits(card, row);
+    if (!units) return;
+    const others = units.peers.filter((peer) => peer !== units.unit);
+    watchDrag(event.nativeEvent, {
+      ...units,
+      scroller: card.closest<HTMLElement>('.scroller'),
+      onLift: () => {
+        for (const element of units.unit.elements)
+          if (element.classList.contains('row-group')) element.classList.add('drag-folded');
+      },
+      onSettle: () => {
+        for (const element of units.unit.elements) element.classList.remove('drag-folded');
+      },
+      onDrop: async (index) => {
+        const next = others[index];
+        const last = others.at(-1);
+        const where = next
+          ? ({ at: 'before', key: next.key } as const)
+          : last
+            ? ({ at: 'after', key: last.key } as const)
+            : null;
+        if (!where) return false;
+        return (await change({ kind: 'place', key: units.unit.key, where })) !== null;
+      },
+    });
+  };
+
+  /**
+   * LIST-05, LIST-06, D-54, D-73: a list dragged in the sidebar, also into and out of groups (a
+   * list just below a group's last list joins the group when it is nearer to it, and shows indented),
+   * or a whole group among the top-level items. Only in the manual order.
+   */
+  const startSidebarDrag = (event: React.MouseEvent): void => {
+    const aside = sidebar.current;
+    if (event.button !== 0 || event.ctrlKey || event.shiftKey || event.altKey || !aside) return;
+    if (naming) return;
+    const target = event.target as HTMLElement;
+    const head = target.closest<HTMLElement>('.nav-group-head');
+    const nav = head ? null : target.closest<HTMLElement>('.nav[data-key]');
+    const items = sidebarView?.items ?? [];
+    const topUnits = (): DragUnit[] =>
+      [...aside.children].flatMap((element): DragUnit[] => {
+        const key = element.matches('.nav-group')
+          ? element.querySelector<HTMLElement>('.nav-group-head')?.dataset['key']
+          : element.matches('.nav[data-key]')
+            ? (element as HTMLElement).dataset['key']
+            : undefined;
+        return key && key !== inbox?.id ? [{ key, elements: [element as HTMLElement] }] : [];
+      });
+    const canStart = (): boolean => reorderable();
+    const scroller = aside;
+    if (head?.parentElement) {
+      const group = head.dataset['key'] ?? '';
+      const peers = topUnits();
+      const unit = peers.find((peer) => peer.key === group);
+      if (!unit) return;
+      watchDrag(event.nativeEvent, {
+        unit,
+        peers,
+        scroller,
+        canStart,
+        onDrop: async (index) =>
+          (await sidebarChange({ kind: 'move', id: group, to: { group: null, index } }))?.ok ===
+          true,
+      });
+      return;
+    }
+    const id = nav?.dataset['key'];
+    if (!nav || !id || id === inbox?.id) return;
+    // Every visible list and group header, in order, each moving on its own.
+    interface Spot {
+      readonly unit: DragUnit;
+      readonly kind: 'head' | 'list';
+      readonly group: string | null;
+      readonly open: boolean;
+    }
+    const spots: Spot[] = [];
+    for (const element of aside.children) {
+      if (element.matches('.nav[data-key]')) {
+        const key = (element as HTMLElement).dataset['key'] ?? '';
+        if (key !== inbox?.id)
+          spots.push({
+            unit: { key, elements: [element as HTMLElement] },
+            kind: 'list',
+            group: null,
+            open: true,
+          });
+      } else if (element.matches('.nav-group')) {
+        const groupHead = element.querySelector<HTMLElement>('.nav-group-head');
+        const group = groupHead?.dataset['key'];
+        if (!groupHead || !group) continue;
+        const open = !(sidebarView?.collapsed.includes(group) ?? false);
+        spots.push({ unit: { key: group, elements: [groupHead] }, kind: 'head', group, open });
+        if (open)
+          for (const list of element.querySelectorAll<HTMLElement>('.group-inner > .nav[data-key]'))
+            spots.push({
+              unit: { key: list.dataset['key'] ?? '', elements: [list] },
+              kind: 'list',
+              group,
+              open,
+            });
+      }
+    }
+    const self = spots.find((spot) => spot.kind === 'list' && spot.unit.key === id);
+    if (!self) return;
+    const others = spots.filter((spot) => spot !== self);
+    const destination = (
+      index: number,
+      offset: number,
+    ): { readonly group: string | null; readonly index: number } => {
+      const next = others[index];
+      const previous = others[index - 1];
+      const listsOf = (group: string): string[] => {
+        const found = items.find((item) => item.kind === 'group' && item.id === group);
+        return found?.kind === 'group' ? found.lists.filter((list) => list !== id) : [];
+      };
+      if (next?.kind === 'list' && next.group)
+        return { group: next.group, index: listsOf(next.group).indexOf(next.unit.key) };
+      if (previous?.kind === 'head' && previous.open) return { group: previous.group, index: 0 };
+      if (previous?.kind === 'list' && previous.group && offset < 0.5)
+        return { group: previous.group, index: listsOf(previous.group).length };
+      const tops = items.filter((item) => item.id !== id);
+      const at = next ? tops.findIndex((item) => item.id === next.unit.key) : -1;
+      return { group: null, index: at < 0 ? tops.length : at };
+    };
+    const inGroup = self.group !== null;
+    watchDrag(event.nativeEvent, {
+      unit: self.unit,
+      peers: spots.map((spot) => spot.unit),
+      scroller,
+      canStart,
+      // A cue for where it will land: indented in a group, flush at the top level.
+      onOver: (index, offset) => {
+        const into = destination(index, offset).group !== null;
+        nav.classList.toggle('drag-indent', into && !inGroup);
+        nav.classList.toggle('drag-outdent', !into && inGroup);
+      },
+      onSettle: () => nav.classList.remove('drag-indent', 'drag-outdent'),
+      onDrop: async (index, offset) =>
+        (await sidebarChange({ kind: 'move', id, to: destination(index, offset) }))?.ok === true,
+    });
+  };
   // D-76: the highlight is also the editing field, gliding between editing rows.
   const glideTarget = editing
     ? editing.kind === 'task'
@@ -1709,6 +1864,7 @@ export function App(): ReactElement {
       <aside
         ref={sidebar}
         className="sidebar"
+        onMouseDown={startSidebarDrag}
         onContextMenu={(event) => {
           event.preventDefault();
           newListMenu({ x: event.clientX, y: event.clientY });
@@ -1833,6 +1989,7 @@ export function App(): ReactElement {
                     className="card tasks page-subtasks"
                     aria-label="Subtasks"
                     ref={pageCard}
+                    onMouseDown={(event) => startRowDrag(event, pageCard.current)}
                   >
                     <Glide
                       card={pageCard}
@@ -1885,7 +2042,12 @@ export function App(): ReactElement {
                   />
                 )}
 
-                <section className="card tasks" aria-label="Tasks" ref={tasksCard}>
+                <section
+                  className="card tasks"
+                  aria-label="Tasks"
+                  ref={tasksCard}
+                  onMouseDown={(event) => startRowDrag(event, tasksCard.current)}
+                >
                   <Glide
                     card={tasksCard}
                     target={glideTarget}
@@ -2069,6 +2231,55 @@ function NavGroup(props: {
       </div>
     </div>
   );
+}
+
+/**
+ * TASK-01, D-54: the units a row drags among: the top-level tasks of the card (each with its
+ * subtasks' rows), or a subtask's siblings. Headings and paragraphs between tasks stay put.
+ */
+function rowDragUnits(
+  card: HTMLElement,
+  row: HTMLElement,
+): { unit: DragUnit; peers: DragUnit[] } | null {
+  const own = row.parentElement?.classList.contains('row-group') ? row.parentElement : row;
+  const keyOf = (element: HTMLElement): string | undefined =>
+    (element.matches('.row') ? element : element.querySelector<HTMLElement>(':scope > .row'))
+      ?.dataset['key'];
+  const isTask = (element: Element): element is HTMLElement =>
+    element.matches('.row[data-key], .row-group') && !element.matches('.leaving');
+  // Top-level units, each with the subtask rows that follow it.
+  const tops: { key: string; elements: HTMLElement[]; subtasks: HTMLElement[] }[] = [];
+  let current: (typeof tops)[number] | null = null;
+  for (const element of card.children) {
+    if (!isTask(element)) {
+      if (!element.matches('.leaving')) current = null;
+      continue;
+    }
+    const key = keyOf(element);
+    if (!key) continue;
+    if (element.classList.contains('subtask')) {
+      if (current) {
+        current.elements.push(element);
+        current.subtasks.push(element);
+      }
+      continue;
+    }
+    current = { key, elements: [element], subtasks: [] };
+    tops.push(current);
+  }
+  if (!own.classList.contains('subtask')) {
+    const peers = tops.map(({ key, elements }) => ({ key, elements }));
+    const unit = peers.find((peer) => peer.elements[0] === own);
+    return unit ? { unit, peers } : null;
+  }
+  const parent = tops.find((top) => top.subtasks.includes(own));
+  if (!parent) return null;
+  const peers = parent.subtasks.flatMap((element) => {
+    const key = keyOf(element);
+    return key ? [{ key, elements: [element] }] : [];
+  });
+  const unit = peers.find((peer) => peer.elements[0] === own);
+  return unit ? { unit, peers } : null;
 }
 
 function NavItem(props: {

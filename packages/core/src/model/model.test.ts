@@ -20,6 +20,7 @@ import {
   moveToList,
   moveUp,
   outdentTask,
+  placeTask,
   setBody,
   setPriority,
   setMuted,
@@ -271,6 +272,20 @@ describe('reordering and nesting (TASK-01, TASK-02, TASK-04, D-22)', () => {
     expect(moveUp(only(documents), 'a', 'aaaa')).toBeNull();
     expect(moveDown(only(documents), 'a', 'cccc')).toBeNull();
     expect(moveUp(only(documents), 'a', 'zzzz')).toBeNull();
+  });
+
+  it('a drag places a task next to another at its level only (D-54)', () => {
+    const result = apply(
+      documents,
+      placeTask(only(documents), 'a', 'cccc', { at: 'before', key: 'aaaa' }),
+    );
+    expect(text(result)).toContain(
+      '# Unicorn\n\n- [ ] C [id:: cccc]\n- [ ] A [id:: aaaa]\n## Backend\n- [ ] B [id:: bbbb]\n    - [ ] B1',
+    );
+    // Not across levels, not into Completed, not onto itself.
+    expect(placeTask(only(documents), 'a', 'bb11', { at: 'after', key: 'cccc' })).toBeNull();
+    expect(placeTask(only(documents), 'a', 'aaaa', { at: 'before', key: 'zzzz' })).toBeNull();
+    expect(placeTask(only(documents), 'a', 'aaaa', { at: 'after', key: 'aaaa' })).toBeNull();
   });
 
   it('Tab nests under the task above; Shift+Tab puts a subtask after its parent group', () => {

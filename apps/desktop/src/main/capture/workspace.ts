@@ -20,6 +20,7 @@ import {
   moveDown,
   moveTasksToList,
   moveUp,
+  placeTask,
   outdentTask,
   serializeDocument,
   setBody,
@@ -595,6 +596,10 @@ export class Workspace {
       }
       case 'move': {
         const op = (change.direction === 'up' ? moveUp : moveDown)(document, path, change.key);
+        return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
+      }
+      case 'place': {
+        const op = placeTask(document, path, change.key, change.where);
         return op ? outcome(await this.record(list, op, 'Moved', now), change.key) : null;
       }
       case 'reminder': {

@@ -217,7 +217,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Settings entry hidden until Settings exists | APP-11 · v1 · M4 (Settings M8) | D-52 |
 | 7 | Proper small icon sizes in the `.ico`; bigger in-app logo and wordmark | UI-07 · v1 · M4 | 09 §7, §8, D-52 |
 | 8 | Task bodies: inline up to ~8 lines, otherwise a full page; "Open as page" for every task; page replaces the list with a back arrow | TASK-05 · v1 · M4 | 03 §3, 09 §8, D-53 |
-| 9 | Locked, springy mouse drag for rows (collapse while dragged) and sidebar lists | TASK-01, LIST-01 · v1 · M4 (no drag to sidebar, D-64) | 03 Mouse, 09 §9, D-54 |
+| 9 | Locked, springy mouse drag for rows (collapse while dragged) and sidebar lists | TASK-01, LIST-01 · Done (0.4.14; no drag to sidebar, D-64) | 03 Mouse, 09 §9, D-54 |
 | 10 | Right-click menus everywhere; Cut / Copy / Paste / Select all in text fields | UI-08 · v1 · M4 (note items M5) | 03, 09 §8, D-55, D-64 (in-page everywhere) |
 | 11 | Minimal motion for the selection highlight and new rows | UI-04 · v1 · M4 | 03 §5, 09 §9, D-56 |
 | 12 | Back/forward via mouse side buttons and Alt+←/→, no visible buttons | NAV-04 · v1 · M4 (with the page view) | 03 §3, D-53 |
@@ -291,8 +291,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 17 | Duplicate for tasks, lists and notes; Convert to note / task list in M4 | TASK-16, LIST-01, LIST-04 · v1 · M4 step 7 | 02, D-72 |
 | 18 | Note right-click menu: trimmed Obsidian-style submenus incl. `==highlight==` | NOTE-02 · v1 · M5 | 02, D-72 |
 | 19 | Ctrl+F find bar: task lists highlight and jump (no filter); notes CodeMirror search restyled | NAV-06 · v1 · M4 step 10 (lists, else M5), M5 (notes) | 03 §3, 09 §8, D-72 |
-| 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · Done (0.4.14; drag next in step 8) | 01, 02, 04 §2, D-73 |
-| 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · Done (0.4.14; drag next in step 8) | 02, 03 §3, D-73 |
+| 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · Done (0.4.14) | 01, 02, 04 §2, D-73 |
+| 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · Done (0.4.14) | 02, 03 §3, D-73 |
 | 22 | Temporary sort by reminder time and date added, next to priority | TASK-08 · v1 · M4 step 10 | 02, D-72 |
 
 ## K. Feedback on 0.4.6 (1 Nov 2026)
@@ -366,7 +366,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Shift+Enter for notes in the composer and while editing a title; "Add notes" in the menu; hint | TASK-05 · v1 · M4 (0.4.11 fixes) | 02, 03 §3, D-78 |
 | 7 | "Priority ›" submenu in the task menu | UI-08 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
 | 8 | Cloud sync via Google Drive, then OneDrive; OAuth PKCE, safeStorage, drive.file; per-task merge with tombstones; no iCloud | SYNC-01 · Later | 06 §3, D-78 |
-| — | Drag to reorder moves into step 8 | TASK-01, LIST-05, LIST-06 · v1 · M4 step 8 | 06, D-78 |
+| — | Drag to reorder moves into step 8 | TASK-01, LIST-05, LIST-06 · Done (0.4.14) | 06, D-78 |
 
 ## O. Feedback on 0.4.12 (1 Nov 2026)
 

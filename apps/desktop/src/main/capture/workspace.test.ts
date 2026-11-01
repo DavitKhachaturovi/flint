@@ -502,6 +502,34 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
     ).toBeNull();
   });
 
+  it('a drop places a task with its subtasks, undoably (TASK-01, D-54)', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n    - [ ] two-a [id:: bb2a]\n    - [ ] two-b [id:: bb2b]\n- [ ] three [id:: ccc3]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    await workspace.change(
+      'inbox',
+      { kind: 'place', key: 'ccc3', where: { at: 'before', key: 'aaa1' } },
+      now,
+    );
+    expect(titles(workspace)).toEqual(['three', 'one', 'two', '  two-a', '  two-b']);
+    await workspace.change(
+      'inbox',
+      { kind: 'place', key: 'bb2b', where: { at: 'before', key: 'bb2a' } },
+      now,
+    );
+    expect(titles(workspace)).toEqual(['three', 'one', 'two', '  two-b', '  two-a']);
+    expect(
+      await workspace.change(
+        'inbox',
+        { kind: 'place', key: 'bb2b', where: { at: 'after', key: 'ccc3' } },
+        now,
+      ),
+    ).toBeNull();
+    await workspace.undoLast(now);
+    await workspace.undoLast(now);
+    expect(await inbox()).toBe(original);
+  });
+
   it('priority, reorder, indent and outdent are undoable and redoable', async () => {
     const original = `${header}- [ ] one [id:: aaa1]\n- [ ] two [id:: bbb2]\n- [ ] three [id:: ccc3]\n`;
     await writeFile(join(folder, 'Inbox.md'), original);

@@ -297,6 +297,22 @@ export function moveTo(list: string, key: string, where: Where): Op {
   return { type: 'move', list, key, where };
 }
 
+/**
+ * Drag-and-drop in the main window (TASK-01, D-54): before or after another task at the same level
+ * (top-level tasks in their section, subtasks under their parent); null for anything else.
+ */
+export function placeTask(
+  document: FlintDocument,
+  list: string,
+  key: string,
+  where: { readonly at: 'before' | 'after'; readonly key: string },
+): Op | null {
+  const found = siblings(document, key);
+  if (!found || where.key === key || !found.list.some((task) => task.key === where.key))
+    return null;
+  return moveTo(list, key, where);
+}
+
 /** Tab (TASK-04): the task becomes the last subtask of the task above. Not for tasks with subtasks. */
 export function indentTask(document: FlintDocument, list: string, key: string): Op | null {
   const found = locate(document, key);
