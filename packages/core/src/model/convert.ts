@@ -66,18 +66,83 @@ function convertBullets(lines: readonly Line[], from: number, to: number): Line[
   });
 }
 
+const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/;
+const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+const QUOTE = /^ {0,3}>/;
+const TABLE = /^ {0,3}\|/;
+
 /**
- * LIST-04, note → task list (D-22): checklist items stay tasks, plain bullets become tasks (and
- * plain bullets directly under them become subtasks); headings, paragraphs and everything else stay
- * in place as non-task content. Nothing is dropped.
+ * D-77: a note's top-level lines as tasks. List items (bullets and numbered) and every other
+ * non-empty plain line become tasks; fenced code and quotes go under the task before them, as its
+ * body; headings, rules, tables, HTML comments and indented lines stay as they are.
+ */
+function topLevelTasks(lines: readonly Line[]): Line[] {
+  const out: Line[] = [];
+  let fence: Fence | null = null;
+  let attach = false;
+  let inComment = false;
+  /** A task is the last top-level block above (blank lines don't end it). */
+  let afterTask = false;
+  const under = (line: Line): Line =>
+    attach && !isBlank(line.text) ? { text: `    ${line.text}`, eol: line.eol } : line;
+  for (const line of lines) {
+    const text = line.text;
+    if (fence) {
+      out.push(under(line));
+      if (isFenceClose(text, fence)) fence = null;
+      continue;
+    }
+    if (inComment) {
+      out.push(line);
+      if (text.includes('-->')) inComment = false;
+      continue;
+    }
+    if (isBlank(text) || indentWidth(text) > 3) {
+      out.push(line);
+      continue;
+    }
+    fence = fenceOpen(text);
+    if (fence || QUOTE.test(text)) {
+      attach = afterTask;
+      out.push(under(line));
+      continue;
+    }
+    attach = false;
+    if (opensHtmlComment(text) || HEADING.test(text) || RULE.test(text) || TABLE.test(text)) {
+      inComment = opensHtmlComment(text);
+      afterTask = false;
+      out.push(line);
+      continue;
+    }
+    const item = listItemStart(text);
+    if (item && item.firstLine === '') {
+      out.push(line);
+      continue;
+    }
+    afterTask = true;
+    if (item?.bullet) {
+      out.push({ text: asTask(text, 0) ?? text, eol: line.eol });
+      continue;
+    }
+    const indent = /^[ \t]*/.exec(text)?.[0] ?? '';
+    out.push({ text: `${indent}- [ ] ${item ? item.firstLine : text.trim()}`, eol: line.eol });
+  }
+  return out;
+}
+
+/**
+ * LIST-04, note → task list (D-22, D-77): checklist items stay tasks; plain bullets, numbered items
+ * and every other non-empty plain line become tasks (plain bullets directly under them become
+ * subtasks); fenced code and quotes go under the task before them as its body; headings and the
+ * rest stay in place as non-task content. Nothing is dropped.
  */
 export function convertToTasks(document: FlintDocument, list: string): Op {
   const header = setFrontmatterValues(document, { mode: 'tasks' });
   const frontmatterLength = header.frontmatter?.lines.length ?? 0;
 
-  // Pass 1: top-level bullets.
+  // Pass 1: the top-level lines.
   const top = documentLines(header);
-  const body = convertBullets(top.slice(frontmatterLength), 0, 3);
+  const body = topLevelTasks(top.slice(frontmatterLength));
   const bom = document.bom ? String.fromCharCode(0xfeff) : '';
   const first = parseDocument(bom + joinLines([...top.slice(0, frontmatterLength), ...body]), {
     keySeed: list,

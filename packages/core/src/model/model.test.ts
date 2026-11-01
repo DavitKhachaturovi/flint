@@ -366,7 +366,7 @@ describe('mode conversion (LIST-04, D-22)', () => {
     expect(text(back)).toBe(LIST);
   });
 
-  it('note → task list: bullets become tasks, everything else stays in place', () => {
+  it('note → task list: bullets and plain lines become tasks, headings stay (D-77)', () => {
     const documents = docs({ a: readFixture('note-unheadered.md') });
     const result = apply(documents, convertToTasks(only(documents), 'a'));
     expect(text(result)).toBe(`---
@@ -378,8 +378,17 @@ mode: tasks
 - [ ] Davit: check VPN gateway logs
 - [x] Share the gateway diff
 
-**Decision:** keep the hotfix on staging until Monday.
+- [ ] **Decision:** keep the hotfix on staging until Monday.
 `);
+  });
+
+  it('note → task list: code and quotes go under the task before them (D-77)', () => {
+    const documents = docs({
+      a: '# Standup\nCheck the DNS\n```\ndig flint.dev\n```\n> from Alex\n\n## Later\n---\n| a | b |\n<!-- note\n- not a task\n-->\nRead the logs\n',
+    });
+    expect(text(apply(documents, convertToTasks(only(documents), 'a')))).toBe(
+      '---\nmode: tasks\n---\n# Standup\n- [ ] Check the DNS\n    ```\n    dig flint.dev\n    ```\n    > from Alex\n\n## Later\n---\n| a | b |\n<!-- note\n- not a task\n-->\n- [ ] Read the logs\n',
+    );
   });
 
   it('converts bullets one level down to subtasks, not code or deeper items', () => {
@@ -388,7 +397,7 @@ mode: tasks
     });
     const result = text(apply(documents, convertToTasks(only(documents), 'a')));
     expect(result).toBe(
-      '---\nmode: tasks\n---\n- [ ] parent\n    - [ ] child\n        - deeper\n    ```\n    - code\n    ```\n1. numbered\n',
+      '---\nmode: tasks\n---\n- [ ] parent\n    - [ ] child\n        - deeper\n    ```\n    - code\n    ```\n- [ ] numbered\n',
     );
   });
 });
