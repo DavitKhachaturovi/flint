@@ -44,7 +44,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 - Statuses beyond done / not done (no "In progress", "Review", etc.).
 - Due-date calendars, Gantt charts, calendar views.
 - Comments or discussion threads.
-- Nested projects, folders-within-folders hierarchies.
+- Nested projects, folders-within-folders hierarchies. (**D-73:** one level of collapsible sidebar groups, LIST-05, is allowed; they are not folders on disk. Nested groups and real folders still aren't.)
 - Unlimited subtask nesting (max one level, see TASK-04).
 
 **Explicitly skipped for this product:**

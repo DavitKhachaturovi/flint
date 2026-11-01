@@ -107,6 +107,8 @@
   --fl-scroll-thumb-hover: #45484D;
   --fl-scroll-size:        10px;  /* gutter; the thumb is a 6px pill inside it */
   --fl-overdue-dot:        #FFFFFF;
+  --fl-selection:          rgba(154, 160, 171, .32); /* the accent, translucent: selected text (UI-11, D-69) */
+  --fl-selection-text:     #FFFFFF;
   --fl-spotlight-dim:      rgba(5, 6, 7, .55); /* the one deliberate translucency (D-61) */
 
   /* ── Motion ──────────────────────────────────────────────── */

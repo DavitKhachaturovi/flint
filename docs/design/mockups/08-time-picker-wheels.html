@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time picker: wheels — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.tp *{box-sizing:border-box}
+:where(.tp button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.pick{width:280px;border-radius:18px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30,inset 0 1px 0 rgba(255,255,255,.07),0 2px 4px rgba(0,0,0,.4),0 30px 70px -18px rgba(0,0,0,.85);padding:12px;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;align-items:center;justify-content:space-between;padding:2px 4px}
+.back{display:flex;align-items:center;gap:6px;font-size:13.5px;color:#C9CCCF}
+.mono{font-family:'Geist Mono',monospace}
+.set{height:36px;border-radius:10px;background:#ECEDEE;color:#0E0F11;font-weight:500;font-size:13.5px;box-shadow:0 4px 12px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;gap:8px}
+.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8E9196}
+.cap{font-size:12.5px;line-height:1.55;color:#8E9196;width:280px}
+</style>
+</head>
+<body>
+<div class="tp" style="box-sizing: border-box; width: 420px; height: 520px; background: #0D0E10; color: #E8E9EB; font-family: 'Onest', system-ui, sans-serif; padding: 40px; display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Time picker · Wheels (chosen)</span>
+<div class="pick">
+<div class="head"><span class="back">‹ Wed 4 Nov</span><span class="lbl">Time</span></div>
+<div style="position: relative; height: 200px; border-radius: 12px; background: #151619; box-shadow: inset 0 0 0 1px #232529; overflow: hidden; display: flex; justify-content: center; gap: 6px">
+<div style="position: absolute; left: 10px; right: 10px; top: 80px; height: 40px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06)"></div>
+<div class="mono" style="position: relative; width: 80px; display: flex; flex-direction: column; align-items: center; font-size: 18px">
+<span style="height: 40px; display: flex; align-items: center; color: #3E4146">12</span>
+<span style="height: 40px; display: flex; align-items: center; color: #6E7176">13</span>
+<span style="height: 40px; display: flex; align-items: center; color: #FFFFFF; font-size: 22px; font-weight: 500">14</span>
+<span style="height: 40px; display: flex; align-items: center; color: #6E7176">15</span>
+<span style="height: 40px; display: flex; align-items: center; color: #3E4146">16</span>
+</div>
+<div class="mono" style="position: relative; display: flex; align-items: center; color: #8E9196; font-size: 22px">:</div>
+<div class="mono" style="position: relative; width: 80px; display: flex; flex-direction: column; align-items: center; font-size: 18px">
+<span style="height: 40px; display: flex; align-items: center; color: #3E4146">20</span>
+<span style="height: 40px; display: flex; align-items: center; color: #6E7176">25</span>
+<span style="height: 40px; display: flex; align-items: center; color: #FFFFFF; font-size: 22px; font-weight: 500">30</span>
+<span style="height: 40px; display: flex; align-items: center; color: #6E7176">35</span>
+<span style="height: 40px; display: flex; align-items: center; color: #3E4146">40</span>
+</div>
+</div>
+<button class="set">Set · Wed 4 Nov, 14:30</button>
+</div>
+<span class="cap">Scroll or drag each column (snaps to the center band), or ↑/↓ and type digits, Tab between hour and minute. 00–23 hours, 5-minute steps; exact minutes via the typed field above the picker.</span>
+</div>
+</body>
+</html>

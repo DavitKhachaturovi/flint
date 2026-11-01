@@ -16,6 +16,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-52 (M4):** a **+** next to the "Lists" label in the sidebar and **Ctrl+Shift+N** (anywhere in the main window) create a list. A small menu offers **Task list** or **Note**; the name is then typed in place in the sidebar (**Proposed**). **D-68:** until the M5 editor, a note is shown as a proper page: its title, a comfortable reading width, aligned with the list views, tokens only. **D-64:** a new note gets plain monospace editing (like task bodies, D-49) until M5's note editor; existing notes become editable the same way.
 - **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
 - **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
+- **D-73:** the manual order is kept in `.flint/sidebar.json` with the groups (LIST-05), not in `ui-state.json`; Alt+↑/↓ reorders the selected list, note or group too (LIST-06).
+- **D-72:** "Duplicate" in the menu of lists and notes: "<name> copy" (then "<name> copy 2"…) right below the original, every task with a new ID (**Proposed** naming). **D-69:** right-clicking empty sidebar space opens the same menu as the **+** (New task list, New note, New group); only the title-bar strip at the top drags the window.
 
 ### LIST-02 — Markdown by default (v1)
 - All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
@@ -32,6 +34,21 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Note → task list (**D-22**, resolves Q-16): checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved), and plain bullet lines become tasks too. Everything else (headings, paragraphs) stays in place as non-task content, which task lists show read-only (TASK-15). Nothing is dropped and no confirmation is needed. Example use: meeting notes → action items.
 - Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless. While the list is a note, its task fields are inert: no Today membership, no reminders (D-29).
 - Conversion is undoable (DATA-03).
+- **D-72 (pulled into M4):** "Convert to note" / "Convert to task list" in the right-click menu of lists and notes (M4 step 7).
+
+### LIST-05 — Sidebar groups (v1, D-73)
+- **One level** of collapsible groups in the sidebar, each holding task lists and notes. No nesting.
+- Groups are **not folders**: the list files stay flat in the Flint folder (04 §2). Membership and order live in `.flint/sidebar.json` (user data, travels with the folder); which groups are collapsed is machine UI state (`ui-state.json`).
+- **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
+- Lists and notes move into or out of a group by drag (M4 step 9) and the right-click menu ("Move to group ▸", "Remove from group").
+- **Proposed:** Inbox stays first, outside any group; groups come first in their own order, then the ungrouped lists; a group header shows a chevron, the name and the number of lists; empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
+- Milestones: M4 step 8; dragging in M4 step 9.
+
+### LIST-06 — Sidebar sorting (v1, D-73)
+- A small sort menu in the sidebar: **Manual** (default, the custom order), **Recently edited**, **Created**. It applies within each group and within the ungrouped lists.
+- In Manual, lists, notes and groups reorder with **Alt+↑/↓** and the locked-axis drag (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
+- **Proposed:** the menu is a small sort button next to the **+**; Recently edited uses the file's modification time and Created its creation time, both newest first; groups keep their manual order under every sort; the choice is machine UI state.
+- Milestone M4 step 8.
 
 ---
 
@@ -130,6 +147,9 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Milestone: M4 for the composer and the capture popup.
 - **D-68:** every picker list scrolls (thin scrollbar, UI-02) within a sensible maximum height, so every list can be reached. **Date/time flow, everywhere:** pick a day in the calendar, then a **time-of-day view** with common times and a custom time field, keyboard-friendly, with a back button to the calendar; typed input (`fri 15`) and the presets stay.
 - **Built in M4 step 5 (Proposed details):** a picked value replaces the token of its kind already in the text (a second one would stay as text, D-25), and None or the list the text already goes to (the composer's list, Inbox in the popup) removes it. The date/time picker inserts `@YYYY-MM-DD HH:MM` (the chip shows `Tomorrow 10:00`) and offers In 1 hour, Tomorrow morning and Next Monday as presets; only future times can be picked. The list picker is also "Move to…" (TASK-11). In the capture popup the window grows while a picker or menu needs the room.
+- **D-69:** the presets are **In 10 minutes**, **In 1 hour** and **Tomorrow 10:00**. Hovering a picker row highlights it only while the mouse is over the picker, as in the menus (UI-08).
+- **D-70 (supersedes D-68's time-of-day list):** after a day is picked, a **wheels** time picker (mockup 08): two columns, hours 00–23 and minutes in 5-minute steps, snapping to a highlighted centre band; mouse wheel or drag per column, ↑/↓ and typed digits, Tab between the columns; a **Set · <day, time>** button; back to the calendar via the header (and ←). It starts at the reminder's current time, or the next rounded time for a new one. The typed field above it stays for exact minutes (`14:37`, `3pm`). The same picker in the composer, the popup and "Change reminder…".
+  - **Proposed:** Enter anywhere in the wheels sets the time; a current time off the 5-minute grid (14:37) is an extra stop on the minutes wheel, so Set never changes it silently; the next rounded time is the next quarter hour today and 10:00 on another day (REM-02); two digits typed within a second make one value (`1`, `4` → 14); for today, a time that has passed disables Set ("Pick a later time").
 
 ---
 
@@ -146,6 +166,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Enter** adds a task (in Edit state; Navigate-state Enter is Q-08), **Alt+↑/↓** reorders, **1 / 2 / 3 / 0** set priority (low / medium / high / none), **Space** completes.
 - Full keymap, including the navigate/edit state model that makes these keys safe, is in 03.
 - Drag-and-drop works too; the keyboard is faster for power users.
+- **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2).
 
 ### TASK-03 — Priority: low / medium / high, shown by color, not text (v1)
 - Each task can have priority **low, medium, high**, or **none**.
@@ -178,6 +199,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - The Completed section is **collapsible** and shows a **count**, e.g. "Completed · 14".
 - Each completed task stores a **completion timestamp**.
 - Un-checking a completed task returns it to the active tasks (**Proposed:** to its previous position if still valid, i.e. after the task that preceded it when it was completed, remembered in `.flint/meta.json`; otherwise the bottom).
+- **D-69:** undoing a completion (Ctrl+Z or the toast's Undo) plays the same un-complete animation as un-checking (D-67).
 - **Auto-archive:** Flint offers to auto-archive completed tasks older than **N days** (N configurable) so the Completed section doesn't grow forever. Archived tasks remain on disk (04) and remain searchable via Ctrl+K (**Proposed**).
 
 ### TASK-07 — Multi-select and bulk actions (v1)
@@ -188,6 +210,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-08 — Temporary "sort by priority" (v1)
 - A one-off action that sorts the visible tasks by priority (high → none) **without destroying the manual order**.
 - Manual (drag) order stays the source of truth: the temporary sort is a view; leaving it, or reordering manually, returns to manual order. **Proposed:** a clear "Sorted by priority · Back to manual order" indicator while active.
+- **D-72:** the temporary sort offers **Priority**, **Reminder time** and **Date added**. **Proposed:** tasks without a reminder sort last; Date added uses `created` from `.flint/meta.json` (04), file order where it is missing; the indicator names the sort ("Sorted by reminder time · Back to manual order"). Milestone M4 step 10.
 
 ### TASK-09 — Multi-line paste creates multiple tasks (v1)
 - Pasting N lines of plain text into a task list creates N tasks, with a toast offering **"Keep as one?"** (which merges them back into a single task with the text as its body). Great for dumping meeting action items.
@@ -214,6 +237,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - A task-list file can contain content that isn't a task: headings, paragraphs and plain bullets added in Obsidian or VS Code, or kept from a note → task-list conversion (LIST-04).
 - It stays exactly where it is in the file and is **shown read-only**: headings as quiet section labels, other text as muted markdown. It is not selectable in Navigate state. To edit it, convert the list to a note or use another editor.
 - There is no UI for creating or collapsing sections: Flint shows what's in the file, it does not grow a sections feature.
+
+### TASK-16 — Duplicate a task (v1, D-72)
+- "Duplicate" in a task's right-click menu.
+- **Proposed:** the copy appears right below the original, open, with a new ID and everything else copied (title, priority, reminder including `muted`, body, subtasks with new IDs), and is selected. Undoable. Milestone M4 step 7.
 
 ### TASK-13 — Stale-task fading (Later)
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
@@ -248,12 +275,13 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - When due, Flint shows a **Windows notification** and/or **plays a sound** (configurable, REM-06) so the user remembers the task.
 - One reminder per task (**Proposed**). No recurring reminders (Non-goals).
 - **D-68 (pulled into M4):** clicking a task's reminder time opens the date/time picker for that task (CAP-11), also for a reminder that already fired; the bell next to it stays the off/on toggle (REM-12). The task's right-click menu has "Change reminder…", and "Set reminder…" for a task without one (**Proposed**).
+- **D-69:** when the time changes, the old text crossfades into the new (its width eases along) instead of jumping (D-67's state band).
 
 ### REM-02 — Natural-language times (v1)
 - Accepted in both the reminder picker and the capture box.
 - Must support at least: `in 20m`, `at 15:00`, `tomorrow 10`, `fri` (plus equivalents like `20m`, `2h`, `15:00`, weekday names).
 - The resolved absolute time is always shown before confirming (picker preview / capture chip).
-- Default time when only a day is given (`tomorrow`, `fri`): see Q-02.
+- Default time when only a day is given (`tomorrow`, `fri`, `3d`): **10:00** (D-69, supersedes Q-02's 09:00), the same as the "Tomorrow 10:00" preset.
 - **Grammar (D-29):**
   - Relative: `20m`, `2h`, `1h30m`, `in 20m`, `in 2 hours`, `3d` (three days from now, at the default time).
   - Clock: `15:00`, `at 15:00`, `9`, `3pm`, `9:30am`.
@@ -299,7 +327,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-11 — Overdue reminders (v1, D-58)
 - An open task whose reminder is in the past is **overdue**: noticeable but not alarming.
-- **D-68 (replaces D-58's label):** no "Overdue" word. The bell stays, with a **small dot** on it, and the time (REM-08 format) is in brighter text. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
+- **D-68 (replaces D-58's label):** no "Overdue" word. The bell stays, with a **small white dot** on it. **D-69:** the time is **not** highlighted: it keeps the bell's tone. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
 - The label turns overdue on its own when the time passes (the view checks every minute, **Proposed**).
 - **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
 - In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
@@ -322,7 +350,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Live preview** (formatting renders inline as you type, markdown syntax revealed near the cursor), **not** a split editor/preview pane.
 
 ### NOTE-02 — Right-click formatting menu (v1)
-- An Obsidian-like right-click context menu for inserting/formatting: bullet list, numbered list, checkbox, heading, code block, quote, link, image, table, bold/italic/strikethrough/inline code (**Proposed** item set).
+- An Obsidian-like right-click context menu for inserting/formatting.
+- **D-72 (decided item set):** Obsidian-style submenus, trimmed:
+  - **Format ▸** Bold, Italic, Strikethrough, Highlight (`==text==` as in Obsidian, shown with a subtle gray background), Code, Clear formatting.
+  - **Paragraph ▸** Bullet list, Numbered list, Task list, Heading 1, Heading 2, Heading 3, Body, Quote.
+  - **Insert ▸** Link, Image, Table, Code block, Horizontal rule.
+  - Then Cut / Copy / Paste / Paste as plain text / Select all.
+  - Not included: Heading 4–6, math, comments, footnotes, callouts, internal links.
+- **Proposed:** `==text==` also renders as a highlight in task titles and bodies (LIST-02) from M5. Milestone M5.
 
 ### NOTE-03 — Slash commands (v1)
 - Typing `/` opens a command menu: e.g. `/check` inserts a checkbox, `/code` a code block. Same items as the right-click menu.
@@ -381,6 +416,11 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NAV-05 — Tabs bar (Later, D-62)
 - Obsidian-style tabs for several open lists and pages. Later: it needs careful design to fit the visual language. v1 has one view at a time with back/forward (NAV-04).
+
+### NAV-06 — Find in page (v1, D-72)
+- **Ctrl+F** opens a find bar in Flint's style (09 §8).
+- **Task lists:** matches are highlighted and **Enter / Shift+Enter** jump to the next / previous one; nothing is filtered. **Proposed:** titles and bodies are searched, the Completed section included; a match in a collapsed body or a collapsed Completed section opens it when jumped to; Esc closes the bar and keeps the selection on the last match. Milestone M4 step 10 (M5 if it doesn't fit).
+- **Notes:** CodeMirror's search, restyled to the same bar. Milestone M5.
 
 ### MINI-01 — Mini mode (v1)
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
@@ -522,6 +562,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-01 — Cursors like native Windows (v1, D-52)
 - The normal **arrow cursor on all controls**: buttons, checkboxes, the composer's tools, rows, sidebar items, menus. The text cursor in text fields. The **hand only on real links**. No cursor flicker when moving across controls.
 - **D-68:** the I-beam shows **only over text that is editable at that moment**: text fields, a task being edited, the note editor. Everywhere else the arrow, task titles, reminder times, hints and read-only text included.
+- **D-69 (bug):** the I-beam still flickered anywhere over the composer's and the note's text boxes; it must be steady.
 - Milestone M4.
 
 ### UI-02 — Thin scrollbar at the window edge (v1, D-52)
@@ -553,12 +594,15 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - The in-app logo and the "Flint" wordmark in the sidebar get slightly bigger.
 - **D-65 (0.4.1 feedback):** still too small next to other apps' icons, whose mark fills the square edge to edge. For 16–48 px the mark fills nearly the whole square. ~~The reminder toast also shows Flint's logo larger, as its `appLogoOverride` image.~~ (Removed again by D-68.)
 - **D-68 (0.4.4 feedback):** the leaf overflowed the dark tile. The tile scales with the leaf: the whole icon fills the square, with the leaf inside the tile, at every small size.
+- **D-69 (0.4.5 feedback), one rule instead of more back and forth:** the dark tile fills the **entire icon square** (full-bleed), with the corner radius Windows uses for app icons (2 px at 48 px, i.e. size / 24, per Microsoft's icon grid) and a 1-pixel rim on its edge so it stays visible on the dark taskbar; the leaf sits **proportionally** inside it, its tips and outline spanning 72 % of the tile's diagonal, at every size from 16 to 96 px. The 256 px image stays the master logo. Details in 09 §8.
 - Milestone M4.
 
 ### UI-08 — Right-click menus everywhere (v1, D-55)
 - Every object has a right-click menu with relevant actions: tasks, lists and notes in the sidebar, the sidebar's background, the composer.
 - **Every text field** keeps the standard **Cut / Copy / Paste / Select all** menu (Electron shows none by default).
 - **D-68:** the mouse highlights an item only while it is over the menu; leaving the menu clears it. Keyboard navigation keeps its highlight.
+- **D-69:** the same in every picker (Move to, priority, list, the reminder presets), which still kept the mouse's highlight.
+- **D-72:** "Duplicate" for tasks, lists and notes; "Convert to note" / "Convert to task list" for lists and notes (LIST-04).
 - Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6).
 - **D-64:** menus are drawn **in the page**, with the tokens, **everywhere**, the capture popup included: while a menu is open there, the popup makes room for it (e.g. by enlarging its transparent margin or window). The native dark Windows menu is only a fallback if that genuinely doesn't work, and Davit is told if it comes to that.
 - Milestones: M4; note-specific items (NOTE-02) in M5.
@@ -572,3 +616,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-10 — A motion pass over everything (v1, D-67)
 - Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (up to ~150 ms for motion that gates the next action, ~250–300 ms for non-blocking state changes). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
 - Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.
+
+### UI-11 — Flint's own text selection colour (v1, D-69)
+- Selected text uses Flint's colour instead of Windows blue: a **soft translucent gray based on the accent** with **white text**, in text fields and selectable app text alike (`--fl-selection`, `--fl-selection-text`, 09 §8).
+- Milestones: M4; the note editor (CodeMirror) in M5.

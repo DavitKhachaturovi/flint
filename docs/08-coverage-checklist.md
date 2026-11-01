@@ -269,3 +269,28 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 14c | Focus returns to the window active right before the popup last got focus; none if it had none | CAP-01 · v1 · M4 step 6 (start) | D-41, D-68 |
 | 14d | Date/time picker: day, then a time-of-day view (common times + custom field), back to the calendar | CAP-11 · v1 · M4 step 6 (start) | D-68 |
 | 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · v1 · M8 at the latest | D-67 |
+
+## J. Feedback on 0.4.5 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Focus return from the popup: confirmed fixed | CAP-01 · Done | D-68, D-69 |
+| 2 | Taskbar icon: full-bleed dark tile with Windows' corner radius, the leaf proportionally inside (72 % of the diagonal), every small size | UI-07 · v1 · M4 step 6 (0.4.5 fixes) | 09 §8, D-69 |
+| 3 | Undo of a completion plays the un-complete animation | TASK-06 · v1 · M4 step 6 (0.4.5 fixes) | D-69 |
+| 4 | Overdue: the white dot stays; the time keeps the bell's tone, not highlighted | REM-11 · v1 · M4 step 6 (0.4.5 fixes) | 09 §8, D-69 |
+| 5 | A changed reminder time crossfades instead of jumping | REM-01 · v1 · M4 step 6 (0.4.5 fixes) | 09 §9, D-69 |
+| 6–8 | Notification text, popup grip, manual start and start after update: confirmed | REM-05, CAP-01, APP-01, APP-16 · Done | D-69 |
+| 9 | Bug: picker hover highlight clears on mouse-leave (Move to, priority, list, reminder presets) | UI-08, CAP-11 · v1 · M4 step 6 (0.4.5 fixes, bugs first) | D-69 |
+| 10 | Bug: no I-beam flicker over the composer and the note text box | UI-01 · v1 · M4 step 6 (0.4.5 fixes, bugs first) | D-69 |
+| 11 | Bug: today in the calendar gets the normal hover, keeps its marker | CAP-11 · v1 · M4 step 6 (0.4.5 fixes, bugs first) | 09 §8, D-69 |
+| 12 | Bug: only the title-bar strip drags the window; right-clicking empty sidebar space opens the + menu | UI-08, LIST-01 · v1 · M4 step 6 (0.4.5 fixes, bugs first) | 03 Mouse, D-69 |
+| 13 | Presets In 10 minutes / In 1 hour / Tomorrow 10:00; a day without a time means 10:00 (supersedes Q-02's 09:00) | CAP-11, REM-02 · v1 · M4 step 6 (0.4.5 fixes) | 04 §3, 06 Q-02, D-69 |
+| 14 | Wheels time picker after the day (hours, 5-minute steps, snapping, keyboard, Set button), typed field kept, same everywhere | CAP-11, REM-01 · v1 · M4 step 6 (0.4.5 fixes) | 03 §3, 09 §8, mockup 08, D-70 |
+| 15 | Click the title text to edit with the caret there; empty row space selects; double-click edits; Esc back to selected | TASK-02 · v1 · M4 step 6 (0.4.5 fixes) | 03 §2, D-71 |
+| 16 | Flint's own text selection colour (translucent accent gray, white text) | UI-11 · v1 · M4 step 6 (0.4.5 fixes); M5 editor | 09 §8, tokens.css, D-69 |
+| 17 | Duplicate for tasks, lists and notes; Convert to note / task list in M4 | TASK-16, LIST-01, LIST-04 · v1 · M4 step 7 | 02, D-72 |
+| 18 | Note right-click menu: trimmed Obsidian-style submenus incl. `==highlight==` | NOTE-02 · v1 · M5 | 02, D-72 |
+| 19 | Ctrl+F find bar: task lists highlight and jump (no filter); notes CodeMirror search restyled | NAV-06 · v1 · M4 step 10 (lists, else M5), M5 (notes) | 03 §3, 09 §8, D-72 |
+| 20 | One level of sidebar groups, not folders; membership and order in `.flint/sidebar.json`; New group, rename, delete; docs/01 non-goal clarified | LIST-05 · v1 · M4 step 8 (drag in step 9) | 01, 02, 04 §2, D-73 |
+| 21 | Sidebar sort menu: Manual / Recently edited / Created; Alt+↑/↓ and drag in Manual; hint otherwise | LIST-06 · v1 · M4 step 8 (drag in step 9) | 02, 03 §3, D-73 |
+| 22 | Temporary sort by reminder time and date added, next to priority | TASK-08 · v1 · M4 step 10 | 02, D-72 |

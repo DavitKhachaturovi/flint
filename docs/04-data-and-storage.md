@@ -26,6 +26,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
   .flint/
     meta.json                   ← per-task bookkeeping (created, last touched), keyed by task ID
     today.json                  ← Today's manual order (task IDs)
+    sidebar.json                ← sidebar groups and the manual order of lists, notes and groups (LIST-05, LIST-06, D-73)
     archive/                    ← auto-archived completed tasks, one file per list (TASK-06)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
 ```
@@ -36,7 +37,7 @@ App data (not in the Flint folder):
 %APPDATA%\Flint\
   settings.json                 ← all settings (APP-11), incl. Flint folder path and hotkeys
   window-state.json             ← window sizes/positions per monitor setup (APP-05)
-  ui-state.json                 ← collapsed sections, last opened list, sidebar list order (D-54), guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
+  ui-state.json                 ← collapsed sections and sidebar groups, the sidebar sort (LIST-06), last opened list, guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
@@ -95,7 +96,7 @@ The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) re
 |---|---|---|---|
 | `id` | written: `[a-z0-9]{4,6}`; read: `[A-Za-z0-9_-]{1,32}` (D-21, D-29) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (D-29) | Today, reminders, undo, CLI |
 | `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
-| `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 09:00 (Q-02). | Reminder time | REM-01 |
+| `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 10:00 (D-69; 09:00 before, Q-02). | Reminder time | REM-01 |
 | `muted` | `true`, any letter case (absent = the reminder is on) (D-66) | The reminder is turned off: kept, shown faint, never fired | REM-12 |
 | `today` | `true`, any letter case (absent = not starred) | Starred into Today | TODAY-01 |
 | `completion` | written: `YYYY-MM-DDTHH:MM`; read: also `YYYY-MM-DD` (what Dataview and Obsidian Tasks write) and `…:SS` (**Proposed**) | Completion timestamp (completed tasks only) | TASK-06 |
@@ -140,6 +141,12 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
 - `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
 - `today.json`: the manual order of Today. Today membership itself is the `today` field in the line, so losing this file only loses the order.
+
+### Sidebar groups in `.flint/sidebar.json` (LIST-05, LIST-06, D-73, Proposed format)
+- One file for the sidebar's groups and its manual order, kept in the Flint folder so it travels with the lists. Groups are not folders: the list files stay flat (D-23).
+- Shape: `{ "flint": 1, "items": [ { "group": "g-k3f9", "name": "Work", "lists": ["unicorn", "standup"] }, { "list": "errands" } ] }`. `items` is the manual order of groups and ungrouped lists, `lists` the order inside a group. Lists are named by their frontmatter `id`, or by file name for a file without a Flint header (D-23).
+- Tolerant reader: unknown IDs are skipped, a list that isn't mentioned shows ungrouped at the end, unknown keys are kept. Written atomically (DATA-01).
+- Losing the file loses only the grouping and the manual order, never a list (the bookkeeping rule above). Which groups are collapsed and the sort choice are machine UI state in `ui-state.json`.
 
 ---
 

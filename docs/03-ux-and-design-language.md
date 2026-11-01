@@ -24,7 +24,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | **Navigate** | A row is *selected* (highlighted), no text cursor | Commands (Space completes, 3 sets high priority, ↑/↓ moves selection) |
 | **Edit** | A text cursor is *inside* a task's text | Typing (Space is a space, 3 is a 3) |
 
-- **Enter** or **click** on a task → Edit state. **Esc** → back to Navigate (with the same row selected).
+- **Enter** → Edit state. **Esc** → back to Navigate (with the same row selected).
+- **Mouse (D-71, replaces click-to-select-then-click-to-edit):** clicking a task's **title text** enters Edit directly, with the caret where you clicked, and the row stays highlighted; clicking **empty row space** only selects; **double-click** anywhere on the row edits; Esc returns to the selected row. **Proposed:** the caret lands at the matching place in the raw text (markup characters such as `**` counted); clicking a link in a title still opens it; Ctrl/Shift+click selects (TASK-07); a press that becomes a drag never edits.
 - The **selected** row and the **row being edited** must look visibly different (e.g. selection = subtle background; editing = caret + slightly stronger outline).
 - This is the same model as Things 3 and Vim, so it feels familiar to developers.
 
@@ -57,6 +58,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Go back to the close match after Tab | Tab again (the card offers `<list> · Tab`) | Proposed |
 | Remove a parsed token (priority, list, time) | Click the × on its chip; the token leaves the text | Proposed |
 | Type a token without remembering it | The flag, `#` and bell buttons under the box open the priority, list and date/time pickers (CAP-11); each picks with the keyboard and inserts the same chip as the shorthand | Decided (D-57) |
+| Date/time picker (also in the main window) | Type a time (`fri 15`, `14:37`) and Enter, or ↑/↓ and Enter on a preset; in the calendar the arrows move the day and Enter picks it; in the wheels ↑/↓ or digits change the column, Tab switches hour / minute, Enter sets, ← goes back to the calendar | Decided (D-70); keys Proposed |
 | Add a note below the title (the title line is always one line) | Shift+Enter; in a note Shift+Enter is a new line, Enter saves, Up from its first line or Shift+Tab goes back to the title, Backspace on an empty note removes it | Decided (D-38); note keys Proposed |
 | Capture hotkey while the popup stays open without focus | Ctrl+Shift+Space brings the cursor back; pressed again while focused, it closes the popup (draft kept) | Decided (D-41) |
 | Add another selection while the popup is open | Ctrl+Shift+X in the other app: appended to the selection area | Decided (D-39) |
@@ -103,6 +105,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z (and Ctrl+Y) | Undo decided; redo proposed |
 | New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
 | Back / forward (NAV-04) | Alt+← / Alt+→, the mouse's side buttons | Decided (D-53) |
+| Find in page (NAV-06) | Ctrl+F; Enter / Shift+Enter next / previous match; Esc closes | Decided (D-72) |
+| Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓, Manual sort only | Decided (D-73) |
 
 ### All text fields
 - Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.
@@ -117,7 +121,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 ### Mouse
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
-- Click a task to edit; click the check to complete.
+- Click a task's title text to edit it there, empty row space to select it, double-click to edit (D-71, §2); click the check to complete.
+- Right-click empty sidebar space for the **+** menu: New task list, New note, New group (D-69, D-73). Only the title-bar strip at the top drags the window.
 - Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; star to Today and reminder join in M6 (**Proposed** items).
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
 - The mouse's back and forward buttons navigate (NAV-04).

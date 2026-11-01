@@ -433,9 +433,46 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - The note page (plain editing until M5, D-64) becomes a proper page: title, comfortable width, aligned with the list views, tokens only.
   - Clicking a task's reminder time opens the date/time picker for it (also for reminders that already fired); the bell stays the off/on toggle; "Change reminder…" in the task's menu (REM-01, pulled into M4).
   - Taskbar icon: the tile scales with the leaf, so the whole icon fills the square with the leaf inside the tile at every small size (UI-07).
-    - **Built (1 Nov 2026):** the tile already fills the whole square, so it grows with the leaf through tighter corners (radius 4 px instead of 5 at 24, 3 instead of 3.5 at 16) while the leaf shrinks slightly (scale 0.076 and 0.05), until both tips sit inside the rim; still larger than in 0.4.1 (09 §8).
+    - **Built (1 Nov 2026):** the tile already fills the whole square, so it grows with the leaf through tighter corners (radius 4 px instead of 5 at 24, 3 instead of 3.5 at 16) while the leaf shrinks slightly (scale 0.076 and 0.05), until both tips sit inside the rim; still larger than in 0.4.1 (09 §8). **Superseded by D-69's rule.**
   - Install and update in one step, Flint opening at the end (APP-16); a manual start shows the main window, only the start-with-Windows launch stays in the tray (APP-01).
   - Reminder notification: "Reminder" and the task name, with Done / Snooze 10m / Open; no time, no list name and no large logo (the small app icon stays). Supersedes the toast-logo part of D-65 (REM-05).
   - Overdue: no "Overdue" word; the bell with a small dot and brighter time. The bell always stays in place: turning an overdue reminder off strikes the bell, fades the time and removes the dot; nothing else moves (REM-11, REM-12).
   - The strike animation is slower and smooth in both directions (it didn't animate back, a bug) (REM-12, D-67).
   - Capture popup: drag only by a small grip at the top of the card, never by its background, so static text never moves the window (supersedes D-47's handle; no pin); no "Nothing was selected" message (CAP-07); focus goes back to the window that was active right before the popup last got the focus, and a popup closed without the focus moves no focus at all (CAP-01, D-41); the date/time picker flow everywhere: pick a day, then a time-of-day view with common times and a custom time field, keyboard-friendly, with a way back to the calendar; typed input and presets stay (CAP-11).
+
+### D-69 — Feedback on 0.4.5
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed working:** focus return from the popup, the completion animation, the bell animations, reminder editing, the notification text, the popup's grip, the manual start and the start after an update.
+- **Decision (fixed in M4 step 6, before bodies and pages; bugs first):**
+  - Bugs: the mouse's hover highlight still stayed in the pickers (Move to, priority, list, the reminder presets) after the mouse left; it clears like in the menus (UI-08, CAP-11). The I-beam still flickered anywhere over the composer's and the note's text boxes (UI-01). Hovering today in the calendar turned it gray with black text: it gets the normal hover and keeps its subtle marker. Empty sidebar space was a window drag region, so right-clicking it showed Windows' window menu (Restore, Move, Size…): only the title-bar strip drags, and right-clicking empty sidebar space opens the **+** menu (UI-08, LIST-01).
+  - Undoing a completion (Ctrl+Z, the toast's Undo) plays the un-complete animation (TASK-06, D-67).
+  - Overdue: the white dot stays on the bell, but the time is not highlighted: it keeps the bell's tone (REM-11; replaces D-68's brighter time).
+  - A changed reminder time crossfades from the old text to the new instead of jumping (REM-01).
+  - App icon, **one rule, no more alternating between shrinking the leaf and growing the tile:** the dark tile fills the entire icon square (full-bleed) with Windows' corner radius for app icons (Microsoft's icon grid: 2 px at 48 px, so size / 24) and a 1-pixel rim on its edge for the dark taskbar; the leaf sits proportionally inside, its tips and outline spanning 72 % of the tile's diagonal, at every size from 16 to 96 px. Supersedes the tile and leaf numbers of D-52, D-65 and D-68; the 256 px master is unchanged (UI-07).
+  - Reminder presets: In 10 minutes, In 1 hour, Tomorrow 10:00 (CAP-11).
+  - The default time for a day without a time (`tomorrow`, `fri`, `3d`, and date-only values in files) is **10:00** instead of 09:00, so typing and the presets agree. Resolves Q-02 with a new default (REM-02, 04 §3).
+  - Text selection: Flint's own colour instead of Windows blue, a soft translucent gray based on the accent with white text, in text fields and selectable app text alike; tokens `--fl-selection` and `--fl-selection-text` (UI-11).
+
+### D-70 — The time of day is picked with wheels
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in CAP-11
+- **Decision:** after a day is picked in the calendar, the time-of-day list and "Other time" field of D-68 are replaced by a **wheels picker** (mockup `design/mockups/08-time-picker-wheels.html`): two columns, hours 00–23 and minutes in 5-minute steps, snapping to a highlighted centre band; mouse wheel or drag per column, ↑/↓ and typed digits, Tab between the columns; a "Set · <day, time>" button; back to the calendar via the header and ←. It starts at the reminder's current time, or the next rounded time for a new one. The typed field above it stays for exact minutes (`14:37`, `3pm`). The same picker in the composer, the capture popup and "Change reminder…" (CAP-11, REM-01).
+
+### D-71 — Clicking a task edits it directly
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in 03 §2
+- **Decision:** clicking a task's title text enters Edit with the caret where you clicked, and the row stays highlighted; clicking empty row space only selects; double-click anywhere edits; Esc returns to the selected state. The keyboard's Navigate/Edit behaviour stays as it is. Replaces click-to-select-then-click-to-edit (M4 step 2, D-51); updates 03 §2.
+
+### D-72 — Duplicate, convert, the note menu, find in page, more temporary sorts
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in 02
+- **Decision:**
+  - Right-click menus: tasks, lists and notes get **Duplicate** (TASK-16, LIST-01); lists and notes get **Convert to note** / **Convert to task list**. LIST-04 is v1 and its rules are decided (D-22, D-29), so conversion moves from M5 into M4 (step 7).
+  - The note right-click menu (NOTE-02) gets Obsidian-style submenus, trimmed: Format (bold, italic, strikethrough, highlight `==text==` with a subtle gray background, code, clear formatting), Paragraph (bullet, numbered and task list, Heading 1–3, body, quote), Insert (link, image, table, code block, horizontal rule), then Cut / Copy / Paste / Paste as plain text / Select all. No H4–H6, math, comments, footnotes, callouts or internal links. M5.
+  - **Ctrl+F** finds in the page with a custom find bar in Flint's style (NAV-06): in notes CodeMirror's search, restyled (M5); in task lists matches are highlighted and Enter / Shift+Enter jump between them, without filtering (M4 step 10, else M5).
+  - The temporary sort in task lists (TASK-08) also sorts by **Reminder time** and **Date added**. Manual order stays the source of truth.
+
+### D-73 — Sidebar groups and sorting
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in 02 and 04
+- **Decision:**
+  - **Groups (LIST-05, v1, now):** one level of collapsible sections in the sidebar that hold task lists and notes. Not file-system folders: the list files stay flat in the Flint folder. Group membership and order live in a file under `.flint/` (`sidebar.json`; user data, travels with the folder); which groups are collapsed is machine UI state. **+** and the sidebar's right-click menu offer "New group"; groups can be renamed and deleted (deleting a group keeps its lists, which move out of it). No nesting. Lists move into and out of groups by drag and the right-click menu. docs/01's non-goals now say one-level sidebar groups are allowed and nested folders still aren't.
+  - **Sorting (LIST-06):** a small sort menu with Manual (default, custom order), Recently edited and Created, applied within each group and the ungrouped area. In Manual, lists, notes and groups reorder with Alt+↑/↓ and the same locked-axis drag as tasks (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
+  - The manual sidebar order moves from `ui-state.json` (D-54, never built) to `.flint/sidebar.json`.
+- **Milestones:** groups, the sort menu and Alt+↑/↓ in M4 step 8; dragging into, out of and within groups with the rest of drag in M4 step 9.
