@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.7 (1 Nov 2026)
+
+- **Nothing waits for an animation any more.** Completing a task saves it at once (you can undo right away); the animation plays on where the row was. Animations are a little fuller: the selection, menus and pickers take about 0.2 s, switching lists about 0.3 s, completing about 0.4 s. Tell me if they feel slow.
+- **Editing a task looks like a text box**: a dark field like the one at the top, clearly different from a selected task. Clicking another task's text goes straight into editing it, without the highlight sliding over first.
+- **Pickers:** when the mouse leaves the list, nothing stays highlighted; the arrow keys bring the highlight back from where the mouse was.
+- **Time wheels:** touchpad scrolling moves calmly, one step per bit of movement; a mouse wheel notch is still one step.
+- **Taskbar and tray icon:** rounded corners like the Flint logo again, and a slightly smaller leaf.
+
 ## 0.4.6 (1 Nov 2026)
 
 - **Click a task's text to edit it**, with the cursor right where you clicked. Clicking beside the text only selects the task; double-click anywhere edits; Esc goes back.
