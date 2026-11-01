@@ -19,8 +19,9 @@ const TRAY = [
 
 /**
  * The sizes in `icon.ico`: Windows' title bar, taskbar and Start sizes at 100–400 % scaling
- * (docs/09 §8). Everything up to 96 px comes from the hand-drawn small logos, whose tile rim stays
- * visible on the dark taskbar and whose mark fills more of the tile; 256 px from the 512 px master.
+ * (docs/09 §8). Everything up to 96 px comes from the hand-drawn small logos, drawn to one rule
+ * (D-69): a full-bleed tile with Windows' corner radius (size / 24) and a rim that stays visible on
+ * the dark taskbar, the leaf spanning 72 % of its diagonal; 256 px from the 512 px master.
  */
 const ICO = [
   [16, 'flint-icon-16.svg'],
