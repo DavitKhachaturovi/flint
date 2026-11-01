@@ -22,7 +22,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 3. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).
 4. Then the rest of M5 and M6 to M8 (§2).
 
-**How a build goes out.** Bump the version in `apps/desktop/package.json` and the `apps/desktop` entry of `package-lock.json`, add an entry to `docs/release-notes.md`, run `npm test`, `npm run typecheck`, `npm run lint` and `npm run e2e`, push, and queue CI with `az pipelines run --name flint --branch m4-lists`; the pipeline builds the unsigned NSIS installer.
+**How a build goes out.** Bump the version in `apps/desktop/package.json` and the `apps/desktop` entry of `package-lock.json`, add an entry to `docs/release-notes.md`, run `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check` (CI fails on it) and `npm run e2e`, build the installer locally with `npm run dist` in `apps/desktop` (Davit installs from `apps/desktop/dist-installer/`), push, and queue CI with `az pipelines run --name flint --branch m4-lists`; the pipeline builds the unsigned NSIS installer.
 
 ## 1. Risk-first build order (replaces the separate spike, D-18)
 
