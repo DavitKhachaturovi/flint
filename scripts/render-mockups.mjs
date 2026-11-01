@@ -19,7 +19,7 @@ const SCREENS = {
   '06': { file: '06-design-system', width: 1280, height: 1000 },
   '07': { file: '07-code-highlighting', width: 1280, height: 1040 },
   '09': { file: '09-expanded-task', width: 840, height: 520 },
-  '10': { file: '10-sidebar-groups', width: 1400, height: 940 },
+  10: { file: '10-sidebar-groups', width: 1400, height: 940 },
 };
 
 const args = process.argv.slice(2);
