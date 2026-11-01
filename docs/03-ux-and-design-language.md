@@ -28,6 +28,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 - **Mouse (D-71, replaces click-to-select-then-click-to-edit):** clicking a task's **title text** enters Edit directly, with the caret where you clicked, and the row stays highlighted; clicking **empty row space** only selects; **double-click** anywhere on the row edits; Esc returns to the selected row. **Proposed:** the caret lands at the matching place in the raw text (markup characters such as `**` counted); clicking a link in a title still opens it; Ctrl/Shift+click selects (TASK-07); a press that becomes a drag never edits.
 - **D-74:** a click on another task's text goes **straight into editing** on that row: no selection glide first. The **editing row looks like a dark input field**, like the composer (`--fl-ground-well` with a subtle edge), so Edit is clearly different from a selected row (09 §8).
 - **D-76:** a **second single click** on an already-selected row (outside its text) enters Edit too, like renaming in Explorer; a double-click edits from any state. The field eases in when Edit starts and glides when Edit moves to another row (Enter on a new row, a click on another task's text).
+- **D-77: nothing is selected when a list opens**; the first ↓ (or ↑) selects the first row, so a single click never unexpectedly starts editing.
 - The **selected** row and the **row being edited** must look visibly different (e.g. selection = subtle background; editing = caret + slightly stronger outline).
 - This is the same model as Things 3 and Vim, so it feels familiar to developers.
 
@@ -83,7 +84,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Add a subtask to the selected task | Right-click → Add subtask (also on the task's page) | Decided (D-76) |
 | Open task as page (TASK-05) | Shift+Enter | Proposed (D-53) |
 | Back from a task's page to its list | Esc (or the back arrow, Alt+←) | Proposed (D-53) |
-| Select all tasks (TASK-07) | Ctrl+A | Proposed (D-59) |
+| Select all open tasks (TASK-07) | Ctrl+A (the visible open tasks; never completed ones) | Decided (D-77) |
 | Star to / unstar from Today | S | Proposed |
 | Set reminder | R | Proposed |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |

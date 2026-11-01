@@ -330,3 +330,25 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 13 | Task page: lighter title, back arrow on the first line, wrapped title editing, subtasks with Add subtask | TASK-05, TASK-04 · v1 · M4 step 6 (0.4.8 fixes) | 02, 09 §8, D-76 |
 | 14 | The plain body field doesn't shift the layout | TASK-05 · v1 · M4 step 6 (0.4.8 fixes); real editor M5 | 02, D-49, D-76 |
 | 15 | Animations: inline body open/close, page open/close, editing start/end | UI-04, UI-10 · v1 · M4 step 6 (0.4.8 fixes) | 09 §9, D-76 |
+
+## M. Feedback on 0.4.9 and 0.4.10 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Confirmed: highlight on open, second click, task motion, wheels, Add subtask, multi-select, action bar, Duplicate | Done | D-77 |
+| — | Ctrl+A: visible open tasks only; no sidebar action bar; nothing selected when a list opens | TASK-07, LIST-01, TASK-02 · v1 · M4 (0.4.10 fixes) | 02, 03 §2–3, D-77 |
+| 1 | Picker open, close and switch smooth and reliable | CAP-11, UI-10 · v1 · M4 (0.4.10 fixes) | 02, D-77 |
+| 2 | Fuller editing-field motion | TASK-02, UI-04 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 3 | No scrollbar flash; scrollbar only on overflow | UI-02 · v1 · M4 (0.4.10 fixes) | 02, D-77 |
+| 4 | Wheels: a click after typing goes straight to the clicked value | CAP-11 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 5 | Opening any list (Inbox too) clears the marks | TASK-07 · v1 · M4 (0.4.10 fixes) | 02, D-77 |
+| 6 | Adjacent marked rows: one continuous highlight | TASK-07 · v1 · M4 (0.4.10 fixes) | 02, 09 §8, D-77 |
+| 7 | The toast animates out | UI-10 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 8 | Completed collapses with an animation, scroll anchored | TASK-06, UI-10 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 9 | Delete and Duplicate (and undo) animate | TASK-12, TASK-16, UI-04 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 10 | An expanded task is one raised card; body in the secondary tone; code cards with label and copy | TASK-05 · v1 · M4 (0.4.10 fixes) | 02, 09 §8, mockup 01, D-77 |
+| 11 | Long bodies open their page from the clickable preview; short ones edit inline | TASK-05 · v1 · M4 (0.4.10 fixes) | 02, D-77 |
+| 12 | Page title field: the body field's inner spacing | TASK-05 · v1 · M4 (0.4.10 fixes) | D-77 |
+| 13 | Image thumbnails and a lightbox with ←/→ within the task | MEDIA-01 · v1 · M5 | 02, D-77 |
+| 14 | Note → task list: every plain line a task; headings labels; code and quotes as bodies | LIST-04 · v1 · M4 (0.4.10 fixes) | 02, D-77 (supersedes D-22 for plain lines) |
+| 15 | Fields in notes as muted chips, id hidden, raw on the cursor's line | LIST-04, NOTE-01 · v1 · M5 | 02, D-77 |
