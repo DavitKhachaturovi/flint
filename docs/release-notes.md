@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.12 (1 Nov 2026)
+
+- **Menus and pickers stay with their task or button** while you scroll, and close when it scrolls out of view.
+- **Priority is one submenu** in a task's right-click menu (High, Medium, Low, None).
+- **Notes, quickly**: Shift+Enter in the task box at the top opens a notes field under it; the notes become the new task's body. Shift+Enter while editing a task's title opens its notes. "Add notes" is in the task's right-click menu too.
+- **Expanded tasks** look like the reference design: always a raised card, the priority stripe along its whole height, body and code inside.
+- Clicking another task while editing one saves the edit and selects the other task. Collapsing a task next to the selected one no longer drags the highlight across it. Selected tasks with a body keep their own spacing.
+
 ## 0.4.11 (1 Nov 2026)
 
 - **Pickers switch reliably**: flag, # and bell pickers (and a reminder's picker) hand over to each other smoothly instead of disappearing or opening at the bottom of the window. They open more visibly and fade out when closed.
