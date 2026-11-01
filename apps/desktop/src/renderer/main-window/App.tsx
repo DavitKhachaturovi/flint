@@ -1256,6 +1256,21 @@ export function App(): ReactElement {
     ];
   };
 
+  /**
+   * D-77: a task whose body shows is one raised card holding its row and its body (mockup 01).
+   */
+  const withBody = (row: ReactElement, task: TaskRow, subtask: boolean): ReactElement => {
+    const body = bodyRows(task, subtask);
+    return body.length === 0 ? (
+      row
+    ) : (
+      <div key={`group-${task.key}`} className={subtask ? 'row-group subtask' : 'row-group'}>
+        {row}
+        {body}
+      </div>
+    );
+  };
+
   // TASK-05, D-76: the page's subtasks, with a new row where Add subtask or Enter opened one.
   const pageRows: ReactElement[] = [];
   if (pageTask) {
@@ -1273,8 +1288,11 @@ export function App(): ReactElement {
     placeNew(pageTask.key);
     for (const sub of pageTask.subtasks) {
       pageRows.push(
-        <Row key={sub.key} task={sub} fresh={freshKeys.get(sub.key)} {...rowProps} />,
-        ...bodyRows(sub, false),
+        withBody(
+          <Row key={sub.key} task={sub} fresh={freshKeys.get(sub.key)} {...rowProps} />,
+          sub,
+          false,
+        ),
       );
       placeNew(sub.key);
     }
@@ -1312,25 +1330,31 @@ export function App(): ReactElement {
         );
       else {
         cardRows.push(
-          <Row
-            key={item.task.key}
-            task={item.task}
-            fresh={freshKeys.get(item.task.key)}
-            {...rowProps}
-          />,
-          ...bodyRows(item.task, false),
+          withBody(
+            <Row
+              key={item.task.key}
+              task={item.task}
+              fresh={freshKeys.get(item.task.key)}
+              {...rowProps}
+            />,
+            item.task,
+            false,
+          ),
         );
         cardRows.push(...ghostRows(ghosts, 'open', item.task.key, rowProps));
         for (const subtask of item.task.subtasks) {
           cardRows.push(
-            <Row
-              key={subtask.key}
-              task={subtask}
-              subtask
-              fresh={freshKeys.get(subtask.key)}
-              {...rowProps}
-            />,
-            ...bodyRows(subtask, true),
+            withBody(
+              <Row
+                key={subtask.key}
+                task={subtask}
+                subtask
+                fresh={freshKeys.get(subtask.key)}
+                {...rowProps}
+              />,
+              subtask,
+              true,
+            ),
           );
           cardRows.push(...ghostRows(ghosts, 'open', subtask.key, rowProps));
           placeNew(subtask.key, true);
@@ -1543,13 +1567,16 @@ export function App(): ReactElement {
                       <div className="completed-inner">
                         {ghostRows(ghosts, 'done', null, rowProps)}
                         {view.completed.flatMap((task) => [
-                          <Row
-                            key={task.key}
-                            task={task}
-                            fresh={freshKeys.get(task.key)}
-                            {...rowProps}
-                          />,
-                          ...bodyRows(task, false),
+                          withBody(
+                            <Row
+                              key={task.key}
+                              task={task}
+                              fresh={freshKeys.get(task.key)}
+                              {...rowProps}
+                            />,
+                            task,
+                            false,
+                          ),
                           ...ghostRows(ghosts, 'done', task.key, rowProps),
                         ])}
                       </div>
@@ -2256,9 +2283,13 @@ function Glide(props: {
   }, [box]);
   useLayoutEffect(() => {
     const measure = (): void => {
-      const row = target
+      const found = target
         ? card.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(target)}"]`)
         : null;
+      // D-77: an expanded task is one card with its body; the highlight covers all of it.
+      const row = found?.parentElement?.classList.contains('row-group')
+        ? found.parentElement
+        : found;
       setBox(
         row
           ? { x: row.offsetLeft, y: row.offsetTop, w: row.offsetWidth, h: row.offsetHeight }

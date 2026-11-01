@@ -3,15 +3,49 @@ import { blockFor, classifyPaste, fencedBlock, type BlockKind } from '@flint/cor
 import { bodyHtml } from '../../shared/body-markdown.js';
 import { highlightLines } from '../highlight/highlight.js';
 
-/** The code blocks of rendered body HTML, highlighted in place (UI-06): JSON and stack traces. */
+const COPY_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
+
+/**
+ * The code blocks of rendered body HTML, highlighted in place (UI-06): JSON and stack traces. Each
+ * becomes a small code card with its kind and a copy button (D-77, mockup 01).
+ */
 function highlightCode(root: HTMLElement): void {
   for (const pre of root.querySelectorAll<HTMLElement>('pre.body-code')) {
     const code = pre.querySelector('code');
     if (!code) continue;
     const text = code.textContent ?? '';
-    const kind: BlockKind =
-      (pre.dataset['lang'] ?? '').toLowerCase() === 'json' ? 'json' : blockFor(text).kind;
+    const lang = (pre.dataset['lang'] ?? '').toLowerCase();
+    const kind: BlockKind = lang === 'json' ? 'json' : blockFor(text).kind;
     code.replaceChildren(...highlightLines(kind, text.split('\n')));
+    const card = document.createElement('div');
+    card.className = 'code-card';
+    const head = document.createElement('div');
+    head.className = 'code-head';
+    const label = document.createElement('span');
+    label.className = 'code-kind';
+    label.textContent =
+      kind === 'stack-trace' ? 'stack trace' : kind === 'json' ? 'json' : lang || 'code';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'code-copy';
+    copy.title = 'Copy';
+    copy.setAttribute('aria-label', 'Copy code');
+    copy.innerHTML = COPY_ICON;
+    copy.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void navigator.clipboard.writeText(text).then(() => {
+        copy.classList.add('copied');
+        copy.title = 'Copied';
+        window.setTimeout(() => {
+          copy.classList.remove('copied');
+          copy.title = 'Copy';
+        }, 1200);
+      });
+    });
+    head.append(label, copy);
+    pre.replaceWith(card);
+    card.append(head, pre);
   }
 }
 
@@ -39,6 +73,7 @@ function BodyView(props: { readonly body: string; readonly onEdit: () => void })
           window.flintMain.openLink(link.href);
           return;
         }
+        if ((event.target as HTMLElement).closest('button')) return;
         // Selecting text in the body doesn't start editing.
         if (window.getSelection()?.isCollapsed !== false) onEdit();
       }}
@@ -102,9 +137,10 @@ function BodyEditor(props: {
 }
 
 /**
- * A task's body in its place (TASK-05, D-49, D-76): rendered, or in its plain field while edited.
- * Inline under a row it sits in a subtle well, and a body longer than about eight lines shows only
- * its top lines, fading out, with "Open as page"; on the task's page it shows in full.
+ * A task's body in its place (TASK-05, D-49, D-76, D-77): rendered, or in its plain field while
+ * edited. Inline, in its task's raised card, a body longer than about eight lines shows only its
+ * top lines, fading out; it isn't edited there: a click on it, or "Open as page", opens the page.
+ * On the task's page it shows in full.
  */
 export function BodyBlock(props: {
   readonly body: string;
@@ -141,7 +177,13 @@ export function BodyBlock(props: {
         <BodyEditor initial={body} onDone={onDone} {...(placeholder ? { placeholder } : {})} />
       ) : (
         <div className="body-clip" ref={clip}>
-          <BodyView body={body} onEdit={() => editable && onEdit()} />
+          <BodyView
+            body={body}
+            onEdit={() => {
+              if (long && onOpenPage) onOpenPage();
+              else if (editable) onEdit();
+            }}
+          />
         </div>
       )}
       {long && onOpenPage && (
