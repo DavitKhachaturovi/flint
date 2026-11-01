@@ -606,6 +606,7 @@ const pickerHost = (button: HTMLElement): PickerHost => ({
   anchor: button.getBoundingClientRect(),
   returnFocus: input,
   room,
+  trigger: button,
 });
 
 // The flag, # and bell open the pickers (CAP-11, D-57); they used to type `!h`, `##` and `@`.

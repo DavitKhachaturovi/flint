@@ -589,7 +589,7 @@ export function App(): ReactElement {
 
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
-    (row: TaskRow, at: Point, keyboard = false): void => {
+    (row: TaskRow, at: Point): void => {
       const open = !row.done;
       const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
         label,
@@ -652,14 +652,13 @@ export function App(): ReactElement {
           { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
         ],
         at,
-        { keyboard },
       );
     },
     [change, edit, mute, remove, toggle, lists, listId, moveTask, changeReminder],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
-  const newListMenu = useCallback((at: Point, keyboard = false): void => {
+  const newListMenu = useCallback((at: Point): void => {
     const start = (mode: 'tasks' | 'note'): void => {
       setNamingProblem(null);
       setNaming({ kind: 'new', mode });
@@ -670,7 +669,6 @@ export function App(): ReactElement {
         { label: 'New note', action: () => start('note') },
       ],
       at,
-      { keyboard },
     );
   }, []);
 
@@ -745,7 +743,7 @@ export function App(): ReactElement {
       if (key === 'n' && event.ctrlKey && event.shiftKey && !event.altKey) {
         event.preventDefault();
         const box = addButton.current?.getBoundingClientRect();
-        newListMenu(box ? { x: box.left, y: box.bottom + 4 } : { x: 24, y: 120 }, true);
+        newListMenu(box ? { x: box.left, y: box.bottom + 4 } : { x: 24, y: 120 });
         return;
       }
       // Ctrl+N works anywhere in the window (docs/03 §2, Q-08 default).
@@ -831,7 +829,7 @@ export function App(): ReactElement {
         const box = document
           .querySelector(`[data-key="${CSS.escape(row.key)}"]`)
           ?.getBoundingClientRect();
-        taskMenu(row, box ? { x: box.left + 48, y: box.bottom } : { x: 300, y: 200 }, true);
+        taskMenu(row, box ? { x: box.left + 48, y: box.bottom } : { x: 300, y: 200 });
       } else if (event.key === 'Escape') {
         setSelected(null);
       }
@@ -1250,6 +1248,7 @@ function Composer(props: {
   const host = (button: HTMLElement): PickerHost => ({
     anchor: button.getBoundingClientRect(),
     returnFocus: inputRef.current,
+    trigger: button,
   });
 
   return (
@@ -1291,6 +1290,7 @@ function Composer(props: {
           <button
             type="button"
             className="tool"
+            data-picker-trigger
             aria-label="Set priority"
             onClick={(event) =>
               openPriorityPicker(host(event.currentTarget), parsed?.priority ?? null, (priority) =>
@@ -1303,6 +1303,7 @@ function Composer(props: {
           <button
             type="button"
             className="tool"
+            data-picker-trigger
             aria-label="Choose list"
             onClick={(event) =>
               openListPicker(
@@ -1327,6 +1328,7 @@ function Composer(props: {
           <button
             type="button"
             className="tool"
+            data-picker-trigger
             aria-label="Set reminder"
             onClick={(event) =>
               openTimePicker(

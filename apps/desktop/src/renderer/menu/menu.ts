@@ -20,8 +20,6 @@ export interface MenuOptions {
    * grows its window by `height` pixels while the menu is open, and calls `release` on close.
    */
   readonly room?: { readonly grow: (height: number) => void; readonly release: () => void };
-  /** Opened from the keyboard: the first item is active at once. */
-  readonly keyboard?: boolean;
 }
 
 const GAP = 8;
@@ -68,9 +66,10 @@ export function openMenu(
     menu.append(button);
   }
 
-  let active = options.keyboard ? buttons.findIndex(({ item }) => !item.disabled) : -1;
+  // D-76: nothing is highlighted until the mouse or an arrow key; Enter acts only on a highlight.
+  let active = -1;
   /** D-68: the mouse highlights only while over the menu; the keyboard's highlight stays. */
-  let byKeyboard = options.keyboard === true;
+  let byKeyboard = false;
   const paint = (): void =>
     buttons.forEach(({ button }, index) => button.classList.toggle('active', index === active));
   const pick = (index: number): void => {

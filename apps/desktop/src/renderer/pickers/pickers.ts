@@ -31,11 +31,18 @@ export interface PickerHost {
   readonly returnFocus: HTMLElement | null;
   /** The capture popup grows its window while a picker needs the room (like its menus). */
   readonly room?: MenuOptions['room'];
+  /** D-76: the button that opens it; pressing it again closes the picker. */
+  readonly trigger?: HTMLElement;
 }
+
+/** Picker buttons: a press on one doesn't close the open picker, so the next can morph from it. */
+const TRIGGERS = '[data-picker], [data-picker-trigger]';
 
 const WIDTH = 280;
 const GAP = 6;
 let closeOpen: (() => void) | null = null;
+let openPanelElement: HTMLElement | null = null;
+let openTrigger: HTMLElement | null = null;
 
 export function closePicker(): void {
   closeOpen?.();
@@ -60,11 +67,25 @@ function element<K extends keyof HTMLElementTagNameMap>(
 function openPanel(
   host: PickerHost,
   label: string,
-): { panel: HTMLElement; close: () => void; show: (focus: HTMLElement) => void } {
+): { panel: HTMLElement; close: () => void; show: (focus: HTMLElement) => void } | null {
+  // D-76: its own button closes an open picker.
+  if (closeOpen && host.trigger && openTrigger === host.trigger) {
+    closePicker();
+    return null;
+  }
+  // Another picker morphs into this one: its place and look are kept for the animation.
+  const previous =
+    closeOpen && openPanelElement && !reducedMotion()
+      ? {
+          rect: openPanelElement.getBoundingClientRect(),
+          ghost: openPanelElement.cloneNode(true) as HTMLElement,
+        }
+      : null;
   // Pickers and menus never stack.
   closePicker();
   closeMenu();
   const panel = element('div', 'fl-picker');
+  if (previous) panel.classList.add('morph');
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', label);
   panel.style.visibility = 'hidden';
@@ -86,10 +107,15 @@ function openPanel(
     }
     panel.style.left = `${Math.round(x)}px`;
     panel.style.top = `${Math.round(Math.max(GAP, y))}px`;
+    // D-76: it grows out of its button's side.
+    const above = y < host.anchor.top;
+    panel.style.transformOrigin = `${Math.round(host.anchor.left + host.anchor.width / 2 - x)}px ${above ? '100%' : '0'}`;
     panel.style.visibility = '';
   };
   const onPointer = (event: MouseEvent): void => {
-    if (!panel.contains(event.target as Node)) close();
+    const target = event.target as Element;
+    if (panel.contains(target) || target.closest?.(TRIGGERS)) return;
+    close();
   };
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
@@ -100,6 +126,8 @@ function openPanel(
   const close = (): void => {
     if (closeOpen !== close) return;
     closeOpen = null;
+    openPanelElement = null;
+    openTrigger = null;
     panel.remove();
     document.removeEventListener('mousedown', onPointer, true);
     document.removeEventListener('keydown', onKey, true);
@@ -109,6 +137,8 @@ function openPanel(
     host.returnFocus?.focus();
   };
   closeOpen = close;
+  openPanelElement = panel;
+  openTrigger = host.trigger ?? null;
   document.addEventListener('mousedown', onPointer, true);
   document.addEventListener('keydown', onKey, true);
   window.addEventListener('blur', close);
@@ -116,9 +146,56 @@ function openPanel(
   // Placed once its content is in, then focused: a hidden element can't take the focus.
   const show = (focus: HTMLElement): void => {
     place();
+    if (previous) morph(previous.rect, previous.ghost, panel);
     focus.focus();
   };
   return { panel, close, show };
+}
+
+const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * D-76: one picker turning into the next: the old panel's copy and the new panel move between the
+ * old and the new place and height while their contents crossfade.
+ */
+function morph(from: DOMRect, ghost: HTMLElement, panel: HTMLElement): void {
+  const to = panel.getBoundingClientRect();
+  const duration =
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-base')) || 200;
+  const options: KeyframeAnimationOptions = { duration, easing: 'cubic-bezier(.2, .9, .3, 1)' };
+  const shift = (x: number, y: number): string => `translate(${x}px, ${y}px)`;
+  ghost.classList.add('morph', 'fl-picker-ghost');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.style.left = `${from.left}px`;
+  ghost.style.top = `${from.top}px`;
+  document.body.append(ghost);
+  ghost
+    .animate(
+      [
+        { transform: 'none', height: `${from.height}px`, opacity: 1 },
+        {
+          transform: shift(to.left - from.left, to.top - from.top),
+          height: `${to.height}px`,
+          opacity: 0,
+        },
+      ],
+      { ...options, fill: 'forwards' },
+    )
+    .finished.then(
+      () => ghost.remove(),
+      () => ghost.remove(),
+    );
+  panel.animate(
+    [
+      {
+        transform: shift(from.left - to.left, from.top - to.top),
+        height: `${from.height}px`,
+        opacity: 0,
+      },
+      { transform: 'none', height: `${to.height}px`, opacity: 1 },
+    ],
+    options,
+  );
 }
 
 interface Row {
@@ -127,22 +204,25 @@ interface Row {
 }
 
 interface RowList {
-  /** Shows these rows, highlighting row `index`. */
-  readonly set: (rows: readonly Row[], index?: number) => void;
-  /** ↑/↓ move the highlight, Enter picks the current row; true if the key was used. */
+  /**
+   * Shows these rows with nothing highlighted (D-76), or with row `index` highlighted when `shown`
+   * (typing highlights the top match); the first arrow key reveals row `index`.
+   */
+  readonly set: (rows: readonly Row[], index?: number, shown?: boolean) => void;
+  /** ↑/↓ reveal or move the highlight, Enter picks it if visible; true if the key was used. */
   readonly keys: (event: KeyboardEvent) => boolean;
 }
 
 /**
- * The highlight in a list of rows (D-74): it follows the last input used. The mouse moves the
- * current row and highlights it; when the mouse leaves `area`, nothing is highlighted (as in the
- * menus); an arrow key brings the highlight back, moving on from the row the mouse was last on.
- * Enter picks the current row.
+ * The highlight in a list of rows (D-74, D-76): it follows the last input used. Nothing is
+ * highlighted at first; the mouse highlights the row it is on, and leaving `area` hides the
+ * highlight again (as in the menus); an arrow key reveals it, then moves it on from where it is.
+ * Enter acts only on a visible highlight.
  */
 function rowList(area: HTMLElement): RowList {
   let rows: readonly Row[] = [];
   let index = 0;
-  let shown = true;
+  let shown = false;
   const paint = (): void =>
     rows.forEach((row, at) => row.button.classList.toggle('active', shown && at === index));
   area.addEventListener('mouseleave', () => {
@@ -150,10 +230,10 @@ function rowList(area: HTMLElement): RowList {
     paint();
   });
   return {
-    set(next, start = 0) {
+    set(next, start = 0, show = false) {
       rows = next;
       index = start;
-      shown = true;
+      shown = show && next.length > 0;
       rows.forEach((row, at) =>
         // A real move, not a row appearing under a resting pointer (that fires mouseenter).
         row.button.addEventListener('mousemove', () => {
@@ -168,14 +248,15 @@ function rowList(area: HTMLElement): RowList {
     keys(event) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         if (rows.length === 0) return true;
-        index = (index + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+        if (shown)
+          index = (index + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
         shown = true;
         paint();
         rows[index]?.button.scrollIntoView({ block: 'nearest' });
         return true;
       }
       if (event.key === 'Enter') {
-        rows[index]?.pick();
+        if (shown) rows[index]?.pick();
         return true;
       }
       return false;
@@ -201,7 +282,9 @@ export function openPriorityPicker(
   current: Priority | null,
   onPick: (priority: Priority | null) => void,
 ): void {
-  const { panel, close, show } = openPanel(host, 'Priority');
+  const opened = openPanel(host, 'Priority');
+  if (!opened) return;
+  const { panel, close, show } = opened;
   const choose = (priority: Priority | null): void => {
     close();
     onPick(priority);
@@ -253,7 +336,9 @@ export function openListPicker(
   options: { readonly exclude?: string; readonly placeholder: string },
   onPick: (pick: ListPick) => void,
 ): void {
-  const { panel, close, show } = openPanel(host, options.placeholder);
+  const opened = openPanel(host, options.placeholder);
+  if (!opened) return;
+  const { panel, close, show } = opened;
   const search = element('input', 'fl-picker-search');
   search.placeholder = options.placeholder;
   search.spellcheck = false;
@@ -273,7 +358,7 @@ export function openListPicker(
       rows.push(makeRow(`New list "${typed}"`, null, () => choose({ newList: typed }), listIcon()));
     box.replaceChildren(...rows.map((row) => row.button));
     if (rows.length === 0) box.append(element('p', 'fl-picker-empty', 'No other task lists'));
-    highlight.set(rows);
+    highlight.set(rows, 0, typed !== '');
   };
   search.addEventListener('input', render);
   search.addEventListener('keydown', (event) => {
@@ -505,7 +590,9 @@ export function openTimePicker(
   current: LocalDateTime | null,
   onPick: (at: LocalDateTime) => void,
 ): void {
-  const { panel, close, show } = openPanel(host, 'Reminder');
+  const opened = openPanel(host, 'Reminder');
+  if (!opened) return;
+  const { panel, close, show } = opened;
   const choose = (at: LocalDateTime): void => {
     close();
     onPick(at);
@@ -623,7 +710,7 @@ export function openTimePicker(
     rowsBox.replaceChildren(...rows.map((row) => row.button));
     if (typed !== '' && rows.length === 0)
       rowsBox.append(element('p', 'fl-picker-empty', 'Not a time Flint knows yet'));
-    highlight.set(rows);
+    highlight.set(rows, 0, typed !== '');
   };
 
   let dayButtons: { date: Date; button: HTMLButtonElement }[] = [];

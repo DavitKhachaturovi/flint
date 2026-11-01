@@ -771,6 +771,16 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await expect(composer).toBeFocused();
   await main.keyboard.type('Plan the rollout');
 
+  // D-76: a picker opens with nothing highlighted, the first arrow reveals the current value
+  // (None), Enter acts only on a visible highlight, and its own button closes it.
+  await main.getByRole('button', { name: 'Set priority' }).click();
+  await expect(main.locator('.fl-picker')).toBeVisible();
+  await expect(main.locator('.fl-picker-row.active')).toHaveCount(0);
+  await main.keyboard.press('ArrowDown');
+  await expect(main.locator('.fl-picker-row.active')).toHaveText(/None/);
+  await main.getByRole('button', { name: 'Set priority' }).click();
+  await expect(main.locator('.fl-picker')).toHaveCount(0);
+
   // Priority: 3 picks High; picking again replaces it instead of leaving "!h" behind as text.
   await main.getByRole('button', { name: 'Set priority' }).click();
   await expect(main.locator('.fl-picker')).toBeVisible();

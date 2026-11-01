@@ -14,8 +14,7 @@
   box-shadow: var(--fl-shadow-float);
   font-family: var(--fl-font-ui);
   font-size: 13px;
-  animation: fl-menu-in var(--fl-dur-base) var(--fl-ease-spring);
-  transform-origin: top left;
+  animation: fl-menu-in var(--fl-dur-base) ease-out;
 }
 
 .fl-menu-item {
@@ -54,10 +53,10 @@
   background: var(--fl-edge-divider);
 }
 
+/* D-76: a right-click menu only fades in. */
 @keyframes fl-menu-in {
   from {
     opacity: 0;
-    transform: scale(0.98);
   }
 }
 
