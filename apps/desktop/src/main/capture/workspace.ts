@@ -466,9 +466,15 @@ export class Workspace {
     let created = false;
     if ('newList' in to) {
       const name = to.newList.trim();
-      if (listNameProblem(name) || this.sameName(name)) return null;
-      target = await this.createList(name);
-      created = true;
+      // In a bulk move (TASK-07) the first task makes the list; the others follow it there.
+      const wanted = normalizeListName(name);
+      const made = this.lists.find(({ entry }) => normalizeListName(entry.name) === wanted);
+      if (made) target = made;
+      else {
+        if (listNameProblem(name)) return null;
+        target = await this.createList(name);
+        created = true;
+      }
     } else target = this.find(to.list);
     if (!target || target === list || target.entry.mode === 'note' || target.file.readOnly)
       return null;
@@ -1052,6 +1058,16 @@ export class Workspace {
       void now;
       return { ok: true, listId: copyId, label };
     });
+  }
+
+  /** LIST-01, D-59: several lists and notes deleted from the sidebar, undone together. */
+  async deleteLists(ids: readonly string[], now: Date): Promise<ListOutcome> {
+    const start = await this.serial(() => Promise.resolve(this.undoStack.length));
+    let last: ListOutcome = { ok: false, problem: 'Nothing to delete' };
+    for (const id of ids) last = await this.deleteList(id, now);
+    const label = `Deleted ${ids.length} lists`;
+    const merged = await this.serial(() => Promise.resolve(this.mergeSince(start, label)));
+    return merged ? { ok: true, listId: 'inbox', label } : last;
   }
 
   /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list; undoable. */

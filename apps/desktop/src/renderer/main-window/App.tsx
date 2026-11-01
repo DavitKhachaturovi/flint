@@ -20,6 +20,7 @@ import {
 import flintIcon from '../../../../../assets/icon/flint-icon-512.svg';
 import type {
   ChangeOutcome,
+  ListActionOutcome,
   ListChange,
   ListSummary,
   ListView,
@@ -29,6 +30,7 @@ import {
   BackIcon,
   BellIcon,
   BodyIcon,
+  CloseIcon,
   CheckIcon,
   ChevronIcon,
   FlagIcon,
@@ -122,6 +124,11 @@ type Editing =
     };
 
 type NewEditing = Extract<Editing, { kind: 'new' }>;
+
+const NOTHING: ReadonlySet<string> = new Set();
+
+/** `1 task`, `3 tasks`. */
+const tasksCount = (count: number): string => (count === 1 ? '1 task' : `${count} tasks`);
 
 /** The new row's key for the editing highlight (D-76): it has no task yet. */
 const NEW_ROW = 'new-row';
@@ -237,6 +244,13 @@ export function App(): ReactElement {
   const [view, setView] = useState<ListView | null>(null);
   const [selected, setSelected] = useState<string | null>(FIRST_ROW);
   const [editing, setEditing] = useState<Editing | null>(null);
+  /** TASK-07, D-59: the tasks marked for a bulk action (two or more), around the selected row. */
+  const [marked, setMarked] = useState<ReadonlySet<string>>(NOTHING);
+  /** Where Shift+↑/↓ and Shift+click ranges start. */
+  const anchor = useRef<string | null>(null);
+  /** LIST-01, D-59: lists and notes marked in the sidebar (Ctrl/Shift+click). */
+  const [markedLists, setMarkedLists] = useState<ReadonlySet<string>>(NOTHING);
+  const listAnchor = useRef<string | null>(null);
   /** TASK-05, D-53: the task shown as a page instead of its list. */
   const [page, setPage] = useState<string | null>(null);
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
@@ -300,6 +314,7 @@ export function App(): ReactElement {
     setHeading(!pages ? null : back || !place.page ? 'back' : 'forward');
     setListId(place.list);
     setPage(place.page);
+    setMarked(NOTHING);
     setSelected(select ?? FIRST_ROW);
     setEditing(null);
     setEditingBody(null);
@@ -583,6 +598,128 @@ export function App(): ReactElement {
     [change, showToast],
   );
 
+  /**
+   * TASK-07, D-59: a row picked with the mouse. Ctrl+click marks or unmarks it, Shift+click marks
+   * the rows from the anchor to it; a plain click selects it alone.
+   */
+  const selectRow = useCallback(
+    (key: string, how?: { readonly ctrl: boolean; readonly shift: boolean }): void => {
+      const range = (from: string, to: string): Set<string> => {
+        const a = rows.findIndex((row) => row.key === from);
+        const b = rows.findIndex((row) => row.key === to);
+        if (a < 0 || b < 0) return new Set([to]);
+        return new Set(rows.slice(Math.min(a, b), Math.max(a, b) + 1).map((row) => row.key));
+      };
+      if (how?.shift) {
+        setMarked(range(anchor.current ?? selected ?? key, key));
+      } else if (how?.ctrl) {
+        setMarked((current) => {
+          const next = new Set(current.size > 0 ? current : selected ? [selected] : []);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+        anchor.current = key;
+      } else {
+        anchor.current = key;
+        setMarked(NOTHING);
+      }
+      setSelected(key);
+    },
+    [rows, selected],
+  );
+
+  /** TASK-07, D-59: several changes as one step, with one toast and one Undo. */
+  const bulk = useCallback(
+    async (label: string, changes: ListChange[]): Promise<void> => {
+      if (changes.length === 0) return;
+      const outcome = await change({ kind: 'many', label, changes });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+  const markedRows = useMemo(() => rows.filter((row) => marked.has(row.key)), [rows, marked]);
+  const bulkComplete = useCallback((): void => {
+    const open = markedRows.filter((row) => !row.done);
+    const done = open.length > 0;
+    const target = done ? open : markedRows;
+    void bulk(
+      `${done ? 'Completed' : 'Reopened'} ${tasksCount(target.length)}`,
+      target.map((row) => ({ kind: 'complete', key: row.key, done })),
+    );
+  }, [bulk, markedRows]);
+  const bulkPriority = useCallback(
+    (priority: TaskRow['priority']): void => {
+      const open = markedRows.filter((row) => !row.done);
+      void bulk(
+        `${tasksCount(open.length)}: ${priority ? `priority ${priority}` : 'no priority'}`,
+        open.map((row) => ({ kind: 'priority', key: row.key, priority })),
+      );
+    },
+    [bulk, markedRows],
+  );
+  const bulkDelete = useCallback((): void => {
+    void bulk(
+      `Deleted ${tasksCount(markedRows.length)}`,
+      markedRows.map((row) => ({ kind: 'delete', key: row.key })),
+    );
+    setMarked(NOTHING);
+  }, [bulk, markedRows]);
+  const bulkMove = useCallback(
+    (anchorBox: DOMRect): void =>
+      openListPicker(
+        { anchor: anchorBox, returnFocus: null },
+        listInfos(lists),
+        { exclude: listId, placeholder: 'Move to list…' },
+        (pick) => {
+          const to = 'newList' in pick ? { newList: pick.newList } : { list: pick.list.id };
+          const name = 'newList' in pick ? pick.newList : pick.list.name;
+          void bulk(
+            `Moved ${tasksCount(markedRows.length)} to ${name}`,
+            markedRows.map((row) => ({ kind: 'moveTo', key: row.key, to })),
+          );
+          setMarked(NOTHING);
+        },
+      ),
+    [bulk, lists, listId, markedRows],
+  );
+  const selectAll = useCallback((): void => {
+    setMarked(new Set(rows.map((row) => row.key)));
+    anchor.current = rows[0]?.key ?? null;
+  }, [rows]);
+  // Marks follow the rows: a task that went away is no longer marked.
+  useEffect(() => {
+    setMarked((current) => {
+      const kept = [...current].filter((key) => rows.some((row) => row.key === key));
+      return kept.length === current.size ? current : new Set(kept);
+    });
+  }, [rows]);
+
+  /** TASK-07, D-59: the right-click menu of a marked row: the actions for all marked tasks. */
+  const bulkMenu = useCallback(
+    (at: Point): void => {
+      const open = markedRows.some((row) => !row.done);
+      openMenu(
+        [
+          { label: open ? 'Complete' : 'Reopen', hint: 'Space', action: bulkComplete },
+          ...(open
+            ? [
+                { label: 'Priority high', hint: '3', action: () => bulkPriority('high') },
+                { label: 'Priority medium', hint: '2', action: () => bulkPriority('medium') },
+                { label: 'Priority low', hint: '1', action: () => bulkPriority('low') },
+                { label: 'No priority', hint: '0', action: () => bulkPriority(null) },
+              ]
+            : []),
+          { label: 'Move to…', action: () => bulkMove(new DOMRect(at.x, at.y, 0, 0)) },
+          'divider',
+          { label: `Delete ${tasksCount(markedRows.length)}`, hint: 'Del', action: bulkDelete },
+        ],
+        at,
+      );
+    },
+    [markedRows, bulkComplete, bulkPriority, bulkMove, bulkDelete],
+  );
+
   /** REM-12, D-66: turns a reminder off (kept, never fired) or on, with Undo. */
   const mute = useCallback(
     async (key: string, muted: boolean): Promise<void> => {
@@ -612,6 +749,11 @@ export function App(): ReactElement {
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
     (row: TaskRow, at: Point): void => {
+      // TASK-07: a marked row's menu acts on all the marked tasks.
+      if (marked.size > 1 && marked.has(row.key)) {
+        bulkMenu(at);
+        return;
+      }
       const open = !row.done;
       const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
         label,
@@ -622,6 +764,19 @@ export function App(): ReactElement {
         [
           ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
           { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
+          ...(open
+            ? [
+                {
+                  label: 'Duplicate',
+                  action: () =>
+                    void change({ kind: 'duplicate', key: row.key }).then((outcome) => {
+                      if (!outcome) return;
+                      showToast(outcome.label, true);
+                      if (outcome.key) setSelected(outcome.key);
+                    }),
+                },
+              ]
+            : []),
           ...(open && view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
             ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
             : []),
@@ -721,6 +876,31 @@ export function App(): ReactElement {
   /** D-55: a list's right-click menu; Inbox has none (LIST-03). */
   const listMenu = useCallback(
     (list: ListSummary, at: Point): void => {
+      const done = (outcome: ListActionOutcome | null): void => {
+        if (!outcome) return;
+        if (!outcome.ok) return showToast(outcome.problem, false);
+        if (outcome.label) showToast(outcome.label, true);
+      };
+      // D-59: a marked list's menu deletes all the marked lists and notes.
+      if (markedLists.size > 1 && markedLists.has(list.id)) {
+        const ids = [...markedLists];
+        openMenu(
+          [
+            {
+              label: `Delete ${ids.length} lists and notes`,
+              action: () =>
+                void window.flintMain.listAction({ kind: 'deleteMany', ids }).then((outcome) => {
+                  setMarkedLists(NOTHING);
+                  if (ids.includes(listId)) openList('inbox');
+                  done(outcome);
+                }),
+            },
+          ],
+          at,
+        );
+        return;
+      }
+      const other = list.mode === 'note' ? 'tasks' : 'note';
       openMenu(
         [
           {
@@ -730,6 +910,19 @@ export function App(): ReactElement {
               setNaming({ kind: 'rename', id: list.id, name: list.name });
             },
           },
+          {
+            label: 'Duplicate',
+            action: () =>
+              void window.flintMain.listAction({ kind: 'duplicate', id: list.id }).then(done),
+          },
+          {
+            label: other === 'note' ? 'Convert to note' : 'Convert to task list',
+            action: () =>
+              void window.flintMain
+                .listAction({ kind: 'convert', id: list.id, mode: other })
+                .then(done),
+          },
+          'divider',
           {
             label: list.mode === 'note' ? 'Delete note' : 'Delete list',
             action: () =>
@@ -744,7 +937,37 @@ export function App(): ReactElement {
         at,
       );
     },
-    [listId, openList, showToast],
+    [listId, openList, showToast, markedLists],
+  );
+
+  /** LIST-01, D-59: a list in the sidebar; Ctrl/Shift+click marks lists and notes instead. */
+  const sidebarSelect = useCallback(
+    (id: string, how: { readonly ctrl: boolean; readonly shift: boolean }): void => {
+      const order = lists.filter((list) => !list.inbox).map((list) => list.id);
+      if (how.shift) {
+        const from = listAnchor.current ?? listId;
+        const a = order.indexOf(from);
+        const b = order.indexOf(id);
+        setMarkedLists(
+          new Set(a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1)),
+        );
+        return;
+      }
+      if (how.ctrl) {
+        setMarkedLists((current) => {
+          const next = new Set(current.size > 0 ? current : order.includes(listId) ? [listId] : []);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+        listAnchor.current = id;
+        return;
+      }
+      listAnchor.current = id;
+      setMarkedLists(NOTHING);
+      openList(id);
+    },
+    [lists, listId, openList],
   );
 
   // UI-08: every text field keeps Cut / Copy / Paste / Select all; elsewhere Electron shows nothing.
@@ -790,6 +1013,13 @@ export function App(): ReactElement {
         void (key === 'z' && !event.shiftKey ? undo() : redo());
         return;
       }
+      // TASK-07: Ctrl+A marks every task in the list.
+      if (event.ctrlKey && !event.altKey && !event.shiftKey && key === 'a') {
+        if (view?.mode !== 'tasks' || page) return;
+        event.preventDefault();
+        selectAll();
+        return;
+      }
       if (event.ctrlKey || event.metaKey || view?.mode !== 'tasks') return;
       // A task's page: Esc goes back to its list (D-53).
       if (page) {
@@ -803,17 +1033,36 @@ export function App(): ReactElement {
       const row = rows[index];
       const open = row && !row.done ? row : undefined;
 
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !event.altKey) {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        const next = rows[Math.max(0, Math.min(rows.length - 1, index + step))];
+        if (!next) return;
+        if (event.shiftKey) {
+          // TASK-07: Shift+↑/↓ marks from the anchor to the new row.
+          anchor.current ??= selected;
+          const from = rows.findIndex((other) => other.key === anchor.current);
+          const to = rows.indexOf(next);
+          if (from >= 0)
+            setMarked(
+              new Set(rows.slice(Math.min(from, to), Math.max(from, to) + 1).map((r) => r.key)),
+            );
+        } else {
+          anchor.current = next.key;
+          setMarked(NOTHING);
+        }
+        setSelected(next.key);
+        return;
+      }
       if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !event.shiftKey) {
         event.preventDefault();
-        const direction = event.key === 'ArrowDown' ? 'down' : 'up';
-        if (event.altKey) {
-          // Alt+↑/↓ reorders (TASK-02); single keys never reach Windows.
-          if (open) void change({ kind: 'move', key: open.key, direction });
-          return;
-        }
-        const step = direction === 'down' ? 1 : -1;
-        const next = rows[Math.max(0, Math.min(rows.length - 1, index + step))];
-        if (next) setSelected(next.key);
+        // Alt+↑/↓ reorders (TASK-02); single keys never reach Windows.
+        if (open)
+          void change({
+            kind: 'move',
+            key: open.key,
+            direction: event.key === 'ArrowDown' ? 'down' : 'up',
+          });
         return;
       }
       if (event.altKey) return;
@@ -827,6 +1076,15 @@ export function App(): ReactElement {
         // TASK-05, D-53: any task opens as a page.
         event.preventDefault();
         openPage(row.key);
+      } else if (event.key === ' ' && marked.size > 1) {
+        event.preventDefault();
+        bulkComplete();
+      } else if (event.key in PRIORITY_KEYS && marked.size > 1) {
+        event.preventDefault();
+        bulkPriority(PRIORITY_KEYS[event.key] ?? null);
+      } else if (event.key === 'Delete' && marked.size > 1) {
+        event.preventDefault();
+        bulkDelete();
       } else if (event.key === ' ' && row) {
         event.preventDefault();
         void toggle(row.key);
@@ -856,7 +1114,9 @@ export function App(): ReactElement {
           ?.getBoundingClientRect();
         taskMenu(row, box ? { x: box.left + 48, y: box.bottom } : { x: 300, y: 200 });
       } else if (event.key === 'Escape') {
-        setSelected(null);
+        // Esc clears the marks first, then the selection (TASK-07).
+        if (marked.size > 0) setMarked(NOTHING);
+        else setSelected(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -864,6 +1124,11 @@ export function App(): ReactElement {
   }, [
     rows,
     selected,
+    marked,
+    selectAll,
+    bulkComplete,
+    bulkPriority,
+    bulkDelete,
     view,
     page,
     expanded,
@@ -908,7 +1173,8 @@ export function App(): ReactElement {
   const rowProps: RowHandlers = {
     selected,
     editing,
-    onSelect: setSelected,
+    onSelect: selectRow,
+    marked,
     onToggle: (key) => void toggle(key),
     onEdit: edit,
     onLeaveTask: leaveTask,
@@ -1086,7 +1352,8 @@ export function App(): ReactElement {
               list={list}
               active={listId === list.id}
               icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-              onSelect={() => openList(list.id)}
+              marked={markedLists.size > 1 && markedLists.has(list.id)}
+              onSelect={(how) => sidebarSelect(list.id, how)}
               onMenu={(at) => listMenu(list, at)}
             />
           ),
@@ -1243,8 +1510,53 @@ export function App(): ReactElement {
         </div>
       </main>
 
+      {marked.size > 1 && (
+        <div className="action-bar" role="toolbar" aria-label="Marked tasks">
+          <span className="action-count">{marked.size} selected</span>
+          <button type="button" onClick={selectAll}>
+            Select all
+          </button>
+          <button
+            type="button"
+            data-picker-trigger
+            onClick={(event) => bulkMove(event.currentTarget.getBoundingClientRect())}
+          >
+            Move
+          </button>
+          <button
+            type="button"
+            data-picker-trigger
+            onClick={(event) =>
+              openPriorityPicker(
+                {
+                  anchor: event.currentTarget.getBoundingClientRect(),
+                  returnFocus: null,
+                  trigger: event.currentTarget,
+                },
+                null,
+                bulkPriority,
+              )
+            }
+          >
+            Priority
+          </button>
+          <button type="button" onClick={bulkDelete}>
+            Delete
+          </button>
+          <button
+            type="button"
+            className="action-clear"
+            aria-label="Clear the selection"
+            title="Clear the selection (Esc)"
+            onClick={() => setMarked(NOTHING)}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      )}
+
       {toast && (
-        <div className="toast" role="status" key={toast.id}>
+        <div className={marked.size > 1 ? 'toast above-bar' : 'toast'} role="status" key={toast.id}>
           <span>{toast.text}</span>
           {toast.undo && (
             <button type="button" onClick={() => void undo().then(() => setToast(null))}>
@@ -1260,19 +1572,24 @@ export function App(): ReactElement {
 function NavItem(props: {
   readonly list: ListSummary;
   readonly active: boolean;
+  /** D-59: marked with Ctrl/Shift+click for deleting several. */
+  readonly marked?: boolean;
   readonly icon: ReactElement;
-  readonly onSelect: () => void;
+  readonly onSelect: (how: { readonly ctrl: boolean; readonly shift: boolean }) => void;
   readonly onMenu: (at: Point) => void;
 }): ReactElement {
-  const { list, active, icon, onSelect, onMenu } = props;
+  const { list, active, marked = false, icon, onSelect, onMenu } = props;
+  const classes = ['nav'];
+  if (active) classes.push('on');
+  if (marked) classes.push('marked');
   return (
     <button
       type="button"
       data-key={list.id}
-      className={active ? 'nav on' : 'nav'}
+      className={classes.join(' ')}
       // A click opens the list without taking the keyboard: the keys stay with the task list.
       onMouseDown={(event) => event.preventDefault()}
-      onClick={onSelect}
+      onClick={(event) => onSelect({ ctrl: event.ctrlKey, shift: event.shiftKey })}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1501,7 +1818,13 @@ function NameField(props: {
 interface RowHandlers {
   readonly selected: string | null;
   readonly editing: Editing | null;
-  readonly onSelect: (key: string) => void;
+  /** A row picked with the mouse; Ctrl/Shift+click mark rows for bulk actions (TASK-07). */
+  readonly onSelect: (
+    key: string,
+    how?: { readonly ctrl: boolean; readonly shift: boolean },
+  ) => void;
+  /** TASK-07, D-59: the tasks marked for a bulk action. */
+  readonly marked: ReadonlySet<string>;
   readonly onToggle: (key: string) => void;
   /** Edit state, with the caret at `caret` in the raw title (D-71) or at the end. */
   readonly onEdit: (key: string, caret?: number) => void;
@@ -1705,15 +2028,23 @@ function Row(
   /** D-76: a second single click on an already-selected row edits it, like renaming in Explorer. */
   const wasSelected = useRef(false);
   if (ghost) classes.push('leaving', ghost);
+  else if (props.marked.size > 1 && props.marked.has(task.key)) classes.push('marked');
   const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
   return (
     <div
       data-key={ghost ? undefined : task.key}
       aria-hidden={ghost ? true : undefined}
       className={classes.join(' ')}
-      onMouseDown={() => {
-        wasSelected.current = task.key === selected && !isEditing;
-        onSelect(task.key);
+      onMouseDown={(event) => {
+        // Shift+click marks a range of rows (TASK-07), never a text selection across them; an
+        // edit in progress ends (leaving the field saves it).
+        if (event.shiftKey) {
+          event.preventDefault();
+          if (isTextField(document.activeElement)) (document.activeElement as HTMLElement).blur();
+        }
+        wasSelected.current =
+          task.key === selected && !isEditing && !event.ctrlKey && !event.shiftKey;
+        onSelect(task.key, { ctrl: event.ctrlKey, shift: event.shiftKey });
       }}
       onClick={(event) => {
         if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;

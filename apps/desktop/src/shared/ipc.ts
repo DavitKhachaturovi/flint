@@ -260,6 +260,8 @@ export type ListAction =
   | { readonly kind: 'new'; readonly name: string; readonly mode: 'tasks' | 'note' }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
   | { readonly kind: 'delete'; readonly id: string }
+  /** D-59: several lists and notes at once, undone together. */
+  | { readonly kind: 'deleteMany'; readonly ids: readonly string[] }
   /** D-72, D-74: "<name> copy" right below it, new IDs, no reminders. */
   | { readonly kind: 'duplicate'; readonly id: string }
   /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list. */

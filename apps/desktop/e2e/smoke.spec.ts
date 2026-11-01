@@ -414,12 +414,27 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
   await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
 
-  // D-75: the task is completed at once; a ghost of its row plays out where it was.
+  // D-75: the task is completed at once; a ghost of its row plays out where it was. Ghosts live
+  // for a moment only, so a MutationObserver records the ones that appear.
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { ghosts: string[] }).ghosts = seen;
+    new MutationObserver(() => {
+      for (const ghost of document.querySelectorAll('.row.leaving'))
+        seen.push(
+          `${ghost.closest('.completed') ? 'completed' : 'tasks'} ${ghost.className} ${ghost.querySelector('.title')?.textContent ?? ''}`,
+        );
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  const ghosts = (): Promise<string[]> =>
+    main.evaluate(() => (window as unknown as { ghosts: string[] }).ghosts.splice(0));
   await main.keyboard.press('Space');
   await expect(main.locator('h1')).toHaveText('Errands · 1 open');
-  await expect(main.locator('.tasks .row.leaving.complete .title')).toHaveText(
-    'Renew the parking permit',
-  );
+  await expect
+    .poll(async () =>
+      (await ghosts()).some((ghost) => /^tasks .*complete Renew the parking permit$/.test(ghost)),
+    )
+    .toBe(true);
   await expect(main.locator('.row.leaving')).toHaveCount(0);
   await expect(main.locator('.toast')).toContainText('Completed');
   await expect(main.locator('.completed .row .title')).toHaveText(['Renew the parking permit']);
@@ -428,11 +443,14 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   );
 
   // Undo reopens it the same way (D-69, D-75).
+  await ghosts();
   await main.keyboard.press('Control+z');
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
-  await expect(main.locator('.completed .row.leaving.reopen .title')).toHaveText(
-    'Renew the parking permit',
-  );
+  await expect
+    .poll(async () =>
+      (await ghosts()).some((ghost) => /^completed .*reopen Renew the parking permit$/.test(ghost)),
+    )
+    .toBe(true);
   await expect.poll(() => readFile(file, 'utf8')).toBe(original);
 });
 
@@ -945,6 +963,70 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await short.click({ position: { x: 600, y: 10 } });
   await expect(main.locator('.title-input')).toHaveValue('Short body');
   await main.keyboard.press('Escape');
+});
+
+test('multi-select, bulk actions, duplicate and convert (TASK-07, TASK-16, LIST-01, LIST-04, D-59, D-74)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const file = join(flint, 'Bulk.md');
+  const original =
+    '---\nflint: 1\nid: blk1\nmode: tasks\n---\n- [ ] one [id:: k1]\n- [ ] two [reminder:: 2030-01-01T10:00] [id:: k2]\n- [ ] three [id:: k3]\n';
+  await writeFile(file, original);
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Bulk' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Bulk/);
+  const row = (name: string) => main.locator('.tasks .row', { hasText: name });
+
+  // Click, then Shift+click: three marked, the action bar shows; 3 sets them all high, one Undo.
+  // (Esc first: the list opens with its first row selected, and a click on it would edit it.)
+  await main.keyboard.press('Escape');
+  await row('one').click({ position: { x: 600, y: 10 } });
+  await row('three').click({ position: { x: 600, y: 10 }, modifiers: ['Shift'] });
+  await expect(main.locator('.action-count')).toHaveText('3 selected');
+  await expect(main.locator('.row.marked')).toHaveCount(3);
+  expect(await main.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  await main.keyboard.press('3');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('three [priority:: high]');
+  expect(await readFile(file, 'utf8')).toContain('one [priority:: high]');
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(file, 'utf8')).toBe(original);
+
+  // Esc clears the marks; Ctrl+A marks all; Delete removes them all, one Undo brings them back.
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.action-bar')).toHaveCount(0);
+  await main.keyboard.press('Control+a');
+  await expect(main.locator('.action-count')).toHaveText('3 selected');
+  await main.getByRole('toolbar').getByRole('button', { name: 'Delete' }).click();
+  await expect(main.locator('.tasks .row')).toHaveCount(0);
+  await main.keyboard.press('Control+z');
+  await expect(main.locator('.tasks .row')).toHaveCount(3);
+
+  // Duplicate a task: a copy right below it, without the reminder (D-74).
+  await row('two').click({ button: 'right', position: { x: 600, y: 10 } });
+  await main.locator('.fl-menu').getByText('Duplicate').click();
+  await expect(main.locator('.tasks .row .title')).toHaveText(['one', 'two', 'two', 'three']);
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(
+      /- \[ \] two \[reminder:: [^\]]+\] \[id:: k2\]\n- \[ \] two \[id:: \w+\]\n- \[ \] three/,
+    );
+
+  // Duplicate and convert the list from the sidebar.
+  await main.locator('.nav', { hasText: 'Bulk' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Duplicate').click();
+  await expect(main.locator('.nav', { hasText: 'Bulk copy' })).toBeVisible();
+  await main.locator('.nav', { hasText: 'Bulk copy' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Convert to note').click();
+  await expect.poll(() => readFile(join(flint, 'Bulk copy.md'), 'utf8')).toMatch(/mode: note\n/);
+
+  // Ctrl+click marks lists in the sidebar; their menu deletes them together, one Undo restores.
+  await main.locator('.nav', { hasText: 'Bulk copy' }).click({ modifiers: ['Control'] });
+  await expect(main.locator('.nav.marked')).toHaveCount(2);
+  await main.locator('.nav', { hasText: 'Bulk copy' }).click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Delete 2 lists and notes').click();
+  await expect(main.locator('.nav', { hasText: 'Bulk' })).toHaveCount(0);
+  await main.keyboard.press('Control+z');
+  await expect(main.locator('.nav', { hasText: /^Bulk/ })).toHaveCount(2);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

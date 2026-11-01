@@ -17,7 +17,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-55, D-59 (M4):** lists and notes have a right-click menu (rename, delete; Inbox has neither). Ctrl+click / Shift+click select several lists or notes in the sidebar; Delete in the right-click menu removes them all. A deleted list goes to Trash storage with its deletion time and an Undo toast, like a deleted task (D-50; **Proposed** for lists).
 - **D-54 (M4):** lists are reordered in the sidebar by dragging, with the same locked, springy drag as task rows; Inbox stays first. The order is kept in `ui-state.json` (04 §2, **Proposed**).
 - **D-73:** the manual order is kept in `.flint/sidebar.json` with the groups (LIST-05), not in `ui-state.json`; Alt+↑/↓ reorders the selected list, note or group too (LIST-06).
-- **D-72, D-74:** "Duplicate" in the menu of lists and notes: "<name> copy" (then "<name> copy 2"…) right below the original, every task with a new ID. **D-69:** right-clicking empty sidebar space opens the same menu as the **+** (New task list, New note, New group); only the title-bar strip at the top drags the window.
+- **D-72, D-74:** "Duplicate" in the menu of lists and notes: "<name> copy" (then "<name> copy 2"…) right below the original, every task with a new ID. **Built in M4 step 7 (Proposed):** the copy leaves out reminders, like a duplicated task; undoing it removes the copy while it is unchanged. Ctrl/Shift+click marks lists and notes in the sidebar; a marked one's menu deletes them all, as one undo step. **D-69:** right-clicking empty sidebar space opens the same menu as the **+** (New task list, New note, New group); only the title-bar strip at the top drags the window.
 
 ### LIST-02 — Markdown by default (v1)
 - All content is markdown, in both modes. Task titles and task bodies support inline markdown; notes are full markdown documents.
@@ -34,7 +34,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Note → task list (**D-22**, resolves Q-16): checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved), and plain bullet lines become tasks too. Everything else (headings, paragraphs) stays in place as non-task content, which task lists show read-only (TASK-15). Nothing is dropped and no confirmation is needed. Example use: meeting notes → action items.
 - Task list → note: tasks become a markdown checklist; priority, reminders, and bodies are preserved in the file format (see 04) so converting back is lossless. While the list is a note, its task fields are inert: no Today membership, no reminders (D-29).
 - Conversion is undoable (DATA-03).
-- **D-72 (pulled into M4):** "Convert to note" / "Convert to task list" in the right-click menu of lists and notes (M4 step 7).
+- **D-72 (pulled into M4):** "Convert to note" / "Convert to task list" in the right-click menu of lists and notes (built in M4 step 7; Inbox stays a task list).
 
 ### LIST-05 — Sidebar groups (v1, D-73)
 - **One level** of collapsible groups in the sidebar, each holding task lists and notes. No nesting.
@@ -215,6 +215,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Shift+↑/↓** (and Shift+click / Ctrl+click with the mouse) selects multiple tasks.
 - Bulk actions: set priority, move to another list, complete, star to Today (and delete, undoable).
 - **D-59 (M4):** with **2+ tasks selected**, a **floating action bar** appears at the bottom of the list: the count, **Select all**, **Move**, **Priority**, **Star** (once Today exists, M6) and **Delete**, plus a clear (×). There is **no separate "edit mode"** and **no extra checkboxes** on rows (they would clash with the completion checkbox): selection looks like the single selected row. **Ctrl+A** in Navigate state selects all tasks in the list (**Proposed**). Esc clears the selection.
+- **Built in M4 step 7 (1 Nov 2026, Proposed details):** Shift+↑/↓ and Shift+click mark a range from the anchor (the last row clicked or moved to), Ctrl+click adds or removes one row; Ctrl+A marks every visible task, completed ones included; Esc clears the marks first, then the selection. With marks, Space, 1/2/3/0 and Delete act on all of them, and a marked row's right-click menu offers the same for all; each bulk action is **one undo step**. Priority and Complete skip what they don't apply to (priority only on open tasks; Complete completes the open ones, or reopens all if none is open). Move with a new list name creates it once and moves them all there. The bar sits at the bottom centre of the window; Star joins it in M6.
 
 ### TASK-08 — Temporary "sort by priority" (v1)
 - A one-off action that sorts the visible tasks by priority (high → none) **without destroying the manual order**.
@@ -249,7 +250,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### TASK-16 — Duplicate a task (v1, D-72)
 - "Duplicate" in a task's right-click menu.
-- **D-74:** the copy has the title, body and priority, but **not the reminder** (a duplicate must not fire the same reminder twice). **Proposed:** it appears right below the original, open, with a new ID (subtasks copied with new IDs), and is selected. Undoable. Milestone M4 step 7.
+- **D-74:** the copy has the title, body and priority, but **not the reminder** (a duplicate must not fire the same reminder twice). **Proposed:** it appears right below the original, open, with a new ID (subtasks copied with new IDs), and is selected; offered for open tasks. Undoable. Built in M4 step 7.
 
 ### TASK-13 — Stale-task fading (Later)
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.

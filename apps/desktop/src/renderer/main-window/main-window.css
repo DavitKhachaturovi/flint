@@ -1339,3 +1339,62 @@ textarea:not([readonly], [disabled]) {
   background: var(--fl-ground-hover);
   color: var(--fl-text-primary);
 }
+
+/* TASK-07, D-59 (09 §8): tasks marked for a bulk action look like the selected row; the floating
+   action bar sits at the bottom, and a toast rises above it. */
+.row.marked,
+.row.marked:hover {
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+.nav.marked {
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+
+.action-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 55;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 6px 6px 16px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  color: var(--fl-text-body);
+  animation: rise var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.action-count {
+  margin-right: 10px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+.action-bar button {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--fl-text-primary);
+  transition: background-color var(--fl-dur-fast);
+}
+
+.action-bar button:hover {
+  background: var(--fl-ground-tile);
+}
+
+.action-bar .action-clear {
+  padding: 6px;
+  color: var(--fl-text-faint);
+}
+
+.toast.above-bar {
+  bottom: 84px;
+}
