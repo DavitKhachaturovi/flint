@@ -54,6 +54,14 @@ export const BellIcon = ({ size = 12 }: IconProps): ReactElement =>
     <path key="b" d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />,
   ]);
 
+/** D-79: a task's body has images. */
+export const ImageIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,
+    <path key="b" d="m3.5 17 5-5 4 4 2.5-2.5 5.5 5.5" />,
+    <circle key="c" cx="15.5" cy="9" r="1.5" />,
+  ]);
+
 export const BodyIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M4 7h16M4 12h16M4 17h10" />);
 

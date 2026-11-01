@@ -41,6 +41,7 @@ import {
   CheckIcon,
   ChevronIcon,
   FlagIcon,
+  ImageIcon,
   HashIcon,
   InboxIcon,
   ListIcon,
@@ -52,7 +53,9 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
-import { BodyBlock } from './Body.js';
+import { BodyBlock, type ShowImage } from './Body.js';
+import { Lightbox } from './Lightbox.js';
+import { bodyHasText, bodyImages } from '../../shared/body-markdown.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
 
@@ -279,6 +282,13 @@ export function App(): ReactElement {
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
+  /** D-79: the image lightbox, on one task's images. */
+  const [lightbox, setLightbox] = useState<{ images: readonly string[]; start: number } | null>(
+    null,
+  );
+  const showImage: ShowImage = (images, start) => {
+    if (images.length > 0) setLightbox({ images, start });
+  };
   const toastTimer = useRef<number | undefined>(undefined);
   const composer = useRef<HTMLInputElement>(null);
 
@@ -1292,6 +1302,7 @@ export function App(): ReactElement {
     onReminder: (task, anchor) => changeReminder(task, anchor),
     expanded,
     onBody: (task) => showBody(task),
+    onImages: (task) => showImage(bodyImages(task.body), 0),
   };
   const saveBody = (key: string, body: string): void => {
     setEditingBody(null);
@@ -1316,6 +1327,7 @@ export function App(): ReactElement {
           onEdit={() => setEditingBody(task.key)}
           onDone={(body) => saveBody(task.key, body)}
           onOpenPage={() => openPage(task.key)}
+          onImage={showImage}
         />
       </div>,
     ];
@@ -1529,6 +1541,7 @@ export function App(): ReactElement {
                 onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
                 onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
                 onAddSubtask={() => addSubtask(pageTask)}
+                onImage={showImage}
               >
                 {pageRows.length > 0 && (
                   <section
@@ -1697,6 +1710,14 @@ export function App(): ReactElement {
             <CloseIcon />
           </button>
         </div>
+      )}
+
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          start={lightbox.start}
+          onClose={() => setLightbox(null)}
+        />
       )}
 
       {toast && (
@@ -2090,6 +2111,8 @@ interface RowHandlers {
   /** TASK-05, D-53: bodies shown inline, and the body indicator (inline or the task's page). */
   readonly expanded: ReadonlySet<string>;
   readonly onBody: (task: TaskRow) => void;
+  /** D-79: the image indicator opens the lightbox on the task's images. */
+  readonly onImages: (task: TaskRow) => void;
 }
 
 /**
@@ -2146,10 +2169,11 @@ function TaskPage(props: {
   readonly onTitle: (text: string) => void;
   readonly onBody: (body: string) => void;
   readonly onAddSubtask: () => void;
+  readonly onImage: ShowImage;
   /** The subtasks' card. */
   readonly children?: ReactElement | false;
 }): ReactElement {
-  const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, children } = props;
+  const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, onImage, children } = props;
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingBody, setEditingBody] = useState(false);
   const editable = !readOnly && !task.done;
@@ -2193,6 +2217,7 @@ function TaskPage(props: {
           editing={editingBody}
           editable={editable}
           placeholder="Notes, code, links…"
+          onImage={onImage}
           onEdit={() => setEditingBody(true)}
           onDone={(body) => {
             setEditingBody(false);
@@ -2285,6 +2310,9 @@ function Row(
     if (joins?.down) classes.push('mark-down');
   }
   const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
+  // D-79: the body icon for text, the image icon for images, both when it has both.
+  const hasImages = useMemo(() => bodyImages(task.body).length > 0, [task.body]);
+  const hasText = hasBody(task) && bodyHasText(task.body);
   return (
     <div
       data-key={ghost ? undefined : task.key}
@@ -2380,7 +2408,20 @@ function Row(
           </span>
         )}
         {task.done && task.completed && <span>{task.completed}</span>}
-        {!task.code && hasBody(task) && (
+        {!task.code && hasImages && (
+          <button
+            type="button"
+            className="body-toggle image-toggle"
+            title="Show the images"
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onImages(task);
+            }}
+          >
+            <ImageIcon />
+          </button>
+        )}
+        {!task.code && hasText && (
           <button
             type="button"
             className={props.expanded.has(task.key) ? 'body-toggle open' : 'body-toggle'}

@@ -349,7 +349,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 10 | An expanded task is one raised card; body in the secondary tone; code cards with label and copy | TASK-05 · v1 · M4 (0.4.10 fixes) | 02, 09 §8, mockup 01, D-77 |
 | 11 | Long bodies open their page from the clickable preview; short ones edit inline | TASK-05 · v1 · M4 (0.4.10 fixes) | 02, D-77 |
 | 12 | Page title field: the body field's inner spacing | TASK-05 · v1 · M4 (0.4.10 fixes) | D-77 |
-| 13 | Image thumbnails and a lightbox with ←/→ within the task | MEDIA-01 · v1 · M5 | 02, D-77 |
+| 13 | Image thumbnails and a lightbox with ←/→ within the task | MEDIA-01 · Done (0.4.13; moved from M5 by D-79) | 02, D-77 |
 | 14 | Note → task list: every plain line a task; headings labels; code and quotes as bodies | LIST-04 · v1 · M4 (0.4.10 fixes) | 02, D-77 (supersedes D-22 for plain lines) |
 | 15 | Fields in notes as muted chips, id hidden, raw on the cursor's line | LIST-04, NOTE-01 · v1 · M5 | 02, D-77 |
 
@@ -380,8 +380,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Composer notes field not clipped | TASK-05 · Done (0.4.13) | D-79 |
 | 7 | Composer paste follows CAP-06 (code, JSON, traces, images) | CAP-06, TASK-05 · Done (0.4.13) | 02, D-79 |
 | 8 | Paste keeps markdown as markdown; only raw code is fenced | CAP-06 · Done (0.4.13) | 02, D-79 |
-| 9 | Body and image indicators; lightbox from the icon or a thumbnail | TASK-05, MEDIA-01 · v1 · M4 (0.4.12 fixes; was M5) | 02, D-79 |
-| 10 | Thumbnails in expanded bodies, full size on the page | TASK-05, MEDIA-01 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 9 | Body and image indicators; lightbox from the icon or a thumbnail | TASK-05, MEDIA-01 · Done (0.4.13) | 02, D-79 |
+| 10 | Thumbnails in expanded bodies, full size on the page | TASK-05, MEDIA-01 · Done (0.4.13) | 02, D-79 |
 | 11 | Indent and Outdent in the task menu | TASK-04, UI-08 · Done (0.4.13) | 03 §3, D-79 |
 | — | Alt+↑/↓ by keyboard focus (task list or sidebar) | LIST-06, TASK-02 · v1 · M4 step 8 | 02, 03 §3, D-79 |
 | 12 | Two-finger touchpad swipe back/forward with an arrow | NAV-04 · v1 · M4 step 9 | 02, 03 §3, D-79 |

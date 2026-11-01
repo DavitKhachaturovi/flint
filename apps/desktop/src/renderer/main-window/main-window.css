@@ -1113,6 +1113,156 @@ textarea:not([readonly], [disabled]) {
   box-shadow: 0 0 0 1px var(--fl-edge-card);
 }
 
+/* D-79: images open the lightbox; in an expanded row they are small thumbnails, full size only on
+   the task's page. */
+.body-view img {
+  cursor: zoom-in;
+}
+
+.body-block.inline .body-view img {
+  display: inline-block;
+  vertical-align: top;
+  max-width: 180px;
+  max-height: 96px;
+  margin: 2px 6px 6px 0;
+  object-fit: cover;
+  transition: box-shadow var(--fl-dur-fast);
+}
+
+.body-block.inline .body-view img:hover {
+  box-shadow: 0 0 0 1px var(--fl-edge-chip);
+}
+
+/* The lightbox (MEDIA-01, D-79): the image large on the window's own ground, solid like every
+   surface (09 §4); it fades and scales in and out, and the images slide a little on ←/→. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fl-ground-window);
+  -webkit-app-region: no-drag;
+  animation: lightbox-in var(--fl-dur-base) ease-out;
+}
+
+.lightbox.leaving {
+  pointer-events: none;
+  animation: lightbox-out var(--fl-dur-base) ease-in forwards;
+}
+
+.lightbox-image {
+  max-width: calc(100% - 136px);
+  max-height: calc(100% - 120px);
+  border-radius: var(--fl-radius-tile);
+  box-shadow: var(--fl-shadow-float);
+  animation: lightbox-zoom var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.lightbox.leaving .lightbox-image {
+  animation: lightbox-unzoom var(--fl-dur-base) ease-in forwards;
+}
+
+.lightbox-image.next {
+  animation: lightbox-next var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.lightbox-image.back {
+  animation: lightbox-back var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.lightbox-close,
+.lightbox-step {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--fl-radius-button);
+  color: var(--fl-text-secondary);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  transition: color var(--fl-dur-fast);
+}
+
+.lightbox-close:hover,
+.lightbox-step:hover {
+  color: var(--fl-text-primary);
+}
+
+/* Below the window's own title bar controls (40px). */
+.lightbox-close {
+  top: 52px;
+  right: 20px;
+}
+
+.lightbox-step {
+  top: 50%;
+  margin-top: -17px;
+}
+
+.lightbox-step.back {
+  left: 20px;
+}
+
+.lightbox-step.back svg {
+  transform: scaleX(-1);
+}
+
+.lightbox-step.next {
+  right: 20px;
+}
+
+.lightbox-count {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes lightbox-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes lightbox-zoom {
+  from {
+    transform: scale(0.94);
+  }
+}
+
+@keyframes lightbox-unzoom {
+  to {
+    transform: scale(0.96);
+  }
+}
+
+@keyframes lightbox-next {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes lightbox-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
 .body-view a {
   color: var(--fl-text-primary);
   text-decoration: underline;

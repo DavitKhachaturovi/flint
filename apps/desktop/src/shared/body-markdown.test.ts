@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyHtml, mediaUrl } from './body-markdown.js';
+import { bodyHasText, bodyHtml, bodyImages, mediaUrl } from './body-markdown.js';
 
 describe('task bodies rendered (TASK-05, D-49)', () => {
   it('renders markdown blocks, never raw HTML', () => {
@@ -38,5 +38,23 @@ describe('task bodies rendered (TASK-05, D-49)', () => {
 
   it('refuses script links', () => {
     expect(bodyHtml('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>\n');
+  });
+});
+
+describe('body indicators and the lightbox (D-79)', () => {
+  it('lists the images from the Flint folder, in order', () => {
+    const body =
+      'See:\n![a](attachments/a.png) and ![b](attachments/b.jpg)\n\n![web](https://x/y.png)';
+    expect(bodyImages(body)).toEqual([
+      'app://media/attachments/a.png',
+      'app://media/attachments/b.jpg',
+    ]);
+    expect(bodyImages('```\n![not](attachments/c.png)\n```')).toEqual([]);
+  });
+
+  it('tells text from image-only bodies', () => {
+    expect(bodyHasText('![](attachments/a.png)\n\n![](attachments/b.png)')).toBe(false);
+    expect(bodyHasText('![](attachments/a.png)\nthe crash')).toBe(true);
+    expect(bodyHasText('plain')).toBe(true);
   });
 });

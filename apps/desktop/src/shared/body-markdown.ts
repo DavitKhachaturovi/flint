@@ -43,6 +43,23 @@ md.renderer.rules.image = (tokens, index, options, env, self) => {
     : `<span class="body-image-missing">${escape(alt || raw)}</span>`;
 };
 
+/** D-79: the body's images from the Flint folder, as `app://media/…` addresses, in order. */
+export function bodyImages(body: string): string[] {
+  const images: string[] = [];
+  for (const token of md.parse(body, {})) {
+    for (const child of token.children ?? []) {
+      const src = child.type === 'image' ? mediaUrl(String(child.attrGet('src') ?? '')) : null;
+      if (src) images.push(src);
+    }
+  }
+  return images;
+}
+
+/** D-79: whether the body has anything besides image links (the row shows the body icon). */
+export function bodyHasText(body: string): boolean {
+  return body.replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim() !== '';
+}
+
 /** The body as HTML (safe to set as innerHTML: markdown-it escapes everything else). */
 export function bodyHtml(body: string): string {
   return md.render(body);

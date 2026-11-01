@@ -966,7 +966,7 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   );
   await writeFile(
     file,
-    `---\nflint: 1\nid: bod1\nmode: tasks\n---\n- [ ] Short body [id:: b1]\n    A **bold** note.\n\n    \`\`\`json\n    {"a": 1}\n    \`\`\`\n- [ ] Long body [id:: b2]\n${long}\n- [ ] Shot [id:: b3]\n    ![dot](attachments/dot.png)\n`,
+    `---\nflint: 1\nid: bod1\nmode: tasks\n---\n- [ ] Short body [id:: b1]\n    A **bold** note.\n\n    \`\`\`json\n    {"a": 1}\n    \`\`\`\n- [ ] Long body [id:: b2]\n${long}\n- [ ] Shot [id:: b3]\n    ![dot](attachments/dot.png)\n    ![dot 2](attachments/dot.png)\n`,
   );
   const main = app.windows().find((page) => page.url().includes('main-window'));
   if (!main) throw new Error('main window page not found');
@@ -1056,9 +1056,22 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   // The image loads from the Flint folder (app://media), not the network.
   await expect
     .poll(() =>
-      main.locator('.body-view img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+      main
+        .locator('.body-view img')
+        .first()
+        .evaluate((image: HTMLImageElement) => image.naturalWidth),
     )
     .toBe(1);
+  // D-79: a click on an image opens the lightbox on the task's images; ←/→ go through them, Esc
+  // closes it and nothing else (the page stays).
+  await main.locator('.body-view img').first().click();
+  const lightbox = main.locator('.lightbox');
+  await expect(lightbox.locator('.lightbox-count')).toHaveText('1 / 2');
+  await main.keyboard.press('ArrowRight');
+  await expect(lightbox.locator('.lightbox-count')).toHaveText('2 / 2');
+  await main.keyboard.press('Escape');
+  await expect(lightbox).toHaveCount(0);
+  await expect(main.locator('.page-title')).toHaveText('Shot');
   await mouseButton(3);
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
   await mouseButton(4);
@@ -1071,9 +1084,22 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect
     .poll(() => readFile(file, 'utf8'))
     .toMatch(
-      /- \[ \] Shot \[id:: b3\]\n {4}!\[dot\]\(attachments\/dot\.png\)\n {4}- \[ \] Crop it/,
+      /- \[ \] Shot \[id:: b3\]\n {4}!\[dot\]\(attachments\/dot\.png\)\n {4}!\[dot 2\]\(attachments\/dot\.png\)\n {4}- \[ \] Crop it/,
     );
   await main.locator('.page-back').click();
+  await expect(main.locator('h1')).toHaveText(/^Bodies/);
+
+  // D-79: the row shows the image icon for images and the body icon for text; the image icon
+  // opens the lightbox.
+  const shot = main.locator('.row', { hasText: 'Shot' });
+  await expect(shot.locator('.image-toggle')).toHaveCount(1);
+  await expect(shot.locator('.body-toggle:not(.image-toggle)')).toHaveCount(0);
+  await expect(short.locator('.image-toggle')).toHaveCount(0);
+  await expect(short.locator('.body-toggle')).toHaveCount(1);
+  await shot.locator('.image-toggle').click();
+  await expect(lightbox.locator('.lightbox-count')).toHaveText('1 / 2');
+  await main.keyboard.press('Escape');
+  await expect(lightbox).toHaveCount(0);
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
 
   // D-76: a second single click on a selected row (beside its text) edits it.

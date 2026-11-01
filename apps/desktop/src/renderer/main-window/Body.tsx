@@ -50,13 +50,20 @@ function highlightCode(root: HTMLElement): void {
   }
 }
 
+/** D-79: opens the lightbox on one of the body's images. */
+export type ShowImage = (images: readonly string[], index: number) => void;
+
 /**
  * A task's body, rendered (TASK-05, D-49): markdown with its line breaks (D-76), highlighted code,
- * images from the Flint folder. A click on a link opens it in the browser; a click anywhere else
- * starts editing.
+ * images from the Flint folder. A click on a link opens it in the browser, on an image the lightbox
+ * (D-79); a click anywhere else starts editing.
  */
-function BodyView(props: { readonly body: string; readonly onEdit: () => void }): ReactElement {
-  const { body, onEdit } = props;
+function BodyView(props: {
+  readonly body: string;
+  readonly onEdit: () => void;
+  readonly onImage?: ShowImage | undefined;
+}): ReactElement {
+  const { body, onEdit, onImage } = props;
   const box = useRef<HTMLDivElement>(null);
   const html = useMemo(() => bodyHtml(body), [body]);
   useLayoutEffect(() => {
@@ -72,6 +79,15 @@ function BodyView(props: { readonly body: string; readonly onEdit: () => void })
         if (link) {
           event.preventDefault();
           window.flintMain.openLink(link.href);
+          return;
+        }
+        const image = (event.target as HTMLElement).closest('img');
+        if (image && onImage && box.current) {
+          const all = [...box.current.querySelectorAll('img')];
+          onImage(
+            all.map((item) => item.getAttribute('src') ?? ''),
+            all.indexOf(image),
+          );
           return;
         }
         if ((event.target as HTMLElement).closest('button')) return;
@@ -151,9 +167,11 @@ export function BodyBlock(props: {
   readonly onEdit: () => void;
   readonly onDone: (body: string) => void;
   readonly onOpenPage?: () => void;
+  readonly onImage?: ShowImage;
   readonly placeholder?: string;
 }): ReactElement {
-  const { body, inline, editing, editable, onEdit, onDone, onOpenPage, placeholder } = props;
+  const { body, inline, editing, editable, onEdit, onDone, onOpenPage, onImage, placeholder } =
+    props;
   const clip = useRef<HTMLDivElement>(null);
   const [long, setLong] = useState(false);
   useLayoutEffect(() => {
@@ -180,6 +198,7 @@ export function BodyBlock(props: {
         <div className="body-clip" ref={clip}>
           <BodyView
             body={body}
+            onImage={onImage}
             onEdit={() => {
               if (long && onOpenPage) onOpenPage();
               else if (editable) onEdit();
