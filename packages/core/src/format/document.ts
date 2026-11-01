@@ -173,6 +173,8 @@ function scanItem(
   limit: number,
   contentColumn: number,
   firstLine: string,
+  /** The content column of the item's container (a subtask's parent task), 0 at the top level. */
+  containerColumn = 0,
 ): number {
   let fence = fenceOpen(firstLine);
   let inComment = fence === null && opensHtmlComment(firstLine);
@@ -211,7 +213,10 @@ function scanItem(
       end++;
       continue;
     }
-    if (paragraph && !interruptsParagraph(text)) {
+    // Whether a line interrupts the paragraph is judged inside the container: a sibling subtask
+    // ("    - [ ] b" under "- [ ] parent") is a list item there, not indented code.
+    const inContainer = stripColumns(text, Math.min(indentWidth(text), containerColumn));
+    if (paragraph && !interruptsParagraph(inContainer)) {
       end++;
       continue;
     }
@@ -260,7 +265,7 @@ function buildTask(
         const item = fence === null && !inComment ? listItemStart(relative) : null;
         if (item) {
           const itemColumn = contentColumn + item.contentColumn;
-          const itemEnd = scanItem(lines, index, end, itemColumn, item.firstLine);
+          const itemEnd = scanItem(lines, index, end, itemColumn, item.firstLine, contentColumn);
           const subtask = item.bullet ? parseTaskLine(text) : null;
           if (subtask) {
             flush();

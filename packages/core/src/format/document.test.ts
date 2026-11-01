@@ -83,6 +83,28 @@ describe('structure: the canonical Flint file (docs/04 §3)', () => {
   });
 });
 
+describe('structure: several subtasks (TASK-04)', () => {
+  it('reads every subtask, not only the first, and keeps lazy lines in their paragraph', () => {
+    const document = parseDocument(
+      '- [ ] parent [id:: p1]\n    - [ ] first [id:: s1]\n    - [ ] second [id:: s2]\n    - [ ] third [id:: s3]\n      continued\nlazy line\n- [ ] next [id:: n1]\n',
+    );
+    expect(titles(document)).toEqual(['parent', '  first', '  second', '  third', 'next']);
+    const parent = document.blocks[0] as TaskNode;
+    const third = parent.children[2] as TaskNode;
+    expect(childText(third)).toBe('      continued\nlazy line\n');
+    expect(serializeDocument(document)).toBe(
+      '- [ ] parent [id:: p1]\n    - [ ] first [id:: s1]\n    - [ ] second [id:: s2]\n    - [ ] third [id:: s3]\n      continued\nlazy line\n- [ ] next [id:: n1]\n',
+    );
+  });
+
+  it('with tabs too', () => {
+    const document = parseDocument(
+      '- [ ] parent [id:: p1]\n\t- [ ] first [id:: s1]\n\t- [ ] second [id:: s2]\n',
+    );
+    expect(titles(document)).toEqual(['parent', '  first', '  second']);
+  });
+});
+
 describe('structure: Obsidian-edited file', () => {
   const document = parseDocument(readFixture('obsidian-edited.md'));
 
