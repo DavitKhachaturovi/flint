@@ -367,3 +367,22 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | "Priority ›" submenu in the task menu | UI-08 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
 | 8 | Cloud sync via Google Drive, then OneDrive; OAuth PKCE, safeStorage, drive.file; per-task merge with tombstones; no iCloud | SYNC-01 · Later | 06 §3, D-78 |
 | — | Drag to reorder moves into step 8 | TASK-01, LIST-05, LIST-06 · v1 · M4 step 8 | 06, D-78 |
+
+## O. Feedback on 0.4.12 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | List/page switching motion restored; motion regression test | UI-04 · Done (0.4.13) | 03 §5, D-79 |
+| 2 | Submenu safe triangle with ~300 ms grace | UI-08 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 3 | Close animations for menus and pickers, also on scroll-out | UI-08, UI-10 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 4 | Same vertical rhythm around expanded and marked tasks with bodies | TASK-05, TASK-07 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 5 | Subtler preview hover; detected language on code cards; Format as code | TASK-05 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 6 | Composer notes field not clipped | TASK-05 · v1 · M4 (0.4.12 fixes) | D-79 |
+| 7 | Composer paste follows CAP-06 (code, JSON, traces, images) | CAP-06, TASK-05 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 8 | Paste keeps markdown as markdown; only raw code is fenced | CAP-06 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 9 | Body and image indicators; lightbox from the icon or a thumbnail | TASK-05, MEDIA-01 · v1 · M4 (0.4.12 fixes; was M5) | 02, D-79 |
+| 10 | Thumbnails in expanded bodies, full size on the page | TASK-05, MEDIA-01 · v1 · M4 (0.4.12 fixes) | 02, D-79 |
+| 11 | Indent and Outdent in the task menu | TASK-04, UI-08 · v1 · M4 (0.4.12 fixes) | 03 §3, D-79 |
+| — | Alt+↑/↓ by keyboard focus (task list or sidebar) | LIST-06, TASK-02 · v1 · M4 step 8 | 02, 03 §3, D-79 |
+| 12 | Two-finger touchpad swipe back/forward with an arrow | NAV-04 · v1 · M4 step 9 | 02, 03 §3, D-79 |
+| — | The M5 editor before step 9; handoff note after step 8 | NOTE-01, TASK-05 · v1 | 06, D-79 |

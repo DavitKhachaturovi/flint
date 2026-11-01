@@ -536,3 +536,19 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - The task menu's priority entries become one "Priority ›" submenu (UI-08).
 - **Step 8 now includes drag to reorder** for the sidebar and task lists (was step 9).
 - **Later (post-v1), recorded: cloud sync (SYNC-01).** Through the providers' own APIs, Google Drive first, then OneDrive (Microsoft Graph); no iCloud. Opt-in sign-in with the provider's auth (OAuth with PKCE and a loopback redirect); tokens kept with Electron `safeStorage`; Google access limited to files Flint creates (`drive.file`). Automatic or manual sync by preference. Merged per task by ID, with tombstones for deletions, never conflict copies. When turned on, it changes the "no network" promise (APP-09) for that feature only.
+
+### D-79 — Feedback on 0.4.12; the M5 editor before step 9
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Regression:** list and page switching had lost its motion. Cause: D-78's "follow layout shifts at once" cancelled the sidebar highlight's glide when the sidebar re-measured during it. Fixed, and an e2e test now fails if a page's arrival or a highlight's glide stops running to its end (03 §5).
+- **Decision (fixed before step 8 continues):**
+  - Submenus: the safe-triangle (menu-aim) rule with a ~300 ms grace delay, so a diagonal move toward a submenu never closes it.
+  - Menus and pickers animate when they close, also when their anchor scrolls out of view.
+  - An expanded or marked task with a body has the same vertical rhythm as the rows around it; the card's outline adds no space.
+  - Expanded bodies: a much subtler hover on a long body's preview; code cards labelled with the detected language; "Format as code" fences a body's unfenced code or JSON on purpose (old text is never re-detected on render).
+  - The composer's notes field is never clipped; pasting into the composer follows CAP-06 (code fenced into its notes, images saved to `attachments/`).
+  - Paste detection keeps markdown as markdown (a fenced block, an image link); only raw unfenced code, JSON and stack traces are fenced (CAP-06).
+  - Row indicators: body icon for text, image icon for images, both when both. Thumbnails in expanded bodies, full size on the page. **The image lightbox moves from M5 into M4** (a smooth popup, ←/→ through the task's images).
+  - Indent and Outdent in the task's right-click menu.
+- **Answers:** Alt+↑/↓ follows the keyboard focus: the task list moves the selected task, the sidebar moves its selected list or group, nothing selected moves nothing; no fallback to the open list. New groups at the end and unique names up to 60 characters: accepted.
+- **New:** two-finger horizontal touchpad swipe = back/forward, with a subtle arrow during the swipe, ignored over horizontally scrollable areas (NAV-04, step 9).
+- **Plan change:** after step 8 comes the M5 editor (CodeMirror live preview for notes, task bodies and task pages, inline images, raw markdown only on the cursor's line), **before** step 9. A handoff note in docs/06 follows step 8, so a new session can continue from the docs alone.

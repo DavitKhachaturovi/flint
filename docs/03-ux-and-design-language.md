@@ -77,7 +77,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Reorder selected task(s) | Alt+↑ / Alt+↓ | Decided |
 | Complete / un-complete | Space | Decided |
 | Priority low / medium / high / none | 1 / 2 / 3 / 0 | Decided |
-| Indent / outdent (one level max) | Tab / Shift+Tab | Decided (Tab indents once) |
+| Indent / outdent (one level max) | Tab / Shift+Tab; also Indent / Outdent in the task's right-click menu (D-79) | Decided (Tab indents once) |
 | Edit selected task | Enter | Proposed (see Q-08) |
 | New task | N (and Ctrl+N anywhere in the app) | Proposed (see Q-08) |
 | Expand / collapse task body | → / ← | Proposed |
@@ -111,7 +111,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
 | Back / forward (NAV-04) | Alt+← / Alt+→, the mouse's side buttons | Decided (D-53) |
 | Find in page (NAV-06) | Ctrl+F; Enter / Shift+Enter next / previous match; Esc closes | Decided (D-72) |
-| Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓, Manual sort only | Decided (D-73) |
+| Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓ with the focus in the sidebar, Manual sort only; with the focus in the task list it moves the selected task; nothing selected, nothing moves | Decided (D-73, D-79) |
+| Back / forward on a precision touchpad (NAV-04) | Two-finger horizontal swipe | Decided (D-79) |
 
 ### All text fields
 - Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.
@@ -201,7 +202,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - The **selection highlight** glides to the newly selected row and **new rows** ease in instead of appearing rigidly (UI-04, D-56).
 - **Switching lists or pages:** the content fades in while rising a few pixels, and the sidebar's highlight glides to the new list (UI-04, D-65).
 - The whole composer card is one text target: the I-beam over all of it except its buttons, so the cursor doesn't flicker between arrow and I-beam around the text box (UI-01, D-65).
-- **Motion never delays input (D-75, supersedes D-67's ~150 / ~250–300 ms limits).** Every action takes effect immediately; animations are interruptible and retarget smoothly on new input (springs); nothing waits for an animation to finish (a completed task is saved and its row can be undone at once, while the animation plays on). Default durations: **selection** movement ~200 ms; **menus and pickers** opening ~200 ms; **list and page switching** ~320 ms (D-76); the **completion** sequence ~360 ms in all (D-76); small state changes (a strike line, a fade) ~260 ms; hover and colour ~120 ms. **Exception:** the capture popup appears instantly and takes typing from its first frame; it may fade in, but never delays input (CAP-10).
+- **Motion never delays input (D-75, supersedes D-67's ~150 / ~250–300 ms limits).** **D-79:** an e2e test records animation and transition events and fails if a page's arrival or a highlight's glide stops running to its end, so motion can't silently disappear again. Every action takes effect immediately; animations are interruptible and retarget smoothly on new input (springs); nothing waits for an animation to finish (a completed task is saved and its row can be undone at once, while the animation plays on). Default durations: **selection** movement ~200 ms; **menus and pickers** opening ~200 ms; **list and page switching** ~320 ms (D-76); the **completion** sequence ~360 ms in all (D-76); small state changes (a strike line, a fade) ~260 ms; hover and colour ~120 ms. **Exception:** the capture popup appears instantly and takes typing from its first frame; it may fade in, but never delays input (CAP-10).
 - **Completion (D-67):** the check fills with a small pop, then the row fades, slides and collapses into Completed. **Un-completing** brings the row back smoothly into the open tasks.
 - **Animation speed (D-67, D-75):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour. If the defaults feel slow in daily use, they are dialled back.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
