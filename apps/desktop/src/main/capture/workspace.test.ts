@@ -320,17 +320,18 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
       ok: false,
     });
     await workspace.sidebarAction({ kind: 'move', id: 'be01', to: { group, index: 0 } }, now);
+    // D-80: a new group goes to the top of Lists.
     expect(workspace.sidebar().items).toEqual([
-      { kind: 'list', id: 'al01' },
       { kind: 'group', id: group, name: 'Work', lists: ['be01'] },
+      { kind: 'list', id: 'al01' },
     ]);
     const saved = JSON.parse(await readFile(join(folder, '.flint', 'sidebar.json'), 'utf8')) as {
       items: unknown;
     };
-    expect(saved.items).toEqual([{ list: 'al01' }, { group, name: 'Work', lists: ['be01'] }]);
+    expect(saved.items).toEqual([{ group, name: 'Work', lists: ['be01'] }, { list: 'al01' }]);
     // A duplicate goes right below its original, in its group.
     await workspace.duplicateList('be01', now);
-    const inGroup = workspace.sidebar().items[1];
+    const inGroup = workspace.sidebar().items[0];
     expect(inGroup?.kind === 'group' && inGroup.lists.length).toBe(2);
     await workspace.undoLast(now);
     // Under a sort, reordering is refused; folding is this machine's.
@@ -343,9 +344,9 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
     expect(workspace.sidebar()).toMatchObject({ sort: 'created', collapsed: [group] });
     await workspace.sidebarAction({ kind: 'sort', sort: 'manual' }, now);
     await workspace.sidebarAction({ kind: 'deleteGroup', id: group }, now);
-    expect(workspace.sidebar().items.map((item) => item.id)).toEqual(['al01', 'be01']);
+    expect(workspace.sidebar().items.map((item) => item.id)).toEqual(['be01', 'al01']);
     expect(await workspace.undoLast(now)).toBe('Deleted group Work');
-    expect(workspace.sidebar().items[1]).toMatchObject({ kind: 'group', lists: ['be01'] });
+    expect(workspace.sidebar().items[0]).toMatchObject({ kind: 'group', lists: ['be01'] });
   });
 
   it('runs several changes as one step, undone together (TASK-07, D-59)', async () => {

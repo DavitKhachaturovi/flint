@@ -21,8 +21,11 @@ export interface DragSetup {
   readonly scroller: HTMLElement | null;
   /** Called once the threshold is passed; false cancels the drag (a sort is active). */
   readonly canStart?: () => boolean;
-  /** Before measuring: e.g. an expanded task folds while it is dragged. */
-  readonly onLift?: () => void;
+  /**
+   * Before measuring: e.g. an expanded task folds while it is dragged. It may return a function
+   * that runs right after the measuring, in the same frame (to start the fold's animation, D-80).
+   */
+  readonly onLift?: () => (() => void) | void;
   /** After the drag ends, whatever happened. */
   readonly onSettle?: () => void;
   /**
@@ -31,14 +34,17 @@ export interface DragSetup {
    * Resolves true when the change was made (the list will re-render in the new order).
    */
   readonly onDrop: (index: number, offset: number) => Promise<boolean>;
-  /** While dragging, after each move: `index` and `offset` as for the drop. */
-  readonly onOver?: (index: number, offset: number) => void;
+  /**
+   * While dragging, after each move: `index` and `offset` as for the drop, and where the item
+   * would land (D-80: the drop line), in viewport coordinates.
+   */
+  readonly onOver?: (index: number, offset: number, slot: Box) => void;
 }
 
 const THRESHOLD = 4;
 const EDGE = 40;
 
-interface Box {
+export interface Box {
   readonly top: number;
   readonly bottom: number;
 }
@@ -54,8 +60,10 @@ const boxOf = (elements: readonly HTMLElement[]): Box => {
   return { top, bottom };
 };
 
+// While dragging, a resting item says so too (`translateY(0px)`): an empty transform is free for
+// the page to use (D-80: a folded group's header held under the pointer). The drag's end clears all.
 const setShift = (unit: DragUnit, by: number): void => {
-  for (const element of unit.elements) element.style.transform = by ? `translateY(${by}px)` : '';
+  for (const element of unit.elements) element.style.transform = `translateY(${by}px)`;
 };
 
 const reduceMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -81,7 +89,7 @@ export function watchDrag(start: MouseEvent, setup: DragSetup): void {
 
   const lift = (): boolean => {
     if (setup.canStart && !setup.canStart()) return false;
-    setup.onLift?.();
+    const lifted = setup.onLift?.();
     self = setup.peers.findIndex((peer) => peer.key === setup.unit.key);
     if (self < 0) return false;
     scrollAt = scrollTop();
@@ -97,7 +105,10 @@ export function watchDrag(start: MouseEvent, setup: DragSetup): void {
         ? own.bottom - previous.bottom
         : own.bottom - own.top;
     index = self;
+    if (lifted) lifted();
     document.body.classList.add('fl-dragging');
+    // D-80: only the dragged area's highlight waits; its rows show their own (the other one stays).
+    setup.scroller?.classList.add('drag-scope');
     window.getSelection()?.removeAllRanges();
     for (const element of setup.unit.elements) element.classList.add('drag-lift');
     for (const peer of setup.peers)
@@ -138,7 +149,15 @@ export function watchDrag(start: MouseEvent, setup: DragSetup): void {
         setShift(peer, shift);
       });
     }
-    setup.onOver?.(index, offset);
+    // The slot it would drop into: where the item it passed ends, less its own height.
+    const landing =
+      index === self
+        ? 0
+        : index > self
+          ? (others[index - 1]?.bottom ?? own.bottom) - height - own.top
+          : (others[index]?.top ?? own.top) - own.top;
+    const top = own.top + landing - scrolled;
+    setup.onOver?.(index, offset, { top, bottom: top + height });
   };
 
   const autoScroll = (): void => {
@@ -178,6 +197,7 @@ export function watchDrag(start: MouseEvent, setup: DragSetup): void {
 
   const cleanUp = (): void => {
     document.body.classList.remove('fl-dragging');
+    setup.scroller?.classList.remove('drag-scope');
     for (const peer of setup.peers)
       for (const element of peer.elements) {
         element.classList.remove('drag-lift', 'drag-peer', 'drag-drop');
@@ -241,4 +261,95 @@ export function watchDrag(start: MouseEvent, setup: DragSetup): void {
 
   window.addEventListener('mousemove', onMove, true);
   window.addEventListener('mouseup', onUp, true);
+}
+
+/** The gap a flex or grid parent puts before an element (rows never touch, UI-03). */
+const gapBefore = (element: HTMLElement): number => {
+  const parent = element.parentElement;
+  if (!parent || element.previousElementSibling === null) return 0;
+  return parseFloat(getComputedStyle(parent).rowGap) || 0;
+};
+
+const foldDuration = (): number => {
+  const value = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-state'),
+  );
+  return Number.isFinite(value) ? value : 260;
+};
+
+/**
+ * D-80: elements folding away while their item is dragged (an expanded task's body, its
+ * subtasks). Their place closes at once, so the drag measures the folded layout; the returned
+ * function, called after measuring in the same frame, plays the fold from their old height.
+ */
+export function foldAway(elements: readonly HTMLElement[]): () => void {
+  const from = elements.map((element) => {
+    const style = getComputedStyle(element);
+    return {
+      height: `${element.offsetHeight}px`,
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      marginTop: style.marginTop,
+      opacity: '1',
+    };
+  });
+  for (const element of elements) {
+    element.style.setProperty('--fold-gap', `${-gapBefore(element)}px`);
+    element.classList.add('drag-fold');
+  }
+  return () => {
+    if (reduceMotion()) return;
+    elements.forEach((element, at) => {
+      const style = getComputedStyle(element);
+      element.animate(
+        [
+          { ...from[at], overflow: 'hidden' },
+          {
+            height: '0px',
+            paddingTop: style.paddingTop,
+            paddingBottom: style.paddingBottom,
+            marginTop: style.marginTop,
+            opacity: '0',
+            overflow: 'hidden',
+          },
+        ],
+        { duration: foldDuration(), easing: 'cubic-bezier(.2, .9, .3, 1)' },
+      );
+    });
+  };
+}
+
+/** D-80: folded elements open again after the drop, easing to their natural height. */
+export function unfold(elements: readonly HTMLElement[]): void {
+  const folded = elements.filter((element) => element.classList.contains('drag-fold'));
+  const from = folded.map((element) => {
+    const style = getComputedStyle(element);
+    return {
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      marginTop: style.marginTop,
+    };
+  });
+  for (const element of folded) {
+    element.classList.remove('drag-fold');
+    element.style.removeProperty('--fold-gap');
+  }
+  if (reduceMotion()) return;
+  folded.forEach((element, at) => {
+    const style = getComputedStyle(element);
+    element.animate(
+      [
+        { height: '0px', ...from[at], opacity: '0', overflow: 'hidden' },
+        {
+          height: `${element.offsetHeight}px`,
+          paddingTop: style.paddingTop,
+          paddingBottom: style.paddingBottom,
+          marginTop: style.marginTop,
+          opacity: '1',
+          overflow: 'hidden',
+        },
+      ],
+      { duration: foldDuration(), easing: 'cubic-bezier(.2, .9, .3, 1)' },
+    );
+  });
 }

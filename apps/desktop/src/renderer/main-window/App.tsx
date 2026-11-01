@@ -47,6 +47,7 @@ import {
   CheckIcon,
   ChevronIcon,
   FlagIcon,
+  FolderIcon,
   ImageIcon,
   HashIcon,
   InboxIcon,
@@ -62,10 +63,13 @@ import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/me
 import { NoteEditor } from './NoteEditor.js';
 import { BodyBlock, type ShowImage } from './Body.js';
 import { Lightbox } from './Lightbox.js';
-import { watchDrag, type DragUnit } from './drag.js';
-import { bodyHasText, bodyImages } from '../../shared/body-markdown.js';
+import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
+import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
+import { codeLanguage } from '../../shared/code-language.js';
+import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
+import { sidebarMotion } from './sidebar-motion.js';
 
 /**
  * The main window (M4, D-48 daily-use slice): the sidebar with the lists, a list's tasks with the
@@ -94,7 +98,7 @@ interface Point {
 type Naming =
   | { readonly kind: 'new'; readonly mode: 'tasks' | 'note' }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
-  /** LIST-05: a new group, at the end (D-79), with a list to move into it (`Move to group ›`). */
+  /** LIST-05: a new group, at the top of Lists (D-80), with a list to move into it (`Move to group ›`). */
   | { readonly kind: 'newGroup'; readonly list?: string }
   | { readonly kind: 'renameGroup'; readonly id: string; readonly name: string };
 
@@ -196,6 +200,8 @@ interface Ghost {
   readonly section: 'open' | 'done';
   /** The row it follows in its section (the open tasks, or Completed); null: the first. */
   readonly after: string | null;
+  /** D-80: it was expanded: its body closes first, then the row plays out. */
+  readonly expanded?: boolean;
 }
 
 let ghostSeq = 0;
@@ -305,6 +311,8 @@ export function App(): ReactElement {
   const [page, setPage] = useState<string | null>(null);
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
@@ -320,26 +328,44 @@ export function App(): ReactElement {
   const composer = useRef<HTMLInputElement>(null);
 
   /** A list's name being typed in the sidebar: a new list or note, or a rename (LIST-01). */
-  const [naming, setNaming] = useState<Naming | null>(null);
+  const [naming, setNamingState] = useState<Naming | null>(null);
   const [namingProblem, setNamingProblem] = useState<string | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   /** The sidebar's highlight glides to the open list like the row selection (UI-04, D-65). */
   const sidebar = useRef<HTMLElement>(null);
+  /** D-80: sidebar rows move to their new places (sort, groups, new and deleted items). */
+  const motion = useMemo(() => sidebarMotion(() => sidebar.current), []);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    const [nextLists, nextView, nextSidebar] = await Promise.all([
-      window.flintMain.lists(),
-      window.flintMain.view(listId),
-      window.flintMain.sidebar(),
-    ]);
-    setLists(nextLists);
-    setView(nextView);
-    setSidebarView(nextSidebar);
-  }, [listId]);
+  /** Reads the lists again; `then` runs in the same render (a name field giving way to its row). */
+  const refresh = useCallback(
+    async (then?: () => void): Promise<void> => {
+      const [nextLists, nextView, nextSidebar] = await Promise.all([
+        window.flintMain.lists(),
+        window.flintMain.view(listId),
+        window.flintMain.sidebar(),
+      ]);
+      motion.capture();
+      setLists(nextLists);
+      setView(nextView);
+      setSidebarView(nextSidebar);
+      then?.();
+    },
+    [listId, motion],
+  );
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /** D-80: a name field opening or closing moves the rows around it smoothly. */
+  const setNaming = useCallback(
+    (next: Naming | null): void => {
+      motion.capture();
+      setNamingState(next);
+    },
+    [motion],
+  );
+  useLayoutEffect(() => motion.play(), [lists, sidebarView, naming, motion]);
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -523,7 +549,15 @@ export function App(): ReactElement {
     if (view.mode !== 'tasks' || reducedMotion()) return;
     const found = departed(before, view);
     if (found.ghosts.length === 0) return;
-    setGhosts((current) => [...current, ...found.ghosts]);
+    // D-80: a deleted expanded task collapses first, then plays its delete animation.
+    const open = expandedRef.current;
+    const ghostsNow = found.ghosts.map((ghost) =>
+      ghost.direction === 'remove' && open.has(ghost.task.key) && hasBody(ghost.task)
+        ? { ...ghost, expanded: true }
+        : ghost,
+    );
+    const collapsing = ghostsNow.some((ghost) => ghost.expanded);
+    setGhosts((current) => [...current, ...ghostsNow]);
     setMoved((current) => new Set([...current, ...found.moved]));
     const ids = new Set(found.ghosts.map((ghost) => ghost.id));
     window.setTimeout(
@@ -531,7 +565,7 @@ export function App(): ReactElement {
         setGhosts((current) => current.filter((ghost) => !ids.has(ghost.id)));
         setMoved((current) => new Set([...current].filter((key) => !found.moved.includes(key))));
       },
-      durationMs('--fl-dur-complete', 400),
+      durationMs('--fl-dur-complete', 400) + (collapsing ? durationMs('--fl-dur-base', 200) : 0),
     );
   }, [view]);
 
@@ -964,27 +998,30 @@ export function App(): ReactElement {
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
-  const newListMenu = useCallback((at: Point): void => {
-    const start = (mode: 'tasks' | 'note'): void => {
-      setNamingProblem(null);
-      setNaming({ kind: 'new', mode });
-    };
-    openMenu(
-      [
-        { label: 'New task list', hint: 'Ctrl+Shift+N', action: () => start('tasks') },
-        { label: 'New note', action: () => start('note') },
-        'divider',
-        {
-          label: 'New group',
-          action: () => {
-            setNamingProblem(null);
-            setNaming({ kind: 'newGroup' });
+  const newListMenu = useCallback(
+    (at: Point): void => {
+      const start = (mode: 'tasks' | 'note'): void => {
+        setNamingProblem(null);
+        setNaming({ kind: 'new', mode });
+      };
+      openMenu(
+        [
+          { label: 'New task list', hint: 'Ctrl+Shift+N', action: () => start('tasks') },
+          { label: 'New note', action: () => start('note') },
+          'divider',
+          {
+            label: 'New group',
+            action: () => {
+              setNamingProblem(null);
+              setNaming({ kind: 'newGroup' });
+            },
           },
-        },
-      ],
-      at,
-    );
-  }, []);
+        ],
+        at,
+      );
+    },
+    [setNaming],
+  );
 
   /** LIST-05, LIST-06: a change to the sidebar; a problem shows in the toast. */
   const sidebarChange = useCallback(
@@ -1071,7 +1108,7 @@ export function App(): ReactElement {
         at,
       );
     },
-    [sidebarChange, showToast],
+    [sidebarChange, showToast, setNaming],
   );
 
   const submitName = useCallback(
@@ -1088,8 +1125,11 @@ export function App(): ReactElement {
           setNamingProblem(outcome.problem);
           return;
         }
-        setNaming(null);
-        setNamingProblem(null);
+        // D-80: the field gives way to the group in one step, in its place.
+        await refresh(() => {
+          setNamingState(null);
+          setNamingProblem(null);
+        });
         if (naming.kind === 'newGroup' && naming.list && outcome.id)
           await sidebarChange({
             kind: 'move',
@@ -1113,7 +1153,7 @@ export function App(): ReactElement {
       if (naming.kind === 'new') openList(outcome.listId);
       if (outcome.label) showToast(outcome.label, true);
     },
-    [naming, openList, showToast, sidebarChange],
+    [naming, openList, showToast, sidebarChange, refresh, setNaming],
   );
 
   /** D-55: a list's right-click menu; Inbox has none (LIST-03). */
@@ -1223,7 +1263,7 @@ export function App(): ReactElement {
         at,
       );
     },
-    [listId, openList, showToast, markedLists, sidebarView, sidebarChange, reorderable],
+    [listId, openList, showToast, markedLists, sidebarView, sidebarChange, reorderable, setNaming],
   );
 
   /** The sidebar's lists in the order shown (Inbox first), for Shift+click ranges. */
@@ -1504,7 +1544,7 @@ export function App(): ReactElement {
       key={key}
       initial={initial}
       placeholder="Group name"
-      icon={<ChevronIcon size={12} />}
+      icon={<FolderIcon />}
       group
       problem={namingProblem}
       onSubmit={(name) => void submitName(name)}
@@ -1541,16 +1581,19 @@ export function App(): ReactElement {
     const units = rowDragUnits(card, row);
     if (!units) return;
     const others = units.peers.filter((peer) => peer !== units.unit);
+    // D-80: an expanded task's body and the task's subtasks fold away, animated, while it moves.
+    const [own, ...subtasks] = units.unit.elements;
+    const folding = [
+      ...(own?.classList.contains('row-group')
+        ? [...own.children].filter((child): child is HTMLElement => !child.matches('.row'))
+        : []),
+      ...subtasks,
+    ];
     watchDrag(event.nativeEvent, {
       ...units,
       scroller: card.closest<HTMLElement>('.scroller'),
-      onLift: () => {
-        for (const element of units.unit.elements)
-          if (element.classList.contains('row-group')) element.classList.add('drag-folded');
-      },
-      onSettle: () => {
-        for (const element of units.unit.elements) element.classList.remove('drag-folded');
-      },
+      onLift: () => foldAway(folding),
+      onSettle: () => unfold(folding),
       onDrop: async (index) => {
         const next = others[index];
         const last = others.at(-1);
@@ -1664,20 +1707,136 @@ export function App(): ReactElement {
       return { group: null, index: at < 0 ? tops.length : at };
     };
     const inGroup = self.group !== null;
+    const cardOf = (group: string): HTMLElement | null =>
+      aside.querySelector<HTMLElement>(`.nav-group[data-group="${CSS.escape(group)}"]`);
+    /**
+     * D-80: a group's card follows its rows while a list is dragged: its surface (drawn apart from
+     * it, CSS) reaches from its header to its last list or the landing slot, wherever they slide.
+     * Positions are the untransformed ones (offsets) plus the shifts the drag gave them.
+     */
+    const shiftOf = (element: Element): number =>
+      Number(/translateY\((-?[\d.]+)px\)/.exec((element as HTMLElement).style.transform)?.[1] ?? 0);
+    const within = (element: HTMLElement, card: HTMLElement): number => {
+      // Up the offset parents to `card` (a group card, or the sidebar itself).
+      let y = 0;
+      for (let node: HTMLElement | null = element; node && node !== card;) {
+        y += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      return y;
+    };
+    const stretchCards = (
+      to: { readonly group: string | null },
+      slot: { readonly top: number; readonly bottom: number },
+    ): void => {
+      for (const card of aside.querySelectorAll<HTMLElement>('.nav-group:not(.flip-ghost)')) {
+        const cardHead = card.querySelector<HTMLElement>(':scope > .nav-group-head');
+        if (!cardHead) continue;
+        const open = card.querySelector('.group-lists.open') !== null;
+        const ends = [within(cardHead, card) + cardHead.offsetHeight + shiftOf(cardHead)];
+        if (open)
+          for (const list of card.querySelectorAll<HTMLElement>('.group-inner > .nav'))
+            if (list !== nav) ends.push(within(list, card) + list.offsetHeight + shiftOf(list));
+        if (open && to.group === card.dataset['group'])
+          ends.push(slot.bottom - card.getBoundingClientRect().top);
+        // The card's padding below its last row: 3 px, and 2 more under an open group's lists.
+        const bottom = Math.max(...ends) + (open ? 5 : 3);
+        card.style.setProperty('--card-top', `${shiftOf(cardHead)}px`);
+        card.style.setProperty('--card-bottom', `${bottom - card.offsetHeight}px`);
+      }
+    };
+    // D-80: the drop line, indented when the list would land in a group (made once dragging).
+    let dropLine: HTMLDivElement | null = null;
+    /** A folded group whose header the dragged list is over: it goes into that group. */
+    let onto: string | null = null;
+    /** Folded headers held in place under the dragged list, with the shift the drag gave them. */
+    const held = new Map<HTMLElement, string>();
+    const listsCount = (group: string): number => {
+      const found = items.find((item) => item.kind === 'group' && item.id === group);
+      return found?.kind === 'group' ? found.lists.length : 0;
+    };
+    let landing: { readonly group: string | null; readonly index: number } | null = null;
     watchDrag(event.nativeEvent, {
       unit: self.unit,
       peers: spots.map((spot) => spot.unit),
       scroller,
       canStart,
-      // A cue for where it will land: indented in a group, flush at the top level.
-      onOver: (index, offset) => {
-        const into = destination(index, offset).group !== null;
+      // Cues for where it will land: the group lights up, the line marks the spot, and the row
+      // shows indented in a group or flush at the top level.
+      onOver: (index, offset, slot) => {
+        // Onto a folded group's header: measured where the header rests, and the header is held
+        // there while the list is over it (it would otherwise slide away from under the pointer).
+        const box = nav.getBoundingClientRect();
+        const middle = (box.top + box.bottom) / 2;
+        onto = null;
+        for (const spot of spots) {
+          const head = spot.unit.elements[0];
+          if (spot.kind !== 'head' || spot.open || !spot.group || !head) continue;
+          // Layout offsets: a header still sliding (the drag's transition) doesn't move them.
+          const top = aside.getBoundingClientRect().top + within(head, aside) - aside.scrollTop;
+          if (middle > top + 4 && middle < top + head.offsetHeight - 4) onto = spot.group;
+        }
+        for (const spot of spots) {
+          const head = spot.unit.elements[0];
+          if (spot.kind !== 'head' || spot.open || !head) continue;
+          if (spot.group === onto) {
+            if (head.style.transform !== '') held.set(head, head.style.transform);
+            head.style.transform = '';
+          } else if (held.has(head)) {
+            if (head.style.transform === '') head.style.transform = held.get(head) ?? '';
+            held.delete(head);
+          }
+        }
+        landing = onto ? { group: onto, index: listsCount(onto) } : destination(index, offset);
+        stretchCards(landing, slot);
+        nav.classList.toggle('drag-onto', onto !== null);
+        const into = landing.group !== null;
         nav.classList.toggle('drag-indent', into && !inGroup);
         nav.classList.toggle('drag-outdent', !into && inGroup);
+        for (const card of aside.querySelectorAll('.nav-group.drop-target'))
+          if (card !== cardOf(landing.group ?? '')) card.classList.remove('drop-target');
+        if (landing.group) cardOf(landing.group)?.classList.add('drop-target');
+        if (!dropLine) {
+          dropLine = document.createElement('div');
+          dropLine.className = 'drop-line';
+          aside.append(dropLine);
+        }
+        const line = dropLine;
+        line.hidden = onto !== null;
+        if (onto) return;
+        const frame = aside.getBoundingClientRect();
+        const inner = landing.group
+          ? cardOf(landing.group)?.querySelector('.group-inner')?.getBoundingClientRect()
+          : null;
+        const left = (inner ? inner.left + 16 : frame.left + 16) - frame.left;
+        line.style.left = `${left}px`;
+        line.style.width = `${frame.width - left - 16}px`;
+        line.style.top = '0';
+        line.style.transform = `translateY(${slot.bottom - frame.top + aside.scrollTop}px)`;
       },
-      onSettle: () => nav.classList.remove('drag-indent', 'drag-outdent'),
-      onDrop: async (index, offset) =>
-        (await sidebarChange({ kind: 'move', id, to: destination(index, offset) }))?.ok === true,
+      onSettle: () => {
+        for (const card of aside.querySelectorAll<HTMLElement>('.nav-group'))
+          card.style.removeProperty('--card-top');
+        for (const card of aside.querySelectorAll<HTMLElement>('.nav-group'))
+          card.style.removeProperty('--card-bottom');
+        nav.classList.remove('drag-indent', 'drag-outdent', 'drag-onto', 'drop-into');
+        for (const card of aside.querySelectorAll('.nav-group.drop-target'))
+          card.classList.remove('drop-target');
+        dropLine?.remove();
+      },
+      onDrop: async (index, offset) => {
+        const to = landing ?? destination(index, offset);
+        const folded = onto;
+        if (folded) nav.classList.add('drop-into');
+        const done = (await sidebarChange({ kind: 'move', id, to }))?.ok === true;
+        // A folded group's header pulses once as the list goes in.
+        if (done && folded && !reducedMotion())
+          cardOf(folded)?.animate(
+            [{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }],
+            { duration: durationMs('--fl-dur-base', 200), easing: 'ease-out' },
+          );
+        return done;
+      },
     });
   };
   // D-76: the highlight is also the editing field, gliding between editing rows.
@@ -1725,6 +1884,12 @@ export function App(): ReactElement {
     setEditingBody(null);
     void change({ kind: 'body', key, body });
   };
+  /** D-80: a code block or an image deleted from a body, with Undo; no confirmation. */
+  const removePart = (key: string, body: string, kind: 'code' | 'image'): void => {
+    void change({ kind: 'body', key, body }).then((outcome) => {
+      if (outcome) showToast(kind === 'code' ? 'Deleted code block' : 'Deleted image', true);
+    });
+  };
   /** A body shown inline under its row (D-76), rendered or being edited (D-49). */
   const bodyRows = (task: TaskRow, subtask: boolean): ReactElement[] => {
     const open = expanded.has(task.key);
@@ -1745,6 +1910,7 @@ export function App(): ReactElement {
           onDone={(body) => saveBody(task.key, body)}
           onOpenPage={() => openPage(task.key)}
           onImage={showImage}
+          onRemovePart={(body, kind) => removePart(task.key, body, kind)}
         />
       </div>,
     ];
@@ -1917,6 +2083,12 @@ export function App(): ReactElement {
             <PlusIcon />
           </button>
         </div>
+        {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
+        {naming?.kind === 'newGroup' && (
+          <div className="nav-group naming" data-flip="naming:group">
+            {groupNameField('', 'new-group')}
+          </div>
+        )}
         {sidebarItems.map((item) => {
           if (item.kind === 'list') {
             const list = listById.get(item.id);
@@ -1944,9 +2116,9 @@ export function App(): ReactElement {
             </NavGroup>
           );
         })}
-        {naming?.kind === 'newGroup' && groupNameField('', 'new-group')}
         {naming?.kind === 'new' && (
           <NameField
+            flip="naming:list"
             key={`new-${naming.mode}`}
             initial=""
             placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
@@ -1983,6 +2155,7 @@ export function App(): ReactElement {
                 onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
                 onAddSubtask={() => addSubtask(pageTask)}
                 onImage={showImage}
+                onRemovePart={(body, kind) => removePart(pageTask.key, body, kind)}
               >
                 {pageRows.length > 0 && (
                   <section
@@ -2188,8 +2361,11 @@ export function App(): ReactElement {
 }
 
 /**
- * LIST-05, D-73, D-74: a group in the sidebar: a header that folds it (chevron, name, number of
- * lists) and its lists, indented under it. Folding animates; folded lists stay rendered, inert.
+ * LIST-05, D-73, D-74, D-80 (mockup 10): a group in the sidebar: a soft card with a header that
+ * folds it (chevron, folder tile, name in normal case, number of lists) and its lists inside,
+ * indented on a guide line. Collapsed, the card is one row whose count says "3 lists". Folding
+ * animates; folded lists stay rendered, inert. While a list is dragged over it, the card lights up
+ * and says "Drop to add" (`drop-target`, set by the drag).
  */
 function NavGroup(props: {
   readonly group: SidebarGroup;
@@ -2203,13 +2379,17 @@ function NavGroup(props: {
   readonly children: ReactNode;
 }): ReactElement {
   const { group, collapsed, focused, header, onToggle, onMenu, children } = props;
+  const count = group.lists.length;
+  const classes = ['nav-group'];
+  if (collapsed) classes.push('collapsed');
+  if (focused) classes.push('focus');
   return (
-    <div className="nav-group">
+    <div className={classes.join(' ')} data-flip={`group:${group.id}`} data-group={group.id}>
       {header ?? (
         <button
           type="button"
           data-key={group.id}
-          className={focused ? 'nav-group-head focus' : 'nav-group-head'}
+          className="nav-group-head"
           aria-expanded={!collapsed}
           onMouseDown={(event) => event.preventDefault()}
           onClick={onToggle}
@@ -2222,8 +2402,20 @@ function NavGroup(props: {
           <span className={collapsed ? 'group-chevron' : 'group-chevron open'}>
             <ChevronIcon size={12} />
           </span>
-          <span className="group-name">{group.name}</span>
-          <span className="nav-count">{group.lists.length}</span>
+          <span className="tile">
+            <FolderIcon />
+          </span>
+          <span className="group-name">
+            <MorphText text={group.name} />
+          </span>
+          <span className="nav-count group-count">
+            <MorphText
+              text={collapsed ? `${count} ${count === 1 ? 'list' : 'lists'}` : `${count}`}
+            />
+          </span>
+          <span className="drop-hint" aria-hidden="true">
+            Drop to add
+          </span>
         </button>
       )}
       <div className={collapsed ? 'group-lists' : 'group-lists open'} inert={collapsed}>
@@ -2299,6 +2491,7 @@ function NavItem(props: {
     <button
       type="button"
       data-key={list.id}
+      {...(!list.inbox && { 'data-flip': `list:${list.id}` })}
       className={classes.join(' ')}
       // A click opens the list without taking the keyboard: the keys stay with the task list.
       onMouseDown={(event) => event.preventDefault()}
@@ -2337,16 +2530,14 @@ function Composer(props: {
     focusNotes.current = false;
     notesRef.current?.focus();
   }, [notes]);
-  /** D-79: a block (fenced code, an image link) goes to the end of the notes, which open. */
-  const addToNotes = (block: string): void => {
-    focusNotes.current = true;
-    setNotes((current) => (current?.trim() ? `${current.replace(/\s+$/, '')}\n\n` : '') + block);
-  };
   /**
-   * D-79, CAP-06 in the composer: a pasted image is saved to attachments/ and linked in the notes;
-   * pasted code, JSON or a stack trace goes into the notes fenced; other text is typed as usual.
+   * D-80 (CAP-06 in the composer, as in the popup's selection area): pasted code, JSON or a stack
+   * trace is a code card, a pasted image a thumbnail chip (the file is saved to attachments/ at
+   * once); on Enter the body is the notes, then the code fenced, then the image links. Pasted
+   * markdown and other text is typed as usual (D-79).
    */
-  const pasteRules = (event: React.ClipboardEvent, field: HTMLTextAreaElement | null): boolean => {
+  const [pasted, setPasted] = useState<readonly ComposerPaste[]>([]);
+  const pasteRules = (event: React.ClipboardEvent): boolean => {
     const image = [...event.clipboardData.items]
       .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
       ?.getAsFile();
@@ -2356,37 +2547,35 @@ function Composer(props: {
         .arrayBuffer()
         .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
         .then((link) => {
-          if (!link) return;
-          if (field) insertAt(field, `![](${link})`);
-          else addToNotes(`![](${link})`);
+          if (link) setPasted((current) => [...current, { kind: 'image', link, id: ++seq }]);
         });
       return true;
     }
-    const pasted = event.clipboardData.getData('text/plain');
-    const kind = classifyPaste(pasted);
+    const clipboard = event.clipboardData.getData('text/plain');
+    const kind = classifyPaste(clipboard);
     if (kind === 'text') return false;
     event.preventDefault();
-    const block = fencedBlock(blockFor(pasted).text, kind === 'json' ? 'json' : '');
-    if (field) insertAt(field, block);
-    else addToNotes(block);
+    const block = blockFor(clipboard);
+    setPasted((current) => [
+      ...current,
+      { kind: 'code', text: block.text, lang: kind === 'json' ? 'json' : '', id: ++seq },
+    ]);
     return true;
-  };
-  /** A block at the notes' caret, on lines of its own. */
-  const insertAt = (field: HTMLTextAreaElement, block: string): void => {
-    const before = field.value.slice(0, field.selectionStart);
-    const after = field.value.slice(field.selectionEnd);
-    const lead =
-      before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
-    const trail = after === '' || after.startsWith('\n') ? '' : '\n';
-    field.setRangeText(lead + block + trail, field.selectionStart, field.selectionEnd, 'end');
-    setNotes(field.value);
   };
   const submit = (): void => {
     const typed = text.escaped();
     if (typed.trim() === '') return;
-    const body = notes?.trim() ? `\n${notes.replace(/\s+$/, '')}` : '';
+    const parts = [
+      ...(notes?.trim() ? [notes.replace(/\s+$/, '')] : []),
+      ...pasted.flatMap((item) =>
+        item.kind === 'code' ? [fencedBlock(item.text, item.lang)] : [],
+      ),
+      ...pasted.flatMap((item) => (item.kind === 'image' ? [`![](${item.link})`] : [])),
+    ];
+    const body = parts.length > 0 ? `\n${parts.join('\n\n')}` : '';
     text.reset('', false);
     setNotes(null);
+    setPasted([]);
     inputRef.current?.focus();
     void onAdd(typed + body);
   };
@@ -2452,7 +2641,7 @@ function Composer(props: {
         spellCheck={false}
         onChange={(event) => text.change(event.target.value)}
         onPaste={(event) => {
-          if (!pasteRules(event, null)) text.paste();
+          if (!pasteRules(event)) text.paste();
         }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
@@ -2479,7 +2668,7 @@ function Composer(props: {
           value={notes}
           spellCheck={false}
           onChange={(event) => setNotes(event.target.value)}
-          onPaste={(event) => void pasteRules(event, event.currentTarget)}
+          onPaste={(event) => void pasteRules(event)}
           onKeyDown={(event) => {
             const field = event.currentTarget;
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -2500,6 +2689,12 @@ function Composer(props: {
               field.blur();
             }
           }}
+        />
+      )}
+      {pasted.length > 0 && (
+        <ComposerPastes
+          items={pasted}
+          onRemove={(id) => setPasted((current) => current.filter((item) => item.id !== id))}
         />
       )}
       <div className="composer-bar">
@@ -2583,6 +2778,102 @@ function Composer(props: {
   );
 }
 
+/** D-80: what was pasted into the composer, shown under it until Enter. */
+type ComposerPaste =
+  | {
+      readonly kind: 'code';
+      readonly text: string;
+      /** The fence's language (json), or none. */
+      readonly lang: string;
+      readonly id: number;
+    }
+  | { readonly kind: 'image'; readonly link: string; readonly id: number };
+
+/** Lines a folded code card shows (as in the popup, D-38). */
+const PREVIEW_LINES = 4;
+
+/**
+ * D-80: pasted code as a card (language, background, the first lines with a chevron to see all, ×
+ * to remove; a preview, not edited here) and pasted images as thumbnail chips, as in the capture
+ * popup's selection area (CAP-06, D-38). Removing an image keeps its file (MEDIA-04).
+ */
+function ComposerPastes(props: {
+  readonly items: readonly ComposerPaste[];
+  readonly onRemove: (id: number) => void;
+}): ReactElement {
+  const { items, onRemove } = props;
+  const images = items.filter((item) => item.kind === 'image');
+  return (
+    <div className="composer-pastes">
+      {items.map((item) =>
+        item.kind === 'code' ? (
+          <CodePreview key={item.id} item={item} onRemove={() => onRemove(item.id)} />
+        ) : null,
+      )}
+      {images.length > 0 && (
+        <div className="composer-images">
+          {images.map((item) => (
+            <span key={item.id} className="chip image-chip">
+              <img className="thumb" src={mediaUrl(item.link) ?? ''} alt="" />
+              <span>{item.link.split('/').pop()}</span>
+              <button
+                type="button"
+                className="chip-x"
+                aria-label="Remove image"
+                onClick={() => onRemove(item.id)}
+              >
+                <CloseIcon size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CodePreview(props: {
+  readonly item: Extract<ComposerPaste, { kind: 'code' }>;
+  readonly onRemove: () => void;
+}): ReactElement {
+  const { item, onRemove } = props;
+  const [open, setOpen] = useState(false);
+  const code = useRef<HTMLPreElement>(null);
+  const lines = useMemo(() => item.text.split(/\r\n|\r|\n/), [item.text]);
+  useLayoutEffect(() => {
+    const kind = item.lang === 'json' ? 'json' : blockFor(item.text).kind;
+    code.current?.replaceChildren(
+      ...highlightLines(kind, open ? lines : lines.slice(0, PREVIEW_LINES)),
+    );
+  }, [item, lines, open]);
+  return (
+    <section className="composer-code">
+      <header className="composer-code-head">
+        <span className="code-kind">
+          {codeLanguage(item.text, item.lang)} · {lines.length}{' '}
+          {lines.length === 1 ? 'line' : 'lines'}
+        </span>
+        {lines.length > PREVIEW_LINES && (
+          <button
+            type="button"
+            className={open ? 'code-toggle open' : 'code-toggle'}
+            aria-expanded={open}
+            aria-label={open ? 'Show less' : 'Show all'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setOpen(!open)}
+          >
+            <ChevronIcon size={12} />
+          </button>
+        )}
+        <button type="button" className="chip-x" aria-label="Remove code" onClick={onRemove}>
+          <CloseIcon size={10} />
+        </button>
+      </header>
+      <pre ref={code} className={open ? 'composer-code-lines open' : 'composer-code-lines'} />
+    </section>
+  );
+}
+
 /**
  * A list's name typed in the sidebar (LIST-01): Enter saves, Esc or leaving the field cancels; a
  * problem (a name Windows can't use, one already taken) shows under it.
@@ -2591,39 +2882,55 @@ function NameField(props: {
   readonly initial: string;
   readonly placeholder?: string;
   readonly icon: ReactElement;
-  /** LIST-05: a group's name, in the group header's style. */
+  /** LIST-05, D-80: a group's name, in the group card's header (mockup 10). */
   readonly group?: boolean;
+  /** D-80: the field's place in the sidebar's motion. */
+  readonly flip?: string;
   readonly problem: string | null;
   readonly onSubmit: (name: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const { initial, placeholder, icon, group = false, problem, onSubmit, onCancel } = props;
+  const { initial, placeholder, icon, group = false, flip, problem, onSubmit, onCancel } = props;
   const [name, setName] = useState(initial);
+  const input = (
+    <input
+      className="name-input"
+      autoFocus
+      value={name}
+      placeholder={placeholder}
+      spellCheck={false}
+      maxLength={group ? 60 : undefined}
+      onFocus={(event) => event.currentTarget.select()}
+      onChange={(event) => setName(event.target.value)}
+      onBlur={onCancel}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onSubmit(name);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          onCancel();
+        }
+      }}
+    />
+  );
   return (
-    <div className={group ? 'name-field group' : 'name-field'}>
-      <div className="nav on">
-        <span className="tile">{icon}</span>
-        <input
-          className="name-input"
-          autoFocus
-          value={name}
-          placeholder={placeholder}
-          spellCheck={false}
-          maxLength={group ? 60 : undefined}
-          onFocus={(event) => event.currentTarget.select()}
-          onChange={(event) => setName(event.target.value)}
-          onBlur={onCancel}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSubmit(name);
-            } else if (event.key === 'Escape') {
-              event.preventDefault();
-              onCancel();
-            }
-          }}
-        />
-      </div>
+    <div className={group ? 'name-field group' : 'name-field'} {...(flip && { 'data-flip': flip })}>
+      {group ? (
+        <div className="naming-head">
+          <span className="group-chevron open">
+            <ChevronIcon size={12} />
+          </span>
+          <span className="tile">{icon}</span>
+          {input}
+        </div>
+      ) : (
+        <div className="nav on">
+          <span className="tile">{icon}</span>
+          {input}
+        </div>
+      )}
+      {group && !problem && <p className="name-hint">Enter saves · Esc cancels</p>}
       {problem && <p className="name-problem">{problem}</p>}
     </div>
   );
@@ -2715,10 +3022,13 @@ function TaskPage(props: {
   readonly onBody: (body: string) => void;
   readonly onAddSubtask: () => void;
   readonly onImage: ShowImage;
+  /** D-80: a code block or an image deleted from the body. */
+  readonly onRemovePart: (body: string, kind: 'code' | 'image') => void;
   /** The subtasks' card. */
   readonly children?: ReactElement | false;
 }): ReactElement {
-  const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, onImage, children } = props;
+  const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, onImage, onRemovePart, children } =
+    props;
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingBody, setEditingBody] = useState(false);
   const editable = !readOnly && !task.done;
@@ -2763,6 +3073,7 @@ function TaskPage(props: {
           editable={editable}
           placeholder="Notes, code, links…"
           onImage={onImage}
+          onRemovePart={onRemovePart}
           onEdit={() => setEditingBody(true)}
           onDone={(body) => {
             setEditingBody(false);
@@ -2796,13 +3107,34 @@ function ghostRows(
   return ghosts
     .filter((ghost) => ghost.section === section && ghost.after === after)
     .flatMap((ghost) => [
-      <Row
-        key={`ghost-${ghost.id}`}
-        task={ghost.task}
-        subtask={ghost.subtask}
-        ghost={ghost.direction}
-        {...handlers}
-      />,
+      ghost.expanded ? (
+        // D-80: an expanded task leaves as its card: the body closes, then the row plays out.
+        <div
+          key={`ghost-${ghost.id}`}
+          className={ghost.subtask ? 'row-group subtask leaving-group' : 'row-group leaving-group'}
+          aria-hidden="true"
+        >
+          <Row task={ghost.task} subtask={ghost.subtask} ghost={ghost.direction} {...handlers} />
+          <div className={ghost.subtask ? 'row-body subtask closing' : 'row-body closing'}>
+            <BodyBlock
+              body={ghost.task.body}
+              inline
+              editing={false}
+              editable={false}
+              onEdit={() => undefined}
+              onDone={() => undefined}
+            />
+          </div>
+        </div>
+      ) : (
+        <Row
+          key={`ghost-${ghost.id}`}
+          task={ghost.task}
+          subtask={ghost.subtask}
+          ghost={ghost.direction}
+          {...handlers}
+        />
+      ),
       ...(ghost.subtask ? [] : ghost.task.subtasks).map((sub) => (
         <Row
           key={`ghost-${ghost.id}-${sub.key}`}
@@ -2855,9 +3187,9 @@ function Row(
     if (joins?.down) classes.push('mark-down');
   }
   const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
-  // D-79: the body icon for text, the image icon for images, both when it has both.
+  // D-80: the body icon for any body (images only too), the image icon as well when it has images.
   const hasImages = useMemo(() => bodyImages(task.body).length > 0, [task.body]);
-  const hasText = hasBody(task) && bodyHasText(task.body);
+  const hasText = hasBody(task);
   return (
     <div
       data-key={ghost ? undefined : task.key}
@@ -3055,11 +3387,22 @@ function Glide(props: {
       const settled = now - measured.current.at > durationMs('--fl-dur-base', 200);
       const follow = measured.current.target === target && settled;
       if (measured.current.target !== target) measured.current = { target, at: now };
+      // D-80: a list inside a group card is placed within the card: offsets add up to ours.
+      let x = 0;
+      let y = 0;
+      for (
+        let node: HTMLElement | null = row ?? null;
+        node && node !== card.current;
+        node = node.offsetParent as HTMLElement | null
+      ) {
+        x += node.offsetLeft;
+        y += node.offsetTop;
+      }
       setBox(
         row
           ? {
-              x: row.offsetLeft,
-              y: row.offsetTop,
+              x,
+              y,
               w: row.offsetWidth,
               h: row.offsetHeight,
               follow,

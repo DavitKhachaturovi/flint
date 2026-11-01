@@ -97,3 +97,7 @@ export const ReminderBellIcon = ({ size = 12 }: IconProps): ReactElement =>
     <path key="b" d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />,
     <path key="c" className="bell-strike" d="M3 3l18 18" pathLength={1} />,
   ]);
+
+/** LIST-05, D-80 (mockup 10): a sidebar group's tile. */
+export const FolderIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />);

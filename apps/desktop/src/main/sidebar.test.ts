@@ -73,8 +73,9 @@ describe('sidebar groups and order (LIST-05, LIST-06, D-73, D-74)', () => {
   it('adds, renames and deletes groups; deleting keeps the lists in its place', () => {
     const items = arrange(file, lists, 'manual');
     const added = addGroup(items, 'g2', 'Home');
-    expect(added.at(-1)).toEqual({ kind: 'group', id: 'g2', name: 'Home', lists: [] });
-    expect(renameGroup(added, 'g2', 'House').at(-1)).toMatchObject({ name: 'House' });
+    // D-80: a new group goes to the top of Lists.
+    expect(added[0]).toEqual({ kind: 'group', id: 'g2', name: 'Home', lists: [] });
+    expect(renameGroup(added, 'g2', 'House')[0]).toMatchObject({ name: 'House' });
     expect(deleteGroup(items, 'g1')).toEqual([
       { kind: 'list', id: 'c' },
       { kind: 'list', id: 'b' },

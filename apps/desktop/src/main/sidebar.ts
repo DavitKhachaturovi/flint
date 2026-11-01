@@ -126,9 +126,9 @@ export function fromItems(items: readonly SidebarItem[], extra: SidebarFile['ext
   };
 }
 
-/** A new group (D-73), at the end. */
+/** A new group (D-73), at the top of Lists (D-80). */
 export function addGroup(items: readonly SidebarItem[], id: string, name: string): SidebarItem[] {
-  return [...items, { kind: 'group', id, name, lists: [] }];
+  return [{ kind: 'group', id, name, lists: [] }, ...items];
 }
 
 export function renameGroup(

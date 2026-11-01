@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -992,8 +992,8 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect
     .poll(() => readFile(file, 'utf8'))
     .toMatch(/- \[ \] With notes \[id:: \w+\]\n {4}first line\n/);
-  // D-79, CAP-06 in the composer: pasted JSON goes into the notes fenced, a pasted image is saved
-  // to attachments/ and linked there; pasted markdown stays as it is.
+  // D-79, D-80, CAP-06 in the composer: pasted JSON shows as a code card and a pasted image (saved
+  // to attachments/ at once) as a thumbnail chip, never as raw text; on Enter they become the body.
   await main.keyboard.type('Pasted');
   await main.evaluate(
     ([json, image]) => {
@@ -1014,10 +1014,17 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     ] as const,
   );
-  const notes = main.locator('.composer-notes');
-  await expect(notes).toHaveValue(
-    /^```json\n\{"b": 2\}\n```\n\n!\[\]\(attachments\/[\w-]+\.png\)$/,
-  );
+  await expect(main.locator('.composer-notes')).toHaveCount(0);
+  await expect(main.locator('.composer-code .code-kind')).toHaveText('json · 1 line');
+  await expect(main.locator('.composer-code .tok-key')).toHaveText('"b"');
+  await expect(main.locator('.composer-images .image-chip')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      main
+        .locator('.image-chip img')
+        .evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth),
+    )
+    .toBe(1);
   await expect(main.locator('.composer-input')).toHaveValue('Pasted');
   await main.keyboard.press('Enter');
   await expect
@@ -1025,6 +1032,7 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
     .toMatch(
       /- \[ \] Pasted \[id:: \w+\]\n {4}```json\n {4}\{"b": 2\}\n {4}```\n\s*\n {4}!\[\]\(attachments/,
     );
+  await expect(main.locator('.composer-pastes')).toHaveCount(0);
   await main.keyboard.press('Escape');
 
   // A small body opens inline, rendered and highlighted; a click edits it, Esc saves.
@@ -1098,11 +1106,11 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await main.locator('.page-back').click();
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
 
-  // D-79: the row shows the image icon for images and the body icon for text; the image icon
-  // opens the lightbox.
+  // D-80: the body icon for any body (images only too), the image icon as well for images; the
+  // image icon opens the lightbox.
   const shot = main.locator('.row', { hasText: 'Shot' });
   await expect(shot.locator('.image-toggle')).toHaveCount(1);
-  await expect(shot.locator('.body-toggle:not(.image-toggle)')).toHaveCount(0);
+  await expect(shot.locator('.body-toggle:not(.image-toggle)')).toHaveCount(1);
   await expect(short.locator('.image-toggle')).toHaveCount(0);
   await expect(short.locator('.body-toggle')).toHaveCount(1);
   await shot.locator('.image-toggle').click();
@@ -1110,6 +1118,29 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await main.keyboard.press('Escape');
   await expect(lightbox).toHaveCount(0);
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
+
+  // D-80: the body icon opens an image-only body with its thumbnails; an image's trash button
+  // removes its link (the file stays) with an undo toast, no confirmation.
+  await shot.locator('.body-toggle:not(.image-toggle)').click();
+  const shotBody = main.locator('.row-group', { hasText: 'Shot' }).locator('.body-view');
+  await expect(shotBody.locator('img')).toHaveCount(2);
+  await shotBody.locator('.body-image').first().hover();
+  await shotBody.locator('.part-trash').first().click();
+  await expect(main.locator('.toast')).toContainText('Deleted image');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('![dot](attachments/dot.png)');
+  await expect(shotBody.locator('img')).toHaveCount(1);
+  expect(existsSync(join(flint, 'attachments', 'dot.png'))).toBe(true);
+  await main.locator('.toast').getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => readFile(file, 'utf8')).toContain('![dot](attachments/dot.png)');
+  // A code card's trash button removes the block with its fences.
+  const shortBody = main.locator('.row-group', { hasText: 'Short body' }).locator('.body-view');
+  await shortBody.locator('.code-card').hover();
+  await shortBody.locator('.code-card .part-trash').click();
+  await expect(main.locator('.toast')).toContainText('Deleted code block');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('{"a": 1}');
+  await main.locator('.toast').getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => readFile(file, 'utf8')).toContain('    {"a": 1}\n');
+  await shot.locator('.body-toggle:not(.image-toggle)').click();
 
   // D-76: a second single click on a selected row (beside its text) edits it.
   await short.click({ position: { x: 600, y: 10 } });
@@ -1217,7 +1248,7 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
     }, key);
   await expect(main.locator('.nav', { hasText: 'Studio' })).toHaveCount(1);
 
-  // A new group from the + menu goes at the end.
+  // D-80: a new group from the + menu goes at the top of Lists, as a card.
   await main.locator('.add-list').click();
   await main.locator('.fl-menu').getByText('New group').click();
   await main.keyboard.type('Home');
@@ -1237,32 +1268,37 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   await main.locator('.fl-submenu').getByText('New group').click();
   await main.keyboard.type('Work');
   await main.keyboard.press('Enter');
-  await expect(head).toHaveText([/Home\s*1/i, /Work\s*1/i]);
+  await expect(head).toHaveText([/Work\s*1/i, /Home\s*1/i]);
   await main.locator('.nav', { hasText: 'Studio' }).click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Remove from group').click();
-  await expect(head.last()).toHaveText(/Work\s*0/i);
+  await expect(head.first()).toHaveText(/Work\s*0/i);
+  const home = main.locator('.nav-group', { hasText: 'Home' }).locator('.nav-group-head');
 
-  // The header folds the group; its lists stay in the file.
-  await head.first().click();
-  await expect(head.first()).toHaveAttribute('aria-expanded', 'false');
-  await expect(main.locator('.group-lists').first()).not.toHaveClass(/open/);
-  await head.first().click();
-  await expect(head.first()).toHaveAttribute('aria-expanded', 'true');
+  // The header folds the group; its lists stay in the file. Folded, its count says "1 list".
+  await home.click();
+  await expect(home).toHaveAttribute('aria-expanded', 'false');
+  await expect(home.locator('.group-count')).toHaveText('1 list');
+  await expect(
+    main.locator('.nav-group', { hasText: 'Home' }).locator('.group-lists'),
+  ).not.toHaveClass(/open/);
+  await home.click();
+  await expect(home).toHaveAttribute('aria-expanded', 'true');
 
-  // D-79: with the group picked in the sidebar, Alt+↓ moves the group; Ctrl+Z puts it back.
+  // D-79: with the group picked in the sidebar, Alt+↑/↓ moves the group; Ctrl+Z puts it back.
   const order = (): Promise<string[]> =>
     main
-      .locator('.sidebar > .nav-group, .sidebar > .nav')
+      .locator('.sidebar > .nav-group:not(.flip-ghost), .sidebar > .nav:not(.flip-ghost)')
       .evaluateAll((items) =>
         items.map((item) =>
           (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),
         ),
       );
   const before = await order();
-  await altArrow('ArrowDown');
+  // Home, picked by its header, is last (new groups go to the top, D-80): Alt+↑ moves it up.
+  await altArrow('ArrowUp');
   await expect.poll(order).not.toEqual(before);
   const at = (await order()).indexOf('Home');
-  expect(at).toBe(before.indexOf('Home') + 1);
+  expect(at).toBe(before.indexOf('Home') - 1);
   await main.keyboard.press('Control+z');
   await expect.poll(order).toEqual(before);
   // Picking a list in the sidebar moves the keyboard there from the group.
@@ -1285,13 +1321,14 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   await head.first().click();
 
   // Rename and delete a group; its lists stay.
-  await head.first().click({ button: 'right' });
+  await home.click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Rename group').click();
   await main.keyboard.press('Control+a');
   await main.keyboard.type('House');
   await main.keyboard.press('Enter');
-  await expect(head.first()).toHaveText(/House/i);
-  await head.first().click({ button: 'right' });
+  const house = main.locator('.nav-group', { hasText: 'House' }).locator('.nav-group-head');
+  await expect(house).toHaveCount(1);
+  await house.click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Delete group').click();
   await expect(main.locator('.toast')).toContainText('Deleted group House · its lists stay');
   await expect(head).toHaveCount(1);
@@ -1328,6 +1365,27 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   const top = async (locator: Locator): Promise<number> =>
     (await locator.boundingBox())?.y ?? Number.NaN;
 
+  // D-80: while a task is dragged, the sidebar keeps its highlight and the dragged row its own
+  // selected look; a task with subtasks folds them away and gets them back after the drop.
+  {
+    const box = await row('two').boundingBox();
+    if (!box) throw new Error('nothing to drag');
+    await main.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2);
+    await main.mouse.down();
+    await main.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2 + 12, { steps: 4 });
+    await expect(main.locator('.nav-glide')).toHaveCSS('opacity', '1');
+    await expect(main.locator('.sel-glide')).toHaveCSS('opacity', '0');
+    await expect(row('two')).toHaveClass(/drag-lift/);
+    await expect(row('two')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(row('two-a')).toHaveClass(/drag-fold/);
+    await main.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 4 });
+    await main.mouse.up();
+    await expect(main.locator('.drag-fold, .drag-lift')).toHaveCount(0);
+    await expect(row('two-a')).toBeVisible();
+    // The subtasks unfold (--fl-dur-state) before the next drag measures the rows.
+    await main.waitForTimeout(400);
+  }
+
   // A task dragged to the top; the others slide; the click that ends it doesn't edit.
   await drag(row('three'), (await top(row('one'))) + 2);
   await expect
@@ -1341,40 +1399,50 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
     .poll(() => readFile(file, 'utf8'))
     .toContain('- [ ] two [id:: d2]\n    - [ ] two-b [id:: d2b]\n    - [ ] two-a [id:: d2a]\n');
 
-  // A list dragged just below an open group's header joins the group.
+  // A list dragged just below an open group's header joins the group. D-80: on the way the group
+  // lights up ("Drop to add") and the drop line shows where it lands.
   await main.locator('.add-list').click();
   await main.locator('.fl-menu').getByText('New group').click();
   await main.keyboard.type('Dragged');
   await main.keyboard.press('Enter');
-  const group = main.locator('.nav-group', { hasText: 'Dragged' });
+  const group = main.locator('.nav-group:not(.flip-ghost)', { hasText: 'Dragged' });
   await expect(group).toHaveCount(1);
   const head = group.locator('.nav-group-head');
+  await main.waitForTimeout(400);
   const headBox = await head.boundingBox();
   if (!headBox) throw new Error('no group header');
-  await drag(main.locator('.sidebar > .nav', { hasText: 'Drag' }), headBox.y + headBox.height + 4);
+  {
+    const list = await main.locator('.sidebar > .nav', { hasText: 'Drag' }).boundingBox();
+    if (!list) throw new Error('no list to drag');
+    const x = list.x + list.width * 0.6;
+    await main.mouse.move(x, list.y + list.height / 2);
+    await main.mouse.down();
+    await main.mouse.move(x, list.y + list.height / 2 - 6, { steps: 2 });
+    await main.mouse.move(x, headBox.y + headBox.height + 4, { steps: 10 });
+    await expect(group).toHaveClass(/drop-target/);
+    await expect(group.locator('.drop-hint')).toBeVisible();
+    await expect(main.locator('.drop-line')).toHaveCount(1);
+    await main.mouse.up();
+  }
   await expect(group.locator('.nav')).toHaveText([/Drag/]);
-  // The whole group dragged up one place.
+  await expect(main.locator('.drop-target, .drop-line')).toHaveCount(0);
+  // The whole group dragged down one place (new groups start at the top, D-80).
   const order = (): Promise<string[]> =>
     main
-      .locator('.sidebar > .nav-group, .sidebar > .nav')
+      .locator('.sidebar > .nav-group:not(.flip-ghost), .sidebar > .nav:not(.flip-ghost)')
       .evaluateAll((items) =>
         items.map((item) =>
           (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),
         ),
       );
   const before = await order();
-  const above = main
-    .locator('.sidebar > *')
-    .nth(
-      (await main
-        .locator('.sidebar > *')
-        .evaluateAll((items) =>
-          items.findIndex((item) => item.querySelector('.group-name')?.textContent === 'Dragged'),
-        )) - 1,
-    );
-  await drag(head, (await top(above)) + 2);
+  await main.waitForTimeout(400);
+  const groupBox = await head.boundingBox();
+  const nextBox = await group.locator('xpath=following-sibling::*[1]').boundingBox();
+  if (!groupBox || !nextBox) throw new Error('nothing below the group');
+  await drag(head, groupBox.y + groupBox.height / 2 + nextBox.height + 2);
   await expect.poll(order).not.toEqual(before);
-  expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') - 1);
+  expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') + 1);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

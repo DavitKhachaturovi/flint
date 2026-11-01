@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyHasText, bodyHtml, bodyImages, mediaUrl } from './body-markdown.js';
+import { bodyHasText, bodyHtml, bodyImages, mediaUrl, removeBodyPart } from './body-markdown.js';
 
 describe('task bodies rendered (TASK-05, D-49)', () => {
   it('renders markdown blocks, never raw HTML', () => {
@@ -17,16 +17,16 @@ describe('task bodies rendered (TASK-05, D-49)', () => {
 
   it('marks code blocks with their language for the highlighter', () => {
     expect(bodyHtml('```json\n{"a": 1}\n```')).toBe(
-      '<pre class="body-code" data-lang="json"><code>{&quot;a&quot;: 1}</code></pre>\n',
+      '<pre class="body-code" data-lang="json" data-part="0"><code>{&quot;a&quot;: 1}</code></pre>\n',
     );
     expect(bodyHtml('    indented <b>')).toBe(
-      '<pre class="body-code" data-lang=""><code>indented &lt;b&gt;</code></pre>\n',
+      '<pre class="body-code" data-lang="" data-part="0"><code>indented &lt;b&gt;</code></pre>\n',
     );
   });
 
   it('loads images from the Flint folder only', () => {
     expect(bodyHtml('![shot](attachments/shot%201.png)')).toBe(
-      '<p><img src="app://media/attachments/shot%201.png" alt="shot"></p>\n',
+      '<p><img src="app://media/attachments/shot%201.png" alt="shot" data-part="0"></p>\n',
     );
     expect(bodyHtml('![remote](https://example.com/x.png)')).toBe(
       '<p><span class="body-image-missing">remote</span></p>\n',
@@ -56,5 +56,66 @@ describe('body indicators and the lightbox (D-79)', () => {
     expect(bodyHasText('![](attachments/a.png)\n\n![](attachments/b.png)')).toBe(false);
     expect(bodyHasText('![](attachments/a.png)\nthe crash')).toBe(true);
     expect(bodyHasText('plain')).toBe(true);
+  });
+});
+
+describe('removing a part of a body (D-80)', () => {
+  const body = [
+    'Context',
+    '',
+    '```json',
+    '{ "a": 1 }',
+    '```',
+    '',
+    '![](attachments/a.png)',
+    '',
+    'See ![shot](attachments/b.png) here',
+    '',
+    '```',
+    '![](attachments/a.png)',
+    '```',
+    '',
+    '![](attachments/a.png)',
+  ].join('\n');
+
+  it('numbers code blocks and images in the HTML', () => {
+    const html = bodyHtml(body);
+    expect(html.match(/data-part="\d+"/g)).toEqual([
+      'data-part="0"',
+      'data-part="0"',
+      'data-part="1"',
+      'data-part="1"',
+      'data-part="2"',
+    ]);
+  });
+
+  it('removes a code block with its fences, leaving one blank line', () => {
+    expect(removeBodyPart(body, 'code', 0)).toBe(
+      ['Context', '', '![](attachments/a.png)', '', 'See ![shot](attachments/b.png) here']
+        .concat(['', '```', '![](attachments/a.png)', '```', '', '![](attachments/a.png)'])
+        .join('\n'),
+    );
+  });
+
+  it('removes only the link of the n-th image, never a look-alike inside code', () => {
+    // Image 2 is the second a.png outside code: the last line.
+    expect(removeBodyPart(body, 'image', 2)).toBe(body.split('\n').slice(0, -2).join('\n'));
+    // An image within text keeps the text.
+    expect(removeBodyPart(body, 'image', 1)).toContain('See  here');
+    expect(removeBodyPart(body, 'image', 0).split('\n').slice(0, 7)).toEqual([
+      'Context',
+      '',
+      '```json',
+      '{ "a": 1 }',
+      '```',
+      '',
+      'See ![shot](attachments/b.png) here',
+    ]);
+  });
+
+  it('leaves the body alone for a part that is not there', () => {
+    expect(removeBodyPart(body, 'code', 5)).toBe(body);
+    expect(removeBodyPart(body, 'image', 9)).toBe(body);
+    expect(removeBodyPart('```\nonly code\n```', 'code', 0)).toBe('');
   });
 });

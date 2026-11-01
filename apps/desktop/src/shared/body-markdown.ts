@@ -24,22 +24,37 @@ export function mediaUrl(src: string): string | null {
   return `${MEDIA_ORIGIN}/${src}`;
 }
 
-const code = (lang: string, content: string): string =>
-  `<pre class="body-code" data-lang="${escape(lang)}"><code>${escape(content.replace(/\n$/, ''))}</code></pre>\n`;
-
-md.renderer.rules.fence = (tokens, index) => {
-  const token = tokens[index];
-  return token ? code(token.info.trim().split(/\s+/)[0] ?? '', token.content) : '';
+/** D-80: code blocks and images are numbered in order (`data-part`), so one can be removed. */
+interface Parts {
+  code: number;
+  image: number;
+}
+const parts = (env: unknown): Parts => {
+  const holder = env as { parts?: Parts };
+  holder.parts ??= { code: 0, image: 0 };
+  return holder.parts;
 };
-md.renderer.rules.code_block = (tokens, index) => code('', tokens[index]?.content ?? '');
+
+const code = (lang: string, content: string, part: number): string =>
+  `<pre class="body-code" data-lang="${escape(lang)}" data-part="${part}"><code>${escape(content.replace(/\n$/, ''))}</code></pre>\n`;
+
+md.renderer.rules.fence = (tokens, index, _options, env) => {
+  const token = tokens[index];
+  return token
+    ? code(token.info.trim().split(/\s+/)[0] ?? '', token.content, parts(env).code++)
+    : '';
+};
+md.renderer.rules.code_block = (tokens, index, _options, env) =>
+  code('', tokens[index]?.content ?? '', parts(env).code++);
 md.renderer.rules.image = (tokens, index, options, env, self) => {
   const token = tokens[index];
   if (!token) return '';
+  const part = parts(env).image++;
   const alt = self.renderInlineAsText(token.children ?? [], options, env);
   const raw = String(token.attrGet('src') ?? '');
   const src = mediaUrl(raw);
   return src
-    ? `<img src="${escape(src)}" alt="${escape(alt)}">`
+    ? `<img src="${escape(src)}" alt="${escape(alt)}" data-part="${part}">`
     : `<span class="body-image-missing">${escape(alt || raw)}</span>`;
 };
 
@@ -62,5 +77,59 @@ export function bodyHasText(body: string): boolean {
 
 /** The body as HTML (safe to set as innerHTML: markdown-it escapes everything else). */
 export function bodyHtml(body: string): string {
-  return md.render(body);
+  return md.render(body, {});
+}
+
+/** An image in the source, `![alt](src "title")`, with its target in group 1. */
+const IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g;
+
+/**
+ * D-80: the body without one of its code blocks or images (numbered as `data-part` in the HTML).
+ * A code block goes with its fence lines; an image only loses its link (the file stays, MEDIA-04),
+ * and its line too when nothing else is on it. One blank line is left where two would meet.
+ */
+export function removeBodyPart(body: string, kind: 'code' | 'image', index: number): string {
+  const tokens = md.parse(body, {});
+  const lines = body.split('\n');
+  const code = tokens.flatMap((token) =>
+    (token.type === 'fence' || token.type === 'code_block') && token.map ? [token.map] : [],
+  );
+  const tidy = (at: number): string => {
+    if (lines[at - 1]?.trim() === '' && (lines[at] ?? '').trim() === '') lines.splice(at - 1, 1);
+    while (lines[0]?.trim() === '') lines.shift();
+    while (lines.at(-1)?.trim() === '') lines.pop();
+    return lines.join('\n');
+  };
+  if (kind === 'code') {
+    const range = code[index];
+    if (!range) return body;
+    lines.splice(range[0], range[1] - range[0]);
+    return tidy(range[0]);
+  }
+  const sources = tokens.flatMap((token) =>
+    (token.children ?? []).flatMap((child) =>
+      child.type === 'image' ? [String(child.attrGet('src') ?? '')] : [],
+    ),
+  );
+  const src = sources[index];
+  if (src === undefined) return body;
+  // The same picture can be in a body twice: the right one is the n-th with this target.
+  let skip = sources.slice(0, index).filter((other) => other === src).length;
+  for (let at = 0; at < lines.length; at++) {
+    if (code.some(([start, end]) => at >= start && at < end)) continue;
+    const line = lines[at] ?? '';
+    for (const match of line.matchAll(IMAGE)) {
+      const target = match[1] ?? '';
+      if (target !== src && md.normalizeLink(target) !== src) continue;
+      if (skip-- > 0) continue;
+      const rest = line.slice(0, match.index) + line.slice(match.index + match[0].length);
+      if (rest.trim() === '') {
+        lines.splice(at, 1);
+        return tidy(at);
+      }
+      lines[at] = rest.replace(/[ \t]+$/, '');
+      return lines.join('\n');
+    }
+  }
+  return body;
 }

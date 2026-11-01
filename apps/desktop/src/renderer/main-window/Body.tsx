@@ -1,17 +1,47 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { blockFor, classifyPaste, fencedBlock, type BlockKind } from '@flint/core/shorthand';
-import { bodyHtml } from '../../shared/body-markdown.js';
+import { bodyHtml, removeBodyPart } from '../../shared/body-markdown.js';
 import { codeLanguage } from '../../shared/code-language.js';
 import { highlightLines } from '../highlight/highlight.js';
 
 const COPY_ICON =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
 
+const TRASH_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path></svg>';
+
+/** D-80: a part of a body that can be removed (a code block or an image), as numbered in the HTML. */
+interface Part {
+  readonly kind: 'code' | 'image';
+  readonly index: number;
+}
+
+/** D-80: the small trash button in a code card's or an image's corner. */
+function trashButton(part: Part, onRemove: (part: Part, from: HTMLElement) => void): HTMLElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'part-trash';
+  const label = part.kind === 'code' ? 'Delete code block' : 'Delete image';
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = TRASH_ICON;
+  button.addEventListener('mousedown', (event) => event.stopPropagation());
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onRemove(part, button);
+  });
+  return button;
+}
+
 /**
  * The code blocks of rendered body HTML, highlighted in place (UI-06): JSON and stack traces. Each
- * becomes a small code card with its kind and a copy button (D-77, mockup 01).
+ * becomes a small code card with its kind and a copy button (D-77, mockup 01), and, when the body
+ * can be changed, a trash button (D-80); so does every image.
  */
-function highlightCode(root: HTMLElement): void {
+function highlightCode(
+  root: HTMLElement,
+  onRemove: ((part: Part, from: HTMLElement) => void) | null,
+): void {
   for (const pre of root.querySelectorAll<HTMLElement>('pre.body-code')) {
     const code = pre.querySelector('code');
     if (!code) continue;
@@ -45,9 +75,67 @@ function highlightCode(root: HTMLElement): void {
       });
     });
     head.append(label, copy);
+    const part = Number(pre.dataset['part']);
+    if (onRemove && Number.isInteger(part))
+      head.append(trashButton({ kind: 'code', index: part }, onRemove));
     pre.replaceWith(card);
     card.append(head, pre);
   }
+  if (!onRemove) return;
+  for (const image of root.querySelectorAll<HTMLImageElement>('img[data-part]')) {
+    const holder = document.createElement('span');
+    holder.className = 'body-image';
+    image.replaceWith(holder);
+    holder.append(
+      image,
+      trashButton({ kind: 'image', index: Number(image.dataset['part']) }, onRemove),
+    );
+  }
+}
+
+/**
+ * D-80: where a removed part was, a copy of it folds away (its height and opacity) while the body
+ * already shows without it: the change is made at once (D-75). A part that sits in a paragraph of
+ * its own (an image on its line) folds with that paragraph; one inside text just goes.
+ */
+interface Leaving {
+  readonly copy: HTMLElement;
+  /** Its place among the body's blocks. */
+  readonly at: number;
+}
+
+function leavingCopy(root: HTMLElement, from: HTMLElement): Leaving | null {
+  const part = from.closest<HTMLElement>('.code-card, .body-image');
+  if (!part) return null;
+  let block: HTMLElement = part;
+  while (block.parentElement && block.parentElement !== root) block = block.parentElement;
+  if (block.parentElement !== root) return null;
+  // An image inside text: nothing to fold.
+  if (part.matches('.body-image') && (block.textContent ?? '').trim() !== '') return null;
+  const copy = block.cloneNode(true) as HTMLElement;
+  copy.classList.add('part-leaving');
+  copy.setAttribute('aria-hidden', 'true');
+  copy.style.height = `${block.offsetHeight}px`;
+  return { copy, at: [...root.children].indexOf(block) };
+}
+
+function foldAwayCopy(root: HTMLElement, leaving: Leaving): void {
+  const { copy, at } = leaving;
+  root.insertBefore(copy, root.children[at] ?? null);
+  const style = getComputedStyle(document.documentElement);
+  const duration = parseFloat(style.getPropertyValue('--fl-dur-state')) || 260;
+  copy
+    .animate(
+      [
+        { height: copy.style.height, opacity: 1 },
+        { height: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px' },
+      ],
+      { duration, easing: 'cubic-bezier(.2, .9, .3, 1)', fill: 'forwards' },
+    )
+    .finished.then(
+      () => copy.remove(),
+      () => copy.remove(),
+    );
 }
 
 /** D-79: opens the lightbox on one of the body's images. */
@@ -62,12 +150,34 @@ function BodyView(props: {
   readonly body: string;
   readonly onEdit: () => void;
   readonly onImage?: ShowImage | undefined;
+  /** D-80: the body without a removed code block or image, to save. */
+  readonly onRemovePart?: ((body: string, kind: Part['kind']) => void) | undefined;
 }): ReactElement {
-  const { body, onEdit, onImage } = props;
+  const { body, onEdit, onImage, onRemovePart } = props;
   const box = useRef<HTMLDivElement>(null);
   const html = useMemo(() => bodyHtml(body), [body]);
+  const leaving = useRef<Leaving | null>(null);
+  const latest = useRef({ body, onRemovePart });
+  latest.current = { body, onRemovePart };
   useLayoutEffect(() => {
-    if (box.current) highlightCode(box.current);
+    const root = box.current;
+    if (!root) return;
+    const remove = (part: Part, from: HTMLElement): void => {
+      const save = latest.current.onRemovePart;
+      if (!save) return;
+      const next = removeBodyPart(latest.current.body, part.kind, part.index);
+      if (next === latest.current.body) return;
+      leaving.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? null
+        : leavingCopy(root, from);
+      save(next, part.kind);
+    };
+    highlightCode(root, onRemovePart ? remove : null);
+    const copy = leaving.current;
+    leaving.current = null;
+    if (copy) foldAwayCopy(root, copy);
+    // Only a new body is rendered again (the cards are built on its HTML once); the handlers are
+    // read through `latest`.
   }, [html]);
   return (
     <div
@@ -168,10 +278,13 @@ export function BodyBlock(props: {
   readonly onDone: (body: string) => void;
   readonly onOpenPage?: () => void;
   readonly onImage?: ShowImage;
+  /** D-80: a code block or an image removed with its trash button: the body to save. */
+  readonly onRemovePart?: (body: string, kind: 'code' | 'image') => void;
   readonly placeholder?: string;
 }): ReactElement {
   const { body, inline, editing, editable, onEdit, onDone, onOpenPage, onImage, placeholder } =
     props;
+  const onRemovePart = editable ? props.onRemovePart : undefined;
   const clip = useRef<HTMLDivElement>(null);
   const [long, setLong] = useState(false);
   useLayoutEffect(() => {
@@ -199,6 +312,7 @@ export function BodyBlock(props: {
           <BodyView
             body={body}
             onImage={onImage}
+            onRemovePart={onRemovePart}
             onEdit={() => {
               if (long && onOpenPage) onOpenPage();
               else if (editable) onEdit();
