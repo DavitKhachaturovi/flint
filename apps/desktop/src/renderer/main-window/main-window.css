@@ -185,6 +185,7 @@ button:focus-visible {
 .scroller {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   /* D-76: the scrollbar's place is always kept, so nothing shifts when one appears (a note). */
   scrollbar-gutter: stable;
@@ -667,8 +668,8 @@ h1 .count {
     transform var(--fl-dur-base) var(--fl-ease-spring),
     width var(--fl-dur-base) var(--fl-ease-spring),
     height var(--fl-dur-base) var(--fl-ease-spring),
-    background-color var(--fl-dur-base) ease,
-    box-shadow var(--fl-dur-base) ease;
+    background-color var(--fl-dur-state) ease,
+    box-shadow var(--fl-dur-state) ease;
 }
 
 /* UI-04, D-76: a new task opens up its place; a reopened one returns from the left. */
@@ -763,7 +764,9 @@ h1 .count {
    editor (M5), on the window ground under the heading, filling the page's height and growing with
    the text, so the page scrolls as a whole. */
 .content.note-page {
-  min-height: 100%;
+  /* D-77: less the page animation's 8 px rise, so arriving never makes it overflow (no flashing
+     scrollbar). */
+  min-height: calc(100% - 8px);
   padding-bottom: 40px;
 }
 
@@ -1345,7 +1348,29 @@ textarea:not([readonly], [disabled]) {
 .row.marked,
 .row.marked:hover {
   background: var(--fl-ground-float);
-  box-shadow: var(--fl-shadow-selected);
+  box-shadow: none;
+}
+
+/* D-77: marked rows next to each other are one highlight: square inner corners, no seam (the
+   card's 2 px gap is filled). */
+.row.marked.mark-up {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.row.marked.mark-down {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.row.marked.mark-down::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--fl-ground-float);
 }
 
 .nav.marked {
@@ -1397,4 +1422,62 @@ textarea:not([readonly], [disabled]) {
 
 .toast.above-bar {
   bottom: 84px;
+}
+
+/* D-77: a deleted task (or one moved away, an undone duplicate) fades and folds away where it was. */
+.row.leaving.remove {
+  animation-name: row-remove;
+}
+
+@keyframes row-remove {
+  0% {
+    max-height: 64px;
+  }
+  40% {
+    opacity: 0.6;
+    transform: scale(0.985);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.97);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* D-77: the toast sinks and fades out. */
+.toast.leaving {
+  pointer-events: none;
+  animation: toast-out var(--fl-dur-base) ease-in forwards;
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+/* D-77: Completed folds away and opens smoothly; the rows stay rendered (inert while folded). */
+.completed-rows {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity var(--fl-dur-state) ease;
+}
+
+.completed-rows.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.completed-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }

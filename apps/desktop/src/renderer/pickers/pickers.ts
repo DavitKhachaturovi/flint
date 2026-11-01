@@ -627,7 +627,9 @@ function wheel(label: string, values: readonly number[], max: number, onChange: 
   column.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    commit();
+    // D-77: a click goes straight to the value clicked; unfinished typing is dropped, not taken
+    // first.
+    if (typed !== null) cancel();
     column.focus();
     column.setPointerCapture(event.pointerId);
     const startY = event.clientY;

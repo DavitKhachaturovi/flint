@@ -412,6 +412,9 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
   // The watcher picks the new list up.
   await main.locator('.nav', { hasText: 'Errands' }).click();
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
+  // D-77: nothing is selected when a list opens; the first ↓ selects the first row.
+  await expect(main.locator('.row.sel')).toHaveCount(0);
+  await main.keyboard.press('ArrowDown');
   await expect(main.locator('.row.sel .title')).toHaveText('Renew the parking permit');
 
   // D-75: the task is completed at once; a ghost of its row plays out where it was. Ghosts live
@@ -1007,12 +1010,23 @@ test('multi-select, bulk actions, duplicate and convert (TASK-07, TASK-16, LIST-
   await row('three').click({ position: { x: 600, y: 10 }, modifiers: ['Shift'] });
   await expect(main.locator('.action-count')).toHaveText('3 selected');
   await expect(main.locator('.row.marked')).toHaveCount(3);
+  // D-77: next to each other they are one highlight.
+  await expect(main.locator('.row.marked.mark-down')).toHaveCount(2);
+  await expect(main.locator('.row.marked.mark-up')).toHaveCount(2);
   expect(await main.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
   await main.keyboard.press('3');
   await expect.poll(() => readFile(file, 'utf8')).toContain('three [priority:: high]');
   expect(await readFile(file, 'utf8')).toContain('one [priority:: high]');
   await main.keyboard.press('Control+z');
   await expect.poll(() => readFile(file, 'utf8')).toBe(original);
+
+  // D-77: opening any other list, Inbox too, clears the marks.
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('.action-bar')).toHaveCount(0);
+  await main.locator('.nav', { hasText: 'Bulk' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Bulk/);
+  await row('one').click({ position: { x: 600, y: 10 } });
+  await row('two').click({ position: { x: 600, y: 10 }, modifiers: ['Shift'] });
 
   // Esc clears the marks; Ctrl+A marks all; Delete removes them all, one Undo brings them back.
   await main.keyboard.press('Escape');

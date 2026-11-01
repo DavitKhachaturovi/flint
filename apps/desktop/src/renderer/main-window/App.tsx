@@ -87,15 +87,14 @@ function listInfos(lists: readonly ListSummary[]): ListInfo[] {
   }));
 }
 
-/** Before a list's rows arrive: select its first row once they do. */
-const FIRST_ROW = '';
-
 let seq = 0;
 
 interface Toast {
   readonly text: string;
   readonly undo: boolean;
   readonly id: number;
+  /** D-77: playing its way out. */
+  readonly leaving?: boolean;
 }
 
 /**
@@ -153,14 +152,17 @@ function durationMs(token: string, fallback: number): number {
 const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * D-75: a copy of a row that has just been completed or reopened, playing the completion animation
- * where the row was, while the task itself is already in its new place. Not interactive.
+ * D-75, D-77: a copy of a row that has just been completed, reopened or removed (deleted, moved to
+ * another list, an undone duplicate), playing its animation where the row was, while the task is
+ * already in its new place, or gone. Not interactive.
  */
 interface Ghost {
   readonly id: number;
   readonly task: TaskRow;
   readonly subtask: boolean;
-  readonly direction: 'complete' | 'reopen';
+  readonly direction: 'complete' | 'reopen' | 'remove';
+  /** The open tasks, or Completed. */
+  readonly section: 'open' | 'done';
   /** The row it follows in its section (the open tasks, or Completed); null: the first. */
   readonly after: string | null;
 }
@@ -171,8 +173,9 @@ const withSubtasks = (tasks: readonly TaskRow[]): TaskRow[] =>
   tasks.flatMap((task) => [task, ...task.subtasks]);
 
 /**
- * The rows that changed sides between two views of a list, by any cause (Space, undo, redo, a
- * reminder's Done): a ghost where each was, and the keys that now ease in at their new place.
+ * The rows that changed sides, or went away, between two views of a list, by any cause (Space,
+ * Delete, undo, redo, a reminder's Done): a ghost where each was, and the keys that now ease in at
+ * their new place.
  */
 function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: string[] } {
   const openTasks = (view: ListView): TaskRow[] =>
@@ -181,15 +184,21 @@ function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: 
   const nowDone = new Set(withSubtasks(after.completed).map((row) => row.key));
   const ghosts: Ghost[] = [];
   const moved: string[] = [];
-  for (const [tasks, direction, there, here] of [
-    [openTasks(before), 'complete', nowDone, nowOpen],
-    [before.completed, 'reopen', nowOpen, nowDone],
+  for (const [tasks, direction, section, there, here] of [
+    [openTasks(before), 'complete', 'open', nowDone, nowOpen],
+    [before.completed, 'reopen', 'done', nowOpen, nowDone],
   ] as const) {
     const rows = withSubtasks(tasks);
+    const gone = (key: string): boolean => !here.has(key) && !there.has(key);
     for (const task of tasks) {
-      // The task (its subtasks go with it), or a subtask that moved on its own.
-      const went = there.has(task.key) ? [task] : task.subtasks.filter((sub) => there.has(sub.key));
-      for (const row of went) {
+      // The task (its subtasks go with it), or a subtask that moved or went on its own.
+      const went: [TaskRow, Ghost['direction']][] =
+        there.has(task.key) || gone(task.key)
+          ? [[task, there.has(task.key) ? direction : 'remove']]
+          : task.subtasks
+              .filter((sub) => there.has(sub.key) || gone(sub.key))
+              .map((sub) => [sub, there.has(sub.key) ? direction : 'remove']);
+      for (const [row, how] of went) {
         const index = rows.indexOf(row);
         const previous = rows
           .slice(0, index)
@@ -199,10 +208,12 @@ function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: 
           id: ++ghostSeq,
           task: row,
           subtask: row !== task,
-          direction,
+          direction: how,
+          section,
           after: previous?.key ?? null,
         });
-        moved.push(row.key, ...(row === task ? task.subtasks.map((sub) => sub.key) : []));
+        if (how !== 'remove')
+          moved.push(row.key, ...(row === task ? task.subtasks.map((sub) => sub.key) : []));
       }
     }
   }
@@ -242,7 +253,8 @@ export function App(): ReactElement {
   const [lists, setLists] = useState<readonly ListSummary[]>([]);
   const [listId, setListId] = useState('inbox');
   const [view, setView] = useState<ListView | null>(null);
-  const [selected, setSelected] = useState<string | null>(FIRST_ROW);
+  // D-77: nothing is selected when a list opens; the first ↓ selects its first row.
+  const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   /** TASK-07, D-59: the tasks marked for a bulk action (two or more), around the selected row. */
   const [marked, setMarked] = useState<ReadonlySet<string>>(NOTHING);
@@ -315,7 +327,8 @@ export function App(): ReactElement {
     setListId(place.list);
     setPage(place.page);
     setMarked(NOTHING);
-    setSelected(select ?? FIRST_ROW);
+    setSelected(select);
+    setMarkedLists(NOTHING);
     setEditing(null);
     setEditingBody(null);
   }, []);
@@ -401,11 +414,22 @@ export function App(): ReactElement {
     return () => window.removeEventListener('mouseup', onButton);
   }, [travel]);
 
-  const showToast = useCallback((text: string, undo: boolean): void => {
-    window.clearTimeout(toastTimer.current);
-    setToast({ text, undo, id: Date.now() });
-    toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
+  /** D-77: the toast plays its way out, then goes. */
+  const hideToast = useCallback((): void => {
+    setToast((current) => current && { ...current, leaving: true });
+    window.setTimeout(
+      () => setToast((current) => (current?.leaving ? null : current)),
+      durationMs('--fl-dur-base', 200),
+    );
   }, []);
+  const showToast = useCallback(
+    (text: string, undo: boolean): void => {
+      window.clearTimeout(toastTimer.current);
+      setToast({ text, undo, id: Date.now() });
+      toastTimer.current = window.setTimeout(hideToast, TOAST_MS);
+    },
+    [hideToast],
+  );
 
   const change = useCallback(
     (next: ListChange): Promise<ChangeOutcome | null> => window.flintMain.change(listId, next),
@@ -414,19 +438,15 @@ export function App(): ReactElement {
 
   const rows = useMemo(() => visibleRows(view, completedOpen), [view, completedOpen]);
 
-  // A fresh list selects its first row. A row that went away hands the selection to the row now
-  // in its place; a task just added isn't in the rows until the next refresh, so it is waited for.
+  // A row that went away hands the selection to the row now in its place; a task just added isn't
+  // in the rows until the next refresh, so it is waited for.
   const previousRows = useRef<TaskRow[]>([]);
   useEffect(() => {
     const before = previousRows.current;
     previousRows.current = rows;
     if (selected === null || rows.some((row) => row.key === selected)) return;
-    if (selected === FIRST_ROW) {
-      if (rows[0]) setSelected(rows[0].key);
-      return;
-    }
     const gone = before.findIndex((row) => row.key === selected);
-    if (gone >= 0) setSelected(rows[Math.min(gone, rows.length - 1)]?.key ?? FIRST_ROW);
+    if (gone >= 0) setSelected(rows[Math.min(gone, rows.length - 1)]?.key ?? null);
   }, [rows, selected]);
 
   /**
@@ -683,9 +703,11 @@ export function App(): ReactElement {
       ),
     [bulk, lists, listId, markedRows],
   );
+  /** D-77: the visible open tasks; Completed is never swept up (Ctrl+A, then Delete). */
   const selectAll = useCallback((): void => {
-    setMarked(new Set(rows.map((row) => row.key)));
-    anchor.current = rows[0]?.key ?? null;
+    const open = rows.filter((row) => !row.done);
+    setMarked(new Set(open.map((row) => row.key)));
+    anchor.current = open[0]?.key ?? null;
   }, [rows]);
   // Marks follow the rows: a task that went away is no longer marked.
   useEffect(() => {
@@ -1167,7 +1189,29 @@ export function App(): ReactElement {
   const pageCard = useRef<HTMLElement>(null);
   const completedCard = useRef<HTMLElement>(null);
   // D-76: the highlight is also the editing field, gliding between editing rows.
-  const glideTarget = editing ? (editing.kind === 'task' ? editing.key : NEW_ROW) : selected;
+  const glideTarget = editing
+    ? editing.kind === 'task'
+      ? editing.key
+      : NEW_ROW
+    : marked.size > 1
+      ? null
+      : selected;
+  // D-77: marked rows next to each other form one highlight: each knows its marked neighbours.
+  const markJoins = new Map<string, { readonly up: boolean; readonly down: boolean }>();
+  if (marked.size > 1)
+    rows.forEach((row, index) => {
+      if (!marked.has(row.key)) return;
+      const joins = (other: TaskRow | undefined, upper: TaskRow): boolean =>
+        other !== undefined &&
+        marked.has(other.key) &&
+        other.done === row.done &&
+        !expanded.has(upper.key);
+      const previous = rows[index - 1];
+      markJoins.set(row.key, {
+        up: previous !== undefined && joins(previous, previous),
+        down: joins(rows[index + 1], row),
+      });
+    });
   const glideVersion = [rows, completedOpen];
 
   const rowProps: RowHandlers = {
@@ -1175,6 +1219,7 @@ export function App(): ReactElement {
     editing,
     onSelect: selectRow,
     marked,
+    markJoins,
     onToggle: (key) => void toggle(key),
     onEdit: edit,
     onLeaveTask: leaveTask,
@@ -1251,7 +1296,7 @@ export function App(): ReactElement {
         <NewRow key={`new-${fresh.seq}`} subtask={nested} onLeave={leaveNew} onTab={tab} />,
       );
     };
-    cardRows.push(...ghostRows(ghosts, 'complete', null, rowProps));
+    cardRows.push(...ghostRows(ghosts, 'open', null, rowProps));
     view.items.forEach((item, index) => {
       if (item.kind === 'heading')
         cardRows.push(
@@ -1275,7 +1320,7 @@ export function App(): ReactElement {
           />,
           ...bodyRows(item.task, false),
         );
-        cardRows.push(...ghostRows(ghosts, 'complete', item.task.key, rowProps));
+        cardRows.push(...ghostRows(ghosts, 'open', item.task.key, rowProps));
         for (const subtask of item.task.subtasks) {
           cardRows.push(
             <Row
@@ -1287,7 +1332,7 @@ export function App(): ReactElement {
             />,
             ...bodyRows(subtask, true),
           );
-          cardRows.push(...ghostRows(ghosts, 'complete', subtask.key, rowProps));
+          cardRows.push(...ghostRows(ghosts, 'open', subtask.key, rowProps));
           placeNew(subtask.key, true);
         }
         placeNew(item.task.key, false);
@@ -1470,7 +1515,7 @@ export function App(): ReactElement {
                 </section>
 
                 {(view.completed.length > 0 ||
-                  ghosts.some((ghost) => ghost.direction === 'reopen')) && (
+                  ghosts.some((ghost) => ghost.section === 'done')) && (
                   <section className="card completed" aria-label="Completed" ref={completedCard}>
                     <Glide
                       card={completedCard}
@@ -1490,18 +1535,25 @@ export function App(): ReactElement {
                       <span>Completed</span>
                       <span className="chip">{view.completed.length}</span>
                     </button>
-                    {completedOpen && ghostRows(ghosts, 'reopen', null, rowProps)}
-                    {completedOpen &&
-                      view.completed.flatMap((task) => [
-                        <Row
-                          key={task.key}
-                          task={task}
-                          fresh={freshKeys.get(task.key)}
-                          {...rowProps}
-                        />,
-                        ...bodyRows(task, false),
-                        ...ghostRows(ghosts, 'reopen', task.key, rowProps),
-                      ])}
+                    {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
+                    <div
+                      className={completedOpen ? 'completed-rows open' : 'completed-rows'}
+                      inert={!completedOpen}
+                    >
+                      <div className="completed-inner">
+                        {ghostRows(ghosts, 'done', null, rowProps)}
+                        {view.completed.flatMap((task) => [
+                          <Row
+                            key={task.key}
+                            task={task}
+                            fresh={freshKeys.get(task.key)}
+                            {...rowProps}
+                          />,
+                          ...bodyRows(task, false),
+                          ...ghostRows(ghosts, 'done', task.key, rowProps),
+                        ])}
+                      </div>
+                    </div>
                   </section>
                 )}
               </>
@@ -1556,10 +1608,16 @@ export function App(): ReactElement {
       )}
 
       {toast && (
-        <div className={marked.size > 1 ? 'toast above-bar' : 'toast'} role="status" key={toast.id}>
+        <div
+          className={['toast', marked.size > 1 ? 'above-bar' : '', toast.leaving ? 'leaving' : '']
+            .filter(Boolean)
+            .join(' ')}
+          role="status"
+          key={toast.id}
+        >
           <span>{toast.text}</span>
           {toast.undo && (
-            <button type="button" onClick={() => void undo().then(() => setToast(null))}>
+            <button type="button" onClick={() => void undo().then(hideToast)}>
               Undo
             </button>
           )}
@@ -1825,6 +1883,8 @@ interface RowHandlers {
   ) => void;
   /** TASK-07, D-59: the tasks marked for a bulk action. */
   readonly marked: ReadonlySet<string>;
+  /** D-77: whether a marked row joins the marked row above and below into one highlight. */
+  readonly markJoins: ReadonlyMap<string, { readonly up: boolean; readonly down: boolean }>;
   readonly onToggle: (key: string) => void;
   /** Edit state, with the caret at `caret` in the raw title (D-71) or at the end. */
   readonly onEdit: (key: string, caret?: number) => void;
@@ -1969,18 +2029,18 @@ function TaskPage(props: {
 /** The ghosts of a section that follow row `after` (null: the section's first rows), D-75. */
 function ghostRows(
   ghosts: readonly Ghost[],
-  direction: Ghost['direction'],
+  section: Ghost['section'],
   after: string | null,
   handlers: RowHandlers,
 ): ReactElement[] {
   return ghosts
-    .filter((ghost) => ghost.direction === direction && ghost.after === after)
+    .filter((ghost) => ghost.section === section && ghost.after === after)
     .flatMap((ghost) => [
       <Row
         key={`ghost-${ghost.id}`}
         task={ghost.task}
         subtask={ghost.subtask}
-        ghost={direction}
+        ghost={ghost.direction}
         {...handlers}
       />,
       ...(ghost.subtask ? [] : ghost.task.subtasks).map((sub) => (
@@ -1988,7 +2048,7 @@ function ghostRows(
           key={`ghost-${ghost.id}-${sub.key}`}
           task={sub}
           subtask
-          ghost={direction}
+          ghost={ghost.direction}
           {...handlers}
         />
       )),
@@ -2002,7 +2062,7 @@ function Row(
     /** Just appeared in the list being looked at, or reopened: it eases in (UI-04, D-76). */
     readonly fresh?: 'new' | 'return' | undefined;
     /** D-75: a ghost playing the completion animation where the task was. */
-    readonly ghost?: 'complete' | 'reopen';
+    readonly ghost?: Ghost['direction'];
   },
 ): ReactElement {
   const {
@@ -2028,7 +2088,12 @@ function Row(
   /** D-76: a second single click on an already-selected row edits it, like renaming in Explorer. */
   const wasSelected = useRef(false);
   if (ghost) classes.push('leaving', ghost);
-  else if (props.marked.size > 1 && props.marked.has(task.key)) classes.push('marked');
+  else if (props.marked.size > 1 && props.marked.has(task.key)) {
+    classes.push('marked');
+    const joins = props.markJoins.get(task.key);
+    if (joins?.up) classes.push('mark-up');
+    if (joins?.down) classes.push('mark-down');
+  }
   const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
   return (
     <div
@@ -2177,11 +2242,17 @@ function Glide(props: {
     element.style.transition = 'none';
     void element.offsetWidth;
     element.style.transition = '';
-    if (!reducedMotion())
-      element.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: durationMs('--fl-dur-base', 200),
-        easing: 'ease-out',
-      });
+    // D-77: a fuller, still subtle, arrival: it fades in and settles from a slightly smaller size.
+    if (!reducedMotion()) {
+      const at = element.style.transform;
+      element.animate(
+        [
+          { opacity: 0, transform: `${at} scale(0.97)` },
+          { opacity: 1, transform: at },
+        ],
+        { duration: durationMs('--fl-dur-state', 260), easing: 'cubic-bezier(.2, .9, .3, 1)' },
+      );
+    }
   }, [box]);
   useLayoutEffect(() => {
     const measure = (): void => {
