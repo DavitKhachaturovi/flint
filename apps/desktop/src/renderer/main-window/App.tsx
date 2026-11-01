@@ -1424,6 +1424,16 @@ function Title(props: {
       dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }}
       onMouseDown={(event) => {
         if (onLink(event)) event.stopPropagation();
+        // D-74: a press on the text doesn't select first, so the click goes straight into
+        // editing that row, without the selection gliding there on the way.
+        else if (
+          onEditAt &&
+          event.button === 0 &&
+          !event.ctrlKey &&
+          !event.shiftKey &&
+          textOffsetAt(event.currentTarget, event.clientX, event.clientY) !== null
+        )
+          event.stopPropagation();
       }}
       onDoubleClick={(event) => {
         if (onLink(event)) event.stopPropagation();

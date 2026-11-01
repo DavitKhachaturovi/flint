@@ -127,38 +127,39 @@ interface Row {
 }
 
 interface RowList {
-  /** Shows these rows' highlight, starting at the keyboard's row `index`. */
+  /** Shows these rows, highlighting row `index`. */
   readonly set: (rows: readonly Row[], index?: number) => void;
-  /** ↑/↓ move from the highlighted row, Enter picks it; true if the key was used. */
+  /** ↑/↓ move the highlight, Enter picks the current row; true if the key was used. */
   readonly keys: (event: KeyboardEvent) => boolean;
 }
 
 /**
- * The highlight in a list of rows (D-68, D-69): the keyboard's row stays highlighted, the mouse's
- * only while the pointer is over it; leaving `area` gives the highlight back to the keyboard's row.
+ * The highlight in a list of rows (D-74): it follows the last input used. The mouse moves the
+ * current row and highlights it; when the mouse leaves `area`, nothing is highlighted (as in the
+ * menus); an arrow key brings the highlight back, moving on from the row the mouse was last on.
+ * Enter picks the current row.
  */
 function rowList(area: HTMLElement): RowList {
   let rows: readonly Row[] = [];
   let index = 0;
-  let hover: number | null = null;
-  const paint = (): void => {
-    const shown = hover ?? index;
-    rows.forEach((row, at) => row.button.classList.toggle('active', at === shown));
-  };
+  let shown = true;
+  const paint = (): void =>
+    rows.forEach((row, at) => row.button.classList.toggle('active', shown && at === index));
   area.addEventListener('mouseleave', () => {
-    hover = null;
+    shown = false;
     paint();
   });
   return {
     set(next, start = 0) {
       rows = next;
       index = start;
-      hover = null;
+      shown = true;
       rows.forEach((row, at) =>
         // A real move, not a row appearing under a resting pointer (that fires mouseenter).
         row.button.addEventListener('mousemove', () => {
-          if (hover === at) return;
-          hover = at;
+          if (shown && index === at) return;
+          index = at;
+          shown = true;
           paint();
         }),
       );
@@ -167,15 +168,14 @@ function rowList(area: HTMLElement): RowList {
     keys(event) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         if (rows.length === 0) return true;
-        index =
-          ((hover ?? index) + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
-        hover = null;
+        index = (index + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+        shown = true;
         paint();
         rows[index]?.button.scrollIntoView({ block: 'nearest' });
         return true;
       }
       if (event.key === 'Enter') {
-        rows[hover ?? index]?.pick();
+        rows[index]?.pick();
         return true;
       }
       return false;
@@ -329,6 +329,10 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 /** One stop of a wheel, in px (mockup 08: 40 px rows, the centre band 80 px from the top). */
 const STOP = 40;
 const BAND_TOP = 80;
+/** Touchpad scrolling: pixels per stop (D-74); a mouse notch is always one stop. */
+const TOUCHPAD_STEP = 80;
+/** A pause in wheel events this long drops a partial step. */
+const WHEEL_PAUSE_MS = 200;
 /** Two digits typed within this time make one value (`1`, `4` → 14). */
 const DIGIT_MS = 1000;
 
@@ -415,16 +419,33 @@ function wheel(label: string, values: readonly number[], max: number, onChange: 
     }
   });
 
-  // The mouse wheel: a stop per notch; a touchpad's small deltas add up.
+  // D-74: a mouse notch is one stop. A touchpad sends many small pixel deltas: they add up, one
+  // stop per TOUCHPAD_STEP, the rest kept for the next; a pause starts afresh.
   let wheeled = 0;
+  let lastWheel = 0;
   column.addEventListener(
     'wheel',
     (event) => {
       event.preventDefault();
-      wheeled += event.deltaY;
-      if (Math.abs(wheeled) < STOP) return;
-      select(index + Math.sign(wheeled));
-      wheeled = 0;
+      if (event.timeStamp - lastWheel > WHEEL_PAUSE_MS) wheeled = 0;
+      lastWheel = event.timeStamp;
+      const legacy = (event as WheelEvent & { readonly wheelDeltaY?: number }).wheelDeltaY ?? 0;
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && legacy !== 0 && legacy % 120 === 0) {
+        wheeled = 0;
+        select(index + Math.sign(event.deltaY));
+        return;
+      }
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? TOUCHPAD_STEP / 3
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? TOUCHPAD_STEP * 5
+            : 1;
+      wheeled += event.deltaY * unit;
+      const steps = Math.trunc(wheeled / TOUCHPAD_STEP);
+      if (steps === 0) return;
+      wheeled -= steps * TOUCHPAD_STEP;
+      select(index + steps);
     },
     { passive: false },
   );

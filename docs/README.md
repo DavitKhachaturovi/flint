@@ -22,7 +22,7 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 ## Status
 
 - **Phase:** M1 (`packages/core`) built on branch `m1-core`: file format, IDs, shorthand, time parser, task operations, undo. M2 (shell) next.
-- **Logo:** `assets/icon/flint-icon-512.svg` (final), with small-size variants `flint-icon-24.svg` and `flint-icon-16.svg`.
+- **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg` and `flint-taskbar-24.svg` (D-74).
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
 - **Repository:** `C:\Forge\flint`, Azure DevOps `DavitKhachaturovi/flint` (branch `main`).
 - **Target platform (v1):** Windows x64, an unsigned installable `.exe` handed to coworkers manually (internal tool, D-19). macOS and ARM come later.

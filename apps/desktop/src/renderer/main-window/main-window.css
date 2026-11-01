@@ -559,11 +559,6 @@ h1 .count {
   font: inherit;
 }
 
-.row.editing {
-  background: var(--fl-ground-float);
-  box-shadow: var(--fl-shadow-selected);
-}
-
 /* UI-02: a thin scrollbar from the tokens: a pill thumb, no track, no arrows (docs/09 §8). */
 ::-webkit-scrollbar {
   width: var(--fl-scroll-size);
@@ -640,6 +635,14 @@ h1 .count {
 .row.sel:hover {
   background: transparent;
   box-shadow: none;
+}
+
+/* TASK-02, D-74 (09 §8): a row in Edit state is a dark input field, like the composer, clearly not
+   the selected-row look (docs/03 §2). */
+.row.editing,
+.row.editing:hover {
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
 }
 
 .sel-glide {
