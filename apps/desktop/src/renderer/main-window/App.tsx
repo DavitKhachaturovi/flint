@@ -1340,8 +1340,8 @@ export function App(): ReactElement {
         composer.current?.focus();
         return;
       }
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
-        return;
+      // Typing in a text field or the note editor (contenteditable) is never a command.
+      if (isTextField(event.target)) return;
       // NAV-04: back and forward, anywhere in the window.
       if (event.altKey && !event.ctrlKey && (key === 'arrowleft' || key === 'arrowright')) {
         event.preventDefault();
@@ -2200,6 +2200,7 @@ export function App(): ReactElement {
                 text={view.noteText ?? ''}
                 readOnly={view.readOnly !== null}
                 onId={setListId}
+                onImage={showImage}
               />
             )}
 
@@ -3200,7 +3201,7 @@ function Row(
         // edit in progress ends (leaving the field saves it).
         if (event.shiftKey) {
           event.preventDefault();
-          if (isTextField(document.activeElement)) (document.activeElement as HTMLElement).blur();
+          if (isTextField(document.activeElement)) document.activeElement.blur();
         }
         wasSelected.current =
           task.key === selected && !isEditing && !event.ctrlKey && !event.shiftKey;

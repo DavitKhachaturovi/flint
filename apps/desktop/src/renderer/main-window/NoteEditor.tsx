@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
+import { MarkdownEditor } from '../editor/MarkdownEditor.js';
+import type { ShowImage } from './Body.js';
 
 const SAVE_AFTER_MS = 600;
 
 /**
- * A note as plain monospace text until the note editor (M5, D-64): saved 600 ms after typing stops,
- * when the field loses focus, and when another list is opened. A change from outside Flint shows
- * at once unless there is unsaved typing, which wins (it is saved over it, like any edit).
+ * A note in the live-preview editor (M5, NOTE-01, D-79): saved 600 ms after typing stops, when the
+ * editor loses focus, and when another list is opened. A change from outside Flint shows at once
+ * unless there is unsaved typing, which wins (it is saved over it, like any edit).
  */
 export function NoteEditor(props: {
   readonly id: string;
@@ -13,9 +15,10 @@ export function NoteEditor(props: {
   readonly readOnly: boolean;
   /** Flint added its header to a file that had none (D-23): the note's ID changed. */
   readonly onId: (id: string) => void;
+  /** MEDIA-01: an image opens the lightbox. */
+  readonly onImage: ShowImage;
 }): ReactElement {
-  const { id, text, readOnly, onId } = props;
-  const [value, setValue] = useState(text);
+  const { id, text, readOnly, onId, onImage } = props;
   const latest = useRef({ id, value: text, dirty: false });
   const timer = useRef<number | undefined>(undefined);
 
@@ -25,7 +28,6 @@ export function NoteEditor(props: {
   useEffect(() => {
     if (latest.current.dirty) return;
     latest.current.value = text;
-    setValue(text);
   }, [text]);
 
   const save = (): void => {
@@ -43,16 +45,18 @@ export function NoteEditor(props: {
   useEffect(() => () => saveRef.current(), []);
 
   return (
-    <textarea
+    <MarkdownEditor
+      text={text}
       className="note-editor"
-      aria-label="Note"
-      placeholder={readOnly ? '' : 'Write here'}
-      value={value}
+      ariaLabel="Note"
       readOnly={readOnly}
-      spellCheck={false}
-      onChange={(event) => {
-        setValue(event.target.value);
-        latest.current.value = event.target.value;
+      {...(readOnly ? {} : { placeholder: 'Write here' })}
+      handlers={{
+        openLink: (href) => window.flintMain.openLink(href),
+        openImage: (images, index) => onImage(images, index),
+      }}
+      onChange={(value) => {
+        latest.current.value = value;
         latest.current.dirty = true;
         window.clearTimeout(timer.current);
         timer.current = window.setTimeout(() => saveRef.current(), SAVE_AFTER_MS);

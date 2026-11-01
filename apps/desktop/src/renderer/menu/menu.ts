@@ -348,12 +348,12 @@ function fadeOut(menu: HTMLElement): void {
 }
 
 /** Text fields (inputs, text areas): what is selected decides Cut and Copy. */
-export function isTextField(
-  target: EventTarget | null,
-): target is HTMLInputElement | HTMLTextAreaElement {
+export function isTextField(target: EventTarget | null): target is HTMLElement {
   return (
     target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLInputElement && ['text', 'search', ''].includes(target.type))
+    (target instanceof HTMLInputElement && ['text', 'search', ''].includes(target.type)) ||
+    // M5: the note editor (CodeMirror) is a contenteditable element.
+    (target instanceof HTMLElement && target.isContentEditable)
   );
 }
 
@@ -363,11 +363,14 @@ export function isTextField(
  * like Ctrl+V, the popup's screenshot and code paste included.
  */
 export function textFieldMenu(
-  field: HTMLInputElement | HTMLTextAreaElement,
+  field: HTMLElement,
   edit: (command: 'cut' | 'copy' | 'paste' | 'selectAll') => void,
 ): MenuEntry[] {
-  const selected = (field.selectionEnd ?? 0) > (field.selectionStart ?? 0);
-  const editable = !field.readOnly && !field.disabled;
+  const plain = field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement;
+  const selected = plain
+    ? (field.selectionEnd ?? 0) > (field.selectionStart ?? 0)
+    : window.getSelection()?.isCollapsed === false;
+  const editable = plain ? !field.readOnly && !field.disabled : field.isContentEditable;
   return [
     { label: 'Cut', hint: 'Ctrl+X', disabled: !selected || !editable, action: () => edit('cut') },
     { label: 'Copy', hint: 'Ctrl+C', disabled: !selected, action: () => edit('copy') },

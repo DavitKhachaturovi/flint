@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { blockFor, classifyPaste, fencedBlock, type BlockKind } from '@flint/core/shorthand';
+import { blockFor, type BlockKind } from '@flint/core/shorthand';
+import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { bodyHtml, removeBodyPart } from '../../shared/body-markdown.js';
 import { codeLanguage } from '../../shared/code-language.js';
 import { highlightLines } from '../highlight/highlight.js';
@@ -209,57 +210,40 @@ function BodyView(props: {
 }
 
 /**
- * A body in its plain field until the note editor (D-49, M5), in the rendered text's place, padding
- * and type, so starting to edit moves nothing (D-76). Esc or leaving the field saves; Enter is a new
- * line. JSON, code and stack traces pasted into it are fenced, as in the capture popup (CAP-06).
+ * A body being edited, in the note editor's live preview (M5, D-79; replaces M4's plain field), in
+ * the rendered text's place and type, so starting to edit moves nothing (D-76). Esc or leaving it
+ * saves; Enter is a new line. Pasting follows CAP-06 (code fenced, images attached).
  */
 function BodyEditor(props: {
   readonly initial: string;
   readonly placeholder?: string;
   readonly onDone: (body: string) => void;
+  readonly onImage?: ShowImage | undefined;
 }): ReactElement {
-  const { initial, placeholder, onDone } = props;
-  const [value, setValue] = useState(initial);
+  const { initial, placeholder, onDone, onImage } = props;
   const done = useRef(false);
-  const leave = (): void => {
+  const leave = (value: string): void => {
     if (done.current) return;
     done.current = true;
     onDone(value);
   };
   return (
-    <textarea
-      className="body-editor"
-      aria-label="Body"
-      autoFocus
-      value={value}
-      placeholder={placeholder}
-      spellCheck={false}
-      onChange={(event) => setValue(event.target.value)}
-      onPaste={(event) => {
-        const text = event.clipboardData.getData('text/plain');
-        const kind = classifyPaste(text);
-        if (kind === 'text') return;
-        event.preventDefault();
-        const field = event.currentTarget;
-        const before = field.value.slice(0, field.selectionStart);
-        const after = field.value.slice(field.selectionEnd);
-        // The fence stands on its own lines.
-        const lead =
-          before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
-        const trail = after === '' || after.startsWith('\n') ? '' : '\n';
-        const block = fencedBlock(blockFor(text).text, kind === 'json' ? 'json' : '');
-        field.setRangeText(lead + block + trail, field.selectionStart, field.selectionEnd, 'end');
-        setValue(field.value);
-      }}
-      onMouseDown={(event) => event.stopPropagation()}
-      onBlur={leave}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return;
-        event.preventDefault();
-        event.stopPropagation();
-        leave();
-      }}
-    />
+    <div onMouseDown={(event) => event.stopPropagation()}>
+      <MarkdownEditor
+        text={initial}
+        className="body-editor"
+        ariaLabel="Body"
+        autoFocus
+        caretAtEnd
+        {...(placeholder ? { placeholder } : {})}
+        handlers={{
+          openLink: (href) => window.flintMain.openLink(href),
+          openImage: (images, index) => onImage?.(images, index),
+        }}
+        onBlur={leave}
+        onEscape={leave}
+      />
+    </div>
   );
 }
 
@@ -306,7 +290,12 @@ export function BodyBlock(props: {
   return (
     <div className={classes.join(' ')}>
       {editing ? (
-        <BodyEditor initial={body} onDone={onDone} {...(placeholder ? { placeholder } : {})} />
+        <BodyEditor
+          initial={body}
+          onDone={onDone}
+          onImage={onImage}
+          {...(placeholder ? { placeholder } : {})}
+        />
       ) : (
         <div className="body-clip" ref={clip}>
           <BodyView

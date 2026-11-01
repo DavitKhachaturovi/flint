@@ -407,3 +407,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 12 | Every dragged task keeps its selection highlight | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 13 | Animated fold and unfold of bodies and subtasks while dragging | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 14 | Settings: Keyboard shortcuts section, global hotkeys rebound there, `?` shows the same list | APP-11, APP-08, NAV-02 · v1 · M8 | 02, 06 §2, D-80 |
+| — | M5 editor, first step: CodeMirror live preview for notes and task bodies (marks on the cursor's line only, inline images, field chips, CAP-06 paste) | NOTE-01, TASK-05, LIST-04, MEDIA-01 · Built, not yet in an installer | 02 NOTE-01, 06 §0, D-79 |

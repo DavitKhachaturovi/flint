@@ -683,7 +683,7 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   await main.locator('.toast button').click();
   await expect(main.locator('.nav', { hasText: 'Shopping' })).toBeVisible();
 
-  // A new note, edited as plain text and saved as it is typed (D-64).
+  // A new note, in the live-preview editor (M5, D-79), saved as it is typed (D-64).
   await main.locator('.add-list').click();
   await menu.getByText('New note').click();
   await main.keyboard.type('Scratch');
@@ -694,6 +694,17 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   await expect
     .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
     .toMatch(/mode: note\n---\n# Standup\nNika: DNS$/);
+  // Away from the cursor the marks are hidden and the text shows formatted; on its line they show.
+  await main.keyboard.type('\n**Decision:** keep');
+  await main.locator('h1').click();
+  await expect(main.locator('.note-editor .cm-fl-h1')).toHaveText('Standup');
+  await expect(main.locator('.note-editor .cm-fl-strong')).toHaveText('Decision:');
+  await expect(main.locator('.note-editor .cm-fl-mark')).toHaveCount(0);
+  await main.locator('.note-editor .cm-fl-strong').click();
+  await expect(main.locator('.note-editor .cm-fl-mark')).toHaveCount(2);
+  await expect
+    .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
+    .toMatch(/# Standup\nNika: DNS\n\*\*Decision:\*\* keep$/);
 
   // Every text field keeps Cut / Copy / Paste / Select all, in the page (UI-08, D-64).
   await main.locator('.note-editor').click({ button: 'right' });
@@ -1042,7 +1053,7 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect(inline.locator('strong')).toHaveText('bold');
   await expect(inline.locator('.tok-key')).toHaveText('"a"');
   await inline.locator('p').click();
-  const editor = main.locator('.body-editor');
+  const editor = main.locator('.body-editor .cm-content');
   await expect(editor).toBeFocused();
   await main.keyboard.press('Control+End');
   await main.keyboard.type('\nMore.');

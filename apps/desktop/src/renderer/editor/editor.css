@@ -1,0 +1,223 @@
+/* The note editor's live preview (M5, NOTE-01, D-79; mockup 04): the raw markdown is the text,
+   these are its looks. On the cursor's lines the syntax marks show faint in mono; elsewhere they
+   are hidden and the text shows formatted. Tokens only (docs/09). */
+.md-editor {
+  position: relative;
+  font-size: var(--fl-size-note);
+  line-height: 1.7;
+  color: var(--fl-text-body);
+}
+
+.md-editor .cm-editor {
+  font-size: inherit;
+}
+
+/* Marks on the cursor's line (mockup 04: `**` faint, in mono). */
+.cm-fl-mark {
+  font-family: var(--fl-font-mono);
+  font-size: 0.86em;
+  color: var(--fl-text-faint);
+}
+
+.cm-fl-h1,
+.cm-fl-h2,
+.cm-fl-h3 {
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+
+.cm-fl-h1 {
+  font-size: 1.45em;
+  letter-spacing: -0.015em;
+}
+
+.cm-fl-h2 {
+  font-size: 1.2em;
+}
+
+.cm-fl-h3 {
+  font-size: 1.05em;
+}
+
+.cm-fl-em {
+  font-style: italic;
+}
+
+.cm-fl-strong {
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.cm-fl-strike {
+  text-decoration: line-through;
+  color: var(--fl-text-muted);
+}
+
+/* `==highlight==` (NOTE-02, D-72): a subtle gray background. */
+.cm-fl-highlight {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fl-text-primary) 12%, transparent);
+}
+
+.cm-fl-inline-code {
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  font-family: var(--fl-font-mono);
+  font-size: 0.86em;
+}
+
+.cm-fl-inline-code .cm-fl-mark {
+  font-size: 1em;
+}
+
+.cm-fl-link {
+  color: var(--fl-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--fl-edge-chip);
+  text-underline-offset: 3px;
+}
+
+.cm-fl-link[data-href] {
+  cursor: pointer;
+}
+
+.cm-fl-link-url {
+  color: var(--fl-text-faint);
+}
+
+.cm-fl-quote {
+  padding-left: 12px !important;
+  border-left: 2px solid var(--fl-edge-chip);
+  color: var(--fl-text-secondary);
+}
+
+/* Fenced code as a code card (mockup 04): the well, a ring, the language as its label. */
+.cm-fl-code {
+  padding: 0 14px !important;
+  background: var(--fl-ground-well);
+  box-shadow:
+    inset 1px 0 0 var(--fl-edge-card),
+    inset -1px 0 0 var(--fl-edge-card);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  line-height: 1.65;
+  color: var(--fl-code-plain);
+}
+
+.cm-fl-code-first {
+  padding-top: 6px !important;
+  border-radius: 12px 12px 0 0;
+  box-shadow:
+    inset 1px 0 0 var(--fl-edge-card),
+    inset -1px 0 0 var(--fl-edge-card),
+    inset 0 1px 0 var(--fl-edge-card);
+}
+
+.cm-fl-code-last {
+  padding-bottom: 6px !important;
+  border-radius: 0 0 12px 12px;
+  box-shadow:
+    inset 1px 0 0 var(--fl-edge-card),
+    inset -1px 0 0 var(--fl-edge-card),
+    inset 0 -1px 0 var(--fl-edge-card);
+}
+
+.cm-fl-code-first.cm-fl-code-last {
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.cm-fl-code-end {
+  font-size: 0;
+  line-height: 0;
+}
+
+.cm-fl-code-label {
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.cm-fl-hr {
+  background: linear-gradient(var(--fl-edge-chip), var(--fl-edge-chip)) center / 100% 1px no-repeat;
+}
+
+/* Bullets are small rounded squares (mockup 04); checkboxes like the task rows'. */
+.cm-fl-bullet {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 10px 0 4px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  vertical-align: middle;
+}
+
+.cm-fl-checkbox {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
+  vertical-align: -3px;
+  cursor: pointer;
+  transition:
+    background-color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+
+.cm-fl-checkbox.on {
+  background: var(--fl-accent);
+  box-shadow: none;
+}
+
+.cm-fl-checkbox.on::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 8px;
+  margin: 2px 0 0 5.5px;
+  border: solid var(--fl-ground-window);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.cm-fl-done {
+  color: var(--fl-text-muted);
+}
+
+/* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */
+.cm-fl-image {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.cm-fl-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  min-width: 64px;
+  min-height: 64px;
+  margin: 4px 0 6px;
+  border-radius: var(--fl-radius-tile);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
+  object-fit: cover;
+  cursor: zoom-in;
+}
+
+.cm-fl-image.missing {
+  color: var(--fl-text-faint);
+  font-style: italic;
+}
+
+/* Flint's task fields in a note (LIST-04, D-77): small muted chips; `id` is hidden. */
+.cm-fl-field {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  font-family: var(--fl-font-mono);
+  font-size: 0.78em;
+  color: var(--fl-text-muted);
+}

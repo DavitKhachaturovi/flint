@@ -3,6 +3,7 @@
 @import '../selection.css';
 @import '../menu/menu.css';
 @import '../pickers/pickers.css';
+@import '../editor/editor.css';
 @import '../highlight/highlight.css';
 
 /* The main window (M4), after docs/design/mockups/01-main-inbox.html; tokens only (docs/09). */
@@ -766,9 +767,9 @@ h1 .count {
   color: var(--fl-text-secondary);
 }
 
-/* D-64, D-68 (09 §8): a note is a page, not a card: its text in plain monospace until the note
-   editor (M5), on the window ground under the heading, filling the page's height and growing with
-   the text, so the page scrolls as a whole. */
+/* D-64, D-68 (09 §8): a note is a page, not a card: its text in the live-preview editor (M5), on
+   the window ground under the heading, filling the page's height and growing with the text, so
+   the page scrolls as a whole. */
 .content.note-page {
   /* D-77: less the page animation's 8 px rise, so arriving never makes it overflow (no flashing
      scrollbar). */
@@ -776,28 +777,26 @@ h1 .count {
   padding-bottom: 40px;
 }
 
+/* M5 (NOTE-01, D-79): the note in the live-preview editor (editor.css), lined up with the heading;
+   the whole empty page below the text is its target. */
 .note-editor {
-  display: block;
   flex: 1;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 240px;
-  /* Lines up with the heading. */
   padding: 0 4px;
-  border: 0;
-  outline: none;
-  resize: none;
-  overflow: hidden;
-  field-sizing: content;
-  background: transparent;
-  font-family: var(--fl-font-mono);
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: var(--fl-text-body);
-  caret-color: var(--fl-accent);
+  font-size: 15px;
 }
 
-.note-editor::placeholder {
-  color: var(--fl-text-faint);
+/* The editable area fills the page, so a click (or right-click) below the text is in the note. */
+.note-editor .cm-editor,
+.note-editor .cm-scroller {
+  flex: 1;
+}
+
+.note-editor .cm-content {
+  align-self: stretch;
 }
 
 /* D-65: a toast always sits above the list, its rows and their hover. */

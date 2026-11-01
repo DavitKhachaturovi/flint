@@ -6,19 +6,19 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 
 **Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.15** (the D-80 fixes) (`docs/release-notes.md` lists what each build changed). Tests: 428 unit (Vitest, including the parsed-structure tests of D-80), 20 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
 
-**In flight.** The M5 editor (next steps, 2.). 0.4.15 (the D-80 fixes) goes to Davit for testing; his feedback comes back as a numbered list and becomes a decision entry before the next build.
+**In flight.** The M5 editor, first step done (not yet in an installer): notes and task bodies are edited in the CodeMirror live preview (02 NOTE-01 lists what it does and what is still to come). 0.4.15 (the D-80 fixes) goes to Davit for testing; his feedback comes back as a numbered list and becomes a decision entry before the next build, which will also carry the editor (0.4.16).
 
 **Accepted by Davit (D-80):** the lightbox on the solid ground, Alt+↑/↓ by keyboard focus, and the drag rules (with a clearly visible drop target). The open questions in §4 keep their proposed defaults.
 
 **Known issues.**
 - While a task is dragged, headings and paragraphs between tasks don't make room, so rows can pass over them. The drop itself is right.
 - A drag moves one task, not a multi-selection.
-- Bodies and notes are still edited in a plain text field until the M5 editor.
+- The editor's code cards have no copy button yet while editing (the rendered body has it), and fenced code highlights only JavaScript, TypeScript, JSON, CSS, Python, SQL and YAML.
 - The end-to-end tests run in order and depend on each other: one failure makes the later ones fail too, so fix the first one. They never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
 
 **Next steps.**
 1. Davit's 0.4.15 feedback, when it comes.
-2. **The M5 editor, before step 9 (D-79):** CodeMirror live preview for notes, task bodies and task pages, inline images, raw markdown only on the cursor's line. It replaces `BodyEditor` (`Body.tsx`) and `NoteEditor`. New dependencies follow D-30 (latest stable at least 7 days old, pinned exactly).
+2. **The M5 editor, before step 9 (D-79):** first step done (`renderer/editor/`: `live-preview.ts`, `MarkdownEditor.tsx`, `editor.css`; `NoteEditor` and `BodyEditor` use it; CodeMirror 6 and seven language packages added under D-30, pinned). Next: Davit's look at it in 0.4.16, then NOTE-02's menu, slash commands, the copy button in the editor's code cards.
 3. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).
 4. Then the rest of M5 and M6 to M8 (§2).
 

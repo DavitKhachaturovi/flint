@@ -1,0 +1,603 @@
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentLess,
+  indentMore,
+} from '@codemirror/commands';
+import { css } from '@codemirror/lang-css';
+import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { python } from '@codemirror/lang-python';
+import { sql } from '@codemirror/lang-sql';
+import { yaml } from '@codemirror/lang-yaml';
+import {
+  HighlightStyle,
+  LanguageDescription,
+  syntaxHighlighting,
+  syntaxTree,
+} from '@codemirror/language';
+import { EditorState, Facet, type Extension, type Range } from '@codemirror/state';
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+  drawSelection,
+  keymap,
+  placeholder as placeholderText,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view';
+import { tags } from '@lezer/highlight';
+import type { MarkdownConfig } from '@lezer/markdown';
+import { mediaUrl } from '../../shared/body-markdown.js';
+
+/**
+ * The note editor (M5, NOTE-01, D-49, D-79): CodeMirror with an Obsidian-style live preview. The
+ * markdown text is the source of truth; everything here is decoration over it. Away from the
+ * cursor, the syntax marks (`**`, `#`, backticks, a link's target, fences) are hidden and the text
+ * shows formatted, images show inline, bullets and checkboxes are drawn, Flint's task fields show
+ * as muted chips with `id` hidden (LIST-04, D-77). On the cursor's lines the raw markdown shows,
+ * its marks faint. Without focus the whole text shows formatted. Used for notes, and for task
+ * bodies on their page and inline (replacing the plain fields of M4).
+ */
+
+/** What the editor's host does for clicks on rendered parts. */
+export interface PreviewHandlers {
+  /** A link's target (rendered text, away from the cursor). */
+  readonly openLink?: (href: string) => void;
+  /** An image: every image of the text (`app://media/…`) and the one clicked. */
+  readonly openImage?: (images: readonly string[], index: number) => void;
+}
+
+const handlersFacet = Facet.define<PreviewHandlers, PreviewHandlers>({
+  combine: (values) => values[0] ?? {},
+});
+
+/** `==highlight==`, as in Obsidian (NOTE-02, D-72): the same rules as `~~strikethrough~~`. */
+const PUNCTUATION = /[!-/:-@[-`{-~¡-¿]/;
+const highlightDelimiter = { resolve: 'Highlight', mark: 'HighlightMark' };
+const Highlight: MarkdownConfig = {
+  defineNodes: [
+    { name: 'Highlight', style: { 'Highlight/...': tags.special(tags.content) } },
+    { name: 'HighlightMark', style: tags.processingInstruction },
+  ],
+  parseInline: [
+    {
+      name: 'Highlight',
+      parse(cx, next, pos) {
+        if (next !== 61 || cx.char(pos + 1) !== 61 || cx.char(pos + 2) === 61) return -1;
+        const before = cx.slice(pos - 1, pos);
+        const after = cx.slice(pos + 2, pos + 3);
+        const spaceBefore = /\s|^$/.test(before);
+        const spaceAfter = /\s|^$/.test(after);
+        const punctBefore = PUNCTUATION.test(before);
+        const punctAfter = PUNCTUATION.test(after);
+        return cx.addDelimiter(
+          highlightDelimiter,
+          pos,
+          pos + 2,
+          !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
+          !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
+        );
+      },
+      after: 'Emphasis',
+    },
+  ],
+};
+
+/** Languages for fenced code (UI-06): highlighted in the grayscale scheme of docs/09 §11. */
+const codeLanguages = [
+  LanguageDescription.of({
+    name: 'javascript',
+    alias: ['js', 'jsx', 'node'],
+    support: javascript({ jsx: true }),
+  }),
+  LanguageDescription.of({
+    name: 'typescript',
+    alias: ['ts', 'tsx'],
+    support: javascript({ typescript: true, jsx: true }),
+  }),
+  LanguageDescription.of({ name: 'json', alias: ['jsonc'], support: json() }),
+  LanguageDescription.of({ name: 'css', support: css() }),
+  LanguageDescription.of({ name: 'python', alias: ['py'], support: python() }),
+  LanguageDescription.of({ name: 'sql', support: sql() }),
+  LanguageDescription.of({ name: 'yaml', alias: ['yml'], support: yaml() }),
+];
+
+/** The grayscale code tokens (UI-06, D-63, docs/09 §11) and the inline markdown styles. */
+const flintHighlight = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--fl-code-keyword)', fontWeight: '600' },
+  { tag: [tags.number, tags.integer, tags.float], color: 'var(--fl-code-number)' },
+  { tag: [tags.bool, tags.null, tags.atom], color: 'var(--fl-code-literal)', fontStyle: 'italic' },
+  { tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--fl-code-string)' },
+  { tag: [tags.propertyName, tags.variableName, tags.attributeName], color: 'var(--fl-code-key)' },
+  {
+    tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
+    color: 'var(--fl-code-function)',
+    fontWeight: '500',
+  },
+  { tag: [tags.typeName, tags.className], color: 'var(--fl-code-type)', fontStyle: 'italic' },
+  { tag: [tags.punctuation, tags.bracket, tags.operator], color: 'var(--fl-code-punctuation)' },
+  {
+    tag: [tags.comment, tags.lineComment, tags.blockComment],
+    color: 'var(--fl-code-comment)',
+    fontStyle: 'italic',
+  },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+  { tag: tags.strong, fontWeight: '600', color: 'var(--fl-text-highlight)' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+]);
+
+class ImageWidget extends WidgetType {
+  readonly src: string;
+  readonly alt: string;
+  constructor(src: string, alt: string) {
+    super();
+    this.src = src;
+    this.alt = alt;
+  }
+  override eq(other: ImageWidget): boolean {
+    return other.src === this.src && other.alt === this.alt;
+  }
+  toDOM(): HTMLElement {
+    const holder = document.createElement('span');
+    holder.className = 'cm-fl-image';
+    const url = mediaUrl(this.src);
+    if (url) {
+      const image = document.createElement('img');
+      image.src = url;
+      image.alt = this.alt;
+      image.dataset['src'] = url;
+      holder.append(image);
+    } else {
+      // Flint makes no network requests (APP-09): another image shows as its text.
+      holder.classList.add('missing');
+      holder.textContent = this.alt || this.src;
+    }
+    return holder;
+  }
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+class BulletWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+  toDOM(): HTMLElement {
+    const bullet = document.createElement('span');
+    bullet.className = 'cm-fl-bullet';
+    return bullet;
+  }
+}
+
+class CheckboxWidget extends WidgetType {
+  readonly checked: boolean;
+  constructor(checked: boolean) {
+    super();
+    this.checked = checked;
+  }
+  override eq(other: CheckboxWidget): boolean {
+    return other.checked === this.checked;
+  }
+  toDOM(): HTMLElement {
+    const box = document.createElement('span');
+    box.className = this.checked ? 'cm-fl-checkbox on' : 'cm-fl-checkbox';
+    box.setAttribute('role', 'checkbox');
+    box.setAttribute('aria-checked', String(this.checked));
+    return box;
+  }
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+/** A task field as a small muted chip (LIST-04, D-77): what it says, not how it is written. */
+class FieldWidget extends WidgetType {
+  readonly text: string;
+  constructor(text: string) {
+    super();
+    this.text = text;
+  }
+  override eq(other: FieldWidget): boolean {
+    return other.text === this.text;
+  }
+  toDOM(): HTMLElement {
+    const chip = document.createElement('span');
+    chip.className = 'cm-fl-field';
+    chip.textContent = this.text;
+    return chip;
+  }
+}
+
+/** A field's chip text: `high`, `30 Oct 15:00`, `Today`, `done 28 Oct`, `muted`. */
+function fieldText(key: string, value: string): string {
+  const when = (raw: string): string => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(raw);
+    if (!match) return raw;
+    const month = new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString('en-GB', {
+      month: 'short',
+    });
+    return `${Number(match[3])} ${month}${match[4] ? ` ${match[4]}` : ''}`;
+  };
+  switch (key) {
+    case 'reminder':
+      return when(value);
+    case 'completion':
+      return `done ${when(value)}`;
+    case 'today':
+      return /^true$/i.test(value) ? 'Today' : 'not Today';
+    case 'muted':
+      return /^true$/i.test(value) ? 'muted' : 'not muted';
+    default:
+      return value;
+  }
+}
+
+const hidden = Decoration.replace({});
+const mark = (className: string, attributes?: Record<string, string>): Decoration =>
+  Decoration.mark({ class: className, ...(attributes && { attributes }) });
+const line = (className: string): Decoration => Decoration.line({ class: className });
+
+/** Flint's task fields in a note (LIST-04, D-77): muted chips, the `id` hidden. */
+const FIELD = /\s?[[(](id|priority|reminder|today|completion|muted)::\s*([^\])\n]*?)\s*[\])]/g;
+
+/** The lines with a cursor or selection on them, while the editor has focus. */
+function activeLines(view: EditorView): Set<number> {
+  const lines = new Set<number>();
+  if (!view.hasFocus) return lines;
+  for (const range of view.state.selection.ranges) {
+    const first = view.state.doc.lineAt(range.from).number;
+    const last = view.state.doc.lineAt(range.to).number;
+    for (let at = first; at <= last; at++) lines.add(at);
+  }
+  return lines;
+}
+
+function decorate(view: EditorView): DecorationSet {
+  const { state } = view;
+  const doc = state.doc;
+  const active = activeLines(view);
+  const isActive = (from: number, to = from): boolean => {
+    const first = doc.lineAt(from).number;
+    const last = doc.lineAt(to).number;
+    for (let at = first; at <= last; at++) if (active.has(at)) return true;
+    return false;
+  };
+  const ranges: Range<Decoration>[] = [];
+  const hide = (from: number, to: number): void => {
+    if (to > from) ranges.push(hidden.range(from, to));
+  };
+  const lines = (from: number, to: number, className: string): void => {
+    const first = doc.lineAt(from).number;
+    const last = doc.lineAt(to).number;
+    for (let at = first; at <= last; at++) {
+      let name = className;
+      if (at === first) name += ` ${className}-first`;
+      if (at === last) name += ` ${className}-last`;
+      ranges.push(line(name).range(doc.line(at).from));
+    }
+  };
+  const codeLines = new Set<number>();
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        const name = node.name;
+        const heading = /^ATXHeading(\d)$/.exec(name);
+        if (heading) {
+          lines(node.from, node.to, `cm-fl-h${Math.min(3, Number(heading[1]))}`);
+          return;
+        }
+        switch (name) {
+          case 'HeaderMark': {
+            // The `#` marks and the space after them.
+            if (node.node.parent?.name.startsWith('ATXHeading') && !isActive(node.from)) {
+              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
+              hide(node.from, node.to + after);
+            } else ranges.push(mark('cm-fl-mark').range(node.from, node.to));
+            return;
+          }
+          case 'Emphasis':
+            ranges.push(mark('cm-fl-em').range(node.from, node.to));
+            return;
+          case 'StrongEmphasis':
+            ranges.push(mark('cm-fl-strong').range(node.from, node.to));
+            return;
+          case 'Strikethrough':
+            ranges.push(mark('cm-fl-strike').range(node.from, node.to));
+            return;
+          case 'Highlight':
+            ranges.push(mark('cm-fl-highlight').range(node.from, node.to));
+            return;
+          case 'InlineCode':
+            ranges.push(mark('cm-fl-inline-code').range(node.from, node.to));
+            return;
+          case 'EmphasisMark':
+          case 'StrikethroughMark':
+          case 'HighlightMark':
+            if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
+            else hide(node.from, node.to);
+            return;
+          case 'CodeMark': {
+            const parent = node.node.parent?.name;
+            if (parent === 'InlineCode') {
+              if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
+              else hide(node.from, node.to);
+            }
+            return;
+          }
+          case 'FencedCode': {
+            const open = isActive(node.from, node.to);
+            lines(node.from, node.to, 'cm-fl-code');
+            // Closed, the hidden closing fence is only the card's bottom edge.
+            const end = doc.lineAt(node.to);
+            if (
+              !open &&
+              end.number > doc.lineAt(node.from).number &&
+              /^\s*(`{3,}|~{3,})\s*$/.test(end.text)
+            )
+              ranges.push(line('cm-fl-code-end').range(end.from));
+            for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
+              codeLines.add(at);
+            const cursor = node.node.cursor();
+            if (cursor.firstChild())
+              do {
+                if (cursor.name === 'CodeMark') {
+                  if (open) ranges.push(mark('cm-fl-mark').range(cursor.from, cursor.to));
+                  else hide(cursor.from, cursor.to);
+                } else if (cursor.name === 'CodeInfo')
+                  ranges.push(mark('cm-fl-code-label').range(cursor.from, cursor.to));
+              } while (cursor.nextSibling());
+            return false;
+          }
+          case 'CodeBlock':
+            lines(node.from, node.to, 'cm-fl-code');
+            for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
+              codeLines.add(at);
+            return false;
+          case 'Blockquote':
+            lines(node.from, node.to, 'cm-fl-quote');
+            return;
+          case 'QuoteMark':
+            if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
+            else {
+              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
+              hide(node.from, node.to + after);
+            }
+            return;
+          case 'HorizontalRule':
+            if (!isActive(node.from)) {
+              ranges.push(line('cm-fl-hr').range(doc.lineAt(node.from).from));
+              hide(node.from, node.to);
+            }
+            return;
+          case 'ListMark': {
+            const item = node.node.parent;
+            const task = item?.getChild('Task');
+            const bullet = item?.parent?.name === 'BulletList';
+            if (isActive(node.from)) {
+              ranges.push(mark('cm-fl-mark').range(node.from, node.to));
+              return;
+            }
+            const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
+            // A checklist line shows only its checkbox; a bullet a drawn bullet.
+            if (task) hide(node.from, node.to + after);
+            else if (bullet)
+              ranges.push(
+                Decoration.replace({ widget: new BulletWidget() }).range(node.from, node.to),
+              );
+            return;
+          }
+          case 'TaskMarker': {
+            const checked = /x/i.test(doc.sliceString(node.from, node.to));
+            if (!checked) return;
+            const taskEnd = node.node.parent?.to ?? node.to;
+            ranges.push(mark('cm-fl-done').range(node.to, taskEnd));
+            return;
+          }
+          case 'Link':
+          case 'Image': {
+            const url = node.node.getChild('URL');
+            const target = url ? doc.sliceString(url.from, url.to) : '';
+            if (name === 'Image') {
+              const text = doc.sliceString(node.from, node.to);
+              const alt = /^!\[([^\]]*)\]/.exec(text)?.[1] ?? '';
+              const widget = Decoration.replace({ widget: new ImageWidget(target, alt) });
+              if (!isActive(node.from)) ranges.push(widget.range(node.from, node.to));
+              else
+                ranges.push(
+                  Decoration.widget({ widget: new ImageWidget(target, alt), side: 1 }).range(
+                    node.to,
+                  ),
+                );
+              return false;
+            }
+            const marks = node.node.getChildren('LinkMark');
+            const open = marks[0];
+            const close = marks[1];
+            if (!open || !close || !url) return false;
+            if (isActive(node.from)) {
+              for (const each of marks) ranges.push(mark('cm-fl-mark').range(each.from, each.to));
+              ranges.push(mark('cm-fl-link-url').range(url.from, url.to));
+              ranges.push(mark('cm-fl-link').range(open.to, close.from));
+            } else {
+              hide(open.from, open.to);
+              ranges.push(mark('cm-fl-link', { 'data-href': target }).range(open.to, close.from));
+              hide(close.from, node.to);
+            }
+            return false;
+          }
+          case 'URL': {
+            // A bare URL or an autolink (`<https://…>`), outside a link or an image.
+            const parent = node.node.parent?.name;
+            if (parent === 'Link' || parent === 'Image') return;
+            ranges.push(
+              mark('cm-fl-link', { 'data-href': doc.sliceString(node.from, node.to) }).range(
+                node.from,
+                node.to,
+              ),
+            );
+            return;
+          }
+          default:
+            return;
+        }
+      },
+    });
+    // Task checkboxes (`- [ ]`), drawn away from the cursor.
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        if (node.name !== 'TaskMarker' || isActive(node.from)) return;
+        const checked = /x/i.test(doc.sliceString(node.from, node.to));
+        ranges.push(
+          Decoration.replace({ widget: new CheckboxWidget(checked) }).range(node.from, node.to),
+        );
+      },
+    });
+    // Flint's task fields (LIST-04, D-77), outside code and away from the cursor.
+    for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
+      if (codeLines.has(at) || active.has(at)) continue;
+      const text = doc.line(at);
+      for (const match of text.text.matchAll(FIELD)) {
+        const start = text.from + match.index;
+        const end = start + match[0].length;
+        if (match[1] === 'id') hide(start, end);
+        else
+          ranges.push(
+            Decoration.replace({
+              widget: new FieldWidget(fieldText(match[1] ?? '', match[2] ?? '')),
+            }).range(start + (match[0].startsWith(' ') ? 1 : 0), end),
+          );
+      }
+    }
+  }
+  return Decoration.set(ranges, true);
+}
+
+const livePreview = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = decorate(view);
+    }
+    update(update: ViewUpdate): void {
+      if (
+        update.docChanged ||
+        update.viewportChanged ||
+        update.selectionSet ||
+        update.focusChanged ||
+        syntaxTree(update.startState) !== syntaxTree(update.state)
+      )
+        this.decorations = decorate(update.view);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
+/** Clicks on rendered parts: a link opens, an image opens the lightbox, a checkbox toggles. */
+const previewClicks = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    if (event.button !== 0) return false;
+    const target = event.target as HTMLElement;
+    const handlers = view.state.facet(handlersFacet);
+    const link = target.closest<HTMLElement>('.cm-fl-link[data-href]');
+    if (link && handlers.openLink) {
+      event.preventDefault();
+      handlers.openLink(link.dataset['href'] ?? '');
+      return true;
+    }
+    const image = target.closest('.cm-fl-image img');
+    if (image && handlers.openImage) {
+      event.preventDefault();
+      const all = [...view.contentDOM.querySelectorAll<HTMLImageElement>('.cm-fl-image img')];
+      handlers.openImage(
+        all.map((each) => each.dataset['src'] ?? ''),
+        all.indexOf(image as HTMLImageElement),
+      );
+      return true;
+    }
+    const box = target.closest('.cm-fl-checkbox');
+    if (box && view.state.facet(EditorState.readOnly) === false) {
+      event.preventDefault();
+      const at = view.posAtDOM(box);
+      const marker = view.state.doc.sliceString(at, at + 3);
+      if (/^\[[ xX]\]$/.test(marker))
+        view.dispatch({
+          changes: { from: at + 1, to: at + 2, insert: marker[1] === ' ' ? 'x' : ' ' },
+        });
+      return true;
+    }
+    return false;
+  },
+});
+
+const flintTheme = EditorView.theme(
+  {
+    '&': { backgroundColor: 'transparent', color: 'inherit' },
+    '&.cm-focused': { outline: 'none' },
+    '.cm-content': {
+      padding: '0',
+      fontFamily: 'var(--fl-font-ui)',
+      caretColor: 'var(--fl-accent)',
+    },
+    '.cm-line': { padding: '0' },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--fl-accent)', borderLeftWidth: '1.5px' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground':
+      { backgroundColor: 'var(--fl-selection)' },
+    '.cm-scroller': { fontFamily: 'inherit', lineHeight: 'inherit', overflow: 'visible' },
+    '.cm-placeholder': { color: 'var(--fl-text-faint)' },
+  },
+  { dark: true },
+);
+
+export interface EditorOptions {
+  readonly readOnly?: boolean;
+  readonly placeholder?: string;
+  readonly handlers?: PreviewHandlers;
+  /** Esc in the editor (a body's field saves and closes, D-49). */
+  readonly onEscape?: () => boolean;
+  /** Text pasted in: true when handled (code fenced, an image attached; CAP-06). */
+  readonly onPaste?: (event: ClipboardEvent, view: EditorView) => boolean;
+}
+
+/** Everything the note editor is made of, for a new editor state. */
+export function editorExtensions(options: EditorOptions): Extension[] {
+  return [
+    history(),
+    drawSelection(),
+    EditorView.lineWrapping,
+    closeBrackets(),
+    markdown({ base: markdownLanguage, codeLanguages, extensions: [Highlight] }),
+    syntaxHighlighting(flintHighlight),
+    keymap.of([
+      ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
+      { key: 'Tab', run: indentMore, shift: indentLess },
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...historyKeymap,
+    ]),
+    livePreview,
+    previewClicks,
+    handlersFacet.of(options.handlers ?? {}),
+    flintTheme,
+    EditorView.contentAttributes.of({ spellcheck: 'false', 'aria-multiline': 'true' }),
+    ...(options.placeholder ? [placeholderText(options.placeholder)] : []),
+    ...(options.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
+    ...(options.onPaste
+      ? [
+          EditorView.domEventHandlers({
+            paste: (event, view) => options.onPaste?.(event, view) ?? false,
+          }),
+        ]
+      : []),
+  ];
+}
