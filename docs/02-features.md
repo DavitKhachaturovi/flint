@@ -44,17 +44,18 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
 - Lists and notes move into or out of a group by drag (M4 step 8, D-78) and the right-click menu ("Move to group ▸", "Remove from group").
 - **Proposed (drag, step 8):** a list dragged right below a group's header goes into the group (first); right below a group's last list it joins the group when it is nearer that list, and goes after the group when it is nearer what follows; it shows indented while it would land in a group and flush while it would land outside one. A group's header drags the whole group among the top-level items. Under a non-manual sort a drag doesn't start and the hint shows.
-- **Proposed (built in step 8):** "Move to group ▸" lists the other groups and ends with **New group**, which names a new group (at the end) with the list already in it. "Remove from group" puts the list right below its group. A click on a group's header folds or opens it (this machine remembers it) and picks the group for Alt+↑/↓. Deleting a group says "Deleted group Work · its lists stay" with Undo; its lists take its place in the order. Under a non-manual sort, moving a list into or out of a group is reordering too, so it shows the same hint.
+- **D-80 (accepted):** the drag rules above, provided the drop target is clearly visible: over a group, the group lights up (accent ring and "Drop to add" in place of its count), an **indented drop line** shows where the list lands, the other rows slide apart and the dragged row lifts (shadow, slight scale). Dropping on a **collapsed** group's header adds the list to it (**Proposed:** at its end) and the header pulses once. Look per `design/mockups/10-sidebar-groups.html` (09 §8): a group is a **soft card** with a folder tile and its name in normal case, its lists inside on a faint guide line; collapsed, a single card row whose count says "N lists". **New groups appear at the top of Lists** with the name field ready (supersedes D-79's "at the end"). Creating, renaming, deleting, expanding, collapsing, Move to group and Remove from group animate (UI-10).
+- **Proposed (built in step 8):** "Move to group ▸" lists the other groups and ends with **New group**, which names a new group (at the top, D-80) with the list already in it. "Remove from group" puts the list right below its group. A click on a group's header folds or opens it (this machine remembers it) and picks the group for Alt+↑/↓. Deleting a group says "Deleted group Work · its lists stay" with Undo; its lists take its place in the order. Under a non-manual sort, moving a list into or out of a group is reordering too, so it shows the same hint.
 - **D-74:** Inbox stays pinned at the top, outside any group. **Groups and ungrouped lists share one manual order**, so a group can sit between lists (like Microsoft To Do). Under a non-manual sort, groups keep their manual positions and lists are sorted within each group and among the ungrouped ones (LIST-06).
-- **Proposed:** a group header shows a chevron, the name and the number of lists; empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
+- **Proposed:** a group header shows a chevron, a folder tile, the name and the number of lists (D-80); empty groups stay until deleted; a list Flint hasn't placed yet (new, or made outside Flint) appears ungrouped at the end.
 - Milestones: M4 step 8; dragging in M4 step 9.
 
 ### LIST-06 — Sidebar sorting (v1, D-73)
 - A small sort menu in the sidebar: **Manual** (default, the custom order), **Recently edited**, **Created**. It applies within each group and within the ungrouped lists.
 - In Manual, lists, notes and groups reorder with **Alt+↑/↓** and the locked-axis drag (D-54). While another sort is active, reordering is disabled with a short hint to switch to Manual.
 - **D-79, Alt+↑/↓ follows the keyboard focus:** with the focus in the task list it moves the selected task; with the focus in the sidebar (a selected list or group) it moves that list or group; with nothing selected, nothing moves (never the open list as a fallback).
-- **Proposed (how "the focus is in the sidebar" works):** a click on a list in the sidebar or on a group's header (or its right-click menu) puts the keyboard there, on that list or group; selecting a task (a click, or ↓ in the opened list) puts it back in the task list. A list opened from the sidebar has no task selected (D-77), so Alt+↑/↓ right after picking it moves the list. A picked group's header shows in `--fl-text-secondary`.
-- **D-79:** new groups go at the end; group names are unique (ignoring case) and up to 60 characters (accepted).
+- **Accepted (D-80; how "the focus is in the sidebar" works):** a click on a list in the sidebar or on a group's header (or its right-click menu) puts the keyboard there, on that list or group; selecting a task (a click, or ↓ in the opened list) puts it back in the task list. A list opened from the sidebar has no task selected (D-77), so Alt+↑/↓ right after picking it moves the list. A picked group's header shows in `--fl-text-secondary`.
+- **D-79:** group names are unique (ignoring case) and up to 60 characters (accepted). **D-80:** new groups go at the top of Lists (no longer at the end). The keyboard-focus rule below is accepted. Changing the sort animates every row to its new place.
 - **D-74 (accepted):** Recently edited uses the file's modification time and Created its creation time, both newest first; groups keep their manual positions under every sort. **Proposed:** the menu is a small sort button next to the **+**; the choice is machine UI state.
 - Milestone M4 step 8.
 
@@ -117,6 +118,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Ranking (D-29):** a task list with the same normalized name is an exact match (an identical spelling wins, then sidebar order); a task list wins over a note of the same name. Among close matches, prefix matches come before typo matches; prefix matches are ordered most recently used first, typo matches by smallest edit distance first, and sidebar order breaks remaining ties.
 
 ### CAP-06 — Paste-to-capture (v1)
+- **D-80:** in the main window's composer, pasted images and code look as in the popup: a thumbnail chip and a code card preview, never raw link or fence text (TASK-05).
 - **D-79:** pasted content that already contains markdown (a fenced code block, an image link) stays markdown; only raw, unfenced code, JSON and stack traces are fenced. The same rules apply in the main window's composer and in body fields.
 - **Pasting a screenshot/image** attaches it to the captured task (stored in the attachments folder, MEDIA-02). The popup shows a small thumbnail chip.
 - **Pasting a stack trace or JSON** auto-wraps it in a fenced code block (with a language hint when detectable, e.g. `json`).
@@ -173,6 +175,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Tasks can be **dragged** to reorder, e.g. dragged to the top to focus on them first. The manual order is the source of truth and is persisted (it is the order of lines in the file, 04).
 - Drag-and-drop and Alt+↑/↓ follow one rule: only the task's block (line, body, subtasks) moves; non-task content in the file never moves as a side effect (D-22).
 - Drag uses snappy spring animations (03).
+- **D-80:** the rules below are accepted. While a task is dragged, the sidebar's highlight stays where it is, and **every dragged task keeps its selection highlight**. An expanded task folds its body **with an animation** when lifted and unfolds with one after the drop; a task with subtasks folds them away while dragged and restores them after (supersedes "the selection highlight waits until the drop").
 - **Proposed (built in step 8, D-78):** a drag starts after the pointer moves 4 px with the left button held on a row (not on its buttons, a body or while editing). A task moves among the tasks at its own level: a top-level task with its subtasks among the top-level open tasks, a subtask among its parent's subtasks (making or breaking subtasks stays Tab and Shift+Tab). Completed tasks and read-only lists don't drag. The dragged row is raised (`--fl-ground-float`, `--fl-shadow-float`) and the selection highlight waits until the drop; it lands when its leading edge passes another row's middle. The drop is one undoable change ("Moved"). A drag that ends where it started is nothing; the click that ends a drag never starts editing. The task page's subtasks drag the same way.
 - **D-54 (M4):** dragging is **locked to the vertical axis and to the list's bounds**: the row never floats freely. Other rows slide out of the way with a smooth spring (≤ 150 ms, off with reduce-motion). An expanded task collapses while it is dragged and re-expands after the drop if it was expanded. Subtasks move with their parent. **D-64:** there is no dragging tasks onto sidebar lists in v1; tasks move with the right-click menu, the list picker, the action bar and Ctrl+K (TASK-11).
 
@@ -208,6 +211,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - A **larger body opens as a full page**; for it, the page is the only way to read it.
   - **"Open as page"** is available for every task (right-click menu, and **Shift+Enter** in Navigate state, **Proposed**).
   - In v1 the **page replaces the list view** with a **back arrow** (no tabs, NAV-05). Back also works with the mouse's back button and Alt+← (NAV-04). The page shows the editable title and the body, rendered, with D-49's plain editing until M5.
+- **D-80 (supersedes D-79's "body icon when the body has text"):** the **body icon shows whenever the task has any body content**, images only included; the **image icon additionally** shows when there are images. The body icon expands the task, with its text and image thumbnails; a thumbnail or the image icon opens the lightbox. **Code cards and images in a body** get a small **trash button** in their corner (on hover or when the task is selected), in the list and on the task's page: the part folds away and an undo toast shows ("Removed code block" / "Removed image"), no confirmation. Deleting an image removes only its link; the file stays in `attachments/` until MEDIA-04 (M7). In the **composer**, a pasted image is a thumbnail chip and pasted code, JSON or a stack trace a code card preview (language label, code background, first 4 lines with an expand chevron, × to remove; not editable, as in the popup); on Enter the body is the notes, then the code fenced, then the image links.
 - **D-79:** a long body's clickable preview takes a much subtler hover that matches the card. A code card's label shows the detected language (`yaml`, `json`, `stack trace`…), not "code". The row's indicators: the body icon when the body has text, the image icon when it has images, both when both. Images in an expanded body show as small **thumbnails** (full size on the task's page); a click on a thumbnail or the image icon opens the **lightbox** (pulled from M5 into M4: a smooth popup, ←/→ through that task's images only, Esc closes).
 - **D-78 (mockup 09, `design/mockups/09-expanded-task.html`):** while a task is expanded it is **always** a raised card (the selected-row surface, edge ring, top highlight and soft shadow), not only when selected or hovered; the **priority stripe spans the card's full height**; the body (13.5 / 1.6, secondary tone) and its code cards sit inside it, 32 px in from the title row. Collapsing a task while another is selected doesn't replay the selection's move on top of it.
 - **D-77 (supersedes D-76's well): an expanded task is one raised card** holding its title row and its body, as in mockup 01's first task: the body in the secondary text tone, code and stack traces in their own small code card with a label and a copy button. A short body is edited in place; a **long body is not editable inline**: its preview is clickable (a soft hover highlight) and opens the task's page, and "Open as page" stays visible. On the page, the title's edit field has the same inner spacing as the body's.
@@ -255,6 +259,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### TASK-12 — Delete tasks (v1)
 - Deleting a task sends it to Trash (DATA-02) with an undo toast. No confirmation dialog.
 - **D-50:** from M4 a deleted task is moved to the Flint folder's `trash/` with its deletion time, so nothing is destroyed; the Trash screen for browsing and restoring comes with DATA-02 in M7.
+- **D-80:** deleting an expanded task first collapses its body, then plays the delete animation.
 
 ### TASK-15 — Non-task content shown read-only (v1, D-22)
 - A task-list file can contain content that isn't a task: headings, paragraphs and plain bullets added in Obsidian or VS Code, or kept from a note → task-list conversion (LIST-04).
@@ -406,6 +411,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ## 7. Media
 
 ### MEDIA-01 — Images and videos (v1)
+- **D-80:** an image in a body has a small trash button in its corner; deleting removes its link (the file stays until MEDIA-04), with an undo toast.
 - **D-77 (M5):** images in bodies show as small thumbnails; a click opens a lightbox with smooth motion, and ←/→ go to the other images of the same task (not other tasks).
 - Images and videos can be added to notes and task bodies via paste, drag-and-drop, or the insert menu.
 - Images render inline; videos render with a player and thumbnail.
@@ -429,6 +435,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NAV-02 — `?` keyboard cheat sheet (v1)
 - Pressing `?` (in navigate state) shows all shortcuts. Essential for a keyboard-first app.
+- **D-80:** it shows the same list as Settings' **Keyboard shortcuts** section (APP-11), from one source.
 
 ### NAV-03 — Main window layout (v1, Proposed)
 - A minimal, collapsible sidebar: Today and Inbox pinned at the top, then the user's lists. The content area shows the selected list.
@@ -541,6 +548,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Auto-archive completed tasks after N days (on/off, N).
 - Auto-link patterns.
 - **D-52:** until this screen exists (M8), the sidebar's Settings entry is **hidden**, not shown disabled (it did nothing).
+- **D-80, Keyboard shortcuts (M8):** a section listing every non-obvious shortcut: Tab / Shift+Tab (indent, outdent), Shift+Enter (notes; Open as page in Navigate state), Alt+↑/↓, Ctrl+Shift+Space and Ctrl+Shift+X, the mini-mode shortcut, Alt+← / Alt+→ (back, forward), Ctrl+K, Ctrl+F, Ctrl+Shift+N, Ctrl+A, 1 / 2 / 3 / 0, Space, Delete, Ctrl+Z / Ctrl+Y. The **global hotkeys are rebound here** (APP-08: the Hotkeys window of D-44 moves into Settings). The `?` cheat sheet (NAV-02) shows the same list.
 
 ### APP-12 — Respect OS reduce-motion (v1)
 - If Windows "show animations" / reduce motion is off, Flint's spring and completion animations turn off automatically.

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flint sidebar groups — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.gp *{box-sizing:border-box}
+.side{width:280px;background:#111214;border-radius:18px;box-shadow:0 0 0 1px #1C1E21;padding:14px 12px 16px 12px;display:flex;flex-direction:column;gap:3px;font-size:14px}
+.row{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 7px;border-radius:12px;color:#C9CCCF}
+.tile{width:26px;height:26px;border-radius:8px;background:#1F2124;box-shadow:inset 0 0 0 1px #2A2C30;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#B9BDC4}
+.tile.strong{background:#ECEDEE;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#0E0F11}
+.cnt{font-family:'Geist Mono',monospace;font-size:12px;color:#7C7F84}
+.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#75787D}
+.grp{border-radius:14px;background:#151619;box-shadow:0 0 0 1px #1F2124,inset 0 1px 0 rgba(255,255,255,.03);padding:3px;margin:3px 0}
+.ghead{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 6px;border-radius:11px;color:#ECEDEE;font-weight:600;font-size:13.5px}
+.kids{position:relative;padding-left:14px;display:flex;flex-direction:column;gap:2px;padding-bottom:2px}
+.kids::before{content:"";position:absolute;left:19px;top:2px;bottom:8px;width:1px;background:#26282C}
+.cap{font-size:12.5px;line-height:1.55;color:#8E9196;width:280px}
+.ttl{font-size:15px;font-weight:600;color:#FFFFFF}
+.ic{width:14px;height:14px}
+</style>
+</head>
+<body>
+<div class="gp" style="box-sizing: border-box; width: 1400px; height: 940px; background: #0D0E10; color: #E8E9EB; font-family: 'Onest', system-ui, sans-serif; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; align-items: baseline; gap: 14px">
+<span style="font-size: 20px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.01em">Sidebar groups</span>
+<span style="font-size: 13px; color: #8E9196">A group is a soft container, not a section label. Its lists sit inside it, indented on a guide line.</span>
+</div>
+<div style="display: flex; gap: 40px; align-items: flex-start">
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span class="ttl">1 · Groups expanded</span>
+<div class="side">
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span><span style="flex: 1">Inbox</span><span class="cnt">18</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 10px 6px 10px"><span class="lbl">Lists</span><span style="display: flex; gap: 10px; color: #8E9196"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span></div>
+<div class="grp">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span><span style="flex: 1">Work</span><span class="cnt">3</span></div>
+<div class="kids">
+<div class="row" style="background: #1C1E21; box-shadow: 0 0 0 1px #26282C, inset 0 1px 0 rgba(255,255,255,.05); color: #FFFFFF"><span class="tile strong"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1; font-weight: 500">Backend</span><span class="cnt" style="color: #C9CCCF">5</span></div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Infra</span><span class="cnt">2</span></div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6"></path></svg></span><span style="flex: 1">Meeting notes</span></div>
+</div>
+</div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Personal</span><span class="cnt">4</span></div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6"></path></svg></span><span style="flex: 1">Ideas</span></div>
+</div>
+<span class="cap">The group is a soft card with a folder tile and its name in normal case (not an uppercase label like "Lists"). Its lists are indented on a faint guide line. Expand/collapse: the chevron turns and the card's height eases.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span class="ttl">2 · Collapsed, sort menu</span>
+<div class="side" style="position: relative">
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span><span style="flex: 1">Inbox</span><span class="cnt">18</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 10px 6px 10px"><span class="lbl">Lists</span><span style="display: flex; gap: 10px; color: #8E9196"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span></div>
+<div class="grp" style="background: #18191C">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C9CCCF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span><span style="flex: 1">Work</span><span class="cnt">3 lists</span></div>
+</div>
+<div class="grp">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span><span style="flex: 1">Side projects</span><span class="cnt">2 lists</span></div>
+</div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Personal</span><span class="cnt">4</span></div>
+<div style="position: absolute; right: 6px; top: 96px; width: 152px; padding: 6px; border-radius: 14px; background: #1B1D20; box-shadow: 0 0 0 1px #2A2C30, inset 0 1px 0 rgba(255,255,255,.07), 0 24px 50px -14px rgba(0,0,0,.85); font-size: 13.5px; z-index: 2">
+<div style="padding: 4px 8px 6px 8px" class="lbl">Sort lists</div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 9px; color: #FFFFFF">Manual<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></div>
+<div style="padding: 8px; border-radius: 9px; color: #C9CCCF">Recently edited</div>
+<div style="padding: 8px; border-radius: 9px; color: #C9CCCF">Created</div>
+</div>
+</div>
+<span class="cap">A collapsed group is a single card row. Its count says "3 lists" so it can't be mistaken for a task count. Hover lightens the card slightly. Dropping a list on a collapsed header adds it to the group; the header pulses once. The sort menu grows from its button; changing the sort animates every row to its new place.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span class="ttl">3 · Dragging into a group</span>
+<div class="side" style="position: relative">
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span><span style="flex: 1">Inbox</span><span class="cnt">18</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 10px 6px 10px"><span class="lbl">Lists</span></div>
+<div class="grp" style="background: #1A1C1F; box-shadow: 0 0 0 1.5px #9AA0AB, 0 0 0 5px rgba(154,160,171,.10)">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C9CCCF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile strong" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span><span style="flex: 1">Work</span><span class="cnt" style="color: #ECEDEE">Drop to add</span></div>
+<div class="kids">
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path></svg></span><span style="flex: 1">Backend</span><span class="cnt">5</span></div>
+<div style="position: relative; height: 46px"><span style="position: absolute; left: 8px; right: 8px; top: 41px; height: 2px; border-radius: 2px; background: #ECEDEE"></span><span style="position: absolute; left: 4px; top: 38px; width: 8px; height: 8px; border-radius: 50%; background: #ECEDEE"></span><div class="row" style="position: absolute; left: 6px; right: -6px; top: -2px; background: #1E2023; color: #FFFFFF; box-shadow: 0 0 0 1px #2C2E33, inset 0 1px 0 rgba(255,255,255,.07), 0 18px 40px -10px rgba(0,0,0,.85); transform: scale(1.02)"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1; font-weight: 500">Personal</span><span class="cnt">4</span></div></div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path></svg></span><span style="flex: 1">Infra</span><span class="cnt">2</span></div>
+</div>
+</div>
+<div style="height: 40px"></div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6"></path></svg></span><span style="flex: 1">Ideas</span></div>
+</div>
+<span class="cap">The dragged list lifts (shadow, slight scale) and leaves an empty slot that closes smoothly. Over a group, the whole group lights up with an accent ring and "Drop to add", and an indented drop line shows exactly where it lands. Other rows slide apart to make room.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span class="ttl">4 · Creating a group</span>
+<div class="side" style="position: relative">
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span><span style="flex: 1">Inbox</span><span class="cnt">18</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 10px 6px 10px"><span class="lbl">Lists</span><span style="display: flex; gap: 10px; color: #8E9196"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span></div>
+<div class="grp" style="box-shadow: 0 0 0 1px #2A2C30, inset 0 1px 0 rgba(255,255,255,.05)">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span>
+<span style="flex: 1; height: 28px; border-radius: 8px; background: #0E0F11; box-shadow: inset 0 0 0 1px #2C2E33; display: flex; align-items: center; padding: 0 8px; font-weight: 500"><span style="background: rgba(154,160,171,.35); color: #FFFFFF; border-radius: 3px; padding: 0 2px">New group</span><span style="width: 1.5px; height: 15px; background: #9AA0AB; margin-left: 1px"></span></span></div>
+<div style="padding: 2px 10px 6px 38px; font-size: 11.5px; color: #75787D">Enter saves · Esc cancels</div>
+</div>
+<div class="grp">
+<div class="ghead"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="tile" style="width: 24px; height: 24px; border-radius: 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg></span><span style="flex: 1">Work</span><span class="cnt">3 lists</span></div>
+</div>
+<div class="row"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path></svg></span><span style="flex: 1">Personal</span><span class="cnt">4</span></div>
+</div>
+<span class="cap">A new group appears at the top of Lists with its name field ready. It eases open and the lists below slide down. Rename uses the same field in place; delete folds the card away and its lists slide out to the top level.</span>
+</div>
+</div>
+</div>
+</body>
+</html>
