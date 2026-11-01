@@ -352,3 +352,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 13 | Image thumbnails and a lightbox with ←/→ within the task | MEDIA-01 · v1 · M5 | 02, D-77 |
 | 14 | Note → task list: every plain line a task; headings labels; code and quotes as bodies | LIST-04 · v1 · M4 (0.4.10 fixes) | 02, D-77 (supersedes D-22 for plain lines) |
 | 15 | Fields in notes as muted chips, id hidden, raw on the cursor's line | LIST-04, NOTE-01 · v1 · M5 | 02, D-77 |
+
+## N. Feedback on 0.4.11 (1 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Confirmed: picker morphing, marks cleared, editing motion, toast and Completed, scrollbar, wheels | Done | D-78 |
+| 1 | Menus and pickers stay anchored while scrolling; close when the anchor leaves the view | UI-08, CAP-11 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
+| 2 | A marked task with a body keeps the subtask spacing; no overlap | TASK-07 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
+| 3 | The expanded task per mockup 09: always raised, full-height stripe, body and code inside | TASK-05 · v1 · M4 (0.4.11 fixes) | 02, 09 §8, mockup 09, D-78 |
+| 4 | Editing A, click B's blank space: A saved, B selected | TASK-02 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
+| 5 | Collapsing next to the selection: no stray selection move | TASK-05, UI-04 · v1 · M4 (0.4.11 fixes) | D-78 |
+| 6 | Shift+Enter for notes in the composer and while editing a title; "Add notes" in the menu; hint | TASK-05 · v1 · M4 (0.4.11 fixes) | 02, 03 §3, D-78 |
+| 7 | "Priority ›" submenu in the task menu | UI-08 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
+| 8 | Cloud sync via Google Drive, then OneDrive; OAuth PKCE, safeStorage, drive.file; per-task merge with tombstones; no iCloud | SYNC-01 · Later | 06 §3, D-78 |
+| — | Drag to reorder moves into step 8 | TASK-01, LIST-05, LIST-06 · v1 · M4 step 8 | 06, D-78 |

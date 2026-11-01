@@ -18,6 +18,7 @@ const SCREENS = {
   '05': { file: '05-mini-mode', width: 440, height: 640 },
   '06': { file: '06-design-system', width: 1280, height: 1000 },
   '07': { file: '07-code-highlighting', width: 1280, height: 1040 },
+  '09': { file: '09-expanded-task', width: 840, height: 520 },
 };
 
 const args = process.argv.slice(2);

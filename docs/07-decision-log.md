@@ -522,3 +522,17 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - Bodies and pages (TASK-05; the editor stays in M5, D-49): an expanded task is **one raised card** with its title row and body, as in mockup 01 (supersedes D-76's well): the body in the secondary tone, code and stack traces in their own small code card with a label and a copy button. Long bodies are not editable inline: the preview is clickable with a soft hover and opens the page; "Open as page" stays. The page title's edit field gets the body field's inner spacing.
   - Conversion: note → task list turns **every non-empty plain text line into a task**; headings stay as section labels; fenced code and quotes attach to the preceding task as its body (supersedes D-22 for plain lines, LIST-04). Task list → note keeps the fields (lossless).
   - **M5:** task fields in notes show as small muted chips (priority, reminder), `id` hidden, raw text only while the cursor is on the line (LIST-04, NOTE-01). Images in bodies show as thumbnails; a click opens a lightbox with smooth motion and ←/→ through the same task's images (MEDIA-01).
+
+### D-78 — Feedback on 0.4.11; cloud sync recorded for later
+- **Date:** 1 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed working:** picker switching and morphing, marks cleared on list switch, the editing field's motion, the toast and Completed animations, the scrollbar, the wheels.
+- **Decision (fixed before step 8):**
+  - Menus and pickers, right-click menus included, stay anchored to their button or task while the page scrolls and close only when the anchor scrolls out of view.
+  - A marked task with a body keeps the spacing used around subtasks; its merged highlight no longer overlaps the task above.
+  - The expanded task follows `design/mockups/09-expanded-task.html` (with its screenshot): always a raised card while expanded (selected-like surface, edge ring, top highlight, soft shadow), the priority stripe over its full height, the body in the secondary tone and code cards inside it.
+  - While editing task A, a click on task B's blank space saves A and selects B.
+  - Collapsing an expanded task while another task is selected no longer plays the selection's move over the body's card.
+  - Shift+Enter adds notes: in the main composer as in the capture popup, and while editing a title it opens and focuses that task's body; "Add notes" in the task menu; the composer's hint says "Shift+Enter for notes" (TASK-05).
+  - The task menu's priority entries become one "Priority ›" submenu (UI-08).
+- **Step 8 now includes drag to reorder** for the sidebar and task lists (was step 9).
+- **Later (post-v1), recorded: cloud sync (SYNC-01).** Through the providers' own APIs, Google Drive first, then OneDrive (Microsoft Graph); no iCloud. Opt-in sign-in with the provider's auth (OAuth with PKCE and a loopback redirect); tokens kept with Electron `safeStorage`; Google access limited to files Flint creates (`drive.file`). Automatic or manual sync by preference. Merged per task by ID, with tombstones for deletions, never conflict copies. When turned on, it changes the "no network" promise (APP-09) for that feature only.
