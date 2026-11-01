@@ -722,7 +722,14 @@ export class Workspace {
     const op = addTask(
       target.file.document,
       target.file.path,
-      { id, title: parsed.title, priority: parsed.priority, reminder: parsed.reminder },
+      {
+        id,
+        title: parsed.title,
+        // D-78: notes added with Shift+Enter in the composer are the new task's body.
+        ...(parsed.body.trim() === '' ? {} : { body: parsed.body.trim() }),
+        priority: parsed.priority,
+        reminder: parsed.reminder,
+      },
       where,
     );
     const label = target === list ? 'Added' : `Added to ${target.entry.name}`;

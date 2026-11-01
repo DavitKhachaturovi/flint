@@ -12,7 +12,7 @@ import {
   toDate,
   type LocalDateTime,
 } from '@flint/core/time';
-import { closeMenu, type MenuOptions } from '../menu/menu.js';
+import { closeMenu, followAnchor, type MenuOptions } from '../menu/menu.js';
 
 /**
  * The pickers of the composer and the capture popup (CAP-11, D-57; 09 §8): priority, list, and
@@ -86,6 +86,13 @@ function openPanel(
   // Pickers and menus never stack.
   closeOpen?.(true);
   closeMenu();
+  // D-78: what it was opened from, to move with it while the page scrolls.
+  const anchorElement =
+    host.trigger ??
+    document.elementFromPoint(
+      host.anchor.left + host.anchor.width / 2,
+      host.anchor.top + host.anchor.height / 2,
+    );
   const panel = element('div', 'fl-picker');
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', label);
@@ -134,6 +141,7 @@ function openPanel(
     closeOpen = null;
     openPanelElement = null;
     openTrigger = null;
+    stopFollowing();
     document.removeEventListener('mousedown', onPointer, true);
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('blur', onBlur);
@@ -145,6 +153,13 @@ function openPanel(
     else fadeOut(panel);
   };
   const onBlur = (): void => close();
+  const stopFollowing = followAnchor(
+    anchorElement,
+    (dx, dy) => {
+      panel.style.translate = `${dx}px ${dy}px`;
+    },
+    () => close(),
+  );
   closeOpen = close;
   openPanelElement = panel;
   openTrigger = host.trigger ?? null;

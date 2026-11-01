@@ -557,8 +557,13 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
   await expect(main.locator('.row.sel .title')).toHaveText('Mow the lawn');
   await main.mouse.dblclick(lawnText.right + 60, lawnText.y);
   await expect(field).toHaveValue('Mow the lawn');
-  await main.keyboard.press('Escape');
-  await expect(main.locator('.row.sel .title')).toHaveText('Mow the lawn');
+  // D-78: a click on another task's blank space saves this edit and selects that task.
+  await main.keyboard.press('End');
+  await main.keyboard.type(' now');
+  await main.locator('.row', { hasText: 'Fix the gate' }).click({ position: { x: 600, y: 10 } });
+  await expect(field).toHaveCount(0);
+  await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('Mow the lawn now');
 });
 
 test('menus, delete to trash, move between lists, list and note actions (M4 step 4: UI-08, TASK-11, TASK-12, LIST-01, D-64)', async () => {
@@ -585,12 +590,14 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
 
   // Right-click a task: its menu; Move to… opens the list picker; a new name makes a new list.
   await main.locator('.row', { hasText: 'Fix the gate' }).click({ button: 'right' });
-  await expect(menuItems).toContainText([
-    'Edit',
-    'Complete',
-    'Priority high',
-    'Move to…',
-    'Delete',
+  await expect(menuItems).toContainText(['Edit', 'Complete', 'Priority', 'Move to…', 'Delete']);
+  // D-78: Priority is a submenu.
+  await menu.getByText('Priority', { exact: true }).hover();
+  await expect(main.locator('.fl-submenu .fl-menu-item')).toContainText([
+    'High',
+    'Medium',
+    'Low',
+    'None',
   ]);
   await menu.getByText('Move to…').click();
   await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
@@ -923,6 +930,18 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   if (!main) throw new Error('main window page not found');
   await main.locator('.nav', { hasText: 'Bodies' }).click();
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
+
+  // D-78: Shift+Enter in the composer adds notes: the new task's body.
+  await main.keyboard.press('Control+n');
+  await main.keyboard.type('With notes');
+  await main.keyboard.press('Shift+Enter');
+  await expect(main.locator('.composer-notes')).toBeFocused();
+  await main.keyboard.type('first line');
+  await main.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(/- \[ \] With notes \[id:: \w+\]\n {4}first line\n/);
+  await main.keyboard.press('Escape');
 
   // A small body opens inline, rendered and highlighted; a click edits it, Esc saves.
   const short = main.locator('.row', { hasText: 'Short body' });

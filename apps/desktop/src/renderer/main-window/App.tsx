@@ -141,7 +141,8 @@ const newRow = (after: string): NewEditing => ({
 });
 
 /** How a text field was left. */
-type Leave = 'enter' | 'escape' | 'blur' | 'indent' | 'outdent';
+/** How a text field was left; `notes` is Shift+Enter, which goes on into the task's body (D-78). */
+type Leave = 'enter' | 'escape' | 'blur' | 'indent' | 'outdent' | 'notes';
 
 /** A duration token in ms (09 §9), so JS timings follow the motion tokens (and the M8 speed). */
 function durationMs(token: string, fallback: number): number {
@@ -396,6 +397,14 @@ export function App(): ReactElement {
     [expanded],
   );
 
+  /** D-78: a task's body opened inline and in its field, for Shift+Enter and "Add notes". */
+  const openNotes = useCallback((key: string): void => {
+    setExpanded((current) => new Set([...current, key]));
+    setClosingBodies((current) => new Set([...current].filter((other) => other !== key)));
+    setEditingBody(key);
+    setSelected(key);
+  }, []);
+
   /** TASK-04, D-76: a new row under the task's last subtask (or as its first subtask). */
   const addSubtask = useCallback((task: TaskRow): void => {
     const last = task.subtasks.at(-1);
@@ -524,11 +533,15 @@ export function App(): ReactElement {
       if (how === 'enter') setEditing(newRow(key));
       else {
         setEditing((current) => (current?.kind === 'task' && current.key === key ? null : current));
-        setSelected(key);
+        // D-78: Esc keeps the task selected; leaving the field by a click on another task (which
+        // selected that one on mousedown) keeps that selection.
+        if (how === 'escape') setSelected(key);
+        else setSelected((current) => current ?? key);
       }
       void change({ kind: 'edit', key, text });
+      if (how === 'notes') openNotes(key);
     },
-    [change],
+    [change, openNotes],
   );
 
   /** Tab and Shift+Tab in Edit state (TASK-04): a task moves at once; a new row changes level. */
@@ -586,8 +599,10 @@ export function App(): ReactElement {
       }
       setEditing(null);
       if (key) setSelected(key);
+      // D-78: Shift+Enter goes on into the new task's notes.
+      if (key && how === 'notes') openNotes(key);
     },
-    [change, listId, lists, showToast],
+    [change, listId, lists, showToast, openNotes],
   );
 
   const addFromComposer = useCallback(
@@ -726,10 +741,15 @@ export function App(): ReactElement {
           { label: open ? 'Complete' : 'Reopen', hint: 'Space', action: bulkComplete },
           ...(open
             ? [
-                { label: 'Priority high', hint: '3', action: () => bulkPriority('high') },
-                { label: 'Priority medium', hint: '2', action: () => bulkPriority('medium') },
-                { label: 'Priority low', hint: '1', action: () => bulkPriority('low') },
-                { label: 'No priority', hint: '0', action: () => bulkPriority(null) },
+                {
+                  label: 'Priority',
+                  submenu: [
+                    { label: 'High', hint: '3', action: () => bulkPriority('high') },
+                    { label: 'Medium', hint: '2', action: () => bulkPriority('medium') },
+                    { label: 'Low', hint: '1', action: () => bulkPriority('low') },
+                    { label: 'None', hint: '0', action: () => bulkPriority(null) },
+                  ],
+                },
               ]
             : []),
           { label: 'Move to…', action: () => bulkMove(new DOMRect(at.x, at.y, 0, 0)) },
@@ -802,6 +822,7 @@ export function App(): ReactElement {
           ...(open && view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
             ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
             : []),
+          ...(open ? [{ label: 'Add notes', action: () => openNotes(row.key) }] : []),
           {
             label: open ? 'Complete' : 'Reopen',
             hint: 'Space',
@@ -810,11 +831,15 @@ export function App(): ReactElement {
           'divider',
           ...(open
             ? [
-                priority('Priority high', '3', 'high'),
-                priority('Priority medium', '2', 'medium'),
-                priority('Priority low', '1', 'low'),
-                priority('No priority', '0', null),
-                'divider' as const,
+                {
+                  label: 'Priority',
+                  submenu: [
+                    priority('High', '3', 'high'),
+                    priority('Medium', '2', 'medium'),
+                    priority('Low', '1', 'low'),
+                    priority('None', '0', null),
+                  ],
+                },
               ]
             : []),
           ...(open
@@ -1201,16 +1226,14 @@ export function App(): ReactElement {
   if (marked.size > 1)
     rows.forEach((row, index) => {
       if (!marked.has(row.key)) return;
-      const joins = (other: TaskRow | undefined, upper: TaskRow): boolean =>
+      // D-78: an expanded task (a card with its body) keeps its own highlight and spacing.
+      const joins = (other: TaskRow | undefined): boolean =>
         other !== undefined &&
         marked.has(other.key) &&
         other.done === row.done &&
-        !expanded.has(upper.key);
-      const previous = rows[index - 1];
-      markJoins.set(row.key, {
-        up: previous !== undefined && joins(previous, previous),
-        down: joins(rows[index + 1], row),
-      });
+        !expanded.has(other.key) &&
+        !expanded.has(row.key);
+      markJoins.set(row.key, { up: joins(rows[index - 1]), down: joins(rows[index + 1]) });
     });
   const glideVersion = [rows, completedOpen];
 
@@ -1237,7 +1260,9 @@ export function App(): ReactElement {
   /** A body shown inline under its row (D-76), rendered or being edited (D-49). */
   const bodyRows = (task: TaskRow, subtask: boolean): ReactElement[] => {
     const open = expanded.has(task.key);
-    if ((!open && !closingBodies.has(task.key)) || !hasBody(task)) return [];
+    // An empty body shows while its notes are being written (D-78).
+    const writing = open && editingBody === task.key;
+    if ((!open && !closingBodies.has(task.key)) || (!hasBody(task) && !writing)) return [];
     const classes = ['row-body'];
     if (subtask) classes.push('subtask');
     if (!open) classes.push('closing');
@@ -1700,6 +1725,24 @@ function Composer(props: {
 }): ReactElement {
   const { listId, lists, inputRef, onAdd } = props;
   const text = useInertText('', false);
+  /** D-78: notes under the title (Shift+Enter, as in the capture popup): the new task's body. */
+  const [notes, setNotes] = useState<string | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const focusNotes = useRef(false);
+  useEffect(() => {
+    if (notes === null || !focusNotes.current) return;
+    focusNotes.current = false;
+    notesRef.current?.focus();
+  }, [notes]);
+  const submit = (): void => {
+    const typed = text.escaped();
+    if (typed.trim() === '') return;
+    const body = notes?.trim() ? `\n${notes.replace(/\s+$/, '')}` : '';
+    text.reset('', false);
+    setNotes(null);
+    inputRef.current?.focus();
+    void onAdd(typed + body);
+  };
   // UI-09: auto-closing brackets and quotes in the composer.
   useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
   const infos = useMemo(() => listInfos(lists), [lists]);
@@ -1764,18 +1807,51 @@ function Composer(props: {
         onPaste={text.paste}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
-          if (event.key === 'Enter') {
+          if (event.key === 'Enter' && event.shiftKey) {
             event.preventDefault();
-            const typed = text.escaped();
-            if (typed.trim() === '') return;
-            text.reset('', false);
-            void onAdd(typed);
+            focusNotes.current = true;
+            if (notes === null) setNotes('');
+            else notesRef.current?.focus();
+          } else if (event.key === 'Enter') {
+            event.preventDefault();
+            submit();
           } else if (event.key === 'Escape') {
             event.preventDefault();
             event.currentTarget.blur();
           }
         }}
       />
+      {notes !== null && (
+        <textarea
+          ref={notesRef}
+          className="composer-notes"
+          aria-label="Notes"
+          placeholder="Notes, code, links…"
+          value={notes}
+          spellCheck={false}
+          onChange={(event) => setNotes(event.target.value)}
+          onKeyDown={(event) => {
+            const field = event.currentTarget;
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              submit();
+            } else if (event.key === 'Backspace' && field.value === '') {
+              event.preventDefault();
+              setNotes(null);
+              inputRef.current?.focus();
+            } else if (
+              (event.key === 'ArrowUp' && field.selectionStart === 0) ||
+              (event.key === 'Tab' && event.shiftKey)
+            ) {
+              event.preventDefault();
+              inputRef.current?.focus();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              field.blur();
+            }
+          }}
+        />
+      )}
       <div className="composer-bar">
         <div className="tools">
           <button
@@ -1849,7 +1925,7 @@ function Composer(props: {
           </span>
         ) : (
           <span className="hint">
-            or type <span className="chip">!h ##list @15:00</span>
+            or type <span className="chip">!h ##list @15:00</span> · Shift+Enter for notes
           </span>
         )}
       </div>
@@ -2252,7 +2328,15 @@ function Glide(props: {
   readonly editing?: boolean;
 }): ReactElement | null {
   const { card, target, version, className = 'sel-glide', editing = false } = props;
-  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    /** D-78: the same target, moved by the layout (a body folding above it): follow at once. */
+    follow: boolean;
+  } | null>(null);
+  const measured = useRef<string | null>(null);
   const node = useRef<HTMLDivElement>(null);
   // D-76: editing that starts on another row appears there (fading in) instead of gliding over;
   // from one editing row to the next it glides.
@@ -2290,9 +2374,17 @@ function Glide(props: {
       const row = found?.parentElement?.classList.contains('row-group')
         ? found.parentElement
         : found;
+      const follow = measured.current === target;
+      measured.current = target;
       setBox(
         row
-          ? { x: row.offsetLeft, y: row.offsetTop, w: row.offsetWidth, h: row.offsetHeight }
+          ? {
+              x: row.offsetLeft,
+              y: row.offsetTop,
+              w: row.offsetWidth,
+              h: row.offsetHeight,
+              follow,
+            }
           : null,
       );
     };
@@ -2312,7 +2404,16 @@ function Glide(props: {
       ref={node}
       className={editing ? `${className} editing` : className}
       aria-hidden="true"
-      style={{ transform: `translate(${box.x}px, ${box.y}px)`, width: box.w, height: box.h }}
+      style={{
+        transform: `translate(${box.x}px, ${box.y}px)`,
+        width: box.w,
+        height: box.h,
+        // Following the layout: no lag in place or size; the look (editing ↔ selected) still eases.
+        ...(box.follow && {
+          transition:
+            'background-color var(--fl-dur-state) ease, box-shadow var(--fl-dur-state) ease',
+        }),
+      }}
     />
   );
 }
@@ -2516,7 +2617,8 @@ function EditField(props: {
         if (event.nativeEvent.isComposing) return;
         if (event.key === 'Enter') {
           event.preventDefault();
-          leave('enter');
+          // D-78: Shift+Enter goes on into the task's notes (its body).
+          leave(event.shiftKey ? 'notes' : 'enter');
         } else if (event.key === 'Escape') {
           event.preventDefault();
           leave('escape');

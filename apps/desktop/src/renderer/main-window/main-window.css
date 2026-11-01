@@ -1513,11 +1513,23 @@ textarea:not([readonly], [disabled]) {
 }
 
 /* D-77, mockup 01: an expanded task is one raised card with its row and body. */
+/* D-78 (mockup 09): always a raised card while expanded, with the spacing used around subtasks;
+   the priority stripe runs its full height. */
 .row-group {
   position: relative;
-  border-radius: var(--fl-radius-row);
+  margin: 2px 0;
+  border-radius: 14px;
   background: var(--fl-ground-float);
   box-shadow: var(--fl-shadow-selected);
+}
+
+.row-group > .row {
+  position: static;
+}
+
+.row-group .stripe {
+  top: 14px;
+  bottom: 14px;
 }
 
 .row-group.subtask {
@@ -1525,7 +1537,8 @@ textarea:not([readonly], [disabled]) {
 }
 
 .row-group > .row,
-.row-group > .row:hover {
+.row-group > .row:hover,
+.row-group > .row.marked {
   background: transparent;
   box-shadow: none;
 }
@@ -1536,7 +1549,13 @@ textarea:not([readonly], [disabled]) {
 
 .row-group > .row-body,
 .row-group > .row-body.subtask {
-  padding: 0 16px 14px 48px;
+  padding: 1px 16px 14px 48px;
+}
+
+.row-group .body-block.inline .body-view,
+.row-group .body-block.inline .body-editor,
+.row-group .body-block.inline .body-clip {
+  font-size: 13.5px;
 }
 
 /* Code and stack traces in a body: a small code card with its kind and a copy button. */
@@ -1593,4 +1612,27 @@ textarea:not([readonly], [disabled]) {
   background: none;
   box-shadow: none;
   line-height: 1.65;
+}
+
+/* D-78: notes under the composer's title (Shift+Enter), the new task's body. */
+.composer-notes {
+  display: block;
+  width: 100%;
+  min-height: 1.6em;
+  margin: -6px 0 8px;
+  padding: 0 10px;
+  border: 0;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  font-family: var(--fl-font-ui);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--fl-text-secondary);
+  caret-color: var(--fl-accent);
+}
+
+.composer-notes::placeholder {
+  color: var(--fl-text-faint);
 }

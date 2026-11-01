@@ -65,3 +65,13 @@
     animation: none;
   }
 }
+
+/* D-78: an item that opens a submenu, and the submenu beside it. */
+.fl-menu-more {
+  font-family: var(--fl-font-ui);
+  font-size: 14px;
+}
+
+.fl-menu-item[aria-haspopup='menu'].active {
+  background: var(--fl-ground-tile);
+}
