@@ -845,7 +845,12 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await popup.keyboard.press('ArrowUp');
   await popup.keyboard.press('Tab');
   await expect(popup.getByRole('listbox', { name: 'Minutes' })).toBeFocused();
-  await popup.keyboard.type('37');
+  // D-76: typing edits the value: 3_ then 37; Enter commits it, the next Enter sets the time.
+  await popup.keyboard.type('3');
+  await expect(popup.locator('.fl-wheel-item.editing')).toHaveText('3_');
+  await popup.keyboard.type('7');
+  await expect(popup.locator('.fl-wheel-item.editing')).toHaveText('37');
+  await popup.keyboard.press('Enter');
   await expect(popup.locator('.fl-wheels-set')).toHaveText(/, 11:37$/);
   await popup.keyboard.press('Enter');
   await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 11:37$/);

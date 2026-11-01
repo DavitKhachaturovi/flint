@@ -119,6 +119,8 @@ function openPanel(
   };
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
+    // Esc in a wheel being typed into cancels the typing, not the picker (D-76).
+    if ((event.target as Element).closest?.('.fl-wheel.editing')) return;
     event.preventDefault();
     event.stopPropagation();
     close();
@@ -414,12 +416,8 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 /** One stop of a wheel, in px (mockup 08: 40 px rows, the centre band 80 px from the top). */
 const STOP = 40;
 const BAND_TOP = 80;
-/** Touchpad scrolling: pixels per stop (D-74); a mouse notch is always one stop. */
-const TOUCHPAD_STEP = 80;
-/** A pause in wheel events this long drops a partial step. */
-const WHEEL_PAUSE_MS = 200;
-/** Two digits typed within this time make one value (`1`, `4` → 14). */
-const DIGIT_MS = 1000;
+/** Touchpad scrolling settles on the nearest value once its events, inertia included, stop. */
+const SETTLE_MS = 140;
 
 interface Wheel {
   readonly element: HTMLElement;
@@ -429,14 +427,20 @@ interface Wheel {
 }
 
 /**
- * One column of the time wheels (D-70, mockup 08): its values top to bottom, the selected one on
- * the centre band. The mouse wheel and dragging move it a stop at a time and it snaps; a click picks
- * a value. From the keyboard ↓ goes to the next value and ↑ to the previous one, and digits type a
- * value (up to `max`). Values don't wrap around.
+ * One column of the time wheels (D-70, D-76, mockup 08): its values top to bottom, the selected one
+ * on the centre band. A touchpad scrolls it freely, pixel by pixel, and it settles on the nearest
+ * value when the movement stops; a mouse-wheel notch moves exactly one value; dragging follows the
+ * pointer and snaps. ↓ goes to the next value and ↑ to the previous one. A click on a value, or a
+ * digit typed in the column, makes the value editable: `4_`, then `47`, any value up to `max`;
+ * Tab, Enter or leaving commits, Esc cancels. Values don't wrap around.
  */
 function wheel(label: string, values: readonly number[], max: number, onChange: () => void): Wheel {
   const stops = [...values];
   let index = 0;
+  /** Where the column is scrolled to, in px: `index * STOP` when settled. */
+  let offset = 0;
+  /** The digits being typed, or null when the value isn't being edited. */
+  let typed: string | null = null;
   const column = element('div', 'fl-wheel');
   column.tabIndex = 0;
   column.setAttribute('role', 'listbox');
@@ -444,29 +448,39 @@ function wheel(label: string, values: readonly number[], max: number, onChange: 
   const track = element('div', 'fl-wheel-track');
   column.append(track);
   const id = `fl-wheel-${label.toLowerCase()}`;
+  const last = (): number => (stops.length - 1) * STOP;
 
-  const render = (offset = 0): void => {
+  const render = (): void => {
+    const nearest = Math.round(offset / STOP);
     track.replaceChildren(
       ...stops.map((value, at) => {
-        const item = element('span', 'fl-wheel-item', pad(value));
+        const editing = typed !== null && at === index;
+        const shown = editing ? typed : null;
+        const text = !shown ? pad(value) : shown.length === 1 ? `${shown}_` : shown;
+        const item = element('span', 'fl-wheel-item', text);
         item.id = `${id}-${value}`;
         item.setAttribute('role', 'option');
         item.setAttribute('aria-selected', String(at === index));
-        const distance = Math.abs(at - index);
+        const distance = Math.abs(at - nearest);
         if (distance === 0) item.classList.add('center');
         else if (distance === 1) item.classList.add('near');
+        if (editing) item.classList.add('editing');
         return item;
       }),
     );
-    track.style.transform = `translateY(${BAND_TOP - index * STOP + offset}px)`;
+    track.style.transform = `translateY(${BAND_TOP - offset}px)`;
+    column.classList.toggle('editing', typed !== null);
     column.setAttribute('aria-activedescendant', `${id}-${stops[index] ?? 0}`);
   };
+  /** Settles on value `next` (clamped), gliding there. */
   const select = (next: number): void => {
     const clamped = Math.max(0, Math.min(stops.length - 1, next));
-    if (clamped === index) return;
+    const changed = clamped !== index;
     index = clamped;
+    offset = index * STOP;
+    column.classList.remove('free');
     render();
-    onChange();
+    if (changed) onChange();
   };
   const set = (value: number): void => {
     let at = stops.indexOf(value);
@@ -476,96 +490,122 @@ function wheel(label: string, values: readonly number[], max: number, onChange: 
       stops.splice(at, 0, value);
     }
     index = at;
+    offset = index * STOP;
     render();
     onChange();
   };
 
-  // Typed digits: one that can't start a two-digit value is the value; otherwise wait a moment
-  // for a second one.
-  let pending: { digit: number; at: number } | null = null;
+  // Editing a value by typing (D-76).
+  const startEditing = (first = ''): void => {
+    typed = first;
+    render();
+  };
+  const commit = (): void => {
+    if (typed === null) return;
+    const value = typed === '' ? null : Number(typed);
+    typed = null;
+    if (value === null) render();
+    else set(value);
+  };
+  const cancel = (): void => {
+    typed = null;
+    render();
+  };
   column.addEventListener('keydown', (event) => {
+    if (typed !== null) {
+      if (/^\d$/.test(event.key)) {
+        event.preventDefault();
+        const next = typed.length >= 2 ? event.key : typed + event.key;
+        // A second digit that would pass the limit is not taken.
+        if (next.length === 1 || Number(next) <= max) typed = next;
+        render();
+      } else if (event.key === 'Backspace') {
+        event.preventDefault();
+        typed = typed.slice(0, -1);
+        render();
+      } else if (event.key === 'Enter' || event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === 'Enter') commit();
+        else cancel();
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') commit();
+      if (typed !== null || event.key === 'Enter' || event.key === 'Escape') return;
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       event.stopPropagation();
-      pending = null;
       select(index + (event.key === 'ArrowDown' ? 1 : -1));
-      return;
-    }
-    if (!/^\d$/.test(event.key)) return;
-    event.preventDefault();
-    const digit = Number(event.key);
-    const time = performance.now();
-    if (pending && time - pending.at < DIGIT_MS && pending.digit * 10 + digit <= max) {
-      set(pending.digit * 10 + digit);
-      pending = null;
-    } else {
-      set(digit);
-      pending = digit * 10 <= max ? { digit, at: time } : null;
+    } else if (/^\d$/.test(event.key)) {
+      event.preventDefault();
+      startEditing(event.key);
     }
   });
+  // Tab, or a click elsewhere: what was typed is taken.
+  column.addEventListener('blur', commit);
 
-  // D-74: a mouse notch is one stop. A touchpad sends many small pixel deltas: they add up, one
-  // stop per TOUCHPAD_STEP, the rest kept for the next; a pause starts afresh.
-  let wheeled = 0;
-  let lastWheel = 0;
+  // The mouse wheel and the touchpad.
+  let settle: number | undefined;
   column.addEventListener(
     'wheel',
     (event) => {
       event.preventDefault();
-      if (event.timeStamp - lastWheel > WHEEL_PAUSE_MS) wheeled = 0;
-      lastWheel = event.timeStamp;
+      commit();
       const legacy = (event as WheelEvent & { readonly wheelDeltaY?: number }).wheelDeltaY ?? 0;
       if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && legacy !== 0 && legacy % 120 === 0) {
-        wheeled = 0;
+        window.clearTimeout(settle);
         select(index + Math.sign(event.deltaY));
         return;
       }
       const unit =
         event.deltaMode === WheelEvent.DOM_DELTA_LINE
-          ? TOUCHPAD_STEP / 3
+          ? STOP
           : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-            ? TOUCHPAD_STEP * 5
+            ? STOP * 5
             : 1;
-      wheeled += event.deltaY * unit;
-      const steps = Math.trunc(wheeled / TOUCHPAD_STEP);
-      if (steps === 0) return;
-      wheeled -= steps * TOUCHPAD_STEP;
-      select(index + steps);
+      offset = Math.max(0, Math.min(last(), offset + event.deltaY * unit));
+      column.classList.add('free');
+      const nearest = Math.round(offset / STOP);
+      if (nearest !== index) {
+        index = nearest;
+        onChange();
+      }
+      render();
+      window.clearTimeout(settle);
+      settle = window.setTimeout(() => select(Math.round(offset / STOP)), SETTLE_MS);
     },
     { passive: false },
   );
 
-  // Dragging follows the pointer, then snaps to the nearest stop; a click without a drag picks the
-  // value under the pointer.
+  // Dragging follows the pointer, then snaps to the nearest stop; a click on a value selects it and
+  // makes it editable.
   column.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    commit();
     column.focus();
     column.setPointerCapture(event.pointerId);
     const startY = event.clientY;
-    const startIndex = index;
+    const start = offset;
     let moved = false;
-    column.classList.add('dragging');
     const move = (next: PointerEvent): void => {
       const dy = next.clientY - startY;
       if (Math.abs(dy) > 3) moved = true;
       if (!moved) return;
-      const reach = Math.max(-startIndex, Math.min(stops.length - 1 - startIndex, -dy / STOP));
-      track.style.transform = `translateY(${BAND_TOP - (startIndex + reach) * STOP}px)`;
+      column.classList.add('free');
+      offset = Math.max(0, Math.min(last(), start - dy));
+      render();
     };
-    const up = (last: PointerEvent): void => {
+    const up = (end: PointerEvent): void => {
       column.removeEventListener('pointermove', move);
       column.removeEventListener('pointerup', up);
       column.removeEventListener('pointercancel', up);
-      column.classList.remove('dragging');
       if (moved) {
-        const target = Math.round(startIndex - (last.clientY - startY) / STOP);
-        if (Math.max(0, Math.min(stops.length - 1, target)) === index) render();
-        else select(target);
-      } else {
-        const top = column.getBoundingClientRect().top;
-        select(index + Math.floor((last.clientY - top - BAND_TOP) / STOP));
+        select(Math.round(offset / STOP));
+        return;
       }
+      const top = column.getBoundingClientRect().top;
+      select(index + Math.floor((end.clientY - top - BAND_TOP) / STOP));
+      startEditing();
     };
     column.addEventListener('pointermove', move);
     column.addEventListener('pointerup', up);
