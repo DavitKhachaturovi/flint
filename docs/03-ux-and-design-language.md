@@ -80,6 +80,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | New task | N (and Ctrl+N anywhere in the app) | Proposed (see Q-08) |
 | Expand / collapse task body | → / ← | Proposed |
 | Open task as page (TASK-05) | Shift+Enter | Proposed (D-53) |
+| Back from a task's page to its list | Esc (or the back arrow, Alt+←) | Proposed (D-53) |
 | Select all tasks (TASK-07) | Ctrl+A | Proposed (D-59) |
 | Star to / unstar from Today | S | Proposed |
 | Set reminder | R | Proposed |

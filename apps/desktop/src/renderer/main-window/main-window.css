@@ -3,6 +3,7 @@
 @import '../selection.css';
 @import '../menu/menu.css';
 @import '../pickers/pickers.css';
+@import '../highlight/highlight.css';
 
 /* The main window (M4), after docs/design/mockups/01-main-inbox.html; tokens only (docs/09). */
 
@@ -188,6 +189,7 @@ button:focus-visible {
 }
 
 .content {
+  position: relative;
   width: 100%;
   max-width: 820px;
   margin: 0 auto;
@@ -966,4 +968,242 @@ body {
 input:not([readonly], [disabled], [type='checkbox'], [type='radio']),
 textarea:not([readonly], [disabled]) {
   cursor: text;
+}
+
+/* TASK-05, D-49, D-53 (09 §8): a task's body, rendered: inline under its row when small, or on the
+   task's page. Note-body type, code blocks in the grayscale scheme, images from the Flint folder. */
+.body-view {
+  font-size: var(--fl-size-note);
+  line-height: 1.7;
+  color: var(--fl-text-body);
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+.body-view > :first-child {
+  margin-top: 0;
+}
+
+.body-view > :last-child {
+  margin-bottom: 0;
+}
+
+.body-view p,
+.body-view ul,
+.body-view ol,
+.body-view blockquote,
+.body-view table {
+  margin: 0 0 10px;
+}
+
+.body-view ul,
+.body-view ol {
+  padding-left: 22px;
+}
+
+.body-view h1,
+.body-view h2,
+.body-view h3,
+.body-view h4 {
+  margin: 14px 0 6px;
+  font-size: 1.05em;
+  font-weight: 600;
+  letter-spacing: normal;
+  color: var(--fl-text-primary);
+}
+
+.body-view h1 {
+  font-size: 1.25em;
+}
+
+.body-view blockquote {
+  padding-left: 12px;
+  border-left: 2px solid var(--fl-edge-chip);
+  color: var(--fl-text-secondary);
+}
+
+.body-view code {
+  font-family: var(--fl-font-mono);
+  font-size: 0.88em;
+}
+
+.body-view pre.body-code {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  font-size: var(--fl-size-meta);
+  line-height: 18px;
+  color: var(--fl-code-plain);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.body-view pre.body-code code {
+  font-size: inherit;
+}
+
+.body-view img {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 4px 0 10px;
+  border-radius: var(--fl-radius-tile);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
+}
+
+.body-view a {
+  color: var(--fl-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--fl-edge-chip);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.body-view table {
+  border-collapse: collapse;
+}
+
+.body-view th,
+.body-view td {
+  padding: 4px 10px;
+  border: 1px solid var(--fl-edge-card);
+}
+
+.body-image-missing {
+  color: var(--fl-text-faint);
+  font-style: italic;
+}
+
+/* The inline body, aligned with the title's text (after the check). */
+.row-body {
+  padding: 2px 16px 12px 48px;
+}
+
+.row-body.subtask {
+  padding-left: 80px;
+}
+
+/* Measuring a body before choosing inline or page (D-53): laid out like the inline body. */
+.body-probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* The content column less its padding, the card's and the inline body's. */
+  width: calc(100% - 156px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* A body in its plain monospace field until the M5 editor (D-49), like a task in Edit state. */
+.body-editor {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--fl-radius-row);
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  font-family: var(--fl-font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--fl-text-body);
+  caret-color: var(--fl-accent);
+}
+
+.body-editor::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.body-toggle {
+  display: flex;
+  padding: 2px;
+  border-radius: 6px;
+  color: inherit;
+  transition: color var(--fl-dur-fast);
+}
+
+.body-toggle:hover,
+.body-toggle.open {
+  color: var(--fl-text-primary);
+}
+
+.code-row {
+  cursor: default;
+}
+
+/* The task page (09 §8): a back-arrow tile left of the title, the body below. */
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px 6px;
+}
+
+.page-back {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-heading-soft);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.page-back:hover {
+  color: var(--fl-text-primary);
+}
+
+.page-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 32px;
+  overflow-wrap: anywhere;
+}
+
+.page-title-edit {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-title-edit .title-input {
+  width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.page-add-body {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.page-add-body:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.content > .body-view,
+.content > .body-editor {
+  padding-left: 4px;
+  padding-right: 4px;
 }

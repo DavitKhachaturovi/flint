@@ -34,7 +34,13 @@ import { hotkeysWindow } from './hotkeys-window.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
-import { APP_SCHEME, contentType, rendererPageUrl, resolveRendererFile } from './renderer-url.js';
+import {
+  APP_SCHEME,
+  contentType,
+  rendererPageUrl,
+  resolveMediaFile,
+  resolveRendererFile,
+} from './renderer-url.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
@@ -136,14 +142,20 @@ function log(message: string): void {
   }
 }
 
+/** The Flint folder, once known: `app://media/…` serves its images (task bodies, D-49). */
+let mediaRoot: string | null = null;
+
 /**
- * Serves `app://flint/…` from the built renderer folder and nothing else (D-34). Read directly, not
- * fetched as `file://`, so the network guard needs no exception for `file:`.
+ * Serves `app://flint/…` from the built renderer folder and nothing else (D-34), and
+ * `app://media/…` from the images in the Flint folder. Read directly, not fetched as `file://`, so
+ * the network guard needs no exception for `file:`.
  */
 function serveRenderer(): void {
   const root = join(import.meta.dirname, '../renderer');
   schemes.handle(APP_SCHEME, async (request) => {
-    const file = resolveRendererFile(request.url, root);
+    const file =
+      resolveRendererFile(request.url, root) ??
+      (mediaRoot ? resolveMediaFile(request.url, mediaRoot) : null);
     if (!file) return new Response('Not found', { status: 404 });
     try {
       return new Response(await readFile(file), {
@@ -219,6 +231,7 @@ async function start(): Promise<void> {
   log(
     `Flint folder ${folder.folder}: ${folder.lists.length} lists, Inbox ${folder.inbox}${folder.inboxCreated ? ' (created)' : ''}`,
   );
+  mediaRoot = folder.folder;
   // Shown in onboarding and settings in M8 (D-23, D-24); logged until then.
   if (folder.insideOneDrive) {
     log('warning: the Flint folder is inside OneDrive, which v1 does not support (D-24)');

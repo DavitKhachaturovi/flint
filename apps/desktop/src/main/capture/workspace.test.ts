@@ -292,6 +292,22 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
           : [],
       ) ?? [];
 
+  it('saves a body under its task, before the subtasks; undo restores it (TASK-05, D-49)', async () => {
+    const original = `${header}- [ ] one [id:: aaa1]\n    - [ ] sub [id:: bbb2]\n`;
+    await writeFile(join(folder, 'Inbox.md'), original);
+    const workspace = await open();
+    const body = 'See the trace:\n\n```\nError: boom\n```';
+    expect(await workspace.change('inbox', { kind: 'body', key: 'aaa1', body }, now)).toMatchObject(
+      { label: 'Edited', key: 'aaa1' },
+    );
+    expect(await inbox()).toBe(
+      `${header}- [ ] one [id:: aaa1]\n    See the trace:\n\n    \`\`\`\n    Error: boom\n    \`\`\`\n    - [ ] sub [id:: bbb2]\n`,
+    );
+    expect(await workspace.change('inbox', { kind: 'body', key: 'aaa1', body }, now)).toBeNull();
+    await workspace.undoLast(now);
+    expect(await inbox()).toBe(original);
+  });
+
   it('the composer adds to the top with shorthand; Edit-state Enter adds below', async () => {
     await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] one [id:: aaa1]\n`);
     const workspace = await open();

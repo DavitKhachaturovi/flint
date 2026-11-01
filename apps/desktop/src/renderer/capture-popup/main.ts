@@ -33,7 +33,7 @@ import {
 } from '../pickers/pickers.js';
 import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
 import { isTextField, openMenu, textFieldMenu } from '../menu/menu.js';
-import { highlightLines } from './highlight.js';
+import { highlightLines } from '../highlight/highlight.js';
 import {
   fitHeight,
   renderBlocks,

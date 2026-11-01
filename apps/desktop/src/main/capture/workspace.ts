@@ -16,6 +16,7 @@ import {
   moveUp,
   outdentTask,
   serializeDocument,
+  setBody,
   setPriority,
   setMuted,
   setReminder,
@@ -327,6 +328,13 @@ export class Workspace {
           if (parsed.reminder) ops.push(setReminder(path, change.key, parsed.reminder));
           const op = bulk(ops);
           return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
+        }
+        case 'body': {
+          // TASK-05, D-49: the body as typed; a `- [ ]` line in it becomes a subtask (04 §3).
+          const found = findTask(document, change.key);
+          if (!found || change.body.trim() === getBody(found.task).trim()) return null;
+          const op = setBody(path, change.key, change.body.trim());
+          return outcome(await this.record(list, op, 'Edited', now), change.key);
         }
         case 'priority': {
           const op = setPriority(path, change.key, change.priority);

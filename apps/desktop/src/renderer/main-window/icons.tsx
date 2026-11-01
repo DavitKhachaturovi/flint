@@ -57,6 +57,9 @@ export const BellIcon = ({ size = 12 }: IconProps): ReactElement =>
 export const BodyIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M4 7h16M4 12h16M4 17h10" />);
 
+export const BackIcon = ({ size = 15 }: IconProps): ReactElement =>
+  svg(size, <path d="M19 12H5m6-6-6 6 6 6" />);
+
 export const CheckIcon = ({ size = 12 }: IconProps): ReactElement =>
   svg(size, <path d="m5 12.5 4.5 4.5L19 7.5" />, 2.6);
 

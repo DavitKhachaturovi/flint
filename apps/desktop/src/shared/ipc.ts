@@ -203,6 +203,8 @@ export type ListChange =
       readonly id?: string;
     }
   | { readonly kind: 'edit'; readonly key: string; readonly text: string }
+  /** TASK-05, D-49: a task's body, as typed in its plain field. */
+  | { readonly kind: 'body'; readonly key: string; readonly body: string }
   | {
       readonly kind: 'priority';
       readonly key: string;

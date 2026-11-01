@@ -26,6 +26,7 @@ import type {
   TaskRow,
 } from '../../shared/ipc.js';
 import {
+  BackIcon,
   BellIcon,
   BodyIcon,
   CheckIcon,
@@ -42,6 +43,7 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
+import { BodyEditor, BodyView, bodyFits } from './Body.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
 
@@ -197,6 +199,23 @@ function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: 
   return { ghosts, moved };
 }
 
+/** NAV-04: where the main window is: a list, or one of its tasks as a page (TASK-05). */
+interface Place {
+  readonly list: string;
+  readonly page: string | null;
+}
+
+/** The task with this key in a list's view, subtasks and completed tasks included. */
+function findRow(view: ListView, key: string): TaskRow | null {
+  const tasks = [
+    ...view.items.flatMap((item) => (item.kind === 'task' ? [item.task] : [])),
+    ...view.completed,
+  ];
+  return withSubtasks(tasks).find((row) => row.key === key) ?? null;
+}
+
+const hasBody = (task: TaskRow): boolean => task.body.trim() !== '';
+
 /** The rows the keyboard moves through, top to bottom (Navigate state, docs/03 §2). */
 function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
   if (!view) return [];
@@ -215,6 +234,12 @@ export function App(): ReactElement {
   const [view, setView] = useState<ListView | null>(null);
   const [selected, setSelected] = useState<string | null>(FIRST_ROW);
   const [editing, setEditing] = useState<Editing | null>(null);
+  /** TASK-05, D-53: the task shown as a page instead of its list. */
+  const [page, setPage] = useState<string | null>(null);
+  /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [editingBody, setEditingBody] = useState<string | null>(null);
+  const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
@@ -251,17 +276,93 @@ export function App(): ReactElement {
     window.flintMain.onChanged(() => void refreshRef.current());
     // A reminder's Open: its list, with the task selected once the rows are there.
     window.flintMain.onReveal(({ listId: id, key }) => {
-      setListId(id);
-      setEditing(null);
-      setSelected(key);
+      goRef.current({ list: id, page: null }, key);
     });
   }, []);
 
-  const openList = useCallback((id: string): void => {
-    setListId(id);
-    setSelected(FIRST_ROW);
+  /**
+   * NAV-04: the views shown this session, for back and forward (Alt+← / Alt+→, the mouse's side
+   * buttons). Going somewhere new drops the forward part, as in a browser.
+   */
+  const history = useRef<{ places: Place[]; at: number }>({
+    places: [{ list: 'inbox', page: null }],
+    at: 0,
+  });
+  const show = useCallback((place: Place, select: string | null = null): void => {
+    setListId(place.list);
+    setPage(place.page);
+    setSelected(select ?? FIRST_ROW);
     setEditing(null);
+    setEditingBody(null);
   }, []);
+  const go = useCallback(
+    (place: Place, select: string | null = null): void => {
+      const trail = history.current;
+      const here = trail.places[trail.at];
+      if (here?.list !== place.list || here.page !== place.page) {
+        trail.places = [...trail.places.slice(0, trail.at + 1), place];
+        trail.at = trail.places.length - 1;
+      }
+      show(place, select);
+    },
+    [show],
+  );
+  const goRef = useRef(go);
+  goRef.current = go;
+  const travel = useCallback(
+    (step: -1 | 1): void => {
+      const trail = history.current;
+      const from = trail.places[trail.at];
+      const to = trail.places[trail.at + step];
+      if (!to) return;
+      trail.at += step;
+      // Back from a task's page selects that task in its list.
+      show(to, from?.page && !to.page && to.list === from.list ? from.page : null);
+    },
+    [show],
+  );
+  /** A page's back arrow and Esc: back, or to the page's list when there is no history. */
+  const leavePage = useCallback((): void => {
+    const trail = history.current;
+    const previous = trail.places[trail.at - 1];
+    if (previous && previous.list === listId && !previous.page) travel(-1);
+    else go({ list: listId, page: null }, page);
+  }, [go, travel, listId, page]);
+
+  const openList = useCallback((id: string): void => go({ list: id, page: null }), [go]);
+  const openPage = useCallback(
+    (key: string): void => go({ list: listId, page: key }, key),
+    [go, listId],
+  );
+
+  /**
+   * TASK-05, D-53: the body indicator, a code row or →: a small body opens inline under its row, a
+   * larger one as the task's page (its only view); shown inline, it closes again.
+   */
+  const showBody = useCallback(
+    async (task: TaskRow): Promise<void> => {
+      if (expanded.has(task.key)) {
+        setExpanded((current) => new Set([...current].filter((key) => key !== task.key)));
+        return;
+      }
+      const column = content.current;
+      if (column && (await bodyFits(task.body, column)))
+        setExpanded((current) => new Set([...current, task.key]));
+      else openPage(task.key);
+    },
+    [expanded, openPage],
+  );
+
+  // NAV-04: the mouse's back and forward buttons.
+  useEffect(() => {
+    const onButton = (event: MouseEvent): void => {
+      if (event.button !== 3 && event.button !== 4) return;
+      event.preventDefault();
+      travel(event.button === 3 ? -1 : 1);
+    };
+    window.addEventListener('mouseup', onButton);
+    return () => window.removeEventListener('mouseup', onButton);
+  }, [travel]);
 
   const showToast = useCallback((text: string, undo: boolean): void => {
     window.clearTimeout(toastTimer.current);
@@ -498,6 +599,7 @@ export function App(): ReactElement {
       openMenu(
         [
           ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
+          { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
           {
             label: open ? 'Complete' : 'Reopen',
             hint: 'Space',
@@ -654,12 +756,26 @@ export function App(): ReactElement {
       }
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
         return;
+      // NAV-04: back and forward, anywhere in the window.
+      if (event.altKey && !event.ctrlKey && (key === 'arrowleft' || key === 'arrowright')) {
+        event.preventDefault();
+        travel(key === 'arrowleft' ? -1 : 1);
+        return;
+      }
       if (event.ctrlKey && !event.altKey && (key === 'z' || key === 'y')) {
         event.preventDefault();
         void (key === 'z' && !event.shiftKey ? undo() : redo());
         return;
       }
       if (event.ctrlKey || event.metaKey || view?.mode !== 'tasks') return;
+      // A task's page: Esc goes back to its list (D-53).
+      if (page) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          leavePage();
+        }
+        return;
+      }
       const index = rows.findIndex((row) => row.key === selected);
       const row = rows[index];
       const open = row && !row.done ? row : undefined;
@@ -678,7 +794,17 @@ export function App(): ReactElement {
         return;
       }
       if (event.altKey) return;
-      if (event.key === ' ' && row) {
+      if (event.key === 'ArrowRight' && row && hasBody(row)) {
+        event.preventDefault();
+        if (!expanded.has(row.key)) void showBody(row);
+      } else if (event.key === 'ArrowLeft' && row && expanded.has(row.key)) {
+        event.preventDefault();
+        void showBody(row);
+      } else if (event.key === 'Enter' && event.shiftKey && row) {
+        // TASK-05, D-53: any task opens as a page.
+        event.preventDefault();
+        openPage(row.key);
+      } else if (event.key === ' ' && row) {
         event.preventDefault();
         void toggle(row.key);
       } else if (event.key in PRIORITY_KEYS && open) {
@@ -712,8 +838,29 @@ export function App(): ReactElement {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [rows, selected, view, change, edit, toggle, undo, redo, remove, taskMenu, newListMenu]);
+  }, [
+    rows,
+    selected,
+    view,
+    page,
+    expanded,
+    change,
+    edit,
+    toggle,
+    undo,
+    redo,
+    remove,
+    taskMenu,
+    newListMenu,
+    travel,
+    leavePage,
+    showBody,
+    openPage,
+  ]);
 
+  /** The task shown as a page, if it is still in the list (else the list shows). */
+  const pageTask =
+    page && view?.mode === 'tasks' && view.id === listId ? findRow(view, page) : null;
   const taskLists = lists.filter((list) => !list.inbox);
   const inbox = lists.find((list) => list.inbox);
   // UI-04: rows that appear in the list being looked at ease in; opening a list doesn't animate.
@@ -743,7 +890,29 @@ export function App(): ReactElement {
     onMenu: (task, at) => taskMenu(task, at),
     onMute: (key, muted) => void mute(key, muted),
     onReminder: (task, anchor) => changeReminder(task, anchor),
+    expanded,
+    onBody: (task) => void showBody(task),
   };
+  const saveBody = (key: string, body: string): void => {
+    setEditingBody(null);
+    void change({ kind: 'body', key, body });
+  };
+  /** A small body shown inline under its row (D-53), rendered or being edited (D-49). */
+  const bodyRows = (task: TaskRow, subtask: boolean): ReactElement[] =>
+    expanded.has(task.key) && hasBody(task)
+      ? [
+          <div key={`body-${task.key}`} className={subtask ? 'row-body subtask' : 'row-body'}>
+            {editingBody === task.key ? (
+              <BodyEditor initial={task.body} onDone={(body) => saveBody(task.key, body)} />
+            ) : (
+              <BodyView
+                body={task.body}
+                onEdit={() => !view?.readOnly && setEditingBody(task.key)}
+              />
+            )}
+          </div>,
+        ]
+      : [];
 
   // The task card as one flat run of rows, so a new row keeps its place (and its focus) while
   // the tasks it adds appear above it. It sits below the newest of its tasks already shown.
@@ -783,6 +952,7 @@ export function App(): ReactElement {
             fresh={freshKeys.has(item.task.key)}
             {...rowProps}
           />,
+          ...bodyRows(item.task, false),
         );
         cardRows.push(...ghostRows(ghosts, 'complete', item.task.key, rowProps));
         for (const subtask of item.task.subtasks) {
@@ -794,6 +964,7 @@ export function App(): ReactElement {
               fresh={freshKeys.has(subtask.key)}
               {...rowProps}
             />,
+            ...bodyRows(subtask, true),
           );
           cardRows.push(...ghostRows(ghosts, 'complete', subtask.key, rowProps));
           placeNew(subtask.key, true);
@@ -884,10 +1055,22 @@ export function App(): ReactElement {
         <div className="scroller">
           {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
           <div
+            ref={content}
             className={view?.mode === 'note' ? 'content note-page' : 'content'}
-            key={view?.id ?? 'none'}
+            key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}`}
           >
-            {view && (
+            {view && pageTask && (
+              <TaskPage
+                key={pageTask.key}
+                task={pageTask}
+                readOnly={view.readOnly !== null}
+                onBack={leavePage}
+                onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
+                onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
+              />
+            )}
+
+            {view && !pageTask && (
               <header className="list-header">
                 <h1>
                   {view.name}
@@ -914,7 +1097,7 @@ export function App(): ReactElement {
               />
             )}
 
-            {view?.mode === 'tasks' && (
+            {view?.mode === 'tasks' && !pageTask && (
               <>
                 {!view.readOnly && (
                   <Composer
@@ -962,6 +1145,7 @@ export function App(): ReactElement {
                           fresh={freshKeys.has(task.key)}
                           {...rowProps}
                         />,
+                        ...bodyRows(task, false),
                         ...ghostRows(ghosts, 'reopen', task.key, rowProps),
                       ])}
                   </section>
@@ -1239,6 +1423,83 @@ interface RowHandlers {
   readonly onMute: (key: string, muted: boolean) => void;
   /** REM-01, D-68: the time opens the date/time picker for the task. */
   readonly onReminder: (task: TaskRow, anchor: DOMRect) => void;
+  /** TASK-05, D-53: bodies shown inline, and the body indicator (inline or the task's page). */
+  readonly expanded: ReadonlySet<string>;
+  readonly onBody: (task: TaskRow) => void;
+}
+
+/**
+ * A task as a page (TASK-05, D-53, 09 §8): it replaces the list, with a back arrow, the title (a
+ * click edits it) and the body, rendered, with plain editing until the note editor (D-49, M5).
+ */
+function TaskPage(props: {
+  readonly task: TaskRow;
+  readonly readOnly: boolean;
+  readonly onBack: () => void;
+  readonly onTitle: (text: string) => void;
+  readonly onBody: (body: string) => void;
+}): ReactElement {
+  const { task, readOnly, onBack, onTitle, onBody } = props;
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingBody, setEditingBody] = useState(false);
+  const editable = !readOnly && !task.done;
+  return (
+    <>
+      <header className="page-head">
+        <button type="button" className="page-back" title="Back (Alt+←)" onClick={onBack}>
+          <BackIcon />
+        </button>
+        {editingTitle ? (
+          <div className="page-title-edit">
+            <EditField
+              initial={task.title}
+              inert
+              onLeave={(text, empty) => {
+                setEditingTitle(false);
+                if (!empty || hasBody(task)) onTitle(text);
+              }}
+              onTab={() => undefined}
+            />
+          </div>
+        ) : (
+          <h1
+            className="page-title"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest('a')) {
+                event.preventDefault();
+                const link = (event.target as HTMLElement).closest('a');
+                if (link) window.flintMain.openLink(link.href);
+              } else if (editable) setEditingTitle(true);
+            }}
+          >
+            {task.title === '' ? (
+              task.label
+            ) : (
+              <span dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }} />
+            )}
+          </h1>
+        )}
+      </header>
+      {editingBody ? (
+        <BodyEditor
+          initial={task.body}
+          placeholder="Notes, code, links…"
+          onDone={(body) => {
+            setEditingBody(false);
+            onBody(body);
+          }}
+        />
+      ) : hasBody(task) ? (
+        <BodyView body={task.body} onEdit={() => editable && setEditingBody(true)} />
+      ) : (
+        editable && (
+          <button type="button" className="page-add-body" onClick={() => setEditingBody(true)}>
+            Add notes, code or links
+          </button>
+        )
+      )}
+    </>
+  );
 }
 
 /** The ghosts of a section that follow row `after` (null: the section's first rows), D-75. */
@@ -1336,7 +1597,7 @@ function Row(
           onTab={onTab}
         />
       ) : task.code ? (
-        <span className="title code-row">
+        <span className="title code-row" onClick={() => props.onBody(task)}>
           <span className="code-kind">
             {task.code.kind} · {task.code.lines} {task.code.lines === 1 ? 'line' : 'lines'}
           </span>
@@ -1382,10 +1643,19 @@ function Row(
           </span>
         )}
         {task.done && task.completed && <span>{task.completed}</span>}
-        {!task.done && !task.code && task.body.trim() !== '' && (
-          <span title="Has a body">
+        {!task.code && hasBody(task) && (
+          <button
+            type="button"
+            className={props.expanded.has(task.key) ? 'body-toggle open' : 'body-toggle'}
+            title={props.expanded.has(task.key) ? 'Hide the body (←)' : 'Show the body (→)'}
+            aria-expanded={props.expanded.has(task.key)}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onBody(task);
+            }}
+          >
             <BodyIcon />
-          </span>
+          </button>
         )}
       </span>
     </div>

@@ -19,6 +19,11 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.json': 'application/json',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
   '.ttf': 'font/ttf',
@@ -34,6 +39,22 @@ export function rendererPageUrl(page: string): string {
 
 /** The file an `app://flint/…` request maps to, or null when it is anything else or leaves `root`. */
 export function resolveRendererFile(url: string, root: string): string | null {
+  return resolveIn(url, 'flint', root);
+}
+
+/** Images task bodies may show (TASK-05, MEDIA-01). SVG stays out: an image, but also a document. */
+const MEDIA_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']);
+
+/**
+ * The image an `app://media/…` request maps to (task bodies, D-49): a file inside the Flint folder
+ * `root` with an image type, or null for anything else.
+ */
+export function resolveMediaFile(url: string, root: string): string | null {
+  const file = resolveIn(url, 'media', root);
+  return file && MEDIA_TYPES.has(extname(file).toLowerCase()) ? file : null;
+}
+
+function resolveIn(url: string, host: string, root: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -41,7 +62,7 @@ export function resolveRendererFile(url: string, root: string): string | null {
     return null;
   }
   // Node reports no origin for schemes it doesn't know, so compare the parts.
-  if (parsed.protocol !== `${APP_SCHEME}:` || parsed.host !== 'flint') return null;
+  if (parsed.protocol !== `${APP_SCHEME}:` || parsed.host !== host) return null;
   let path: string;
   try {
     path = decodeURIComponent(parsed.pathname);

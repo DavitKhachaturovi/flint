@@ -1,0 +1,43 @@
+/* The capture popup's and the task bodies' code highlighting (UI-06, D-63, docs/09 §11): one line
+   per element, grayscale tokens. Shared by every window that shows code. */
+.code-line {
+  display: block;
+}
+
+/* Grayscale code tokens (UI-06, D-63, docs/09 §11). */
+.tok-key {
+  color: var(--fl-code-key);
+}
+
+.tok-string {
+  color: var(--fl-code-string);
+}
+
+.tok-number {
+  color: var(--fl-code-number);
+}
+
+.tok-literal {
+  color: var(--fl-code-literal);
+  font-style: italic;
+}
+
+.tok-punctuation {
+  color: var(--fl-code-punctuation);
+}
+
+.tok-error {
+  color: var(--fl-code-exception);
+  font-weight: 600;
+}
+
+.tok-frame {
+  color: var(--fl-code-frame);
+}
+
+.tok-location {
+  color: var(--fl-code-location);
+  text-decoration: underline;
+  text-decoration-color: var(--fl-code-underline);
+  text-underline-offset: 3px;
+}

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -841,6 +841,74 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 11:37$/);
   await popup.locator('#capture').fill('');
   await popup.keyboard.press('Escape');
+});
+
+test('bodies: inline when small, a page when large, back and forward (TASK-05, NAV-04, D-49, D-53)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const file = join(flint, 'Bodies.md');
+  // Thirty paragraphs: far more than eight rendered lines.
+  const long = Array.from({ length: 30 }, (_, index) => `    line ${index + 1}`).join('\n\n');
+  await mkdir(join(flint, 'attachments'), { recursive: true });
+  await writeFile(
+    join(flint, 'attachments', 'dot.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
+  await writeFile(
+    file,
+    `---\nflint: 1\nid: bod1\nmode: tasks\n---\n- [ ] Short body [id:: b1]\n    A **bold** note.\n\n    \`\`\`json\n    {"a": 1}\n    \`\`\`\n- [ ] Long body [id:: b2]\n${long}\n- [ ] Shot [id:: b3]\n    ![dot](attachments/dot.png)\n`,
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Bodies' }).click();
+  await expect(main.locator('h1')).toHaveText(/^Bodies/);
+
+  // A small body opens inline, rendered and highlighted; a click edits it, Esc saves.
+  const short = main.locator('.row', { hasText: 'Short body' });
+  await short.locator('.body-toggle').click();
+  const inline = main.locator('.row-body .body-view');
+  await expect(inline.locator('strong')).toHaveText('bold');
+  await expect(inline.locator('.tok-key')).toHaveText('"a"');
+  await inline.locator('p').click();
+  const editor = main.locator('.body-editor');
+  await expect(editor).toBeFocused();
+  await main.keyboard.press('Control+End');
+  await main.keyboard.type('\nMore.');
+  await main.keyboard.press('Escape');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('    ```\n    More.\n- [ ] Long body');
+  await expect(inline.locator('p').last()).toHaveText('More.');
+
+  // A large body opens as a page; Esc goes back to the list with the task selected.
+  await main.locator('.row', { hasText: 'Long body' }).click({ position: { x: 600, y: 10 } });
+  await main.keyboard.press('ArrowRight');
+  await expect(main.locator('.page-title')).toHaveText('Long body');
+  await expect(main.locator('.body-view')).toContainText('line 30');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('h1')).toHaveText(/^Bodies/);
+  await expect(main.locator('.row.sel .title')).toHaveText('Long body');
+
+  // Shift+Enter opens any task as a page; the mouse's back and forward buttons move through them.
+  const mouseButton = (button: number): Promise<void> =>
+    main.evaluate((which) => {
+      window.dispatchEvent(new MouseEvent('mouseup', { button: which }));
+    }, button);
+  await main.locator('.row', { hasText: 'Shot' }).click({ position: { x: 600, y: 10 } });
+  await main.keyboard.press('Shift+Enter');
+  await expect(main.locator('.page-title')).toHaveText('Shot');
+  // The image loads from the Flint folder (app://media), not the network.
+  await expect
+    .poll(() =>
+      main.locator('.body-view img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBe(1);
+  await mouseButton(3);
+  await expect(main.locator('h1')).toHaveText(/^Bodies/);
+  await mouseButton(4);
+  await expect(main.locator('.page-title')).toHaveText('Shot');
+  await main.locator('.page-back').click();
+  await expect(main.locator('h1')).toHaveText(/^Bodies/);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

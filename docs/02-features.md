@@ -195,6 +195,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - A **larger body opens as a full page**; for it, the page is the only way to read it.
   - **"Open as page"** is available for every task (right-click menu, and **Shift+Enter** in Navigate state, **Proposed**).
   - In v1 the **page replaces the list view** with a **back arrow** (no tabs, NAV-05). Back also works with the mouse's back button and Alt+← (NAV-04). The page shows the editable title and the body, rendered, with D-49's plain editing until M5.
+- **Built in M4 step 6 (1 Nov 2026, Proposed details):** the body indicator is a button on every task with a body, completed ones included; it (or →, or a click on an untitled code row) opens a small body inline and a larger one as the page, measured with images loaded; ← or the indicator closes it again. A click on a rendered body (not on a link, not while selecting text) turns it into the plain monospace field; Esc or leaving the field saves, Enter is a new line. On the page, a click on the title edits it, an empty body offers "Add notes, code or links", and Esc goes back to the list with the task selected. Code blocks are highlighted like the popup (JSON and stack traces, UI-06); images load from the Flint folder only (05 §3, `app://media`); other images show their text.
 
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
 - Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
@@ -414,6 +415,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NAV-04 — Back and forward (v1, D-53)
 - The main window keeps a history of the views shown this session (lists, Today, task pages). **Back / forward** with the **mouse's side buttons** and **Alt+← / Alt+→**.
+- **Built in M4 step 6 (Proposed details):** going somewhere new drops the forward part, as in a browser; going back from a task's page selects that task in its list; a reminder's Open is a step in the history too.
 - No visible back/forward buttons, except the back arrow on a task page (TASK-05).
 - Milestone M4, with the page view.
 
