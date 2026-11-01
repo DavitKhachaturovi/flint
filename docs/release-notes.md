@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.14 (2 Nov 2026)
+
+- **Groups in the sidebar**: New group from the + (or right-click the sidebar). Click a group's header to fold it. Right-click a list for **Move to group** (with New group at the end) or **Remove from group**; right-click a group to rename or delete it (its lists stay, and Ctrl+Z brings the group back).
+- **Sort the sidebar** with the new button next to the +: Manual, Recently edited or Created.
+- **Drag to reorder**: drag a task (it takes its subtasks along), a subtask among its siblings, a list in the sidebar (also into and out of a group) or a whole group. Everything else slides out of the way. Ctrl+Z undoes a move.
+- **Alt+↑/↓** moves whatever you picked last: the selected task, or the list or group you clicked in the sidebar. With nothing picked, nothing moves.
+- **Fixed: a task with two or more subtasks showed only the first one.** The others were read as part of the first subtask's notes. Your files were never changed; the missing subtasks come back as they were.
+
 ## 0.4.13 (1 Nov 2026)
 
 - **Switching lists and pages animates again** (it had stopped in 0.4.12); a test now catches it if it ever stops.

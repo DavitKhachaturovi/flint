@@ -1,5 +1,33 @@
 # 06 — Roadmap & Open Questions
 
+## 0. Handoff (2 Nov 2026, after M4 step 8)
+
+A fresh session can continue from this section, CLAUDE.md and the documents it points to.
+
+**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.14** (`docs/release-notes.md` lists what each build changed). Tests: 416 unit (Vitest), 20 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
+
+**In flight.** Nothing half-built. 0.4.14 goes to Davit for testing; his feedback comes back as a numbered list and becomes a decision entry (as D-79 did for 0.4.12) before the next step.
+
+**Waiting for Davit's look (all marked Proposed in the docs):**
+- The image lightbox on the window's solid ground, not a dimmed overlay (09 §8, D-79).
+- What "the keyboard is in the sidebar" means for Alt+↑/↓: a click on a list or group header puts it there, selecting a task takes it back (02 LIST-06).
+- Drag rules: tasks only move among tasks at their own level; lists join a group when dropped nearer its last list; under a non-manual sort neither drag nor Move to group happens (02 TASK-01, LIST-05).
+- The open questions in §4 (Q-04, Q-05, Q-07, Q-11, Q-12, Q-13, Q-17) keep their proposed defaults.
+
+**Known issues.**
+- While a task is dragged, headings and paragraphs between tasks don't make room, so rows can pass over them. The drop itself is right.
+- A drag moves one task, not a multi-selection.
+- Bodies and notes are still edited in a plain text field until the M5 editor.
+- The end-to-end tests run in order and depend on each other: one failure makes the later ones fail too, so fix the first one. They never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
+
+**Next steps.**
+1. Davit's 0.4.14 feedback.
+2. **The M5 editor, before step 9 (D-79):** CodeMirror live preview for notes, task bodies and task pages, inline images, raw markdown only on the cursor's line. It replaces `BodyEditor` (`Body.tsx`) and `NoteEditor`. New dependencies follow D-30 (latest stable at least 7 days old, pinned exactly).
+3. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).
+4. Then the rest of M5 and M6 to M8 (§2).
+
+**How a build goes out.** Bump the version in `apps/desktop/package.json` and the `apps/desktop` entry of `package-lock.json`, add an entry to `docs/release-notes.md`, run `npm test`, `npm run typecheck`, `npm run lint` and `npm run e2e`, push, and queue CI with `az pipelines run --name flint --branch m4-lists`; the pipeline builds the unsigned NSIS installer.
+
 ## 1. Risk-first build order (replaces the separate spike, D-18)
 
 There is **no throwaway spike**. Instead, the three riskiest pieces are built first, **as production code**, at the start of M2/M3, each with measurable acceptance checks. If one fails, it is found in the first days, and only that piece is reworked. Test on an **average laptop with a Teams call active** (including full-screen), not a dev workstation.
