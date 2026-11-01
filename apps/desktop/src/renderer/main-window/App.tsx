@@ -737,6 +737,7 @@ export function App(): ReactElement {
 
   return (
     <div className="app">
+      <div className="sidebar-drag" aria-hidden="true" />
       <aside
         ref={sidebar}
         className="sidebar"

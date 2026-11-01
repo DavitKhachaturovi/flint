@@ -116,23 +116,60 @@ interface Row {
   readonly pick: () => void;
 }
 
-/** ↑/↓ through rows, Enter picks the active one. */
-function rowKeys(rows: () => readonly Row[], active: { index: number }, paint: () => void) {
-  return (event: KeyboardEvent): boolean => {
-    const list = rows();
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (list.length === 0) return true;
-      active.index =
-        (active.index + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+interface RowList {
+  /** Shows these rows' highlight, starting at the keyboard's row `index`. */
+  readonly set: (rows: readonly Row[], index?: number) => void;
+  /** ↑/↓ move from the highlighted row, Enter picks it; true if the key was used. */
+  readonly keys: (event: KeyboardEvent) => boolean;
+}
+
+/**
+ * The highlight in a list of rows (D-68, D-69): the keyboard's row stays highlighted, the mouse's
+ * only while the pointer is over it; leaving `area` gives the highlight back to the keyboard's row.
+ */
+function rowList(area: HTMLElement): RowList {
+  let rows: readonly Row[] = [];
+  let index = 0;
+  let hover: number | null = null;
+  const paint = (): void => {
+    const shown = hover ?? index;
+    rows.forEach((row, at) => row.button.classList.toggle('active', at === shown));
+  };
+  area.addEventListener('mouseleave', () => {
+    hover = null;
+    paint();
+  });
+  return {
+    set(next, start = 0) {
+      rows = next;
+      index = start;
+      hover = null;
+      rows.forEach((row, at) =>
+        // A real move, not a row appearing under a resting pointer (that fires mouseenter).
+        row.button.addEventListener('mousemove', () => {
+          if (hover === at) return;
+          hover = at;
+          paint();
+        }),
+      );
       paint();
-      list[active.index]?.button.scrollIntoView({ block: 'nearest' });
-      return true;
-    }
-    if (event.key === 'Enter') {
-      list[active.index]?.pick();
-      return true;
-    }
-    return false;
+    },
+    keys(event) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (rows.length === 0) return true;
+        index =
+          ((hover ?? index) + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+        hover = null;
+        paint();
+        rows[index]?.button.scrollIntoView({ block: 'nearest' });
+        return true;
+      }
+      if (event.key === 'Enter') {
+        rows[hover ?? index]?.pick();
+        return true;
+      }
+      return false;
+    },
   };
 }
 
@@ -173,30 +210,22 @@ export function openPriorityPicker(
       element('span', `fl-picker-stripe p-${option.value ?? 'none'}`),
     ),
   );
-  const active = {
-    index: Math.max(
+  panel.append(...rows.map((row) => row.button));
+  const list = rowList(panel);
+  list.set(
+    rows,
+    Math.max(
       0,
       options.findIndex((option) => option.value === current),
     ),
-  };
-  const paint = (): void =>
-    rows.forEach((row, index) => row.button.classList.toggle('active', index === active.index));
-  rows.forEach((row, index) => {
-    row.button.addEventListener('mouseenter', () => {
-      active.index = index;
-      paint();
-    });
-    panel.append(row.button);
-  });
-  paint();
+  );
   panel.tabIndex = -1;
-  const keys = rowKeys(() => rows, active, paint);
   panel.addEventListener('keydown', (event) => {
     const direct = options.find((option) => option.key === event.key);
     if (direct) {
       event.preventDefault();
       choose(direct.value);
-    } else if (keys(event)) event.preventDefault();
+    } else if (list.keys(event)) event.preventDefault();
   });
   show(panel);
 }
@@ -224,32 +253,21 @@ export function openListPicker(
     close();
     onPick(pick);
   };
-  let rows: Row[] = [];
-  const active = { index: 0 };
-  const paint = (): void =>
-    rows.forEach((row, index) => row.button.classList.toggle('active', index === active.index));
+  const highlight = rowList(box);
   const render = (): void => {
     const typed = search.value.trim();
     const found = suggestLists(typed, lists).filter((list) => list.id !== options.exclude);
-    rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
+    const rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
     const taken = lists.some((list) => normalizeListName(list.name) === normalizeListName(typed));
     if (typed !== '' && !taken && isValidListName(typed))
       rows.push(makeRow(`New list "${typed}"`, null, () => choose({ newList: typed }), listIcon()));
     box.replaceChildren(...rows.map((row) => row.button));
     if (rows.length === 0) box.append(element('p', 'fl-picker-empty', 'No other task lists'));
-    rows.forEach((row, index) =>
-      row.button.addEventListener('mouseenter', () => {
-        active.index = index;
-        paint();
-      }),
-    );
-    active.index = 0;
-    paint();
+    highlight.set(rows);
   };
-  const keys = rowKeys(() => rows, active, paint);
   search.addEventListener('input', render);
   search.addEventListener('keydown', (event) => {
-    if (keys(event)) event.preventDefault();
+    if (highlight.keys(event)) event.preventDefault();
   });
   render();
   show(search);
@@ -323,6 +341,9 @@ export function openTimePicker(
       ? new Date(start.getFullYear(), start.getMonth(), start.getDate())
       : today;
   let month = new Date(day.getFullYear(), day.getMonth(), 1);
+  // D-69: the strong tile marks a chosen day (the reminder's, or one the arrow keys moved to); a new
+  // reminder starts with none, so today shows only its own marker.
+  let marked = day !== today;
 
   const text = element('input', 'fl-picker-search');
   text.placeholder = 'in 2h, fri 10, 2 nov 15:00…';
@@ -369,10 +390,7 @@ export function openTimePicker(
   };
 
   // Presets, or what the typed text means.
-  let rows: Row[] = [];
-  const active = { index: 0 };
-  const paint = (): void =>
-    rows.forEach((row, index) => row.button.classList.toggle('active', index === active.index));
+  const highlight = rowList(rowsBox);
   const presets = (): { label: string; at: Date }[] => {
     const inHour = new Date(Math.ceil((now.getTime() + 3_600_000) / 60_000) * 60_000);
     const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 9, 0);
@@ -387,6 +405,7 @@ export function openTimePicker(
   };
   const renderRows = (): void => {
     const typed = text.value.trim();
+    let rows: Row[];
     if (typed === '') {
       rows = presets().map(({ label, at: moment }) =>
         makeRow(label, describeTime(fromDate(moment), now), () =>
@@ -400,14 +419,7 @@ export function openTimePicker(
     rowsBox.replaceChildren(...rows.map((row) => row.button));
     if (typed !== '' && rows.length === 0)
       rowsBox.append(element('p', 'fl-picker-empty', 'Not a time Flint knows yet'));
-    rows.forEach((row, index) =>
-      row.button.addEventListener('mouseenter', () => {
-        active.index = index;
-        paint();
-      }),
-    );
-    active.index = 0;
-    paint();
+    highlight.set(rows);
   };
 
   let dayButtons: { date: Date; button: HTMLButtonElement }[] = [];
@@ -428,7 +440,7 @@ export function openTimePicker(
       button.disabled = value.getTime() < today.getTime();
       button.tabIndex = sameDay(value, day) ? 0 : -1;
       button.classList.toggle('today', sameDay(value, today));
-      button.classList.toggle('on', sameDay(value, day));
+      button.classList.toggle('on', marked && sameDay(value, day));
       button.addEventListener('mousedown', (event) => event.preventDefault());
       button.addEventListener('click', () => openTimes(value));
       dayButtons.push({ date: value, button });
@@ -440,20 +452,17 @@ export function openTimePicker(
     target.setDate(day.getDate() + delta);
     if (target.getTime() < today.getTime()) return;
     day = target;
+    marked = true;
     month = new Date(day.getFullYear(), day.getMonth(), 1);
     renderGrid();
     dayButtons.find(({ date }) => sameDay(date, day))?.button.focus();
   };
 
   // The time-of-day view for the picked day.
-  let timeRows: Row[] = [];
-  const timeActive = { index: 0 };
-  const paintTimes = (): void =>
-    timeRows.forEach((row, index) =>
-      row.button.classList.toggle('active', index === timeActive.index),
-    );
+  const timeHighlight = rowList(timeList);
   const openTimes = (date: Date): void => {
     day = date;
+    marked = true;
     const label = describeTime(
       fromDate(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9)),
       now,
@@ -461,28 +470,21 @@ export function openTimePicker(
     const dayName = label.replace(/ \d\d:\d\d$/, '');
     back.textContent = `‹  ${dayName}`;
     back.setAttribute('aria-label', `${dayName}, back to the calendar`);
-    timeRows = COMMON_TIMES.flatMap((value) => {
+    const timeRows = COMMON_TIMES.flatMap((value) => {
       const moment = at(date, value);
       return moment ? [makeRow(value, null, () => choose(moment))] : [];
     });
     timeList.replaceChildren(...timeRows.map((row) => row.button));
     if (timeRows.length === 0)
       timeList.append(element('p', 'fl-picker-empty', 'Type a later time below'));
-    timeRows.forEach((row, index) =>
-      row.button.addEventListener('mouseenter', () => {
-        timeActive.index = index;
-        paintTimes();
-      }),
-    );
     // Changing a reminder on its own day starts from its current time.
     const was =
       start && sameDay(start, date)
         ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
         : '';
     const wasIndex = timeRows.findIndex((row) => row.button.textContent === was);
-    timeActive.index = was !== '' && wasIndex >= 0 ? wasIndex : 0;
-    paintTimes();
-    timeRows[timeActive.index]?.button.scrollIntoView({ block: 'nearest' });
+    timeHighlight.set(timeRows, was !== '' && wasIndex >= 0 ? wasIndex : 0);
+    timeRows[Math.max(0, wasIndex)]?.button.scrollIntoView({ block: 'nearest' });
     time.value = was !== '' && wasIndex < 0 ? was : '';
     calendar.hidden = true;
     rowsBox.hidden = true;
@@ -516,12 +518,11 @@ export function openTimePicker(
   });
   back.addEventListener('mousedown', (event) => event.preventDefault());
   back.addEventListener('click', openCalendar);
-  const timeKeys = rowKeys(() => timeRows, timeActive, paintTimes);
   timeList.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
       event.preventDefault();
       openCalendar();
-    } else if (timeKeys(event)) event.preventDefault();
+    } else if (timeHighlight.keys(event)) event.preventDefault();
   });
   time.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
@@ -532,7 +533,6 @@ export function openTimePicker(
   });
   time.addEventListener('input', () => time.classList.remove('invalid'));
 
-  const keys = rowKeys(() => rows, active, paint);
   text.addEventListener('input', () => {
     // Typing always goes back to the typed result, whatever view was open.
     if (!times.hidden) openCalendar();
@@ -540,7 +540,7 @@ export function openTimePicker(
     text.focus();
   });
   text.addEventListener('keydown', (event) => {
-    if (keys(event)) event.preventDefault();
+    if (highlight.keys(event)) event.preventDefault();
   });
 
   renderRows();

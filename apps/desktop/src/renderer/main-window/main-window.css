@@ -38,6 +38,7 @@ button:focus-visible {
 }
 
 .app {
+  position: relative;
   display: flex;
   height: 100%;
 }
@@ -52,11 +53,17 @@ button:focus-visible {
   background: var(--fl-ground-sidebar);
   border-right: 1px solid var(--fl-edge-divider);
   overflow-y: auto;
-  -webkit-app-region: drag;
 }
 
-.sidebar > * {
-  -webkit-app-region: no-drag;
+/* D-69: only the 40 px strip at the top of the window drags it (here over the sidebar, .titlebar
+   over the main area), so right-clicking the sidebar opens Flint's menu, not Windows' window menu. */
+.sidebar-drag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 236px;
+  height: 40px;
+  -webkit-app-region: drag;
 }
 
 .brand {
@@ -68,7 +75,6 @@ button:focus-visible {
   font-size: 17px;
   letter-spacing: -0.01em;
   color: var(--fl-text-primary);
-  -webkit-app-region: drag;
 }
 
 .brand img {

@@ -212,7 +212,8 @@
   box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
 }
 
-.fl-cal-day.on {
+.fl-cal-day.on,
+.fl-cal-day.on:hover {
   background: var(--fl-strong-bg);
   color: var(--fl-strong-fg);
 }

@@ -125,8 +125,16 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // D-42: the transparent margin lets clicks through; the renderer turns clicks back on over the
-  // card (`popupInteractive`). Mouse moves are still forwarded so it can tell.
-  window.setIgnoreMouseEvents(true, { forward: true });
+  // card (`popupInteractive`). Mouse moves are forwarded so it can tell, but only while the popup
+  // is visible: forwarding watches every mouse move on the system and makes the cursor flicker over
+  // text fields in Flint's other windows (D-69; Electron issues #48035, #35414).
+  const clickThrough = (): void => {
+    if (window.isVisible()) window.setIgnoreMouseEvents(true, { forward: true });
+    else window.setIgnoreMouseEvents(true);
+  };
+  clickThrough();
+  window.on('show', clickThrough);
+  window.on('hide', clickThrough);
 
   void window.loadURL(url);
 
@@ -239,7 +247,7 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   ipcMain.on(Channels.popupInteractive, (event, interactive: unknown) => {
     if (event.sender !== window.webContents) return;
     if (interactive === true) window.setIgnoreMouseEvents(false);
-    else window.setIgnoreMouseEvents(true, { forward: true });
+    else clickThrough();
   });
 
   ipcMain.handle(Channels.popupAttach, (event, bytes: unknown, type: unknown) => {
