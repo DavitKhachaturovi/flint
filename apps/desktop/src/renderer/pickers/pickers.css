@@ -22,8 +22,12 @@
   outline: none;
 }
 
-.fl-picker-search,
-.fl-cal-time-input {
+/* A view of the picker that isn't showing (the calendar or the wheels). */
+.fl-picker [hidden] {
+  display: none;
+}
+
+.fl-picker-search {
   display: block;
   width: 100%;
   padding: 8px 10px;
@@ -228,24 +232,6 @@
   outline: 1px solid var(--fl-accent);
 }
 
-.fl-cal-time {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  color: var(--fl-text-muted);
-}
-
-.fl-cal-time-input {
-  width: 90px;
-  font-family: var(--fl-font-mono);
-  font-size: var(--fl-size-meta);
-}
-
-.fl-cal-time-input.invalid {
-  box-shadow: inset 0 0 0 1px var(--fl-text-secondary);
-}
-
 @keyframes fl-picker-in {
   from {
     opacity: 0;
@@ -259,31 +245,143 @@
   }
 }
 
-/* D-68: the time-of-day view after a day is picked. */
-.fl-times-back {
-  display: block;
-  width: 100%;
-  margin: 4px 0;
-  padding: 6px 8px;
+/* D-70, mockup 08: the time wheels after a day is picked. */
+.fl-wheels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.fl-wheels-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+}
+
+.fl-wheels-back {
+  padding: 4px 6px;
+  margin-left: -6px;
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--fl-text-secondary);
+  color: var(--fl-text-heading-soft);
   font: inherit;
-  text-align: left;
+  font-size: 13.5px;
   cursor: default;
 }
 
-.fl-times-back:hover {
+.fl-wheels-back:hover {
   background: var(--fl-ground-tile);
   color: var(--fl-text-primary);
 }
 
-.fl-times-list:focus {
-  outline: none;
+.fl-wheels-label {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
 }
 
-.fl-times-list .fl-picker-label {
+.fl-wheels-well {
+  position: relative;
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.fl-wheels-band {
+  position: absolute;
+  top: 80px;
+  left: 10px;
+  right: 10px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fl-ground-tile);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+.fl-wheels-colon {
+  position: relative;
+  align-self: center;
   font-family: var(--fl-font-mono);
-  font-size: var(--fl-size-meta);
+  font-size: 22px;
+  color: var(--fl-text-muted);
+}
+
+.fl-wheel {
+  position: relative;
+  width: 80px;
+  outline: none;
+  touch-action: none;
+}
+
+.fl-wheel:focus-visible .fl-wheel-item.center {
+  text-decoration: underline;
+  text-decoration-color: var(--fl-accent);
+  text-underline-offset: 6px;
+}
+
+.fl-wheel-track {
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.fl-wheel.dragging .fl-wheel-track {
+  transition: none;
+}
+
+.fl-wheel-item {
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fl-font-mono);
+  font-size: 18px;
+  color: var(--fl-text-faint);
+  opacity: 0.5;
+  transition:
+    color var(--fl-dur-base),
+    opacity var(--fl-dur-base);
+}
+
+.fl-wheel-item.near {
+  opacity: 1;
+}
+
+.fl-wheel-item.center {
+  opacity: 1;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--fl-text-highlight);
+}
+
+.fl-wheels-set {
+  height: 36px;
+  border: 0;
+  border-radius: var(--fl-radius-button);
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-primary-button);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: default;
+}
+
+.fl-wheels-set:disabled {
+  opacity: 0.5;
+}
+
+.fl-wheels-set:focus-visible {
+  outline: 1px solid var(--fl-accent);
+  outline-offset: 2px;
 }

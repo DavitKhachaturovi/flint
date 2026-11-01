@@ -68,6 +68,9 @@ function openPanel(
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', label);
   panel.style.visibility = 'hidden';
+  // The picker owns the keyboard while it has the focus: Tab, digits and arrows are its own, never
+  // the list's Navigate keys (docs/03 §2).
+  panel.addEventListener('keydown', (event) => event.stopPropagation());
   document.body.append(panel);
   let grown = false;
   const place = (): void => {
@@ -309,26 +312,171 @@ const sameDay = (a: Date, b: Date): boolean =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-/** Times offered for a picked day (D-68); today only those still ahead. */
-const COMMON_TIMES = [
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-  '20:00',
-];
+const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** `Today`, `Tomorrow`, `Wed 4 Nov`, or `Wed 4 Nov 2027` in another year (mockup 08). */
+function dayLabel(date: Date, today: Date): string {
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (sameDay(date, today)) return 'Today';
+  if (sameDay(date, tomorrow)) return 'Tomorrow';
+  const year = date.getFullYear() === today.getFullYear() ? '' : ` ${date.getFullYear()}`;
+  const month = MONTHS[date.getMonth()]?.slice(0, 3) ?? '';
+  return `${WEEKDAYS_SHORT[date.getDay()] ?? ''} ${date.getDate()} ${month}${year}`;
+}
+
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+/** One stop of a wheel, in px (mockup 08: 40 px rows, the centre band 80 px from the top). */
+const STOP = 40;
+const BAND_TOP = 80;
+/** Two digits typed within this time make one value (`1`, `4` → 14). */
+const DIGIT_MS = 1000;
+
+interface Wheel {
+  readonly element: HTMLElement;
+  readonly value: () => number;
+  /** Selects `value`, adding it as an extra stop if the wheel doesn't have it (14:37). */
+  readonly set: (value: number) => void;
+}
 
 /**
- * Date and time (REM-01, REM-02, D-68): a natural-language field reading the same grammar as `@`,
- * presets, and a month grid. Picking a day opens a time-of-day view: common times and a custom time
- * field, with a way back to the calendar. Everything works from the keyboard: ↑/↓ and Enter in the
- * lists, arrow keys in the grid, ← or Backspace from the times back to the calendar. Only times in
- * the future can be picked.
+ * One column of the time wheels (D-70, mockup 08): its values top to bottom, the selected one on
+ * the centre band. The mouse wheel and dragging move it a stop at a time and it snaps; a click picks
+ * a value. From the keyboard ↓ goes to the next value and ↑ to the previous one, and digits type a
+ * value (up to `max`). Values don't wrap around.
+ */
+function wheel(label: string, values: readonly number[], max: number, onChange: () => void): Wheel {
+  const stops = [...values];
+  let index = 0;
+  const column = element('div', 'fl-wheel');
+  column.tabIndex = 0;
+  column.setAttribute('role', 'listbox');
+  column.setAttribute('aria-label', label);
+  const track = element('div', 'fl-wheel-track');
+  column.append(track);
+  const id = `fl-wheel-${label.toLowerCase()}`;
+
+  const render = (offset = 0): void => {
+    track.replaceChildren(
+      ...stops.map((value, at) => {
+        const item = element('span', 'fl-wheel-item', pad(value));
+        item.id = `${id}-${value}`;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(at === index));
+        const distance = Math.abs(at - index);
+        if (distance === 0) item.classList.add('center');
+        else if (distance === 1) item.classList.add('near');
+        return item;
+      }),
+    );
+    track.style.transform = `translateY(${BAND_TOP - index * STOP + offset}px)`;
+    column.setAttribute('aria-activedescendant', `${id}-${stops[index] ?? 0}`);
+  };
+  const select = (next: number): void => {
+    const clamped = Math.max(0, Math.min(stops.length - 1, next));
+    if (clamped === index) return;
+    index = clamped;
+    render();
+    onChange();
+  };
+  const set = (value: number): void => {
+    let at = stops.indexOf(value);
+    if (at < 0) {
+      at = stops.findIndex((stop) => stop > value);
+      if (at < 0) at = stops.length;
+      stops.splice(at, 0, value);
+    }
+    index = at;
+    render();
+    onChange();
+  };
+
+  // Typed digits: one that can't start a two-digit value is the value; otherwise wait a moment
+  // for a second one.
+  let pending: { digit: number; at: number } | null = null;
+  column.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      event.stopPropagation();
+      pending = null;
+      select(index + (event.key === 'ArrowDown' ? 1 : -1));
+      return;
+    }
+    if (!/^\d$/.test(event.key)) return;
+    event.preventDefault();
+    const digit = Number(event.key);
+    const time = performance.now();
+    if (pending && time - pending.at < DIGIT_MS && pending.digit * 10 + digit <= max) {
+      set(pending.digit * 10 + digit);
+      pending = null;
+    } else {
+      set(digit);
+      pending = digit * 10 <= max ? { digit, at: time } : null;
+    }
+  });
+
+  // The mouse wheel: a stop per notch; a touchpad's small deltas add up.
+  let wheeled = 0;
+  column.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      wheeled += event.deltaY;
+      if (Math.abs(wheeled) < STOP) return;
+      select(index + Math.sign(wheeled));
+      wheeled = 0;
+    },
+    { passive: false },
+  );
+
+  // Dragging follows the pointer, then snaps to the nearest stop; a click without a drag picks the
+  // value under the pointer.
+  column.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    column.focus();
+    column.setPointerCapture(event.pointerId);
+    const startY = event.clientY;
+    const startIndex = index;
+    let moved = false;
+    column.classList.add('dragging');
+    const move = (next: PointerEvent): void => {
+      const dy = next.clientY - startY;
+      if (Math.abs(dy) > 3) moved = true;
+      if (!moved) return;
+      const reach = Math.max(-startIndex, Math.min(stops.length - 1 - startIndex, -dy / STOP));
+      track.style.transform = `translateY(${BAND_TOP - (startIndex + reach) * STOP}px)`;
+    };
+    const up = (last: PointerEvent): void => {
+      column.removeEventListener('pointermove', move);
+      column.removeEventListener('pointerup', up);
+      column.removeEventListener('pointercancel', up);
+      column.classList.remove('dragging');
+      if (moved) {
+        const target = Math.round(startIndex - (last.clientY - startY) / STOP);
+        if (Math.max(0, Math.min(stops.length - 1, target)) === index) render();
+        else select(target);
+      } else {
+        const top = column.getBoundingClientRect().top;
+        select(index + Math.floor((last.clientY - top - BAND_TOP) / STOP));
+      }
+    };
+    column.addEventListener('pointermove', move);
+    column.addEventListener('pointerup', up);
+    column.addEventListener('pointercancel', up);
+  });
+
+  render();
+  return { element: column, value: () => stops[index] ?? 0, set };
+}
+
+/**
+ * Date and time (REM-01, REM-02, D-68, D-70): a natural-language field reading the same grammar as
+ * `@` (exact minutes: `14:37`, `3pm`), presets, and a month grid. Picking a day opens the time
+ * wheels (mockup 08): hours and minutes in 5-minute steps, starting at the reminder's time, or the
+ * next quarter hour today and 10:00 on another day, then "Set". From the keyboard: arrows move the
+ * day and Enter picks it; in the wheels ↑/↓ or digits, ←/→ (or Tab) between hours and minutes,
+ * Enter sets, ← from the hours goes back to the calendar. Only times in the future can be set.
  */
 export function openTimePicker(
   host: PickerHost,
@@ -370,31 +518,55 @@ export function openTimePicker(
   const grid = element('div', 'fl-cal-grid');
   calendar.append(head, grid);
 
-  // The time-of-day view.
-  const times = element('div', 'fl-times');
+  // The time wheels for the picked day (D-70).
+  const times = element('div', 'fl-wheels');
   times.hidden = true;
-  const back = element('button', 'fl-times-back');
+  const timesHead = element('div', 'fl-wheels-head');
+  const back = element('button', 'fl-wheels-back');
   back.type = 'button';
-  const timeList = element('div', 'fl-picker-rows fl-times-list');
-  timeList.tabIndex = -1;
-  const custom = element('label', 'fl-cal-time');
-  const time = element('input', 'fl-cal-time-input');
-  time.spellcheck = false;
-  time.placeholder = '13:45';
-  custom.append(element('span', '', 'Other time'), time);
-  times.append(back, timeList, custom);
+  timesHead.append(back, element('span', 'fl-wheels-label', 'Time'));
+  const well = element('div', 'fl-wheels-well');
+  const set = element('button', 'fl-wheels-set');
+  set.type = 'button';
+  const chosen = (): LocalDateTime => {
+    const moment = new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      hours.value(),
+      minutes.value(),
+    );
+    return fromDate(moment);
+  };
+  const isLater = (): boolean => toDate(chosen()).getTime() > now.getTime();
+  const update = (): void => {
+    const later = isLater();
+    set.disabled = !later;
+    set.textContent = later
+      ? `Set · ${dayLabel(day, today)}, ${pad(hours.value())}:${pad(minutes.value())}`
+      : 'Pick a later time';
+  };
+  const hours = wheel(
+    'Hours',
+    Array.from({ length: 24 }, (_, hour) => hour),
+    23,
+    () => update(),
+  );
+  const minutes = wheel(
+    'Minutes',
+    Array.from({ length: 12 }, (_, step) => step * 5),
+    59,
+    () => update(),
+  );
+  well.append(
+    element('div', 'fl-wheels-band'),
+    hours.element,
+    element('span', 'fl-wheels-colon', ':'),
+    minutes.element,
+  );
+  times.append(timesHead, well, set);
 
   panel.append(text, rowsBox, calendar, times);
-
-  const at = (date: Date, value: string): LocalDateTime | null => {
-    const match = /^(\d{1,2})[:.]?(\d{2})$/.exec(value.trim());
-    if (!match) return null;
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (hours > 23 || minutes > 59) return null;
-    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes);
-    return moment.getTime() > now.getTime() ? fromDate(moment) : null;
-  };
 
   // Presets, or what the typed text means.
   const highlight = rowList(rowsBox);
@@ -469,38 +641,28 @@ export function openTimePicker(
     dayButtons.find(({ date }) => sameDay(date, day))?.button.focus();
   };
 
-  // The time-of-day view for the picked day.
-  const timeHighlight = rowList(timeList);
+  /** D-70: the reminder's time, or the next quarter hour today, or 10:00 on another day. */
+  const startTime = (date: Date): { hour: number; minute: number } => {
+    if (start) return { hour: start.getHours(), minute: start.getMinutes() };
+    if (!sameDay(date, today)) return { hour: DEFAULT_HOUR, minute: 0 };
+    const quarter = new Date(Math.floor(now.getTime() / 900_000 + 1) * 900_000);
+    return sameDay(quarter, today)
+      ? { hour: quarter.getHours(), minute: quarter.getMinutes() }
+      : { hour: 23, minute: 55 };
+  };
   const openTimes = (date: Date): void => {
     day = date;
     marked = true;
-    const label = describeTime(
-      fromDate(new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9)),
-      now,
-    );
-    const dayName = label.replace(/ \d\d:\d\d$/, '');
-    back.textContent = `‹  ${dayName}`;
-    back.setAttribute('aria-label', `${dayName}, back to the calendar`);
-    const timeRows = COMMON_TIMES.flatMap((value) => {
-      const moment = at(date, value);
-      return moment ? [makeRow(value, null, () => choose(moment))] : [];
-    });
-    timeList.replaceChildren(...timeRows.map((row) => row.button));
-    if (timeRows.length === 0)
-      timeList.append(element('p', 'fl-picker-empty', 'Type a later time below'));
-    // Changing a reminder on its own day starts from its current time.
-    const was =
-      start && sameDay(start, date)
-        ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
-        : '';
-    const wasIndex = timeRows.findIndex((row) => row.button.textContent === was);
-    timeHighlight.set(timeRows, was !== '' && wasIndex >= 0 ? wasIndex : 0);
-    timeRows[Math.max(0, wasIndex)]?.button.scrollIntoView({ block: 'nearest' });
-    time.value = was !== '' && wasIndex < 0 ? was : '';
+    const name = dayLabel(date, today);
+    back.textContent = `‹  ${name}`;
+    back.setAttribute('aria-label', `${name}, back to the calendar`);
+    const { hour, minute } = startTime(date);
+    hours.set(hour);
+    minutes.set(minute);
     calendar.hidden = true;
     rowsBox.hidden = true;
     times.hidden = false;
-    (timeRows.length > 0 ? timeList : time).focus();
+    hours.element.focus();
   };
   const openCalendar = (): void => {
     times.hidden = true;
@@ -529,20 +691,24 @@ export function openTimePicker(
   });
   back.addEventListener('mousedown', (event) => event.preventDefault());
   back.addEventListener('click', openCalendar);
-  timeList.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
+  set.addEventListener('mousedown', (event) => event.preventDefault());
+  set.addEventListener('click', () => {
+    if (isLater()) choose(chosen());
+  });
+  times.addEventListener('keydown', (event) => {
+    const inHours = event.target === hours.element;
+    if (event.key === 'Enter') {
       event.preventDefault();
-      openCalendar();
-    } else if (timeHighlight.keys(event)) event.preventDefault();
+      if (isLater()) choose(chosen());
+    } else if (event.key === 'ArrowLeft' && event.target !== set) {
+      event.preventDefault();
+      if (inHours) openCalendar();
+      else hours.element.focus();
+    } else if (event.key === 'ArrowRight' && inHours) {
+      event.preventDefault();
+      minutes.element.focus();
+    }
   });
-  time.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    const moment = at(day, time.value);
-    if (moment) choose(moment);
-    else time.classList.add('invalid');
-  });
-  time.addEventListener('input', () => time.classList.remove('invalid'));
 
   text.addEventListener('input', () => {
     // Typing always goes back to the typed result, whatever view was open.

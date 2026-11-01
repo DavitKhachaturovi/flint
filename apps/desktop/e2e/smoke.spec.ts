@@ -778,18 +778,27 @@ test('pickers: priority, list and date/time insert the shorthand, replacing the 
   await popup.keyboard.press('1');
   await expect(popup.locator('#capture')).toHaveValue('check logs !l');
 
-  // D-68: a day from the calendar opens the times of day; ← goes back, the second time picks.
+  // D-70: a day from the calendar opens the wheels at 10:00; ← from the hours goes back to the
+  // calendar; ↓/↑ move a wheel, digits type a value (37 joins the 5-minute stops), Enter sets.
   await popup.locator('[data-picker="time"]').click();
   await popup.getByRole('button', { name: 'Next month' }).click();
   await popup.locator('.fl-cal-day', { hasText: /^15$/ }).click();
-  await expect(popup.locator('.fl-times-list')).toBeFocused();
+  const hours = popup.getByRole('listbox', { name: 'Hours' });
+  await expect(hours).toBeFocused();
+  await expect(popup.locator('.fl-wheels-set')).toHaveText(/^Set · \w{3} 15 \w{3}, 10:00$/);
   await popup.keyboard.press('ArrowLeft');
   await expect(popup.locator('.fl-cal-day.on')).toBeFocused();
   await popup.keyboard.press('Enter');
+  await expect(hours).toBeFocused();
   await popup.keyboard.press('ArrowDown');
-  await expect(popup.locator('.fl-times-list .fl-picker-row.active')).toHaveText('10:00');
+  await popup.keyboard.press('ArrowDown');
+  await popup.keyboard.press('ArrowUp');
+  await popup.keyboard.press('Tab');
+  await expect(popup.getByRole('listbox', { name: 'Minutes' })).toBeFocused();
+  await popup.keyboard.type('37');
+  await expect(popup.locator('.fl-wheels-set')).toHaveText(/, 11:37$/);
   await popup.keyboard.press('Enter');
-  await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 10:00$/);
+  await expect(popup.locator('#capture')).toHaveValue(/^check logs !l @\d{4}-\d{2}-15 11:37$/);
   await popup.locator('#capture').fill('');
   await popup.keyboard.press('Escape');
 });
