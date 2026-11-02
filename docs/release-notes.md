@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.18 (2 Nov 2026)
+
+- **A panel beside your tasks on wide windows** (about 1580 px and up, or a smaller interface size with Ctrl+−). **Ctrl+\** hides and shows it; each monitor remembers.
+- **Select a task** and the panel shows it: tick it, edit the title, change priority, list or reminder from the chips, write its notes, tick and add subtasks, see when it was created and last edited. On wide windows the notes are edited there instead of opening under the row.
+- **With nothing selected**, it shows **Up next**: overdue reminders, then today's and tomorrow's by time. Click one to go to the task.
+- **In a note**, it shows the outline: headings, and the code blocks and pictures under each, named by their first comment, their JSON keys or the exception. Click to jump there. Below: the checklist's progress and when the note was last edited. A task opened as a page gets the same for its notes.
+
 ## 0.4.17 (2 Nov 2026)
 
 The note editor is complete; please test it as a whole.
