@@ -114,6 +114,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓ with the focus in the sidebar, Manual sort only; with the focus in the task list it moves the selected task; nothing selected, nothing moves | Decided (D-73, D-79) |
 | Back / forward on a precision touchpad (NAV-04) | Two-finger horizontal swipe | Decided (D-79) |
 | Interface size (UI-12) | Ctrl+= (Ctrl++) / Ctrl+− / Ctrl+0, remembered per display | Decided (D-81) |
+| Hide / show the context panel (NAV-07) | Ctrl+\, remembered per display | Decided (D-83) |
 
 ### All text fields
 - Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.
@@ -208,6 +209,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - **Motion never delays input (D-75, supersedes D-67's ~150 / ~250–300 ms limits).** **D-79:** an e2e test records animation and transition events and fails if a page's arrival or a highlight's glide stops running to its end, so motion can't silently disappear again. Every action takes effect immediately; animations are interruptible and retarget smoothly on new input (springs); nothing waits for an animation to finish (a completed task is saved and its row can be undone at once, while the animation plays on). Default durations: **selection** movement ~200 ms; **menus and pickers** opening ~200 ms; **list and page switching** ~320 ms (D-76); the **completion** sequence ~360 ms in all (D-76); small state changes (a strike line, a fade) ~260 ms; hover and colour ~120 ms. **Exception:** the capture popup appears instantly and takes typing from its first frame; it may fade in, but never delays input (CAP-10).
 - **Completion (D-67):** the check fills with a small pop, then the row fades, slides and collapses into Completed. **Un-completing** brings the row back smoothly into the open tasks.
 - **Animation speed (D-67, D-75):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour. If the defaults feel slow in daily use, they are dialled back.
+- **The context panel (NAV-07, D-83):** it slides and fades in when it appears, its height eases when its content changes, and its content crossfades when the selection or state changes; nothing waits for it.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).
 

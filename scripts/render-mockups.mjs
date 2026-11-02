@@ -20,6 +20,13 @@ const SCREENS = {
   '07': { file: '07-code-highlighting', width: 1280, height: 1040 },
   '09': { file: '09-expanded-task', width: 840, height: 520 },
   10: { file: '10-sidebar-groups', width: 1400, height: 940 },
+  // D-83: three states, chosen with the mockup's own switch (`setMode`), one screenshot each.
+  11: {
+    file: '11-context-panel',
+    width: 1920,
+    height: 1140,
+    states: ['details', 'upnext', 'note'],
+  },
 };
 
 const args = process.argv.slice(2);
@@ -41,11 +48,14 @@ try {
     });
     await page.goto(`file:///${join(mockups, `${screen.file}.html`).replace(/\\/g, '/')}`);
     await page.evaluate('document.fonts.ready');
-    // Let entry animations (≤ 150 ms, docs/09 §9) finish.
-    await page.waitForTimeout(400);
-    const path = join(out, `${screen.file}.png`);
-    await page.screenshot({ path });
-    console.log(`rendered ${path}`);
+    for (const state of screen.states ?? [null]) {
+      if (state) await page.evaluate(`setMode(${JSON.stringify(state)})`);
+      // Let entry animations (≤ 150 ms, docs/09 §9) finish.
+      await page.waitForTimeout(400);
+      const path = join(out, `${screen.file}${state ? `-${state}` : ''}.png`);
+      await page.screenshot({ path });
+      console.log(`rendered ${path}`);
+    }
     await page.close();
   }
 } finally {

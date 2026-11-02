@@ -430,3 +430,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Slash commands, `/` at line start or after a space | NOTE-03 · Done (next build) | 02, D-82 |
 | 5 | Copy button on code blocks inside the editor | NOTE-05 · Done (next build) | 02, D-82 |
 | 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · Done (next build) | 02, D-82 |
+
+## S. The editor's details and the context panel (2 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Ctrl+B / Ctrl+I, Ctrl+Shift+V, wrap/unwrap, prefix replacing, 3-column tables accepted | NOTE-02, NOTE-03 · Done | 02, 03 §3, D-83 |
+| 1 | Context panel: 440 px beside the 820 px column, centred pair, 28 px gap, height fits content | NAV-07 · v1 · after the M5 editor, before M4 step 9 | 02, 09 §8, mockup 11, D-83 |
+| 2 | Appears at ~1400 px; Ctrl+\ hides/shows, remembered per monitor | NAV-07 · v1 · same | 02, 03 §3, D-83 |
+| 3 | Task selected: details, chips with pickers, notes in the editor, subtasks with progress, dates; no row expand on wide screens | NAV-07, TASK-05 · v1 · same | 02, D-83 |
+| 4 | Nothing selected: Up next (overdue, today, tomorrow; starred once M6) | NAV-07, REM-11, TODAY-01 · v1 · same | 02, D-83 |
+| 5 | Note open: outline with headings and titled blocks, In this note | NAV-07, NOTE-01 · v1 · same | 02, D-83 |
+| 6 | Block titles: fence info title, first comment, JSON keys / exception, type | NAV-07 · v1 · same | 02, D-83 |
+| 7 | Motion: slide/fade in, height eases, content crossfades | NAV-07, UI-10 · v1 · same | 03 §5, 09 §8, D-83 |
