@@ -2,6 +2,22 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.19 (2 Nov 2026)
+
+- **The panel fits more screens.** A slightly narrower version of the side panel appears on windows from about 1480 px, so a 1920 px laptop screen at 125 % gets it at 100 % size.
+- **Back in the panel.** When you open a task from Up next, a back arrow in the panel's header (or Alt+←) returns to where you were.
+- **A panel button** at the top right, next to the window buttons, shows and hides the panel (as Ctrl+\ does). Right-click the page's empty space or the panel for Show / Hide panel.
+- The panel now lines up with the "Add a task" box (or the note's card) and stays there while you scroll.
+- **Click empty space** next to your tasks to clear the selection and see Up next again.
+- **Up next** shows your pinned tasks first, then today's and tomorrow's reminders, then overdue ones, a little quieter, at the bottom. **Recently captured** (your last five quick captures) sits below as one line you can open.
+- **Pin tasks** with **P** or right-click → Pin (also for several selected tasks). Pinned tasks show a small pin and appear in the panel from any list; they will make up the Today view later. A completed pinned task drops off at the end of its day.
+- **References and Attachments**: a task's or note's links and files, each as one line in the panel ("References · 3") that opens with a click. Linked large files are marked, missing ones flagged. The panel remembers which ones you keep open.
+- **Notes sit on a card**, so it's clear where you can type. "In this note" now says when the note was created as well as last edited.
+- The outline follows your reading reliably, all the way to the last heading, and a click on an entry scrolls there smoothly.
+- The panel animates as intended: it slides in, the old content fades out as the new fades in, and the outline's marker slides.
+- **Convert to note**: right-click a task to make it a note (its notes become the text, subtasks a checklist). Ctrl+Z brings the task back.
+- Folding a group in the sidebar no longer stalls now and then.
+
 ## 0.4.18 (2 Nov 2026)
 
 - **A panel beside your tasks on wide windows** (about 1580 px and up, or a smaller interface size with Ctrl+−). **Ctrl+\** hides and shows it; each monitor remembers.

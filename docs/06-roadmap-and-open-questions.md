@@ -1,23 +1,22 @@
 # 06 — Roadmap & Open Questions
 
-## 0. Handoff (2 Nov 2026, 0.4.18: the context panel)
+## 0. Handoff (2 Nov 2026, 0.4.19: the context panel after 0.4.18, pins)
 
 A fresh session can continue from this section, CLAUDE.md and the documents it points to.
 
-**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.18** (the context panel on wide screens, NAV-07; before it 0.4.17, the M5 editor complete) (`docs/release-notes.md` lists what each build changed). Tests: 459 unit (Vitest, including the parsed-structure tests of D-80), 23 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
+**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.19** (the context panel after Davit's 0.4.18 feedback, pins replacing starring, a task converting to a note: D-85; before it 0.4.18, the context panel, and 0.4.17, the M5 editor complete) (`docs/release-notes.md` lists what each build changed). Tests: 467 unit (Vitest, including the parsed-structure tests of D-80), 23 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
 
-**In flight.** Nothing half-built. 0.4.17 has the M5 editor complete (D-82, D-84) and 0.4.18 the context panel (NAV-07, D-83, its width threshold tuned), both for Davit to test; next is M4 step 9.
+**In flight.** Nothing half-built. 0.4.19 has D-85 (the responsive pair, the panel's fixes and sections, pins, Convert to note) for Davit to test; next is M4 step 9.
 
 **Accepted by Davit (D-80, D-81):** 0.4.15 except the group look (reverted to 0.4.14's with an expanded card and a white drop ring, D-81); the lightbox on the solid ground, Alt+↑/↓ by keyboard focus, and the drag rules (with a clearly visible drop target). The open questions in §4 keep their proposed defaults.
 
 **Known issues.**
 - While a task is dragged, headings and paragraphs between tasks don't make room, so rows can pass over them. The drop itself is right.
 - A drag moves one task, not a multi-selection.
-- The context panel needs a window of about 1580 px (D-83); a 1536 px laptop (1920 at 125 %) sees it only at 90 % interface size.
 - The end-to-end tests run in order and depend on each other: one failure makes the later ones fail too, so fix the first one. They never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
 
 **Next steps.**
-1. Davit's look at the complete M5 editor (0.4.17) and the context panel (0.4.18: `renderer/main-window/ContextPanel.tsx`, `renderer/panel/outline.ts`, `main/task-meta.ts`, `main/up-next.ts`).
+1. Davit's look at 0.4.19 (the context panel: `renderer/main-window/ContextPanel.tsx`, `renderer/panel/outline.ts` and `extras.ts`, `main/task-meta.ts`, `main/up-next.ts`; pins: `pinned` in `packages/core/src/format/fields.ts`, `Workspace.panelTasks` and `unpinDone`; Convert to note: `taskAsNoteText`, `Workspace.taskToNote`).
 2. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).
 3. Then the rest of M5 and M6 to M8 (§2).
 
