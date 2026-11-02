@@ -439,9 +439,11 @@ async function start(): Promise<void> {
     const problem = await shell.openPath(path);
     return problem === '' ? 'opened' : 'refused';
   });
-  // NAV-07, D-83: the context panel's "Up next".
+  // NAV-07, D-83, D-85: the context panel's "Up next": pins, reminders, recent captures.
   ipcMain.handle(Channels.mainUpNext, (event) =>
-    owns(event.sender) ? upNext(workspace.reminderTasks(), new Date()) : [],
+    owns(event.sender)
+      ? upNext({ reminders: workspace.reminderTasks(), ...workspace.panelTasks() }, new Date())
+      : [],
   );
   // NOTE-06, D-84: a note in monospace, on this machine.
   ipcMain.handle(Channels.mainNoteMono, async (event, id: unknown, on: unknown) => {
@@ -513,6 +515,20 @@ async function start(): Promise<void> {
   workspace.onChange(() => {
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
   });
+  // TODAY-01, D-85: completed pinned tasks lose their pin once their day is over.
+  const unpin = (): void => {
+    workspace
+      .unpinDone(new Date())
+      .catch((error: unknown) => log(`unpin failed: ${String(error)}`));
+  };
+  let pinDay = new Date().toDateString();
+  unpin();
+  setInterval(() => {
+    const day = new Date().toDateString();
+    if (day === pinDay) return;
+    pinDay = day;
+    unpin();
+  }, 60_000).unref();
 
   const drafts = new DraftFile(join(app.getPath('userData'), 'drafts.json'));
   await drafts.load();

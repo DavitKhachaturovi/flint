@@ -98,10 +98,6 @@ export const ReminderBellIcon = ({ size = 12 }: IconProps): ReactElement =>
     <path key="c" className="bell-strike" d="M3 3l18 18" pathLength={1} />,
   ]);
 
-/** LIST-05, D-80 (mockup 10): a sidebar group's tile. */
-export const FolderIcon = ({ size = 14 }: IconProps): ReactElement =>
-  svg(size, <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />);
-
 /** NAV-07, D-83 (mockup 11): the context panel's "Open as page" and hide buttons. */
 export const OpenPageIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [
@@ -114,4 +110,14 @@ export const PanelIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [
     <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,
     <path key="b" d="M15 4v16" />,
+  ]);
+
+/** TODAY-01, D-85: a pinned task (row indicator, menu). */
+export const PinIcon = ({ size = 12 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M12 17v5" />,
+    <path
+      key="b"
+      d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
+    />,
   ]);

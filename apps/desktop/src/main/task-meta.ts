@@ -5,7 +5,9 @@ import { writeFileAtomic } from './storage/atomic.js';
 /**
  * Per-task bookkeeping in `.flint/meta.json` (docs/04 §3): when Flint first saw each task
  * (`created`) and when it last changed one (`lastTouched`: an edit, a move, a priority, a
- * completion). User data, travelling with the Flint folder; keyed by task ID. Tolerant: a missing or
+ * completion), and, for a task from the capture popup, when it was captured (`captured`, D-85: the
+ * panel's Recently captured). A note's entry (keyed by its list ID) gives it a created date.
+ * User data, travelling with the Flint folder; keyed by task ID. Tolerant: a missing or
  * broken file starts empty, unknown keys are kept. The context panel's footer shows them (NAV-07).
  * Times are local `YYYY-MM-DDTHH:MM`.
  */
@@ -13,6 +15,7 @@ import { writeFileAtomic } from './storage/atomic.js';
 export interface TaskMeta {
   readonly created: string;
   readonly lastTouched: string;
+  readonly captured?: string;
 }
 
 const two = (value: number): string => String(value).padStart(2, '0');
@@ -39,12 +42,13 @@ export class TaskMetaFile {
       this.extra = extra;
       if (typeof tasks === 'object' && tasks !== null)
         for (const [id, value] of Object.entries(tasks as Record<string, unknown>)) {
-          const { created, lastTouched } = (value ?? {}) as Record<string, unknown>;
+          const { created, lastTouched, captured } = (value ?? {}) as Record<string, unknown>;
           if (typeof created === 'string' && STAMP.test(created))
             this.tasks.set(id, {
               created,
               lastTouched:
                 typeof lastTouched === 'string' && STAMP.test(lastTouched) ? lastTouched : created,
+              ...(typeof captured === 'string' && STAMP.test(captured) && { captured }),
             });
         }
     } catch {
@@ -75,10 +79,33 @@ export class TaskMetaFile {
     for (const id of ids) {
       if (id.startsWith('~')) continue;
       const known = this.tasks.get(id);
-      this.tasks.set(id, { created: known?.created ?? stamp, lastTouched: stamp });
+      this.tasks.set(id, { ...known, created: known?.created ?? stamp, lastTouched: stamp });
       changed = true;
     }
     if (changed) this.schedule();
+  }
+
+  /** D-85: a task saved from the capture popup. */
+  captured(id: string, now: Date): void {
+    const stamp = localStamp(now);
+    const known = this.tasks.get(id);
+    this.tasks.set(id, {
+      created: known?.created ?? stamp,
+      lastTouched: known?.lastTouched ?? stamp,
+      captured: stamp,
+    });
+    this.schedule();
+  }
+
+  /** D-85: the IDs of the tasks captured with the popup, newest first. */
+  captures(): string[] {
+    return [...this.tasks]
+      .filter(([, meta]) => meta.captured !== undefined)
+      .sort(
+        ([a, x], [b, y]) =>
+          (y.captured ?? '').localeCompare(x.captured ?? '') || b.localeCompare(a),
+      )
+      .map(([id]) => id);
   }
 
   /** Writes soon (several changes in a row are one write). */

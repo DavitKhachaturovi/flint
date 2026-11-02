@@ -88,6 +88,8 @@ function taskRow(task: TaskNode, now: Date, stamps?: TaskStamps): TaskRow {
           ? 'overdue'
           : 'on',
     done,
+    // TODAY-01, D-85.
+    ...(line.fields.pinned && { pinned: true }),
     completed: completion ? completionLabel(completion, now) : null,
     body,
     subtasks: task.children

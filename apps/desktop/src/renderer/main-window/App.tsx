@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -53,6 +54,8 @@ import {
   InboxIcon,
   ListIcon,
   NoteIcon,
+  PanelIcon,
+  PinIcon,
   PlusIcon,
   ReminderBellIcon,
   SortIcon,
@@ -85,9 +88,13 @@ import { sidebarMotion } from './sidebar-motion.js';
  */
 
 const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
-/** NAV-07, D-83: the main area's width the column, the gap and the panel need: 820 + 28 + 440, and
- * 24 px either side. About 1590 px of window with the sidebar (tuned from the proposed ~1400). */
-const PANEL_FITS = 820 + 28 + 440 + 48;
+/**
+ * NAV-07, D-83, D-85: the main area's width each pair needs, 24 px either side: the full pair (820 px
+ * column, 28 px gap, 440 px panel; about 1580 px of window) and the compact one (780, 24, 380; a
+ * 1536 px window, 1920 px at 125 %). Narrower, no panel.
+ */
+const PAIR_FULL = 820 + 28 + 440 + 48;
+const PAIR_COMPACT = 780 + 24 + 380 + 48;
 const TOAST_MS = 5000;
 
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
@@ -270,6 +277,28 @@ function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: 
 interface Place {
   readonly list: string;
   readonly page: string | null;
+  /** NAV-07, D-85: the task selected there, restored by back and forward. */
+  readonly select?: string | null;
+  /** NAV-07, D-85: reached from a link in the context panel (its header then has a back arrow). */
+  readonly fromPanel?: boolean;
+}
+
+/** What decides where the sidebar's rows are: the lists' names and modes, groups, order, folds. */
+function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null): string {
+  return JSON.stringify([
+    lists.map((list) => [list.id, list.name, list.mode]),
+    sidebar && { ...sidebar, collapsed: [...sidebar.collapsed].sort() },
+  ]);
+}
+
+/** NAV-07, D-85: what isn't blank space in the main area (a click there keeps the selection). */
+const BLANK_EXCEPT =
+  '.row, .context-panel, .composer, .body-card, .inline-body, .completed-head, button, a, input, textarea, [contenteditable], .menu, .picker';
+
+/** The note's editor, when a note is open (the outline measures and scrolls through it). */
+function noteEditorView(root: HTMLElement): CodeEditorView | null {
+  const editor = root.querySelector<HTMLElement>('.note-editor .cm-editor');
+  return editor ? CodeEditorView.findFromDOM(editor) : null;
 }
 
 /** The task with this key in a list's view, subtasks and completed tasks included. */
@@ -400,6 +429,10 @@ export function App(): ReactElement {
   /** D-80: sidebar rows move to their new places (sort, groups, new and deleted items). */
   const motion = useMemo(() => sidebarMotion(() => sidebar.current), []);
 
+  const listsRef = useRef(lists);
+  listsRef.current = lists;
+  const sidebarRef = useRef(sidebarView);
+  sidebarRef.current = sidebarView;
   /** Reads the lists again; `then` runs in the same render (a name field giving way to its row). */
   const refresh = useCallback(
     async (then?: () => void): Promise<void> => {
@@ -408,7 +441,13 @@ export function App(): ReactElement {
         window.flintMain.view(listId),
         window.flintMain.sidebar(),
       ]);
-      motion.capture();
+      // D-85: only a sidebar that changes moves its rows. A refresh that brings what is already on
+      // screen (the echo of a fold, the minute's refresh) must not measure rows mid-animation and
+      // play the fold a second time.
+      if (
+        sidebarShape(nextLists, nextSidebar) !== sidebarShape(listsRef.current, sidebarRef.current)
+      )
+        motion.capture();
       setLists(nextLists);
       setView(nextView);
       setSidebarView(nextSidebar);
@@ -490,8 +529,12 @@ export function App(): ReactElement {
       const to = trail.places[trail.at + step];
       if (!to) return;
       trail.at += step;
-      // Back from a task's page selects that task in its list.
-      show(to, from?.page && !to.page && to.list === from.list ? from.page : null, step < 0);
+      // Back from a task's page selects that task in its list; else the place's own selection.
+      show(
+        to,
+        from?.page && !to.page && to.list === from.list ? from.page : (to.select ?? null),
+        step < 0,
+      );
     },
     [show],
   );
@@ -504,6 +547,25 @@ export function App(): ReactElement {
   }, [go, travel, listId, page]);
 
   const openList = useCallback((id: string): void => go({ list: id, page: null }), [go]);
+  /**
+   * NAV-07, D-85: a task reached from the context panel (Up next, a pin, a capture) is a place of
+   * its own, also in the same list, so back (the panel's arrow, Alt+←) returns to what was before.
+   */
+  const selectedRef = useRef<string | null>(null);
+  const followFromPanel = useCallback(
+    (list: string, key: string): void => {
+      const trail = history.current;
+      const here = trail.places[trail.at];
+      if (here) trail.places[trail.at] = { ...here, select: selectedRef.current };
+      trail.places = [
+        ...trail.places.slice(0, trail.at + 1),
+        { list, page: null, select: key, fromPanel: true },
+      ];
+      trail.at = trail.places.length - 1;
+      show({ list, page: null }, key);
+    },
+    [show],
+  );
   const openPage = useCallback(
     (key: string): void => go({ list: listId, page: key }, key),
     [go, listId],
@@ -514,13 +576,17 @@ export function App(): ReactElement {
    * 28 px gap and the 440 px panel (with room either side), and it isn't hidden on this display.
    */
   const scroller = useRef<HTMLDivElement>(null);
-  const [wide, setWide] = useState(false);
+  const [pairSize, setPairSize] = useState<'full' | 'compact' | null>(null);
+  const wide = pairSize !== null;
   const [panelHidden, setPanelHidden] = useState(false);
   useEffect(() => {
     window.flintMain.onPanel(setPanelHidden);
     const element = scroller.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setWide(element.clientWidth >= PANEL_FITS));
+    const observer = new ResizeObserver(() => {
+      const width = element.clientWidth;
+      setPairSize(width >= PAIR_FULL ? 'full' : width >= PAIR_COMPACT ? 'compact' : null);
+    });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -952,6 +1018,22 @@ export function App(): ReactElement {
     });
   }, [rows]);
 
+  /** TODAY-01, D-85: pins or unpins tasks, one undo step (with a toast for several). */
+  const pin = useCallback(
+    async (tasks: readonly TaskRow[], pinned: boolean): Promise<void> => {
+      const targets = tasks.filter((task) => (task.pinned === true) !== pinned);
+      if (targets.length === 0) return;
+      const label = `${pinned ? 'Pinned' : 'Unpinned'}${targets.length > 1 ? ` ${tasksCount(targets.length)}` : ''}`;
+      const outcome = await change({
+        kind: 'many',
+        label,
+        changes: targets.map((task) => ({ kind: 'pin', key: task.key, pinned })),
+      });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+
   /** TASK-07, D-59: the right-click menu of a marked row: the actions for all marked tasks. */
   const bulkMenu = useCallback(
     (at: Point): void => {
@@ -973,13 +1055,17 @@ export function App(): ReactElement {
               ]
             : []),
           { label: 'Move to…', action: () => bulkMove(new DOMRect(at.x, at.y, 0, 0)) },
+          // TODAY-01, D-85: pins all, or unpins all when all are pinned.
+          markedRows.every((row) => row.pinned)
+            ? { label: 'Unpin', hint: 'P', action: () => void pin(markedRows, false) }
+            : { label: 'Pin', hint: 'P', action: () => void pin(markedRows, true) },
           'divider',
           { label: `Delete ${tasksCount(markedRows.length)}`, hint: 'Del', action: bulkDelete },
         ],
         at,
       );
     },
-    [markedRows, bulkComplete, bulkPriority, bulkMove, bulkDelete],
+    [markedRows, bulkComplete, bulkPriority, bulkMove, bulkDelete, pin],
   );
 
   /** REM-12, D-66: turns a reminder off (kept, never fired) or on, with Undo. */
@@ -1043,6 +1129,12 @@ export function App(): ReactElement {
             ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
             : []),
           ...(open ? [{ label: 'Add notes', action: () => openNotes(row.key) }] : []),
+          // TODAY-01, D-85.
+          {
+            label: row.pinned ? 'Unpin' : 'Pin',
+            hint: 'P',
+            action: () => void pin([row], !row.pinned),
+          },
           // D-79: Shift+Tab and Tab, made findable.
           ...(open
             ? [
@@ -1128,13 +1220,21 @@ export function App(): ReactElement {
                   ),
               ),
           },
+          // TASK-17, D-85.
+          {
+            label: 'Convert to note',
+            action: () =>
+              void change({ kind: 'toNote', key: row.key }).then((outcome) => {
+                if (outcome) showToast(outcome.label, true);
+              }),
+          },
           'divider',
           { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
         ],
         at,
       );
     },
-    [change, edit, mute, remove, toggle, lists, listId, moveTask, changeReminder],
+    [change, edit, mute, remove, toggle, lists, listId, moveTask, changeReminder, pin],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -1614,6 +1714,12 @@ export function App(): ReactElement {
       } else if (event.key === 'Enter' && open) {
         event.preventDefault();
         edit(open.key);
+      } else if (key === 'p' && !event.shiftKey && (marked.size > 1 || row)) {
+        // TODAY-01, D-85: P pins or unpins (all marked, or the selected task).
+        event.preventDefault();
+        const targets = marked.size > 1 ? rows.filter((other) => marked.has(other.key)) : [row];
+        const tasks = targets.filter((task): task is TaskRow => task !== undefined);
+        void pin(tasks, !tasks.every((task) => task.pinned));
       } else if (key === 'n' && !event.shiftKey) {
         event.preventDefault();
         composer.current?.focus();
@@ -1665,6 +1771,7 @@ export function App(): ReactElement {
     leavePage,
     showBody,
     openPage,
+    pin,
   ]);
 
   /** The task shown as a page, if it is still in the list (else the list shows). */
@@ -2164,13 +2271,26 @@ export function App(): ReactElement {
     });
   }
 
+  /** NAV-07, D-85: "Show panel" / "Hide panel", where a right-click menu has room for it. */
+  const panelItem = (): MenuEntry[] =>
+    wide && view
+      ? [
+          {
+            label: panelHidden ? 'Show panel' : 'Hide panel',
+            hint: 'Ctrl+\\',
+            action: togglePanel,
+          },
+        ]
+      : [];
+  const panelMenu = (at: Point): void => openMenu(panelItem(), at);
+
   // NAV-07, D-83: what the context panel shows.
   const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
   const panelState: PanelState | null =
     !panelShown || !view
       ? null
       : view.mode === 'note'
-        ? { kind: 'note', text: view.noteText ?? '', edited: view.edited }
+        ? { kind: 'note', text: view.noteText ?? '', edited: view.edited, created: view.created }
         : pageTask
           ? { kind: 'page', task: pageTask }
           : selectedRow
@@ -2186,7 +2306,13 @@ export function App(): ReactElement {
   useEffect(() => {
     if (wantsUpNext) void window.flintMain.upNext().then(setUpNextItems);
   }, [wantsUpNext, view]);
-  // The outline's current section: the last heading above the top of the page's view.
+  // NAV-07, D-85: the panel's back arrow, for a task reached from a link in the panel.
+  selectedRef.current = selected;
+  const herePlace = history.current.places[history.current.at];
+  const panelBack =
+    herePlace?.fromPanel === true && history.current.at > 0 && herePlace.select === selected;
+  // The outline's current section (D-85, a scroll-spy): the last heading above a line 96 px below
+  // the top of the view; scrolled to the end, the last heading.
   const panelText =
     panelState?.kind === 'note'
       ? panelState.text
@@ -2202,11 +2328,11 @@ export function App(): ReactElement {
     const element = scroller.current;
     if (!element || !panelOutline || panelOutline.headings.length === 0) return;
     const headingTops = (): number[] => {
-      const editor = element.querySelector<HTMLElement>('.note-editor .cm-editor');
-      const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+      const cm = noteEditorView(element);
+      // The editor draws only what is near the view: the height map knows where the rest is.
       if (cm)
         return panelOutline.headings.map(
-          (heading) => cm.coordsAtPos(heading.from)?.top ?? Infinity,
+          (heading) => cm.documentTop + cm.lineBlockAt(heading.from).top,
         );
       return [...element.querySelectorAll('.body-view :is(h1, h2, h3, h4, h5, h6)')].map(
         (heading) => heading.getBoundingClientRect().top,
@@ -2215,11 +2341,15 @@ export function App(): ReactElement {
     let frame = 0;
     const measure = (): void => {
       frame = 0;
-      const top = element.getBoundingClientRect().top + 96;
       const tops = headingTops();
+      if (element.scrollTop + element.clientHeight >= element.scrollHeight - 2) {
+        setOutlineCurrent(tops.length - 1);
+        return;
+      }
+      const line = element.getBoundingClientRect().top + 96;
       let at = 0;
       tops.forEach((value, index) => {
-        if (value <= top) at = index;
+        if (value <= line) at = index;
       });
       setOutlineCurrent(at);
     };
@@ -2228,13 +2358,49 @@ export function App(): ReactElement {
     };
     measure();
     element.addEventListener('scroll', onScroll, { passive: true });
+    const observer = new ResizeObserver(onScroll);
+    observer.observe(element);
     return () => {
       element.removeEventListener('scroll', onScroll);
+      observer.disconnect();
       cancelAnimationFrame(frame);
     };
   }, [panelOutline]);
+  /**
+   * NAV-07, D-85: the panel's top lines up with the composer's (a task list) or the note card's,
+   * and sticks there while the page scrolls (never higher).
+   */
+  const [panelTop, setPanelTop] = useState(4);
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (!element || !panelShown) return;
+    const measure = (): void => {
+      const anchor = element.querySelector<HTMLElement>(
+        '.content > .composer, .content > .note-card',
+      );
+      const pair = element.querySelector<HTMLElement>('.pair');
+      if (!anchor || !pair) {
+        setPanelTop(4);
+        return;
+      }
+      // Layout offsets, not boxes: the page's arrival animation moves the boxes for a moment.
+      const offset = (element: HTMLElement): number => {
+        let top = 0;
+        for (let at: HTMLElement | null = element; at; at = at.offsetParent as HTMLElement | null)
+          top += at.offsetTop;
+        return top;
+      };
+      setPanelTop(Math.max(4, Math.round(offset(anchor) - offset(pair))));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (content.current) observer.observe(content.current);
+    return () => observer.disconnect();
+  }, [panelShown, view?.id, view?.mode, pageTask?.key]);
   const panelHandlers: PanelHandlers = {
     onHide: togglePanel,
+    onBack: panelBack ? () => travel(-1) : null,
+    onMenu: (at) => panelMenu(at),
     onOpenPage: openPage,
     onToggle: (key) => void toggle(key),
     onTitle: (key, text) => void change({ kind: 'edit', key, text }),
@@ -2260,14 +2426,18 @@ export function App(): ReactElement {
     onRemovePart: (key, body, kind) => removePart(key, body, kind),
     onAddSubtask: addSubtask,
     onImage: showImage,
-    onGo: (item) => go({ list: item.listId, page: null }, item.key),
+    onGo: (item) => followFromPanel(item.listId, item.key),
     onJump: (kind, index, from) => {
       const root = scroller.current;
       if (!root) return;
-      const editor = root.querySelector<HTMLElement>('.note-editor .cm-editor');
-      const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+      const cm = noteEditorView(root);
       if (cm) {
-        cm.dispatch({ effects: CodeEditorView.scrollIntoView(from, { y: 'start', yMargin: 24 }) });
+        // D-85: a smooth scroll to the heading or block (instant under reduce-motion).
+        const y = cm.documentTop + cm.lineBlockAt(from).top - root.getBoundingClientRect().top;
+        root.scrollTo({
+          top: root.scrollTop + y - 24,
+          behavior: reducedMotion() ? 'auto' : 'smooth',
+        });
         return;
       }
       // A task's page: its rendered body's headings and blocks, in order.
@@ -2390,10 +2560,44 @@ export function App(): ReactElement {
       </aside>
 
       <main className="main">
-        <div className="titlebar" />
-        <div className="scroller" ref={scroller}>
-          {/* NAV-07, D-83: the column and the context panel, centred together on wide screens. */}
-          <div className={panelState ? 'pair' : 'pair single'}>
+        <div className="titlebar">
+          {/* NAV-07, D-85: shows or hides the panel whenever the window can fit it. */}
+          {wide && view && (
+            <button
+              type="button"
+              className={panelHidden ? 'panel-toggle' : 'panel-toggle on'}
+              aria-label={panelHidden ? 'Show the panel' : 'Hide the panel'}
+              aria-pressed={!panelHidden}
+              title={panelHidden ? 'Show the panel (Ctrl+\\)' : 'Hide the panel (Ctrl+\\)'}
+              onClick={togglePanel}
+            >
+              <PanelIcon />
+            </button>
+          )}
+        </div>
+        <div
+          className="scroller"
+          ref={scroller}
+          onMouseDown={(event) => {
+            // NAV-07, D-85: a click on blank space (not on a row) clears the selection.
+            if (event.button !== 0 || view?.mode !== 'tasks' || pageTask) return;
+            if ((event.target as Element).closest(BLANK_EXCEPT)) return;
+            setSelected(null);
+            setMarked(NOTHING);
+          }}
+          onContextMenu={(event) => {
+            if (event.defaultPrevented || (event.target as Element).closest(BLANK_EXCEPT)) return;
+            const items = panelItem();
+            if (items.length === 0) return;
+            event.preventDefault();
+            openMenu(items, { x: event.clientX, y: event.clientY });
+          }}
+        >
+          {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
+          <div
+            className={panelState ? `pair ${pairSize ?? ''}` : 'pair single'}
+            style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
+          >
             {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
             <div
               ref={content}
@@ -2436,7 +2640,7 @@ export function App(): ReactElement {
                 </TaskPage>
               )}
 
-              {view && !pageTask && (
+              {view && !pageTask && view.mode === 'tasks' && (
                 <header className="list-header">
                   <h1>
                     {view.name}
@@ -2454,15 +2658,26 @@ export function App(): ReactElement {
               )}
 
               {view?.mode === 'note' && (
-                <NoteEditor
-                  key={view.name}
-                  id={view.id}
-                  text={view.noteText ?? ''}
-                  readOnly={view.readOnly !== null}
-                  onId={setListId}
-                  onImage={showImage}
-                  mono={view.mono === true}
-                />
+                // NOTE-01, D-85: the note's title and text on a card, so it is clear where to type.
+                <div className="card note-card">
+                  <header className="list-header">
+                    <h1>{view.name}</h1>
+                    {view.readOnly && (
+                      <span className="subtitle">
+                        Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                      </span>
+                    )}
+                  </header>
+                  <NoteEditor
+                    key={view.name}
+                    id={view.id}
+                    text={view.noteText ?? ''}
+                    readOnly={view.readOnly !== null}
+                    onId={setListId}
+                    onImage={showImage}
+                    mono={view.mono === true}
+                  />
+                </div>
               )}
 
               {view?.mode === 'tasks' && !pageTask && (
@@ -2551,6 +2766,7 @@ export function App(): ReactElement {
                 state={panelState}
                 upNext={upNextItems}
                 current={outlineCurrent}
+                back={panelBack}
                 handlers={panelHandlers}
               />
             )}
@@ -2587,6 +2803,13 @@ export function App(): ReactElement {
             }
           >
             Priority
+          </button>
+          {/* TODAY-01, D-85: pins them all, or unpins them when all are pinned. */}
+          <button
+            type="button"
+            onClick={() => void pin(markedRows, !markedRows.every((row) => row.pinned))}
+          >
+            {markedRows.every((row) => row.pinned) ? 'Unpin' : 'Pin'}
           </button>
           <button type="button" onClick={bulkDelete}>
             Delete
@@ -3548,6 +3771,11 @@ function Row(
         />
       )}
       <span className="ind">
+        {task.pinned && (
+          <span className="pin-ind" title="Pinned (P)">
+            <PinIcon />
+          </span>
+        )}
         {task.reminder && !task.done && (
           // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the
           // overdue dot, and the time next to it opens the date/time picker (REM-01).

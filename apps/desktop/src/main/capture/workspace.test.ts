@@ -708,3 +708,77 @@ describe('delete, move and list actions (M4 step 4: TASK-11, TASK-12, LIST-01, D
     expect(workspace.view(id, now)?.noteText).toBe('# Standup\n\n- Alex: DNS\n');
   });
 });
+
+describe('pins, captures and a task as a note (TODAY-01, TASK-17, D-85)', () => {
+  const list = (body: string): Promise<void> =>
+    writeFile(join(folder, 'Work.md'), `---\nflint: 1\nid: wrk1\nmode: tasks\n---\n${body}`);
+  const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
+
+  it('pins and unpins undoably; an old `today` pin reads as a pin and is written as `pinned`', async () => {
+    await list('- [ ] Plan [today:: true] [id:: aaaa]\n- [ ] Ship [id:: bbbb]\n');
+    const workspace = await open();
+    expect(workspace.panelTasks().pinned.map((task) => task.id)).toEqual(['aaaa']);
+    expect(
+      await workspace.change('wrk1', { kind: 'pin', key: 'bbbb', pinned: true }, now),
+    ).toMatchObject({ label: 'Pinned' });
+    expect(await work()).toContain('- [ ] Ship [pinned:: true] [id:: bbbb]\n');
+    expect(
+      await workspace.change('wrk1', { kind: 'pin', key: 'bbbb', pinned: true }, now),
+    ).toBeNull();
+    expect(await workspace.undoLast(now)).toBe('Pinned');
+    expect(await work()).toContain('- [ ] Ship [id:: bbbb]\n');
+    await workspace.change('wrk1', { kind: 'edit', key: 'aaaa', text: 'Plan the day' }, now);
+    expect(await work()).toContain('- [ ] Plan the day [pinned:: true] [id:: aaaa]\n');
+  });
+
+  it('unpins tasks completed before today, keeps today’s done pins and open ones', async () => {
+    await list(
+      '- [ ] Open [pinned:: true] [id:: aaaa]\n- [x] Done today [pinned:: true] [completion:: 2026-10-29T09:00] [id:: bbbb]\n- [x] Done before [pinned:: true] [completion:: 2026-10-28T17:00] [id:: cccc]\n',
+    );
+    const workspace = await open();
+    expect(await workspace.unpinDone(now)).toBe(1);
+    const text = await work();
+    expect(text).toContain('Open [pinned:: true]');
+    expect(text).toContain('Done today [pinned:: true]');
+    expect(text).toContain('- [x] Done before [completion:: 2026-10-28T17:00] [id:: cccc]');
+    expect(await workspace.unpinDone(new Date(2026, 9, 30, 0, 5))).toBe(1);
+  });
+
+  it('remembers popup captures, newest first', async () => {
+    const workspace = await open();
+    await workspace.capture({ text: 'first', chooseNewList: false }, now);
+    await workspace.capture(
+      { text: 'second', chooseNewList: false },
+      new Date(2026, 9, 29, 14, 31),
+    );
+    await workspace.change('inbox', { kind: 'add', text: 'from the composer', where: 'top' }, now);
+    expect(workspace.panelTasks().captured.map((task) => task.title)).toEqual(['second', 'first']);
+  });
+
+  it('converts a task to a note and back with one undo', async () => {
+    await list(
+      '- [ ] Fix the resolver [priority:: high] [id:: aaaa]\n    Seen on staging.\n    - [x] Reproduce [id:: bbbb]\n- [ ] Ship [id:: cccc]\n',
+    );
+    const workspace = await open();
+    const outcome = await workspace.change('wrk1', { kind: 'toNote', key: 'aaaa' }, now);
+    expect(outcome).toMatchObject({
+      label: 'Converted to note Fix the resolver',
+      listName: 'Fix the resolver',
+    });
+    const note = await readFile(join(folder, 'Fix the resolver.md'), 'utf8');
+    expect(note).toBe(
+      `---\nflint: 1\nid: ${outcome?.listId}\nmode: note\n---\nSeen on staging.\n\n- [x] Reproduce\n`,
+    );
+    expect(await work()).toBe(
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Ship [id:: cccc]\n',
+    );
+    expect(await workspace.undoLast(now)).toBe('Converted to note Fix the resolver');
+    expect(await work()).toContain('- [ ] Fix the resolver [priority:: high] [id:: aaaa]\n');
+    await expect(readFile(join(folder, 'Fix the resolver.md'))).rejects.toThrow();
+    expect(await workspace.redoLast(now)).toBe('Converted to note Fix the resolver');
+    expect(await readFile(join(folder, 'Fix the resolver.md'), 'utf8')).toContain(
+      '- [x] Reproduce\n',
+    );
+    expect(await work()).not.toContain('Fix the resolver');
+  });
+});

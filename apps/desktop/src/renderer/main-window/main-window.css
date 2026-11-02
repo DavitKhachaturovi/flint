@@ -769,14 +769,26 @@ h1 .count {
   color: var(--fl-text-secondary);
 }
 
-/* D-64, D-68 (09 §8): a note is a page, not a card: its text in the live-preview editor (M5), on
-   the window ground under the heading, filling the page's height and growing with the text, so
-   the page scrolls as a whole. */
+/* D-64, D-68 (09 §8): a note is a page: its text in the live-preview editor (M5), filling the
+   page's height and growing with the text, so the page scrolls as a whole. D-85: its title and text
+   sit on a card (the task list's surface), so it is clear where to type. */
 .content.note-page {
   /* D-77: less the page animation's 8 px rise, so arriving never makes it overflow (no flashing
      scrollbar). */
   min-height: calc(100% - 8px);
   padding-bottom: 40px;
+}
+
+.note-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 24px 28px;
+}
+
+.note-card > .list-header {
+  padding-bottom: 0;
 }
 
 /* M5 (NOTE-01, D-79): the note in the live-preview editor (editor.css), lined up with the heading;
@@ -2536,8 +2548,9 @@ a.auto-link {
   vertical-align: middle;
 }
 
-/* NAV-07, D-83 (09 §8, mockup 11): the column and the context panel, centred together as a pair
-   with a 28 px gap on wide screens; below that width the column stands alone as before. */
+/* NAV-07, D-83, D-85 (09 §8, mockup 11): the column and the context panel, centred together as a
+   pair: the full pair (820 / 28 / 440) or, a little narrower, the compact one (780 / 24 / 380);
+   narrower still, the column stands alone as before. */
 .pair.single {
   display: contents;
 }
@@ -2557,26 +2570,41 @@ a.auto-link {
   padding-right: 0;
 }
 
+.pair.compact {
+  gap: 24px;
+}
+
+.pair.compact > .content {
+  flex-basis: 780px;
+}
+
+/* D-85: the panel's top lines up with the composer (or the note card) and stays there while the
+   page scrolls; --panel-top is measured. */
 .context-panel {
   position: sticky;
-  top: 4px;
+  top: var(--panel-top, 4px);
   flex: 0 0 440px;
-  max-height: calc(100vh - 40px - 24px);
-  margin-top: 4px;
+  max-height: calc(100vh - 40px - var(--panel-top, 4px) - 24px);
+  margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
   animation: panel-in var(--fl-dur-state) var(--fl-ease-spring);
 }
 
+.pair.compact > .context-panel {
+  flex-basis: 380px;
+}
+
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateX(16px);
   }
 }
 
 .panel-inner {
+  position: relative;
   padding: 16px 14px 14px 20px;
 }
 
@@ -2589,6 +2617,22 @@ a.auto-link {
 
 @keyframes panel-crossfade {
   from {
+    opacity: 0;
+  }
+}
+
+/* D-85: the previous content fades out over the new (a real crossfade, never in the way). */
+.panel-ghost {
+  position: absolute;
+  inset: 16px 14px auto 20px;
+  max-height: calc(100% - 30px);
+  overflow: hidden;
+  pointer-events: none;
+  animation: panel-fade-out var(--fl-dur-state) ease forwards;
+}
+
+@keyframes panel-fade-out {
+  to {
     opacity: 0;
   }
 }
@@ -2823,6 +2867,7 @@ a.auto-link {
 }
 
 .outline {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -2857,15 +2902,19 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
-.outline-heading.current::before {
-  content: '';
+/* D-85: one marker that slides to the current section. */
+.outline-marker {
   position: absolute;
   left: 3px;
-  top: 8px;
-  bottom: 8px;
+  top: 0;
+  z-index: 1;
   width: 2px;
   border-radius: 2px;
   background: var(--fl-accent);
+  pointer-events: none;
+  transition:
+    transform var(--fl-dur-base) var(--fl-ease-spring),
+    height var(--fl-dur-base) var(--fl-ease-spring);
 }
 
 .outline-tile {
@@ -2913,4 +2962,127 @@ a.auto-link {
   font-family: var(--fl-font-mono);
   font-size: 12px;
   color: var(--fl-text-secondary);
+}
+
+/* NAV-07, D-85 (09 §8): the panel toggle in the title-bar strip, left of Windows' caption buttons. */
+.panel-toggle {
+  position: fixed;
+  top: 6px;
+  left: calc(env(titlebar-area-x, 0px) + env(titlebar-area-width, calc(100vw - 138px)) - 36px);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--fl-text-faint);
+  -webkit-app-region: no-drag;
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.panel-toggle.on {
+  background: var(--fl-ground-float);
+  color: var(--fl-text-muted);
+}
+
+.panel-toggle:hover {
+  color: var(--fl-text-primary);
+}
+
+.panel-back {
+  margin-left: -6px;
+  margin-right: -4px;
+}
+
+/* D-85: Up next: done pins and captures faded; Overdue the quiet section at the bottom. */
+.panel-item.done {
+  color: var(--fl-text-faint);
+}
+
+.panel-item.done .panel-item-title {
+  text-decoration: line-through;
+}
+
+.panel-item.pinned .panel-item-when {
+  color: var(--fl-text-faint);
+}
+
+.panel-section.overdue .panel-label,
+.panel-section.overdue .panel-item,
+.panel-item.overdue .panel-item-when {
+  color: var(--fl-text-faint);
+}
+
+.panel-item-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fl-ground-tile);
+  font-size: 11px;
+  color: var(--fl-text-muted);
+}
+
+.panel-item.attachment.missing .panel-item-title {
+  color: var(--fl-text-faint);
+}
+
+/* D-85: an extra section is one quiet line until opened (it folds like Completed). */
+.panel-extra-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  text-align: left;
+  color: var(--fl-text-faint);
+}
+
+.panel-extra-head:hover,
+.panel-extra-head:hover .panel-label {
+  color: var(--fl-text-muted);
+}
+
+.panel-extra-head .chev {
+  display: flex;
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.panel-extra.open .panel-extra-head .chev {
+  transform: rotate(90deg);
+}
+
+.panel-extra-count {
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+}
+
+.panel-extra-rows {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity var(--fl-dur-state) ease;
+}
+
+.panel-extra.open .panel-extra-rows {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.panel-extra-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-left: 8px;
+}
+
+/* TODAY-01, D-85: a pinned row's pin, quiet, in the indicator run. */
+.pin-ind {
+  display: flex;
+  align-items: center;
+  color: var(--fl-text-faint);
 }

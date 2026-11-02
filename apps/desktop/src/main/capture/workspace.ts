@@ -26,7 +26,9 @@ import {
   setBody,
   setPriority,
   setMuted,
+  setPinned,
   setReminder,
+  taskAsNoteText,
   uncompleteTask,
   type Applied,
   type Op,
@@ -40,7 +42,7 @@ import {
   type CaptureParse,
   type ListInfo,
 } from '@flint/core/shorthand';
-import { atDefaultTime, fromDate } from '@flint/core/time';
+import { atDefaultTime, fromDate, toDate } from '@flint/core/time';
 import type {
   ChangeOutcome,
   SidebarAction,
@@ -71,7 +73,8 @@ import {
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
-import { agoLabel, localStamp, TaskMetaFile } from '../task-meta.js';
+import { agoLabel, dayLabel, localStamp, TaskMetaFile } from '../task-meta.js';
+import { RECENT_CAPTURES, type PanelTask } from '../up-next.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
 import {
@@ -149,6 +152,19 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 const NEW_LIST_HEADER = (id: string, mode: ListMode = 'tasks'): string =>
   `---\nflint: 1\nid: ${id}\nmode: ${mode}\n---\n`;
+
+/** TASK-17, D-85: a note's name made from a task's title: what Windows allows in a file name. */
+function noteName(title: string): string {
+  const name = [...title]
+    .map((char) => (char < ' ' ? ' ' : char))
+    .join('')
+    .replace(/[<>:"/\\|?*]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+    .replace(/[. ]+$/, '');
+  return isValidListName(name) ? name : 'Note';
+}
 
 /** A list's name, as typed in the sidebar (LIST-01): Windows file-name rules (D-25). */
 function listNameProblem(name: string): string | null {
@@ -471,10 +487,14 @@ export class Workspace {
     } catch {
       edited = undefined;
     }
+    // NAV-07, D-85: a note's created date is its first sighting.
+    if (loaded.entry.mode === 'note') this.meta.seen([id], now);
+    const created = loaded.entry.mode === 'note' ? this.meta.get(id)?.created : undefined;
     return {
       ...view,
       ...(this.monoNotes.includes(id) && { mono: true }),
       ...(edited !== undefined && { edited }),
+      ...(created !== undefined && { created: dayLabel(created, now) }),
     };
   }
 
@@ -657,6 +677,18 @@ export class Workspace {
           change.key,
         );
       }
+      case 'pin': {
+        // TODAY-01, D-85.
+        const found = findTask(document, change.key);
+        if (!found || (found.task.line.fields.pinned !== undefined) === change.pinned) return null;
+        const label = change.pinned ? 'Pinned' : 'Unpinned';
+        return outcome(
+          await this.record(list, setPinned(path, change.key, change.pinned), label, now),
+          change.key,
+        );
+      }
+      case 'toNote':
+        return this.taskToNote(list, change.key, now);
       case 'delete': {
         // TASK-12, D-50: the task goes to Trash storage first, so it is never only in memory.
         const found = findTask(document, change.key);
@@ -751,6 +783,48 @@ export class Workspace {
     );
     await this.markRecent(this.listId(target.entry));
     return { label, key, listId: this.listId(target.entry), listName: name };
+  }
+
+  /**
+   * TASK-17, D-85: the task becomes a note named after it (its body, its subtasks as a checklist)
+   * and leaves its list; one undo step takes the task back and the note away while it is unchanged.
+   * The note is written first: a crash between the two writes leaves a copy, never a loss.
+   */
+  private async taskToNote(list: Loaded, key: string, now: Date): Promise<ChangeOutcome | null> {
+    const found = findTask(list.file.document, key);
+    if (!found) return null;
+    const task = found.task;
+    const base = noteName(taskLabel(titlePlain(task.line.title.trim()), getBody(task)));
+    let name = base;
+    for (let count = 2; this.sameName(name); count++) name = `${base} ${count}`;
+    if (listNameProblem(name)) return null;
+    const noteId = generateId(this.isTaken);
+    const body = taskAsNoteText(task);
+    const text = NEW_LIST_HEADER(noteId, 'note') + (body === '' ? '' : `${body}\n`);
+    await this.createList(name, 'note', noteId, text);
+    const label = `Converted to note ${name}`;
+    const start = this.undoStack.length;
+    const created = (): UndoEntry => ({
+      label,
+      run: async () => {
+        const note = this.find(noteId);
+        if (!note) return null;
+        await this.dropIfUnchanged(note, text);
+        if (this.find(noteId)) return null;
+        return {
+          label,
+          run: async () => {
+            if (this.find(noteId) || this.sameName(name)) return null;
+            await this.createList(name, 'note', noteId, text);
+            return created();
+          },
+        };
+      },
+    });
+    this.remember(created());
+    await this.record(list, deleteTask(list.file.path, key), label, now);
+    this.mergeSince(start, label);
+    return { label, key: null, listId: noteId, listName: name };
   }
 
   /** Another list already has this name, ignoring case, spaces and hyphens (D-25). */
@@ -1009,6 +1083,62 @@ export class Workspace {
     return tasks;
   }
 
+  /** NAV-07, D-85: the panel's pinned tasks (in list order) and the last popup captures. */
+  panelTasks(): { pinned: PanelTask[]; captured: PanelTask[] } {
+    const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
+    const pinned: PanelTask[] = [];
+    const byId = new Map<string, PanelTask>();
+    for (const { entry, file } of this.lists) {
+      if (entry.mode === 'note') continue;
+      const listId = this.listId(entry);
+      for (const { task } of allTasks(file.document)) {
+        const item: PanelTask = {
+          id: task.key,
+          listId,
+          listName: names.get(listId) ?? entry.name,
+          title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
+          done: task.line.status !== ' ',
+        };
+        byId.set(task.key, item);
+        if (task.line.fields.pinned) pinned.push(item);
+      }
+    }
+    const captured = this.meta
+      .captures()
+      .flatMap((id) => byId.get(id) ?? [])
+      .slice(0, RECENT_CAPTURES);
+    return { pinned, captured };
+  }
+
+  /**
+   * TODAY-01, D-85: at the day change, tasks completed before today lose their pin, whether or not
+   * the rollover prompt is on (not an undo step: nothing the user did). The number unpinned.
+   */
+  unpinDone(now: Date): Promise<number> {
+    return this.serial(async () => {
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const before = (task: Parameters<typeof getBody>[0]): boolean => {
+        const completion = task.line.fields.completion;
+        if (completion) return toDate(completion.value.value) < dayStart;
+        const touched = this.meta.get(task.key)?.lastTouched;
+        return touched === undefined || touched < localStamp(dayStart);
+      };
+      let count = 0;
+      for (const list of this.lists) {
+        if (list.entry.mode === 'note' || list.file.readOnly) continue;
+        const ops = [...allTasks(list.file.document)]
+          .filter(({ task }) => task.line.fields.pinned && task.line.status !== ' ' && before(task))
+          .map(({ task }) => setPinned(list.file.path, task.key, false));
+        const op = bulk(ops);
+        if (!op) continue;
+        await this.applyAndSave(list, op, now);
+        count += ops.length;
+      }
+      if (count > 0) this.notify();
+      return count;
+    });
+  }
+
   /** The list holding a task; task IDs are unique in the Flint folder (D-21, D-29). */
   locate(taskId: string): { readonly listId: string; readonly key: string } | null {
     for (const { entry, file } of this.lists)
@@ -1213,6 +1343,8 @@ export class Workspace {
       reminder: parsed.reminder,
     });
     await this.applyAndSave(target, op, now);
+    // D-85: for the panel's Recently captured.
+    this.meta.captured(id, now);
     if (target.entry.id !== INBOX_ID) await this.markRecent(this.listId(target.entry));
     return {
       kind: 'saved',

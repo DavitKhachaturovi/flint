@@ -200,17 +200,24 @@ export interface TaskRow {
   /** NAV-07, docs/04 §3: when Flint first saw it, and last changed it (`29 Oct`, `2 h ago`). */
   readonly created?: string;
   readonly edited?: string;
+  /** TODAY-01, D-85: pinned (the Today view in M6). */
+  readonly pinned?: boolean;
 }
 
-/** NAV-07, D-83: an item of the context panel's "Up next". */
+/**
+ * NAV-07, D-83, D-85: an item of the context panel's "Up next": a pinned task, a reminder, or a
+ * recent capture (its own collapsed section).
+ */
 export interface UpNextItem {
-  readonly group: 'overdue' | 'today' | 'tomorrow';
+  readonly group: 'pinned' | 'today' | 'tomorrow' | 'overdue' | 'captured';
   readonly key: string;
   readonly listId: string;
   readonly listName: string;
   readonly title: string;
-  /** `15:00`, or for an overdue one `Yest 17:00`. */
+  /** `15:00`, or for an overdue one `Yest 17:00`; empty for a pin or a capture without one. */
   readonly when: string;
+  /** A done pin (until the day changes) or a done capture: shown faded. */
+  readonly done?: boolean;
 }
 
 /** Something in a task list that isn't a task: shown read-only (TASK-15). */
@@ -234,6 +241,8 @@ export interface ListView {
   readonly mono?: boolean;
   /** NAV-07: when the file last changed (`just now`, `2 h ago`). */
   readonly edited?: string;
+  /** NAV-07, D-85: a note's first sighting (`2 Nov`). */
+  readonly created?: string;
 }
 
 /**
@@ -286,6 +295,10 @@ export type ListChange =
     }
   /** REM-12, D-66: the bell turns a reminder off (kept, never fired) or back on. */
   | { readonly kind: 'mute'; readonly key: string; readonly muted: boolean }
+  /** TODAY-01, D-85. */
+  | { readonly kind: 'pin'; readonly key: string; readonly pinned: boolean }
+  /** TASK-17, D-85: the task becomes a note; the outcome's list is the note. */
+  | { readonly kind: 'toNote'; readonly key: string }
   /** TASK-12, D-50: to Trash storage, undoable. */
   | { readonly kind: 'delete'; readonly key: string }
   /** TASK-11: to the top of another list, or of a new one. */
