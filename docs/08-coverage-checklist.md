@@ -443,3 +443,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Note open: outline with headings and titled blocks, In this note | NAV-07, NOTE-01 · v1 · same | 02, D-83 |
 | 6 | Block titles: fence info title, first comment, JSON keys / exception, type | NAV-07 · v1 · same | 02, D-83 |
 | 7 | Motion: slide/fade in, height eases, content crossfades | NAV-07, UI-10 · v1 · same | 03 §5, 09 §8, D-83 |
+
+## T. The rest of the M5 editor (2 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Per-note Monospace (menu, Ctrl+Shift+M), this machine; global default in M8 | NOTE-06, APP-11 · v1 · M5 (setting M8) | 02, D-84 |
+| 2 | Link patterns engine (both ways), settings.json; the M8 editor with inference, preview, presets | NOTE-07, TASK-10, APP-11 · v1 · M5 (editor M8) | 02, D-84 |
+| 3 | Videos MP4/WebM/MOV inline with thumbnail; an unplayable one offers its default player | MEDIA-01 · v1 · M5 | 02, D-84 |
+| 4 | Files over 25 MB linked, sticky notice with Copy into Flint, Linked badge, File not found | MEDIA-03 · v1 · M5 | 02, 04, D-84 |
+| 5 | Linked files not in snapshots, export, sync; snapshots store each attachment once | DATA-04, DATA-06, SYNC-01 · v1 · M7 | 04, D-84 |
+| 6 | Programs and scripts are never launched from a link | MEDIA-03, APP-09 · v1 · M5 | 02, 05, D-84 |
+| 7 | Highlighting for all common languages, in the editor and in rendered bodies | NOTE-04, UI-06 · v1 · M5 | 02, D-84 |
+| 8 | Find in notes (Ctrl+F) | NAV-06 · v1 · M5 | 02, D-84 |

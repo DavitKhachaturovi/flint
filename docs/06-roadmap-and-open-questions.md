@@ -17,7 +17,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 - The end-to-end tests run in order and depend on each other: one failure makes the later ones fail too, so fix the first one. They never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
 
 **Next steps.**
-1. The rest of the M5 editor (02 NOTE-01's "still to come"), then a build for Davit to test the editor as a whole.
+1. The rest of the M5 editor (D-84: all-language highlighting, find in notes, monospace, link patterns, videos, dragging files in, large files linked), then a build for Davit to test the editor as a whole.
 2. **The M5 editor, before step 9 (D-79):** first step done (`renderer/editor/`: `live-preview.ts`, `MarkdownEditor.tsx`, `editor.css`; `NoteEditor` and `BodyEditor` use it; CodeMirror 6 and seven language packages added under D-30, pinned). Next: Davit's look at it (0.4.16), then NOTE-02's menu, slash commands, the copy button in the editor's code cards.
 3. **The context panel (NAV-07, D-83)**, after the M5 editor work and before step 9: `design/mockups/11-context-panel.html`, three states.
 4. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).

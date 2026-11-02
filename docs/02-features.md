@@ -248,6 +248,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Pasted URLs are displayed with short, meaningful titles; the full URL is kept in the file.
 - Example: `https://dev.azure.com/.../pullrequest/42` displays as **"PR 42"**.
 - **Proposed** built-in recognizers: Azure DevOps pull requests and work items, GitHub pull requests and issues. Other URLs display as domain + shortened path.
+- **D-84:** a pasted URL that matches one of the user's link patterns (NOTE-07) displays as that pattern's short form (`AB#1234`); the full URL stays in the file.
 - **Long URLs never wrap rows**; they truncate with an ellipsis.
 - Applies in task titles, task bodies, and notes.
 
@@ -405,11 +406,13 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NOTE-06 — Monospace toggle (v1)
 - A setting (and per-note toggle, **Proposed**) to render text in a monospace font.
+- **D-84:** the per-note toggle is a checked **Monospace** item in the note's right-click menu (and **Ctrl+Shift+M**), remembered per note on this machine (UI state), the file unchanged. The global default comes with Settings (M8, APP-11).
 
 ### NOTE-07 — Configurable auto-linking patterns (v1)
 - Users configure patterns that auto-link: e.g. `AB#1234` → the Azure DevOps work item URL.
 - Configuration = a pattern + a URL template (e.g. `AB#(\d+)` → `https://dev.azure.com/<org>/<project>/_workitems/edit/$1`).
 - Works in notes, task titles, and task bodies. Gives integration value without building an integration.
+- **D-84:** per user, in `settings.json` (`linkPatterns`); the engine is built in M5, its editor in M8's Settings (APP-11): a **Link patterns** section where you paste an example link and type the short form you want (`https://dev.azure.com/org/project/_workitems/edit/1234` + `AB#1234`). Flint infers the pattern from what varies (the part present in both), shows a live preview, asks for a second example when it's ambiguous, and an **Advanced** toggle shows the generated pattern. **Each pattern works both ways:** a typed short form becomes a link chip, a pasted full URL is displayed as its short form (smart link titles, TASK-10). Presets: GitHub issues and pull requests, Azure DevOps work items and pull requests, Jira. No company-specific URLs as built-in defaults; only http(s) links. **Proposed engine details:** a pattern is a short form and a URL with named placeholders (`AB#{id}`, `https://dev.azure.com/acme/web/_workitems/edit/{id}`); a placeholder in both is the varying part (digits, or a word), one only in the URL is fixed by the example; a short form only matches between non-word characters.
 
 ---
 
@@ -420,12 +423,19 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-77 (M5):** images in bodies show as small thumbnails; a click opens a lightbox with smooth motion, and ←/→ go to the other images of the same task (not other tasks).
 - Images and videos can be added to notes and task bodies via paste, drag-and-drop, or the insert menu.
 - Images render inline; videos render with a player and thumbnail.
+- **D-84:** videos are MP4, WebM and MOV, added by paste or drag (also from Explorer), playing inline with a first-frame thumbnail. A video that can't play inline (e.g. HEVC from a phone) shows a placeholder with **Open in default player**. Files dragged or pasted from Explorer that aren't media (PDF, Office documents, text) are linked as attachments the same way and open in their default app; programs and scripts are never attached or launched (MEDIA-03).
 
 ### MEDIA-02 — Attachments folder with relative paths (v1)
 - Media is stored in an `attachments/` folder inside the Flint folder and referenced by **relative paths**, so moving the Flint folder never breaks images.
 
-### MEDIA-03 — Large-file warning (v1, Proposed)
-- Warn when adding a file above a size threshold (e.g. large videos), since everything lives on local disk and is included in snapshots/exports.
+### MEDIA-03 — Large files are linked, not copied (v1, D-84)
+- ~~Warn when adding a file above a size threshold.~~ **D-84 (replaces the warning):** no hard size limit. Up to **25 MB** a file is copied into `attachments/`; above it, it is added **as a link to its original location** at once (nothing copied).
+- A notice says **"Large file, linked to its original location"** with **Copy into Flint instead**. It stays until acted on or dismissed (it never fades) and never blocks input. Hovering the button, or the small info icon beside it, explains: large files are linked by default because copying them makes the Flint folder, snapshots, exports and future sync slow and big; copying keeps the file safe if the original is moved or deleted.
+- A linked attachment shows a small **Linked** badge; its right-click menu has **Copy into Flint**, so it can be switched later.
+- A linked file plays inline when it can, otherwise a click opens it in its default app. If the original is moved or deleted it shows **File not found** with the original path, never a broken player.
+- **Linked files are not included in snapshots, export or (later) sync** (DATA-04, DATA-06, SYNC-01).
+- **Never launches programs or scripts** from a link (`.exe`, `.bat`, `.cmd`, `.ps1`, `.msi`, `.com`, `.scr`, `.vbs`, `.js`, `.lnk`, `.reg`, `.hta`, …): only media and documents open; anything else asks first.
+- **Proposed:** a linked file is written as a `file:///` link (`![clip](file:///C:/Users/…/clip.mp4)`), which Obsidian also opens.
 
 ### MEDIA-04 — Orphaned-attachment cleanup (v1)
 - When a task or note leaves the Trash permanently, attachments no longer referenced by any list (or by anything still in Trash) are deleted too. Otherwise the attachments folder grows forever.
@@ -563,6 +573,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Auto-link patterns.
 - **D-52:** until this screen exists (M8), the sidebar's Settings entry is **hidden**, not shown disabled (it did nothing).
 - **D-81, Interface size (M8):** the app zoom of UI-12 (per display), next to the animation speed.
+- **D-84, Link patterns (M8):** the editor for NOTE-07's patterns: paste an example link, type the short form, a live preview, a second example when ambiguous, an Advanced view of the generated pattern; presets for GitHub, Azure DevOps and Jira. **Monospace** default for notes (NOTE-06).
 - **D-80, Keyboard shortcuts (M8):** a section listing every non-obvious shortcut: Tab / Shift+Tab (indent, outdent), Shift+Enter (notes; Open as page in Navigate state), Alt+↑/↓, Ctrl+Shift+Space and Ctrl+Shift+X, the mini-mode shortcut, Alt+← / Alt+→ (back, forward), Ctrl+K, Ctrl+F, Ctrl+Shift+N, Ctrl+A, 1 / 2 / 3 / 0, Space, Delete, Ctrl+Z / Ctrl+Y. The **global hotkeys are rebound here** (APP-08: the Hotkeys window of D-44 moves into Settings). The `?` cheat sheet (NAV-02) shows the same list.
 
 ### APP-12 — Respect OS reduce-motion (v1)

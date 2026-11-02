@@ -174,6 +174,7 @@ mode: note
 
 - Stored in `attachments/` with unique file names (e.g. `2026-10-29-153012-k3f9.png`).
 - Referenced with **relative** markdown links (`![](attachments/…png)`), so moving the folder never breaks them.
+- **D-84 (MEDIA-03):** a file over 25 MB is not copied: it is linked where it is, with a `file:///` link (**Proposed**), and shows a **Linked** badge with **Copy into Flint**. Linked files are outside the Flint folder, so snapshots, export and sync don't carry them; a moved or deleted original shows **File not found**.
 - Large-file warning above a threshold (MEDIA-03).
 - **Orphan cleanup:** when content leaves Trash permanently, any attachment not referenced by a list, the archive, or Trash is deleted (MEDIA-04).
 
@@ -198,6 +199,7 @@ mode: note
 
 ### Snapshots (DATA-04)
 - Periodic zipped copies of the Flint folder (excluding nothing; it's small) in `%LOCALAPPDATA%\Flint\snapshots`, taken only when something changed. Restore from settings. Retention: Q-05 (**Proposed:** hourly for 48 h, then daily for 30 days).
+- **D-84:** snapshots store each attachment once (an unchanged attachment, large ones especially, is never zipped again); linked files (MEDIA-03) are never in a snapshot.
 
 ### Export (DATA-05)
 - One click → a zip of the entire Flint folder, saved where the user chooses.
