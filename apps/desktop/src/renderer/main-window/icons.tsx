@@ -101,3 +101,17 @@ export const ReminderBellIcon = ({ size = 12 }: IconProps): ReactElement =>
 /** LIST-05, D-80 (mockup 10): a sidebar group's tile. */
 export const FolderIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />);
+
+/** NAV-07, D-83 (mockup 11): the context panel's "Open as page" and hide buttons. */
+export const OpenPageIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M14 4h6v6" />,
+    <path key="b" d="M20 4 11 13" />,
+    <path key="c" d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />,
+  ]);
+
+export const PanelIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,
+    <path key="b" d="M15 4v16" />,
+  ]);

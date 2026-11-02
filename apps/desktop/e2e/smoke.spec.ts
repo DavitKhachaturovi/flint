@@ -1588,6 +1588,70 @@ test('wide windows and the interface size (UI-12, D-81, D-82)', async () => {
   await expect(main.locator('.zoom-pill')).toHaveText('100%');
 });
 
+test('the context panel: Up next, the selected task, a note outline, Ctrl+\\ (NAV-07, D-83)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0);
+  const stamp = `${tomorrow.getFullYear()}-${two(tomorrow.getMonth() + 1)}-${two(tomorrow.getDate())}T10:00`;
+  await writeFile(
+    join(flint, 'Panel tasks.md'),
+    `---\nflint: 1\nid: pnl1\nmode: tasks\n---\n- [ ] Check the gateway logs [reminder:: ${stamp}] [id:: p1]\n    - [x] Pull the logs [id:: p2]\n    - [ ] Read them [id:: p3]\n- [ ] Plain task [id:: p4]\n`,
+  );
+  await writeFile(
+    join(flint, 'Panel note.md'),
+    '---\nflint: 1\nid: pnl2\nmode: note\n---\n## Goals\nShip it.\n\n```bash\n# Check the gateway health\naz network show\n```\n\n## Decisions\n- [x] Keep the hotfix\n- [ ] Tell the team\n',
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const sizeTo = (width: number, height: number): Promise<void> =>
+    app.evaluate(
+      ({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: 0, y: 0, ...size });
+      },
+      { width, height },
+    );
+  const panel = main.locator('.context-panel');
+  await main.locator('.nav', { hasText: 'Panel tasks' }).click();
+  // Narrow: no panel.
+  await expect(panel).toHaveCount(0);
+  await sizeTo(1920, 1040);
+
+  // Nothing selected: Up next, with tomorrow's reminder; clicking it selects the task.
+  await expect(panel.locator('.panel-head .panel-label')).toHaveText('Up next');
+  const item = panel.locator('.panel-item', { hasText: 'Check the gateway logs' });
+  await expect(item.locator('.panel-item-when')).toHaveText('10:00');
+  await item.click();
+  await expect(panel.locator('.panel-head .panel-label')).toHaveText('Task');
+  await expect(panel.locator('.panel-title')).toHaveText('Check the gateway logs');
+  await expect(panel).toContainText('Subtasks');
+  await expect(panel).toContainText('1 of 2');
+
+  // The selection drives the panel.
+  await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
+  await expect(panel.locator('.panel-title')).toHaveText('Plain task');
+
+  // A note: its outline, the blocks under their heading, the checklist.
+  await main.locator('.nav', { hasText: 'Panel note' }).click();
+  await expect(panel.locator('.panel-head .panel-label')).toHaveText('Outline');
+  await expect(panel.locator('.outline-heading')).toHaveText(['Goals', 'Decisions']);
+  await expect(panel.locator('.outline-block .outline-title')).toHaveText(
+    'Check the gateway health',
+  );
+  await expect(panel).toContainText('1 of 2');
+
+  // Ctrl+\ hides it and shows it again.
+  await main.keyboard.press('Control+Backslash');
+  await expect(panel).toHaveCount(0);
+  await main.keyboard.press('Control+Backslash');
+  await expect(panel).toHaveCount(1);
+  await sizeTo(1120, 780);
+  await expect(panel).toHaveCount(0);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

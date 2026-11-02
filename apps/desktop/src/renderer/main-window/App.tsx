@@ -32,6 +32,7 @@ import type {
   ListChange,
   ListSummary,
   ListView,
+  UpNextItem,
   SidebarAction,
   SidebarItem,
   SidebarOutcome,
@@ -60,6 +61,9 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
+import { ContextPanel, type PanelHandlers, type PanelState } from './ContextPanel.js';
+import { outline as outlineOf } from '../panel/outline.js';
+import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { BodyBlock, type ShowImage } from './Body.js';
 import { Lightbox } from './Lightbox.js';
@@ -81,6 +85,9 @@ import { sidebarMotion } from './sidebar-motion.js';
  */
 
 const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
+/** NAV-07, D-83: the main area's width the column, the gap and the panel need: 820 + 28 + 440, and
+ * 24 px either side. About 1590 px of window with the sidebar (tuned from the proposed ~1400). */
+const PANEL_FITS = 820 + 28 + 440 + 48;
 const TOAST_MS = 5000;
 
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
@@ -502,6 +509,33 @@ export function App(): ReactElement {
     [go, listId],
   );
 
+  /**
+   * NAV-07, D-83: the context panel, when the main area is wide enough for the 820 px column, the
+   * 28 px gap and the 440 px panel (with room either side), and it isn't hidden on this display.
+   */
+  const scroller = useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(false);
+  const [panelHidden, setPanelHidden] = useState(false);
+  useEffect(() => {
+    window.flintMain.onPanel(setPanelHidden);
+    const element = scroller.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setWide(element.clientWidth >= PANEL_FITS));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const panelShown = wide && !panelHidden && view !== null;
+  const panelShownRef = useRef(panelShown);
+  panelShownRef.current = panelShown;
+  useEffect(() => {
+    if (panelShown) setExpanded(new Set());
+  }, [panelShown]);
+  const togglePanel = useCallback((): void => {
+    setPanelHidden((hidden) => {
+      window.flintMain.setPanel(!hidden);
+      return !hidden;
+    });
+  }, []);
   /** Inline bodies closing: shown a moment longer, playing their closing animation (D-76). */
   const [closingBodies, setClosingBodies] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -510,6 +544,11 @@ export function App(): ReactElement {
    */
   const showBody = useCallback(
     (task: TaskRow): void => {
+      // NAV-07, D-83: with the context panel, the body is read and edited there: select the task.
+      if (panelShownRef.current) {
+        setSelected(task.key);
+        return;
+      }
       const without = (keys: ReadonlySet<string>): Set<string> =>
         new Set([...keys].filter((key) => key !== task.key));
       if (!expanded.has(task.key)) {
@@ -1441,6 +1480,12 @@ export function App(): ReactElement {
         composer.current?.focus();
         return;
       }
+      // NAV-07, D-83: Ctrl+\ hides or shows the context panel, from anywhere.
+      if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key === '\\') {
+        event.preventDefault();
+        if (wide) togglePanel();
+        return;
+      }
       // Typing in a text field or the note editor (contenteditable) is never a command.
       if (isTextField(event.target)) return;
       // NAV-06, D-84: Ctrl+F on a note's page finds in the note (the editor has it when focused).
@@ -1593,6 +1638,8 @@ export function App(): ReactElement {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [
+    wide,
+    togglePanel,
     sidebarFocus,
     reorderable,
     sidebarChange,
@@ -2117,6 +2164,124 @@ export function App(): ReactElement {
     });
   }
 
+  // NAV-07, D-83: what the context panel shows.
+  const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
+  const panelState: PanelState | null =
+    !panelShown || !view
+      ? null
+      : view.mode === 'note'
+        ? { kind: 'note', text: view.noteText ?? '', edited: view.edited }
+        : pageTask
+          ? { kind: 'page', task: pageTask }
+          : selectedRow
+            ? {
+                kind: 'task',
+                task: selectedRow,
+                listName: view.name,
+                readOnly: view.readOnly !== null,
+              }
+            : { kind: 'upnext' };
+  const [upNextItems, setUpNextItems] = useState<readonly UpNextItem[]>([]);
+  const wantsUpNext = panelState?.kind === 'upnext' || panelState?.kind === 'page';
+  useEffect(() => {
+    if (wantsUpNext) void window.flintMain.upNext().then(setUpNextItems);
+  }, [wantsUpNext, view]);
+  // The outline's current section: the last heading above the top of the page's view.
+  const panelText =
+    panelState?.kind === 'note'
+      ? panelState.text
+      : panelState?.kind === 'page'
+        ? panelState.task.body
+        : null;
+  const panelOutline = useMemo(
+    () => (panelText === null ? null : outlineOf(panelText)),
+    [panelText],
+  );
+  const [outlineCurrent, setOutlineCurrent] = useState(0);
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element || !panelOutline || panelOutline.headings.length === 0) return;
+    const headingTops = (): number[] => {
+      const editor = element.querySelector<HTMLElement>('.note-editor .cm-editor');
+      const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+      if (cm)
+        return panelOutline.headings.map(
+          (heading) => cm.coordsAtPos(heading.from)?.top ?? Infinity,
+        );
+      return [...element.querySelectorAll('.body-view :is(h1, h2, h3, h4, h5, h6)')].map(
+        (heading) => heading.getBoundingClientRect().top,
+      );
+    };
+    let frame = 0;
+    const measure = (): void => {
+      frame = 0;
+      const top = element.getBoundingClientRect().top + 96;
+      const tops = headingTops();
+      let at = 0;
+      tops.forEach((value, index) => {
+        if (value <= top) at = index;
+      });
+      setOutlineCurrent(at);
+    };
+    const onScroll = (): void => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    element.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      element.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [panelOutline]);
+  const panelHandlers: PanelHandlers = {
+    onHide: togglePanel,
+    onOpenPage: openPage,
+    onToggle: (key) => void toggle(key),
+    onTitle: (key, text) => void change({ kind: 'edit', key, text }),
+    onPriority: (task, anchor) =>
+      openPriorityPicker(
+        { anchor, returnFocus: null },
+        task.priority,
+        (priority) => void change({ kind: 'priority', key: task.key, priority }),
+      ),
+    onList: (task, anchor) =>
+      openListPicker(
+        { anchor, returnFocus: null },
+        listInfos(lists),
+        { exclude: listId, placeholder: 'Move to list…' },
+        (pick) =>
+          void moveTask(
+            task.key,
+            'newList' in pick ? { newList: pick.newList } : { list: pick.list.id },
+          ),
+      ),
+    onReminder: (task, anchor) => changeReminder(task, anchor),
+    onBody: (key, body) => void change({ kind: 'body', key, body }),
+    onRemovePart: (key, body, kind) => removePart(key, body, kind),
+    onAddSubtask: addSubtask,
+    onImage: showImage,
+    onGo: (item) => go({ list: item.listId, page: null }, item.key),
+    onJump: (kind, index, from) => {
+      const root = scroller.current;
+      if (!root) return;
+      const editor = root.querySelector<HTMLElement>('.note-editor .cm-editor');
+      const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+      if (cm) {
+        cm.dispatch({ effects: CodeEditorView.scrollIntoView(from, { y: 'start', yMargin: 24 }) });
+        return;
+      }
+      // A task's page: its rendered body's headings and blocks, in order.
+      const targets =
+        kind === 'heading'
+          ? root.querySelectorAll('.body-view :is(h1, h2, h3, h4, h5, h6)')
+          : root.querySelectorAll('.body-view :is(.code-card, .body-image)');
+      targets[index]?.scrollIntoView({
+        block: 'start',
+        behavior: reducedMotion() ? 'auto' : 'smooth',
+      });
+    },
+  };
+
   return (
     <div className="app">
       <div className="sidebar-drag" aria-hidden="true" />
@@ -2226,157 +2391,168 @@ export function App(): ReactElement {
 
       <main className="main">
         <div className="titlebar" />
-        <div className="scroller">
-          {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
-          <div
-            ref={content}
-            className={[
-              'content',
-              view?.mode === 'note' ? 'note-page' : '',
-              pageTask ? 'task-page' : '',
-              heading ?? '',
-            ].join(' ')}
-            key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}`}
-          >
-            {view && pageTask && (
-              <TaskPage
-                key={pageTask.key}
-                task={pageTask}
-                readOnly={view.readOnly !== null}
-                onBack={leavePage}
-                onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
-                onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
-                onAddSubtask={() => addSubtask(pageTask)}
-                onImage={showImage}
-                onRemovePart={(body, kind) => removePart(pageTask.key, body, kind)}
-              >
-                {pageRows.length > 0 && (
+        <div className="scroller" ref={scroller}>
+          {/* NAV-07, D-83: the column and the context panel, centred together on wide screens. */}
+          <div className={panelState ? 'pair' : 'pair single'}>
+            {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
+            <div
+              ref={content}
+              className={[
+                'content',
+                view?.mode === 'note' ? 'note-page' : '',
+                pageTask ? 'task-page' : '',
+                heading ?? '',
+              ].join(' ')}
+              key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}`}
+            >
+              {view && pageTask && (
+                <TaskPage
+                  key={pageTask.key}
+                  task={pageTask}
+                  readOnly={view.readOnly !== null}
+                  onBack={leavePage}
+                  onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
+                  onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
+                  onAddSubtask={() => addSubtask(pageTask)}
+                  onImage={showImage}
+                  onRemovePart={(body, kind) => removePart(pageTask.key, body, kind)}
+                >
+                  {pageRows.length > 0 && (
+                    <section
+                      className="card tasks page-subtasks"
+                      aria-label="Subtasks"
+                      ref={pageCard}
+                      onMouseDown={(event) => startRowDrag(event, pageCard.current)}
+                    >
+                      <Glide
+                        card={pageCard}
+                        target={glideTarget}
+                        version={[pageTask, editing]}
+                        editing={editing !== null}
+                      />
+                      {pageRows}
+                    </section>
+                  )}
+                </TaskPage>
+              )}
+
+              {view && !pageTask && (
+                <header className="list-header">
+                  <h1>
+                    {view.name}
+                    {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                  </h1>
+                  {lists.find((list) => list.id === view.id)?.inbox && (
+                    <span className="subtitle">{INBOX_SUBTITLE}</span>
+                  )}
+                  {view.readOnly && (
+                    <span className="subtitle">
+                      Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                    </span>
+                  )}
+                </header>
+              )}
+
+              {view?.mode === 'note' && (
+                <NoteEditor
+                  key={view.name}
+                  id={view.id}
+                  text={view.noteText ?? ''}
+                  readOnly={view.readOnly !== null}
+                  onId={setListId}
+                  onImage={showImage}
+                  mono={view.mono === true}
+                />
+              )}
+
+              {view?.mode === 'tasks' && !pageTask && (
+                <>
+                  {!view.readOnly && (
+                    <Composer
+                      key={view.id}
+                      listId={view.id}
+                      lists={lists}
+                      inputRef={composer}
+                      onAdd={addFromComposer}
+                    />
+                  )}
+
                   <section
-                    className="card tasks page-subtasks"
-                    aria-label="Subtasks"
-                    ref={pageCard}
-                    onMouseDown={(event) => startRowDrag(event, pageCard.current)}
+                    className="card tasks"
+                    aria-label="Tasks"
+                    ref={tasksCard}
+                    onMouseDown={(event) => startRowDrag(event, tasksCard.current)}
                   >
                     <Glide
-                      card={pageCard}
-                      target={glideTarget}
-                      version={[pageTask, editing]}
-                      editing={editing !== null}
-                    />
-                    {pageRows}
-                  </section>
-                )}
-              </TaskPage>
-            )}
-
-            {view && !pageTask && (
-              <header className="list-header">
-                <h1>
-                  {view.name}
-                  {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                </h1>
-                {lists.find((list) => list.id === view.id)?.inbox && (
-                  <span className="subtitle">{INBOX_SUBTITLE}</span>
-                )}
-                {view.readOnly && (
-                  <span className="subtitle">
-                    Read-only: Flint can&apos;t change this file ({view.readOnly}).
-                  </span>
-                )}
-              </header>
-            )}
-
-            {view?.mode === 'note' && (
-              <NoteEditor
-                key={view.name}
-                id={view.id}
-                text={view.noteText ?? ''}
-                readOnly={view.readOnly !== null}
-                onId={setListId}
-                onImage={showImage}
-                mono={view.mono === true}
-              />
-            )}
-
-            {view?.mode === 'tasks' && !pageTask && (
-              <>
-                {!view.readOnly && (
-                  <Composer
-                    key={view.id}
-                    listId={view.id}
-                    lists={lists}
-                    inputRef={composer}
-                    onAdd={addFromComposer}
-                  />
-                )}
-
-                <section
-                  className="card tasks"
-                  aria-label="Tasks"
-                  ref={tasksCard}
-                  onMouseDown={(event) => startRowDrag(event, tasksCard.current)}
-                >
-                  <Glide
-                    card={tasksCard}
-                    target={glideTarget}
-                    version={glideVersion}
-                    editing={editing !== null}
-                  />
-                  {view.items.length === 0 && (
-                    <p className="empty">
-                      Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
-                      hotkey.
-                    </p>
-                  )}
-                  {cardRows}
-                </section>
-
-                {(view.completed.length > 0 ||
-                  ghosts.some((ghost) => ghost.section === 'done')) && (
-                  <section className="card completed" aria-label="Completed" ref={completedCard}>
-                    <Glide
-                      card={completedCard}
+                      card={tasksCard}
                       target={glideTarget}
                       version={glideVersion}
                       editing={editing !== null}
                     />
-                    <button
-                      type="button"
-                      className="completed-head"
-                      aria-expanded={completedOpen}
-                      onClick={() => setCompletedOpen(!completedOpen)}
-                    >
-                      <span className={completedOpen ? 'chev open' : 'chev'}>
-                        <ChevronIcon />
-                      </span>
-                      <span>Completed</span>
-                      <span className="chip">{view.completed.length}</span>
-                    </button>
-                    {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
-                    <div
-                      className={completedOpen ? 'completed-rows open' : 'completed-rows'}
-                      inert={!completedOpen}
-                    >
-                      <div className="completed-inner">
-                        {ghostRows(ghosts, 'done', null, rowProps)}
-                        {view.completed.flatMap((task) => [
-                          withBody(
-                            <Row
-                              key={task.key}
-                              task={task}
-                              fresh={freshKeys.get(task.key)}
-                              {...rowProps}
-                            />,
-                            task,
-                            false,
-                          ),
-                          ...ghostRows(ghosts, 'done', task.key, rowProps),
-                        ])}
-                      </div>
-                    </div>
+                    {view.items.length === 0 && (
+                      <p className="empty">
+                        Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
+                        hotkey.
+                      </p>
+                    )}
+                    {cardRows}
                   </section>
-                )}
-              </>
+
+                  {(view.completed.length > 0 ||
+                    ghosts.some((ghost) => ghost.section === 'done')) && (
+                    <section className="card completed" aria-label="Completed" ref={completedCard}>
+                      <Glide
+                        card={completedCard}
+                        target={glideTarget}
+                        version={glideVersion}
+                        editing={editing !== null}
+                      />
+                      <button
+                        type="button"
+                        className="completed-head"
+                        aria-expanded={completedOpen}
+                        onClick={() => setCompletedOpen(!completedOpen)}
+                      >
+                        <span className={completedOpen ? 'chev open' : 'chev'}>
+                          <ChevronIcon />
+                        </span>
+                        <span>Completed</span>
+                        <span className="chip">{view.completed.length}</span>
+                      </button>
+                      {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
+                      <div
+                        className={completedOpen ? 'completed-rows open' : 'completed-rows'}
+                        inert={!completedOpen}
+                      >
+                        <div className="completed-inner">
+                          {ghostRows(ghosts, 'done', null, rowProps)}
+                          {view.completed.flatMap((task) => [
+                            withBody(
+                              <Row
+                                key={task.key}
+                                task={task}
+                                fresh={freshKeys.get(task.key)}
+                                {...rowProps}
+                              />,
+                              task,
+                              false,
+                            ),
+                            ...ghostRows(ghosts, 'done', task.key, rowProps),
+                          ])}
+                        </div>
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+            {panelState && (
+              <ContextPanel
+                state={panelState}
+                upNext={upNextItems}
+                current={outlineCurrent}
+                handlers={panelHandlers}
+              />
             )}
           </div>
         </div>
