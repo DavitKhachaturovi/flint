@@ -26,7 +26,7 @@ describe('task bodies rendered (TASK-05, D-49)', () => {
 
   it('loads images from the Flint folder only', () => {
     expect(bodyHtml('![shot](attachments/shot%201.png)')).toBe(
-      '<p><img src="app://media/attachments/shot%201.png" alt="shot" data-part="0"></p>\n',
+      '<p><img src="app://media/attachments/shot%201.png" alt="shot" data-part="0" data-link="attachments/shot%201.png"></p>\n',
     );
     expect(bodyHtml('![remote](https://example.com/x.png)')).toBe(
       '<p><span class="body-image-missing">remote</span></p>\n',
@@ -117,5 +117,24 @@ describe('removing a part of a body (D-80)', () => {
     expect(removeBodyPart(body, 'code', 5)).toBe(body);
     expect(removeBodyPart(body, 'image', 9)).toBe(body);
     expect(removeBodyPart('```\nonly code\n```', 'code', 0)).toBe('');
+  });
+});
+
+describe('videos and linked files in bodies (MEDIA-01, MEDIA-03, D-84)', () => {
+  it('renders a video and a linked file as media slots, and a linked file loads from app://linked', () => {
+    expect(bodyHtml('![](attachments/clip.mp4)')).toContain(
+      '<span class="fl-media-slot" data-link="attachments/clip.mp4" data-alt="" data-part="0"></span>',
+    );
+    expect(bodyHtml('![big](file:///C:/Videos/demo%20clip.mov)')).toContain(
+      'data-link="file:///C:/Videos/demo%20clip.mov"',
+    );
+    expect(mediaUrl('file:///C:/Videos/demo%20clip.mov')).toBe(
+      `app://linked/${encodeURIComponent('C:/Videos/demo clip.mov')}`,
+    );
+    // Videos aren't in the lightbox's pictures; javascript: links still aren't links.
+    expect(bodyImages('![](attachments/clip.mp4)\n![](attachments/a.png)')).toEqual([
+      'app://media/attachments/a.png',
+    ]);
+    expect(bodyHtml('[x](javascript:alert(1))')).not.toContain('href');
   });
 });

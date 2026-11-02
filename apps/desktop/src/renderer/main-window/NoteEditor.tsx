@@ -17,8 +17,10 @@ export function NoteEditor(props: {
   readonly onId: (id: string) => void;
   /** MEDIA-01: an image opens the lightbox. */
   readonly onImage: ShowImage;
+  /** NOTE-06, D-84: shown in monospace (this machine's choice). */
+  readonly mono: boolean;
 }): ReactElement {
-  const { id, text, readOnly, onId, onImage } = props;
+  const { id, text, readOnly, onId, onImage, mono } = props;
   const latest = useRef({ id, value: text, dirty: false });
   const timer = useRef<number | undefined>(undefined);
 
@@ -47,7 +49,8 @@ export function NoteEditor(props: {
   return (
     <MarkdownEditor
       text={text}
-      className="note-editor"
+      className={mono ? 'note-editor mono' : 'note-editor'}
+      monospace={{ on: mono, toggle: () => void window.flintMain.noteMono(id, !mono) }}
       ariaLabel="Note"
       readOnly={readOnly}
       {...(readOnly ? {} : { placeholder: 'Write here' })}

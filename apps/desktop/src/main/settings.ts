@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { writeFileAtomic } from './storage/atomic.js';
+import { readLinkPatterns, type LinkPattern } from '../shared/link-patterns.js';
 
 /**
  * Settings (APP-11) in app data, never in the Flint folder (D-14, docs/04 §2). Reads are tolerant:
@@ -22,6 +23,8 @@ export interface Settings {
   readonly sound: boolean;
   /** REM-10: toasts say only "Flint reminder", for screen sharing. Default off. */
   readonly hideNotificationText: boolean;
+  /** NOTE-07, TASK-10, D-84: the user's link patterns (edited in M8's Settings). */
+  readonly linkPatterns: readonly LinkPattern[];
 }
 
 /** Development builds default to their own folder, so they never write into the real one. */
@@ -34,6 +37,7 @@ export function defaultSettings(development = false): Settings {
     notifications: true,
     sound: true,
     hideNotificationText: false,
+    linkPatterns: [],
   };
 }
 
@@ -72,6 +76,7 @@ export function readSettings(stored: Stored, development = false): Settings {
       isBoolean,
       defaults.hideNotificationText,
     ),
+    linkPatterns: readLinkPatterns(stored['linkPatterns']),
   };
 }
 

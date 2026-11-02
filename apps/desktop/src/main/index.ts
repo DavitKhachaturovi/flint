@@ -1,5 +1,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { extname, join } from 'node:path';
 import {
   app,
@@ -43,9 +45,18 @@ import {
   contentType,
   MAIN_WINDOW_HOST,
   rendererPageUrl,
+  isVideoFile,
+  resolveLinkedFile,
   resolveMediaFile,
   resolveRendererFile,
 } from './renderer-url.js';
+import {
+  attachFile,
+  copyIntoFlint,
+  linkedPath,
+  openRule,
+  type AttachOutcome,
+} from './attachments.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
@@ -132,7 +143,8 @@ configureAppPaths(IDENTITY.name);
 guardNodeNetworkForTests();
 // Before the app is ready: a standard, secure origin for the renderers, inside Flint only.
 schemes.registerSchemesAsPrivileged([
-  { scheme: APP_SCHEME, privileges: { standard: true, secure: true } },
+  // D-84: `stream` lets videos seek (range requests).
+  { scheme: APP_SCHEME, privileges: { standard: true, secure: true, stream: true } },
 ]);
 
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
@@ -169,8 +181,11 @@ function serveRenderer(): void {
   schemes.handle(APP_SCHEME, async (request) => {
     const file =
       resolveRendererFile(request.url, root) ??
-      (mediaRoot ? resolveMediaFile(request.url, mediaRoot) : null);
+      (mediaRoot ? resolveMediaFile(request.url, mediaRoot) : null) ??
+      resolveLinkedFile(request.url);
     if (!file) return new Response('Not found', { status: 404 });
+    // D-84: videos (also large linked ones) are streamed, with range requests for seeking.
+    if (isVideoFile(file)) return streamFile(file, request.headers.get('range'));
     try {
       return new Response(await readFile(file), {
         headers: { 'Content-Type': contentType(file) },
@@ -370,6 +385,68 @@ async function start(): Promise<void> {
           return null;
         })
       : null,
+  );
+  // MEDIA-01, MEDIA-03, D-84: a dragged or pasted file: copied in, or linked when it's large.
+  ipcMain.handle(Channels.mainAttachFile, (event, path: unknown): Promise<AttachOutcome | null> =>
+    owns(event.sender) && typeof path === 'string'
+      ? attachFile(path, folder.folder, new Date())
+      : Promise.resolve(null),
+  );
+  ipcMain.handle(
+    Channels.mainCopyIntoFlint,
+    (event, link: unknown): Promise<AttachOutcome | null> =>
+      owns(event.sender) && typeof link === 'string'
+        ? copyIntoFlint(link, folder.folder, new Date())
+        : Promise.resolve(null),
+  );
+  ipcMain.handle(Channels.mainAttachmentExists, async (event, link: unknown) => {
+    if (!owns(event.sender) || typeof link !== 'string') return false;
+    const path = linkedPath(link, folder.folder);
+    return path
+      ? stat(path).then(
+          (info) => info.isFile(),
+          () => false,
+        )
+      : false;
+  });
+  // D-84: opens an attachment in its default app: media and documents only; programs and scripts
+  // never; anything else after asking.
+  ipcMain.handle(Channels.mainOpenAttachment, async (event, link: unknown) => {
+    if (!owns(event.sender) || typeof link !== 'string') return 'refused';
+    const path = linkedPath(link, folder.folder);
+    if (!path) return 'refused';
+    const exists = await stat(path).then(
+      (info) => info.isFile(),
+      () => false,
+    );
+    if (!exists) return 'missing';
+    const rule = openRule(path);
+    if (rule === 'never') return 'refused';
+    if (rule === 'ask') {
+      const answer = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['Open', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        title: 'Open file',
+        message: `Open “${path.split(/[\\/]/).pop() ?? path}”?`,
+        detail:
+          'Flint opens pictures, videos and documents by itself. This is another kind of file.',
+      });
+      if (answer.response !== 0) return 'cancelled';
+    }
+    const problem = await shell.openPath(path);
+    return problem === '' ? 'opened' : 'refused';
+  });
+  // NOTE-06, D-84: a note in monospace, on this machine.
+  ipcMain.handle(Channels.mainNoteMono, async (event, id: unknown, on: unknown) => {
+    if (!owns(event.sender) || typeof id !== 'string' || typeof on !== 'boolean') return;
+    await workspace.setMono(id, on);
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
+  });
+  // NOTE-07, D-84: the user's link patterns, for titles, bodies and notes.
+  ipcMain.handle(Channels.mainLinkPatterns, (event) =>
+    owns(event.sender) ? settingsFile.current.linkPatterns : [],
   );
   // NOTE-02, D-82: Insert ▸ Image: a picture from the file picker, copied into attachments/.
   ipcMain.handle(Channels.mainPickImage, async (event) => {
@@ -849,4 +926,39 @@ function setUpZoom(window: BrowserWindow): void {
       ? zoomBy(how)
       : undefined,
   );
+}
+
+/**
+ * D-84: a video, streamed: the whole file, or the range a player asks for (seeking), so even a large
+ * linked video never has to be read at once.
+ */
+async function streamFile(file: string, range: string | null): Promise<Response> {
+  let size: number;
+  try {
+    size = (await stat(file)).size;
+  } catch {
+    return new Response('Not found', { status: 404 });
+  }
+  const type = contentType(file);
+  const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+  if (!match) {
+    const body = Readable.toWeb(createReadStream(file)) as ReadableStream;
+    return new Response(body, {
+      headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes' },
+    });
+  }
+  const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2] || 0));
+  const end = match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+  if (start >= size || start > end)
+    return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  const body = Readable.toWeb(createReadStream(file, { start, end })) as ReadableStream;
+  return new Response(body, {
+    status: 206,
+    headers: {
+      'Content-Type': type,
+      'Content-Length': String(end - start + 1),
+      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Accept-Ranges': 'bytes',
+    },
+  });
 }

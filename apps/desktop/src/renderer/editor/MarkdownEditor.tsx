@@ -3,6 +3,14 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
 import { insertBlock } from './commands.js';
+import {
+  announce,
+  announceLinked,
+  isImageLink,
+  isVideoLink,
+  openAttachment,
+} from '../media/media.js';
+import { replaceLink } from './live-preview.js';
 import { editorExtensions, type PreviewHandlers } from './live-preview.js';
 
 /**
@@ -30,6 +38,8 @@ export function MarkdownEditor(props: {
   readonly onBlur?: (text: string) => void;
   /** Esc (a body's field saves and closes). */
   readonly onEscape?: (text: string) => void;
+  /** NOTE-06, D-84: a note's Monospace toggle, in its menu (and Ctrl+Shift+M). */
+  readonly monospace?: { readonly on: boolean; readonly toggle: () => void };
 }): ReactElement {
   const {
     text,
@@ -60,7 +70,11 @@ export function MarkdownEditor(props: {
             readOnly,
             ...(placeholder ? { placeholder } : {}),
             handlers: {
-              openLink: (href) => latest.current.handlers?.openLink?.(href),
+              // D-84: a link to an attachment (a document) opens in its default app, by Flint's rules.
+              openLink: (href) => {
+                if (/^(https?|mailto):/i.test(href)) latest.current.handlers?.openLink?.(href);
+                else void openAttachment(null, href);
+              },
               openImage: (images, index) => latest.current.handlers?.openImage?.(images, index),
             },
             onEscape: () => {
@@ -73,6 +87,7 @@ export function MarkdownEditor(props: {
             // NOTE-02, NOTE-03 (D-82): the formatting menus, in the main window's terms.
             commands: () => ({
               pickImage: () => window.flintMain.pickImage(),
+              monospace: latest.current.monospace,
               edit: (command) => window.flintMain.edit(command),
               pastePlain: () => {
                 plainPaste = true;
@@ -93,6 +108,18 @@ export function MarkdownEditor(props: {
               latest.current.onBlur?.(update.state.doc.toString());
           }),
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
+          // MEDIA-01, D-84: files dragged in (from Explorer) go where they are dropped.
+          EditorView.domEventHandlers({
+            drop: (event, target) => {
+              const files = [...(event.dataTransfer?.files ?? [])];
+              if (files.length === 0 || readOnly) return false;
+              event.preventDefault();
+              const at = target.posAtCoords({ x: event.clientX, y: event.clientY });
+              if (at !== null) target.dispatch({ selection: { anchor: at } });
+              void addFiles(target, files);
+              return true;
+            },
+          }),
         ],
       }),
     });
@@ -133,6 +160,13 @@ function paste(event: ClipboardEvent, view: EditorView): boolean {
   }
   const data = event.clipboardData;
   if (!data) return false;
+  // D-84: files copied in Explorer come with their paths: copied in, or linked when large.
+  const files = [...data.files].filter((file) => window.flintMain.pathFor(file) !== '');
+  if (files.length > 0) {
+    event.preventDefault();
+    void addFiles(view, files);
+    return true;
+  }
   const image = [...data.items]
     .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
     ?.getAsFile();
@@ -152,4 +186,30 @@ function paste(event: ClipboardEvent, view: EditorView): boolean {
   event.preventDefault();
   insertBlock(view, fencedBlock(blockFor(pasted).text, kind === 'json' ? 'json' : ''));
   return true;
+}
+
+/**
+ * MEDIA-01, MEDIA-03, D-84: files dragged or pasted in: each copied into attachments/ (or linked
+ * where it is when over 25 MB, with the notice), inserted at the cursor: pictures and videos as
+ * images, other files as links. Programs and scripts are refused.
+ */
+async function addFiles(view: EditorView, files: readonly File[]): Promise<void> {
+  for (const file of files) {
+    const path = window.flintMain.pathFor(file);
+    if (path === '') continue;
+    const outcome = await window.flintMain.attachFile(path);
+    if (!outcome) continue;
+    if (!outcome.ok) {
+      announce(outcome.problem);
+      continue;
+    }
+    const media = isImageLink(outcome.link) || isVideoLink(outcome.link);
+    insertBlock(view, media ? `![](${outcome.link})` : `[${outcome.name}](${outcome.link})`);
+    if (outcome.linked)
+      announceLinked({
+        name: outcome.name,
+        link: outcome.link,
+        relink: (next) => view.dom.isConnected && replaceLink(view, outcome.link, next),
+      });
+  }
 }

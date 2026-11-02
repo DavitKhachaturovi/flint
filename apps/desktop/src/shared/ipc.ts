@@ -52,6 +52,18 @@ export const Channels = {
   mainListAction: 'main:list-action',
   /** Main window → main: Insert ▸ Image (NOTE-02, D-82): pick a picture, copy it into attachments/. */
   mainPickImage: 'main:pick-image',
+  /** Main window → main: a dragged or pasted file (MEDIA-01, MEDIA-03, D-84). */
+  mainAttachFile: 'main:attach-file',
+  /** Main window → main: a linked large file copied into attachments/ (MEDIA-03, D-84). */
+  mainCopyIntoFlint: 'main:copy-into-flint',
+  /** Main window → main: whether an attachment's file is there (D-84). */
+  mainAttachmentExists: 'main:attachment-exists',
+  /** Main window → main: an attachment in its default app, by the rules of D-84. */
+  mainOpenAttachment: 'main:open-attachment',
+  /** Main window → main: a note in monospace or not (NOTE-06, D-84). */
+  mainNoteMono: 'main:note-mono',
+  /** Main window → main: the user's link patterns (NOTE-07, D-84). */
+  mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
   mainZoomed: 'main:zoomed',
   /** Main window → main: zoom in, out or back to 100 % (keys the main process didn't see first). */
@@ -198,6 +210,8 @@ export interface ListView {
   readonly readOnly: string | null;
   /** A note's text (LIST-01), shown read-only until the note editor (M5). */
   readonly noteText: string | null;
+  /** NOTE-06, D-84: a note shown in monospace (this machine's choice). */
+  readonly mono?: boolean;
 }
 
 /**
@@ -328,3 +342,19 @@ export type SidebarOutcome =
 export type ListActionOutcome =
   | { readonly ok: true; readonly listId: string; readonly label: string }
   | { readonly ok: false; readonly problem: string };
+
+/** MEDIA-01, MEDIA-03, D-84: a file added to a note or a body. */
+export type AttachFileOutcome =
+  | {
+      readonly ok: true;
+      /** `attachments/…`, or `file:///…` when the file is large and linked where it is. */
+      readonly link: string;
+      readonly linked: boolean;
+      readonly kind: 'image' | 'video' | 'document' | 'blocked' | 'other';
+      readonly name: string;
+      readonly bytes: number;
+    }
+  | { readonly ok: false; readonly problem: string };
+
+/** What opening an attachment did (D-84). */
+export type OpenAttachmentOutcome = 'opened' | 'missing' | 'refused' | 'cancelled';

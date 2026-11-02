@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   contentType,
   rendererPageUrl,
+  resolveLinkedFile,
   resolveMediaFile,
   resolveRendererFile,
 } from './renderer-url.js';
@@ -29,6 +30,17 @@ describe('app://flint renderer files (D-34)', () => {
       join(root, 'assets', 'main-1.js'),
     );
     expect(resolveRendererFile('app://other/assets/main-1.js', root)).toBeNull();
+  });
+
+  it('serves videos, and large files linked where they are, by media type only (D-84)', () => {
+    expect(resolveMediaFile('app://media/attachments/clip.mp4', root)).toBe(
+      join(root, 'attachments', 'clip.mp4'),
+    );
+    const linked = `app://linked/${encodeURIComponent('C:\\Videos\\demo clip.mov')}`;
+    expect(resolveLinkedFile(linked)).toBe('C:\\Videos\\demo clip.mov');
+    expect(resolveLinkedFile(`app://linked/${encodeURIComponent('C:\\secret.txt')}`)).toBeNull();
+    expect(resolveLinkedFile(`app://linked/${encodeURIComponent('relative.mp4')}`)).toBeNull();
+    expect(contentType('clip.mov')).toBe('video/quicktime');
   });
 
   it('gives module scripts a JavaScript content type', () => {

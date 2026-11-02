@@ -41,3 +41,29 @@
   text-decoration-color: var(--fl-code-underline);
   text-underline-offset: 3px;
 }
+
+/* An empty line keeps its height. */
+.code-line:empty::after {
+  content: ' ';
+}
+
+/* D-84: the tokens of other languages (languages.ts), in the same grayscale scheme. */
+.tok-keyword {
+  color: var(--fl-code-keyword);
+  font-weight: 600;
+}
+
+.tok-function {
+  color: var(--fl-code-function);
+  font-weight: 500;
+}
+
+.tok-type {
+  color: var(--fl-code-type);
+  font-style: italic;
+}
+
+.tok-comment {
+  color: var(--fl-code-comment);
+  font-style: italic;
+}

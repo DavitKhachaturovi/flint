@@ -322,3 +322,107 @@
   font-style: normal;
   color: var(--fl-text-faint);
 }
+
+/* D-84 (NOTE-07): link-pattern links, as small chips (as in titles and bodies). */
+.cm-fl-auto-link {
+  padding: 0 4px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 0.86em;
+  text-decoration: none;
+}
+
+/* NAV-06, D-72, D-84: the find bar, in Flint's style, at the top of the note (it stays in view). */
+.md-editor .cm-panels {
+  background: transparent;
+  border: 0;
+  z-index: 20;
+}
+
+.md-editor .cm-panels-top {
+  top: 8px;
+  border: 0;
+}
+
+.fl-find {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(420px, 100%);
+  margin: 0 0 10px auto;
+  padding: 5px 6px 5px 12px;
+  border-radius: 14px;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  animation: find-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+@keyframes find-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.fl-find-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fl-text-primary);
+  font: inherit;
+  font-family: var(--fl-font-ui);
+  font-size: 13.5px;
+  caret-color: var(--fl-accent);
+}
+
+.fl-find-input::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.fl-find-count {
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+  white-space: nowrap;
+}
+
+.fl-find-button {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.fl-find-button:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.md-editor .cm-searchMatch {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fl-accent) 22%, transparent);
+  outline: 0;
+}
+
+.md-editor .cm-searchMatch.cm-searchMatch-selected {
+  background: color-mix(in srgb, var(--fl-text-primary) 38%, transparent);
+}
+
+/* NOTE-06, D-84: a note in monospace (its headings keep their sizes). */
+.md-editor.mono .cm-content {
+  font-family: var(--fl-font-mono);
+  font-size: 13.5px;
+}

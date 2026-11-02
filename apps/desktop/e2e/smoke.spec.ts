@@ -5,6 +5,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   _electron as electron,
   expect,
@@ -734,9 +735,22 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Paste',
     'Paste as plain text',
     'Select all',
+    'Monospace',
   ]);
+  // NOTE-06, D-84: Monospace for this note (this machine), and back with Ctrl+Shift+M.
+  await menu.getByText('Monospace', { exact: true }).click();
+  await expect(main.locator('.note-editor.mono')).toHaveCount(1);
+  await main.locator('.note-editor .cm-fl-strong').click();
+  await main.keyboard.press('Control+Shift+M');
+  await expect(main.locator('.note-editor.mono')).toHaveCount(0);
+  // NAV-06, D-84: Ctrl+F finds in the note; Esc closes the bar.
+  await main.keyboard.press('Control+f');
+  const find = main.locator('.fl-find');
+  await expect(find.locator('.fl-find-input')).toBeFocused();
+  await main.keyboard.type('Standup');
+  await expect(find.locator('.fl-find-count')).toHaveText('1 of 1');
   await main.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
+  await expect(find).toHaveCount(0);
   // Insert ▸ Code block: a code card with its copy button (NOTE-05).
   await main.locator('.note-editor .cm-fl-strong').click({ button: 'right' });
   await menu.getByText('Insert', { exact: true }).hover();
@@ -1488,6 +1502,46 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   await drag(head, groupBox.y + groupBox.height / 2 + nextBox.height + 2);
   await expect.poll(order).not.toEqual(before);
   expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') + 1);
+});
+
+test('large files linked where they are: badge, loading, File not found (MEDIA-03, D-84)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const outside = join(dataDirectory, 'Elsewhere');
+  await mkdir(outside, { recursive: true });
+  await writeFile(
+    join(outside, 'big shot.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
+  const shot = pathToFileURL(join(outside, 'big shot.png')).href;
+  const gone = pathToFileURL(join(outside, 'gone.mp4')).href;
+  await writeFile(
+    join(flint, 'Linked.md'),
+    `---\nflint: 1\nid: lnk1\nmode: tasks\n---\n- [ ] With linked files [id:: l1]\n    ![](${shot})\n\n    ![](${gone})\n`,
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.nav', { hasText: 'Linked' }).click();
+  await main
+    .locator('.row', { hasText: 'With linked files' })
+    .click({ position: { x: 600, y: 10 } });
+  await main.keyboard.press('Shift+Enter');
+  const media = main.locator('.body-view .fl-media');
+  await expect(media).toHaveCount(2);
+  await expect(media.first().locator('.fl-media-badge')).toHaveText('Linked');
+  await expect
+    .poll(() =>
+      media
+        .first()
+        .locator('img')
+        .evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBe(1);
+  await expect(media.last().locator('.fl-media-missing-title')).toHaveText('File not found');
+  await expect(media.last().locator('.fl-media-missing-path')).toContainText('gone.mp4');
+  await main.keyboard.press('Escape');
 });
 
 test('wide windows and the interface size (UI-12, D-81, D-82)', async () => {

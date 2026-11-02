@@ -2290,3 +2290,248 @@ textarea:not([readonly], [disabled]) {
     opacity: 0;
   }
 }
+
+/* D-84: `==highlight==` in titles and bodies (as in the editor), and link-pattern links
+   (NOTE-07): a typed short form reads as a small link chip. */
+mark {
+  border-radius: 3px;
+  padding: 0 1px;
+  background: color-mix(in srgb, var(--fl-text-primary) 12%, transparent);
+  color: inherit;
+}
+
+a.auto-link {
+  padding: 0 4px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 0.86em;
+  text-decoration: none;
+}
+
+/* MEDIA-03, D-84: the notice for a large file linked where it is: in a corner, kept until acted on
+   or dismissed; never takes focus. Hovering the button or the info mark explains why. */
+.linked-notices {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(440px, calc(100vw - 48px));
+}
+
+.linked-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 10px 14px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  animation: notice-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.linked-notice-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.linked-notice-title {
+  font-size: 13px;
+  color: var(--fl-text-primary);
+}
+
+.linked-notice-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.linked-notice-why-holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.linked-notice-copy {
+  padding: 5px 10px;
+  border-radius: 9px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-size: 12.5px;
+  color: var(--fl-text-primary);
+  white-space: nowrap;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.linked-notice-copy:hover {
+  background: var(--fl-ground-hover);
+}
+
+.linked-notice-info {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 10px;
+  color: var(--fl-text-muted);
+}
+
+.linked-notice-why {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 300px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fl-text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity var(--fl-dur-fast),
+    transform var(--fl-dur-fast);
+}
+
+.linked-notice-copy:hover ~ .linked-notice-why,
+.linked-notice-info:hover ~ .linked-notice-why {
+  opacity: 1;
+  transform: none;
+}
+
+.linked-notice-close {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--fl-text-muted);
+}
+
+.linked-notice-close:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+/* MEDIA-01, MEDIA-03, D-84: pictures, videos and files in notes and bodies (media.ts). */
+.fl-media {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.fl-media video {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 4px 0 10px;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-ground-well);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
+}
+
+.body-block.inline .fl-media video {
+  max-width: 320px;
+  max-height: 180px;
+}
+
+.fl-media-badge {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  color: var(--fl-text-secondary);
+}
+
+.fl-media-missing,
+.fl-media-unplayable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  margin: 4px 0 10px;
+  padding: 12px 14px;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.fl-media.linked .fl-media-missing,
+.fl-media.linked .fl-media-unplayable {
+  padding-top: 32px;
+}
+
+.fl-media-missing-title {
+  font-size: 13px;
+  color: var(--fl-text-primary);
+}
+
+.fl-media-missing-path,
+.fl-media-name {
+  overflow-wrap: anywhere;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.fl-media-open,
+.fl-media-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 9px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-size: 12.5px;
+  color: var(--fl-text-primary);
+  cursor: pointer;
+}
+
+.fl-media.file .fl-media-file {
+  margin: 2px 0;
+}
+
+.fl-media.linked.file .fl-media-badge {
+  position: static;
+  margin-left: 6px;
+  vertical-align: middle;
+}

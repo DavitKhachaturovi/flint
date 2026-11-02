@@ -226,6 +226,18 @@ export class Workspace {
     return sort === 'edited' || sort === 'created' ? sort : 'manual';
   }
 
+  /** NOTE-06, D-84: the notes shown in monospace on this machine (ui-state.json). */
+  private get monoNotes(): string[] {
+    const value = this.uiState.monoNotes;
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  }
+
+  /** NOTE-06, D-84: a note in monospace or not; this machine only, the file unchanged. */
+  async setMono(id: string, on: boolean): Promise<void> {
+    const others = this.monoNotes.filter((other) => other !== id);
+    await this.saveUiState({ monoNotes: on ? [...others, id] : others });
+  }
+
   private get collapsedGroups(): string[] {
     const value = this.uiState.collapsedGroups;
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
@@ -427,7 +439,7 @@ export class Workspace {
     const loaded = this.find(id);
     if (!loaded) return null;
     const info = this.listInfos().find((list) => list.id === id);
-    return listView(
+    const view = listView(
       loaded.file.document,
       {
         id,
@@ -437,6 +449,7 @@ export class Workspace {
       },
       now,
     );
+    return this.monoNotes.includes(id) ? { ...view, mono: true } : view;
   }
 
   /**

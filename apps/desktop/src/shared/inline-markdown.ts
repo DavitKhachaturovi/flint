@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { flintMarkdown } from './markdown-extras.js';
 
 /**
  * Inline markdown in task titles (LIST-02, D-52): bold, italic, strikethrough, inline code, links
@@ -8,7 +9,8 @@ import MarkdownIt from 'markdown-it';
  */
 const md = new MarkdownIt('zero', { html: false, linkify: true })
   .enable(['text', 'escape', 'backticks', 'emphasis', 'strikethrough', 'link', 'autolink'])
-  .enable(['entity', 'linkify', 'text_join']);
+  .enable(['entity', 'linkify', 'text_join'])
+  .use(flintMarkdown);
 
 /** The title as HTML for a row (safe to set as innerHTML: markdown-it escapes everything else). */
 export function titleHtml(title: string): string {

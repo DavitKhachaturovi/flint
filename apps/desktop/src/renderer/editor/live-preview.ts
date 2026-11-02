@@ -6,19 +6,9 @@ import {
   indentLess,
   indentMore,
 } from '@codemirror/commands';
-import { css } from '@codemirror/lang-css';
-import { javascript } from '@codemirror/lang-javascript';
-import { json } from '@codemirror/lang-json';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { python } from '@codemirror/lang-python';
-import { sql } from '@codemirror/lang-sql';
-import { yaml } from '@codemirror/lang-yaml';
-import {
-  HighlightStyle,
-  LanguageDescription,
-  syntaxHighlighting,
-  syntaxTree,
-} from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { languages } from '@codemirror/language-data';
 import { EditorState, Facet, type Extension, type Range } from '@codemirror/state';
 import {
   Decoration,
@@ -32,8 +22,10 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import type { SyntaxNode } from '@lezer/common';
 import type { MarkdownConfig } from '@lezer/markdown';
-import { mediaUrl } from '../../shared/body-markdown.js';
+import { announce, isLinkedFile, mediaElement, openAttachment } from '../media/media.js';
+import { activeLinkPatterns, findShortForms, shortFormOf } from '../../shared/link-patterns.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
   EDITOR_COMMANDS,
@@ -42,6 +34,7 @@ import {
   type CommandSection,
 } from './commands.js';
 import { slashCommands } from './slash.js';
+import { findInNote } from './find.js';
 
 /**
  * The note editor (M5, NOTE-01, D-49, D-79): CodeMirror with an Obsidian-style live preview. The
@@ -97,25 +90,6 @@ const Highlight: MarkdownConfig = {
   ],
 };
 
-/** Languages for fenced code (UI-06): highlighted in the grayscale scheme of docs/09 §11. */
-const codeLanguages = [
-  LanguageDescription.of({
-    name: 'javascript',
-    alias: ['js', 'jsx', 'node'],
-    support: javascript({ jsx: true }),
-  }),
-  LanguageDescription.of({
-    name: 'typescript',
-    alias: ['ts', 'tsx'],
-    support: javascript({ typescript: true, jsx: true }),
-  }),
-  LanguageDescription.of({ name: 'json', alias: ['jsonc'], support: json() }),
-  LanguageDescription.of({ name: 'css', support: css() }),
-  LanguageDescription.of({ name: 'python', alias: ['py'], support: python() }),
-  LanguageDescription.of({ name: 'sql', support: sql() }),
-  LanguageDescription.of({ name: 'yaml', alias: ['yml'], support: yaml() }),
-];
-
 /** The grayscale code tokens (UI-06, D-63, docs/09 §11) and the inline markdown styles. */
 const flintHighlight = HighlightStyle.define([
   { tag: tags.keyword, color: 'var(--fl-code-keyword)', fontWeight: '600' },
@@ -152,20 +126,10 @@ class ImageWidget extends WidgetType {
     return other.src === this.src && other.alt === this.alt;
   }
   toDOM(): HTMLElement {
+    // D-84: pictures, videos and other attachments, with the Linked badge and File not found.
     const holder = document.createElement('span');
     holder.className = 'cm-fl-image';
-    const url = mediaUrl(this.src);
-    if (url) {
-      const image = document.createElement('img');
-      image.src = url;
-      image.alt = this.alt;
-      image.dataset['src'] = url;
-      holder.append(image);
-    } else {
-      // Flint makes no network requests (APP-09): another image shows as its text.
-      holder.classList.add('missing');
-      holder.textContent = this.alt || this.src;
-    }
+    holder.append(mediaElement(this.src, this.alt));
     return holder;
   }
   override ignoreEvent(): boolean {
@@ -285,6 +249,31 @@ class CopyWidget extends WidgetType {
   }
   override ignoreEvent(): boolean {
     return true;
+  }
+}
+
+/** D-84 (TASK-10): a URL shown as its link pattern's short form; a click opens it. */
+class ShortLinkWidget extends WidgetType {
+  readonly text: string;
+  readonly href: string;
+  constructor(text: string, href: string) {
+    super();
+    this.text = text;
+    this.href = href;
+  }
+  override eq(other: ShortLinkWidget): boolean {
+    return other.text === this.text && other.href === this.href;
+  }
+  toDOM(): HTMLElement {
+    const chip = document.createElement('span');
+    chip.className = 'cm-fl-link cm-fl-auto-link';
+    chip.dataset['href'] = this.href;
+    chip.title = this.href;
+    chip.textContent = this.text;
+    return chip;
+  }
+  override ignoreEvent(): boolean {
+    return false;
   }
 }
 
@@ -494,11 +483,16 @@ function decorate(view: EditorView): DecorationSet {
             // A bare URL or an autolink (`<https://…>`), outside a link or an image.
             const parent = node.node.parent?.name;
             if (parent === 'Link' || parent === 'Image') return;
+            const href = doc.sliceString(node.from, node.to);
+            // D-84 (TASK-10): a URL one of the link patterns knows shows as its short form.
+            const short = isActive(node.from) ? null : shortFormOf(href, activeLinkPatterns());
             ranges.push(
-              mark('cm-fl-link', { 'data-href': doc.sliceString(node.from, node.to) }).range(
-                node.from,
-                node.to,
-              ),
+              short
+                ? Decoration.replace({ widget: new ShortLinkWidget(short, href) }).range(
+                    node.from,
+                    node.to,
+                  )
+                : mark('cm-fl-link', { 'data-href': href }).range(node.from, node.to),
             );
             return;
           }
@@ -519,6 +513,31 @@ function decorate(view: EditorView): DecorationSet {
         );
       },
     });
+    // D-84 (NOTE-07): typed short forms (`AB#1234`) are links, outside code and links.
+    const patterns = activeLinkPatterns();
+    if (patterns.length > 0)
+      for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
+        if (codeLines.has(at)) continue;
+        const text = doc.line(at);
+        for (const link of findShortForms(text.text, patterns)) {
+          const start = text.from + link.from;
+          let inside = false;
+          for (
+            let node: SyntaxNode | null = syntaxTree(state).resolveInner(start, 1);
+            node;
+            node = node.parent
+          )
+            if (['InlineCode', 'Link', 'URL', 'Image', 'CodeText'].includes(node.name))
+              inside = true;
+          if (!inside)
+            ranges.push(
+              mark('cm-fl-link cm-fl-auto-link', { 'data-href': link.href }).range(
+                start,
+                text.from + link.to,
+              ),
+            );
+        }
+      }
     // Flint's task fields (LIST-04, D-77), outside code and away from the cursor.
     for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
       if (codeLines.has(at) || active.has(at)) continue;
@@ -634,7 +653,8 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     drawSelection(),
     EditorView.lineWrapping,
     closeBrackets(),
-    markdown({ base: markdownLanguage, codeLanguages, extensions: [Highlight] }),
+    // D-84: every language CodeMirror's language data knows, each loaded when a block uses it.
+    markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [Highlight] }),
     syntaxHighlighting(flintHighlight),
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
@@ -646,6 +666,7 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     ]),
     livePreview,
     previewClicks,
+    findInNote(),
     ...(options.commands && !options.readOnly
       ? [slashCommands(options.commands), formatMenu(options.commands)]
       : []),
@@ -669,6 +690,8 @@ export interface MenuHost {
   readonly edit: (command: 'cut' | 'copy' | 'paste' | 'selectAll') => void;
   /** Paste as plain text: without CAP-06's fencing. */
   readonly pastePlain: () => void;
+  /** NOTE-06, D-84: a note's Monospace toggle (notes only). */
+  readonly monospace?: { readonly on: boolean; readonly toggle: () => void } | undefined;
 }
 
 /** Ctrl+B and Ctrl+I (Proposed, D-82): bold and italic, as the menu's hints say. */
@@ -693,6 +716,15 @@ function formatKeys(
         return true;
       },
     },
+    {
+      key: 'Mod-Shift-m',
+      run: () => {
+        const monospace = host().monospace;
+        if (!monospace) return false;
+        monospace.toggle();
+        return true;
+      },
+    },
   ];
 }
 
@@ -707,6 +739,28 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       // Not also the window's text-field menu.
       event.stopPropagation();
       const commands = host();
+      // D-84: on an attachment, its own items first: open it, copy a linked one in.
+      const media = (event.target as HTMLElement).closest<HTMLElement>('.fl-media[data-link]');
+      const link = media?.dataset['link'] ?? '';
+      const attachment: MenuEntry[] =
+        media && link !== ''
+          ? [
+              { label: 'Open in default app', action: () => void openAttachment(media, link) },
+              ...(isLinkedFile(link)
+                ? [
+                    {
+                      label: 'Copy into Flint',
+                      action: () =>
+                        void window.flintMain.copyIntoFlint(link).then((outcome) => {
+                          if (outcome?.ok) replaceLink(view, link, outcome.link);
+                          else if (outcome) announce(outcome.problem);
+                        }),
+                    },
+                  ]
+                : []),
+              'divider',
+            ]
+          : [];
       const section = (name: CommandSection): MenuEntry => ({
         label: SECTION_LABELS[name],
         submenu: EDITOR_COMMANDS.filter((command) => command.section === name).map((command) => ({
@@ -718,6 +772,7 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       const selected = !view.state.selection.main.empty;
       openMenu(
         [
+          ...attachment,
           section('format'),
           section('paragraph'),
           section('insert'),
@@ -737,10 +792,37 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
           },
           'divider',
           { label: 'Select all', hint: 'Ctrl+A', action: () => commands.edit('selectAll') },
+          ...(commands.monospace
+            ? [
+                'divider' as const,
+                {
+                  label: 'Monospace',
+                  hint: 'Ctrl+Shift+M',
+                  checked: commands.monospace.on,
+                  action: () => commands.monospace?.toggle(),
+                },
+              ]
+            : []),
         ],
         { x: event.clientX, y: event.clientY },
       );
       return true;
     },
   });
+}
+
+/** D-84: every `](old)` in the editor's text becomes `](next)` (Copy into Flint); false if none. */
+export function replaceLink(view: EditorView, old: string, next: string): boolean {
+  const text = view.state.doc.toString();
+  const changes: { from: number; to: number; insert: string }[] = [];
+  for (const target of [`](${old})`, `](<${old}>)`]) {
+    let at = text.indexOf(target);
+    while (at >= 0) {
+      changes.push({ from: at, to: at + target.length, insert: `](${next})` });
+      at = text.indexOf(target, at + target.length);
+    }
+  }
+  if (changes.length === 0) return false;
+  view.dispatch({ changes, userEvent: 'input.relink' });
+  return true;
 }

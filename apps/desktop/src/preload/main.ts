@@ -1,6 +1,9 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import type { LinkPattern } from '../shared/link-patterns.js';
 import {
   Channels,
+  type AttachFileOutcome,
+  type OpenAttachmentOutcome,
   type ChangeOutcome,
   type EditCommand,
   type ListAction,
@@ -47,6 +50,36 @@ const main = {
   /** NOTE-02, D-82: Insert ▸ Image: the file picker; the picture's relative link, or null. */
   pickImage(): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainPickImage) as Promise<string | null>;
+  },
+  /** D-84: where a dragged or pasted file is on disk (empty for a picture from the clipboard). */
+  pathFor(file: File): string {
+    return webUtils.getPathForFile(file);
+  },
+  /** MEDIA-01, MEDIA-03, D-84: a file added: copied into attachments/, or linked when large. */
+  attachFile(path: string): Promise<AttachFileOutcome | null> {
+    return ipcRenderer.invoke(Channels.mainAttachFile, path) as Promise<AttachFileOutcome | null>;
+  },
+  /** MEDIA-03, D-84: Copy into Flint: the linked file copied into attachments/. */
+  copyIntoFlint(link: string): Promise<AttachFileOutcome | null> {
+    return ipcRenderer.invoke(
+      Channels.mainCopyIntoFlint,
+      link,
+    ) as Promise<AttachFileOutcome | null>;
+  },
+  attachmentExists(link: string): Promise<boolean> {
+    return ipcRenderer.invoke(Channels.mainAttachmentExists, link) as Promise<boolean>;
+  },
+  /** D-84: in its default app; never a program or script. */
+  openAttachment(link: string): Promise<OpenAttachmentOutcome> {
+    return ipcRenderer.invoke(Channels.mainOpenAttachment, link) as Promise<OpenAttachmentOutcome>;
+  },
+  /** NOTE-06, D-84: a note in monospace or not (this machine). */
+  noteMono(id: string, on: boolean): Promise<void> {
+    return ipcRenderer.invoke(Channels.mainNoteMono, id, on) as Promise<void>;
+  },
+  /** NOTE-07, D-84: the user's link patterns, from the settings. */
+  linkPatterns(): Promise<readonly LinkPattern[]> {
+    return ipcRenderer.invoke(Channels.mainLinkPatterns) as Promise<readonly LinkPattern[]>;
   },
   /** LIST-05, LIST-06: the sidebar's groups and order. */
   sidebar(): Promise<SidebarView | null> {

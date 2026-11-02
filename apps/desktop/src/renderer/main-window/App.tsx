@@ -60,11 +60,14 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
+import { openFindIn } from '../editor/find.js';
 import { BodyBlock, type ShowImage } from './Body.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
 import { codeLanguage } from '../../shared/code-language.js';
+import { setLinkPatterns } from '../../shared/link-patterns.js';
+import { relink, type LinkedNotice } from '../media/media.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
@@ -316,6 +319,29 @@ export function App(): ReactElement {
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
+  /**
+   * MEDIA-03, D-84: large files linked where they are: one notice each, kept until acted on or
+   * dismissed (it never fades and never takes focus).
+   */
+  const [linkedNotices, setLinkedNotices] = useState<readonly (LinkedNotice & { id: number })[]>(
+    [],
+  );
+  useEffect(() => {
+    const onLinked = (event: Event): void => {
+      const notice = (event as CustomEvent<LinkedNotice>).detail;
+      setLinkedNotices((current) => [...current, { ...notice, id: ++seq }]);
+    };
+    window.addEventListener('flint:linked', onLinked);
+    return () => window.removeEventListener('flint:linked', onLinked);
+  }, []);
+  /** NOTE-07, D-84: the user's link patterns, for titles, bodies and notes. */
+  const [, setPatternsLoaded] = useState(0);
+  useEffect(() => {
+    void window.flintMain.linkPatterns().then((patterns) => {
+      setLinkPatterns(patterns);
+      setPatternsLoaded((count) => count + 1);
+    });
+  }, []);
   /** UI-12, D-81: the interface size, shown a moment when it changes. */
   const [zoomShown, setZoomShown] = useState<{ readonly text: string; readonly id: number } | null>(
     null,
@@ -543,6 +569,14 @@ export function App(): ReactElement {
     [hideToast],
   );
 
+  // D-84: short messages from the editor and the media code (a refused program, a failed copy).
+  useEffect(() => {
+    const onNotice = (event: Event): void =>
+      showToast((event as CustomEvent<string>).detail, false);
+    window.addEventListener('flint:notice', onNotice);
+    return () => window.removeEventListener('flint:notice', onNotice);
+  }, [showToast]);
+
   const change = useCallback(
     (next: ListChange): Promise<ChangeOutcome | null> => window.flintMain.change(listId, next),
     [listId],
@@ -724,6 +758,42 @@ export function App(): ReactElement {
       else setSelected(outcome.key);
     },
     [change, listId, showToast],
+  );
+
+  /**
+   * MEDIA-03, D-84: Copy into Flint from a notice: the file copied into attachments/, then the
+   * link swapped in the editor that added it, or else in the open note or the task that has it.
+   */
+  const copyLinkedIn = useCallback(
+    async (notice: LinkedNotice & { id: number }): Promise<void> => {
+      const outcome = await window.flintMain.copyIntoFlint(notice.link);
+      if (!outcome?.ok) {
+        if (outcome) showToast(outcome.problem, false);
+        return;
+      }
+      setLinkedNotices((current) => current.filter((other) => other.id !== notice.id));
+      let done = notice.relink(outcome.link);
+      if (!done && view?.mode === 'note' && view.noteText?.includes(notice.link)) {
+        await window.flintMain.saveNote(view.id, relink(view.noteText, notice.link, outcome.link));
+        done = true;
+      }
+      if (!done && view) {
+        const row = visibleRows(view, true).find((task) => task.body.includes(notice.link));
+        if (row) {
+          await change({
+            kind: 'body',
+            key: row.key,
+            body: relink(row.body, notice.link, outcome.link),
+          });
+          done = true;
+        }
+      }
+      showToast(
+        done ? `Copied ${notice.name} into Flint` : 'Copied; the link to update wasn’t found',
+        false,
+      );
+    },
+    [view, change, showToast],
   );
 
   /** TASK-12, D-50: to Trash storage, with Undo. */
@@ -1373,6 +1443,18 @@ export function App(): ReactElement {
       }
       // Typing in a text field or the note editor (contenteditable) is never a command.
       if (isTextField(event.target)) return;
+      // NAV-06, D-84: Ctrl+F on a note's page finds in the note (the editor has it when focused).
+      if (
+        key === 'f' &&
+        event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        view?.mode === 'note'
+      ) {
+        event.preventDefault();
+        openFindIn(document);
+        return;
+      }
       // NAV-04: back and forward, anywhere in the window.
       if (event.altKey && !event.ctrlKey && (key === 'arrowleft' || key === 'arrowright')) {
         event.preventDefault();
@@ -1921,6 +2003,7 @@ export function App(): ReactElement {
           onOpenPage={() => openPage(task.key)}
           onImage={showImage}
           onRemovePart={(body, kind) => removePart(task.key, body, kind)}
+          onRelink={(body) => void change({ kind: 'body', key: task.key, body })}
         />
       </div>,
     ];
@@ -2211,6 +2294,7 @@ export function App(): ReactElement {
                 readOnly={view.readOnly !== null}
                 onId={setListId}
                 onImage={showImage}
+                mono={view.mono === true}
               />
             )}
 
@@ -2340,6 +2424,48 @@ export function App(): ReactElement {
           >
             <CloseIcon />
           </button>
+        </div>
+      )}
+
+      {linkedNotices.length > 0 && (
+        <div className="linked-notices" role="status">
+          {linkedNotices.map((notice) => (
+            <div key={notice.id} className="linked-notice">
+              <div className="linked-notice-text">
+                <span className="linked-notice-title">
+                  Large file, linked to its original location
+                </span>
+                <span className="linked-notice-name">{notice.name}</span>
+              </div>
+              <span className="linked-notice-why-holder">
+                <button
+                  type="button"
+                  className="linked-notice-copy"
+                  onClick={() => void copyLinkedIn(notice)}
+                >
+                  Copy into Flint instead
+                </button>
+                <span className="linked-notice-info" aria-hidden="true">
+                  i
+                </span>
+                <span className="linked-notice-why" role="tooltip">
+                  Large files are linked by default: copying them makes the Flint folder, snapshots,
+                  exports and future sync slow and big. Copying keeps the file safe if the original
+                  is moved or deleted.
+                </span>
+              </span>
+              <button
+                type="button"
+                className="linked-notice-close"
+                aria-label="Dismiss"
+                onClick={() =>
+                  setLinkedNotices((current) => current.filter((other) => other.id !== notice.id))
+                }
+              >
+                <CloseIcon size={12} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

@@ -24,6 +24,10 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
   '.ttf': 'font/ttf',
@@ -62,14 +66,42 @@ export function resolveRendererFile(url: string, root: string): string | null {
 
 /** Images task bodies may show (TASK-05, MEDIA-01). SVG stays out: an image, but also a document. */
 const MEDIA_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']);
+/** D-84 (MEDIA-01): videos play from the same places, streamed. */
+const VIDEO_TYPES = new Set(['.mp4', '.m4v', '.webm', '.mov']);
+const isMedia = (file: string): boolean => {
+  const extension = extname(file).toLowerCase();
+  return MEDIA_TYPES.has(extension) || VIDEO_TYPES.has(extension);
+};
+export const isVideoFile = (file: string): boolean => VIDEO_TYPES.has(extname(file).toLowerCase());
 
 /**
- * The image an `app://media/…` request maps to (task bodies, D-49): a file inside the Flint folder
- * `root` with an image type, or null for anything else.
+ * The image or video an `app://media/…` request maps to (task bodies, D-49, D-84): a file inside
+ * the Flint folder `root` with a media type, or null for anything else.
  */
 export function resolveMediaFile(url: string, root: string): string | null {
   const file = resolveIn(url, 'media', root);
-  return file && MEDIA_TYPES.has(extname(file).toLowerCase()) ? file : null;
+  return file && isMedia(file) ? file : null;
+}
+
+/**
+ * MEDIA-03, D-84: a large file linked where it is, `app://linked/<the absolute path, encoded>`:
+ * only image and video types, nothing else on the disk.
+ */
+export function resolveLinkedFile(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== `${APP_SCHEME}:` || parsed.host !== 'linked') return null;
+  let path: string;
+  try {
+    path = decodeURIComponent(parsed.pathname.slice(1));
+  } catch {
+    return null;
+  }
+  return isAbsolute(path) && isMedia(path) ? path : null;
 }
 
 function resolveIn(url: string, host: string, root: string): string | null {

@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { flintMarkdown } from './markdown-extras.js';
 
 /**
  * A task's body, rendered (TASK-05, D-49): markdown with headings, lists, quotes, tables, code
@@ -10,19 +11,32 @@ import MarkdownIt from 'markdown-it';
 export const MEDIA_ORIGIN = 'app://media';
 
 // D-76: a single line break stays a line break, as in Obsidian.
-const md = new MarkdownIt('commonmark', { html: false, linkify: true, breaks: true }).enable([
-  'linkify',
-  'strikethrough',
-  'table',
-]);
+const md = new MarkdownIt('commonmark', { html: false, linkify: true, breaks: true })
+  .enable(['linkify', 'strikethrough', 'table'])
+  // D-84: `==highlight==` and the user's link patterns, as in the note editor.
+  .use(flintMarkdown);
+// D-84: `file:///` links are allowed (large files linked where they are, MEDIA-03); Flint decides
+// what may load or open. `javascript:`, `vbscript:` and `data:` stay refused.
+md.validateLink = (url) => !/^\s*(javascript|vbscript|data):/i.test(url);
 
 const escape = (text: string): string => md.utils.escapeHtml(text);
 
 /** The `app://media/…` address of a relative image path, or null for anything else. */
 export function mediaUrl(src: string): string | null {
+  // MEDIA-03, D-84: a large file linked where it is (`file:///C:/…`) loads from `app://linked/…`.
+  if (/^file:\/\//i.test(src)) {
+    try {
+      const path = decodeURIComponent(new URL(src).pathname).replace(/^\/([A-Za-z]:)/, '$1');
+      return `app://linked/${encodeURIComponent(path)}`;
+    } catch {
+      return null;
+    }
+  }
   if (src === '' || /^[a-z][a-z0-9+.-]*:/i.test(src) || /^[\\/]/.test(src)) return null;
   return `${MEDIA_ORIGIN}/${src}`;
 }
+
+const VIDEO = /\.(mp4|m4v|webm|mov)$/i;
 
 /** D-80: code blocks and images are numbered in order (`data-part`), so one can be removed. */
 interface Parts {
@@ -53,9 +67,11 @@ md.renderer.rules.image = (tokens, index, options, env, self) => {
   const alt = self.renderInlineAsText(token.children ?? [], options, env);
   const raw = String(token.attrGet('src') ?? '');
   const src = mediaUrl(raw);
-  return src
-    ? `<img src="${escape(src)}" alt="${escape(alt)}" data-part="${part}">`
-    : `<span class="body-image-missing">${escape(alt || raw)}</span>`;
+  if (!src) return `<span class="body-image-missing">${escape(alt || raw)}</span>`;
+  // D-84: a video, or a file linked where it is, becomes Flint's media element in the page.
+  if (VIDEO.test(raw) || /^file:/i.test(raw))
+    return `<span class="fl-media-slot" data-link="${escape(raw)}" data-alt="${escape(alt)}" data-part="${part}"></span>`;
+  return `<img src="${escape(src)}" alt="${escape(alt)}" data-part="${part}" data-link="${escape(raw)}">`;
 };
 
 /** D-79: the body's images from the Flint folder, as `app://media/…` addresses, in order. */
@@ -63,7 +79,8 @@ export function bodyImages(body: string): string[] {
   const images: string[] = [];
   for (const token of md.parse(body, {})) {
     for (const child of token.children ?? []) {
-      const src = child.type === 'image' ? mediaUrl(String(child.attrGet('src') ?? '')) : null;
+      const raw = child.type === 'image' ? String(child.attrGet('src') ?? '') : '';
+      const src = raw === '' || VIDEO.test(raw) ? null : mediaUrl(raw);
       if (src) images.push(src);
     }
   }

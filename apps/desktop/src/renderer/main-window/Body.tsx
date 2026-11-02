@@ -2,8 +2,12 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'r
 import { blockFor, type BlockKind } from '@flint/core/shorthand';
 import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { bodyHtml, removeBodyPart } from '../../shared/body-markdown.js';
+import { linkPatternsVersion } from '../../shared/link-patterns.js';
 import { codeLanguage } from '../../shared/code-language.js';
 import { highlightLines } from '../highlight/highlight.js';
+import { highlightLanguage } from '../highlight/languages.js';
+import { openMenu } from '../menu/menu.js';
+import { announce, isLinkedFile, mediaElement, openAttachment, relink } from '../media/media.js';
 
 const COPY_ICON =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
@@ -50,6 +54,9 @@ function highlightCode(
     const lang = (pre.dataset['lang'] ?? '').toLowerCase();
     const kind: BlockKind = lang === 'json' ? 'json' : blockFor(text).kind;
     code.replaceChildren(...highlightLines(kind, text.split('\n')));
+    // D-84: any other language CodeMirror knows, once it has loaded (plain until then).
+    if (lang !== '' && lang !== 'json' && kind !== 'stack-trace')
+      void highlightLanguage(code, text, lang);
     const card = document.createElement('div');
     card.className = 'code-card';
     const head = document.createElement('div');
@@ -82,8 +89,14 @@ function highlightCode(
     pre.replaceWith(card);
     card.append(head, pre);
   }
+  // D-84: videos and linked files: Flint's media element (badge, not-found, default player).
+  for (const slot of root.querySelectorAll<HTMLElement>('.fl-media-slot')) {
+    const media = mediaElement(slot.dataset['link'] ?? '', slot.dataset['alt'] ?? '');
+    media.dataset['part'] = slot.dataset['part'] ?? '';
+    slot.replaceWith(media);
+  }
   if (!onRemove) return;
-  for (const image of root.querySelectorAll<HTMLImageElement>('img[data-part]')) {
+  for (const image of root.querySelectorAll<HTMLElement>('img[data-part], .fl-media[data-part]')) {
     const holder = document.createElement('span');
     holder.className = 'body-image';
     image.replaceWith(holder);
@@ -153,10 +166,14 @@ function BodyView(props: {
   readonly onImage?: ShowImage | undefined;
   /** D-80: the body without a removed code block or image, to save. */
   readonly onRemovePart?: ((body: string, kind: Part['kind']) => void) | undefined;
+  /** D-84: the body with a linked file copied into Flint. */
+  readonly onRelink?: ((body: string) => void) | undefined;
 }): ReactElement {
-  const { body, onEdit, onImage, onRemovePart } = props;
+  const { body, onEdit, onImage, onRemovePart, onRelink } = props;
   const box = useRef<HTMLDivElement>(null);
-  const html = useMemo(() => bodyHtml(body), [body]);
+  // D-84: made again when the link patterns arrive or change.
+  const patterns = linkPatternsVersion();
+  const html = useMemo(() => bodyHtml(body), [body, patterns]);
   const leaving = useRef<Leaving | null>(null);
   const latest = useRef({ body, onRemovePart });
   latest.current = { body, onRemovePart };
@@ -185,16 +202,51 @@ function BodyView(props: {
       ref={box}
       className="body-view"
       dangerouslySetInnerHTML={{ __html: html }}
+      onContextMenu={(event) => {
+        // D-84: an attachment's own menu: open it, copy a linked one in, or delete it.
+        const media = (event.target as HTMLElement).closest<HTMLElement>('.body-image');
+        const link = media?.querySelector<HTMLElement>('[data-link]')?.dataset['link'] ?? '';
+        if (!media || link === '') return;
+        event.preventDefault();
+        event.stopPropagation();
+        const trash = media.querySelector<HTMLButtonElement>('.part-trash');
+        openMenu(
+          [
+            { label: 'Open in default app', action: () => void openAttachment(media, link) },
+            ...(isLinkedFile(link) && onRelink
+              ? [
+                  {
+                    label: 'Copy into Flint',
+                    action: () =>
+                      void window.flintMain.copyIntoFlint(link).then((outcome) => {
+                        if (outcome?.ok) onRelink(relink(latest.current.body, link, outcome.link));
+                        else if (outcome) announce(outcome.problem);
+                      }),
+                  },
+                ]
+              : []),
+            ...(trash
+              ? ['divider' as const, { label: 'Delete', action: () => trash.click() }]
+              : []),
+          ],
+          { x: event.clientX, y: event.clientY },
+        );
+      }}
       onClick={(event) => {
         const link = (event.target as HTMLElement).closest('a');
         if (link) {
           event.preventDefault();
-          window.flintMain.openLink(link.href);
+          const href = link.getAttribute('href') ?? '';
+          // D-84: an attachment link (a document) opens in its default app, by Flint's rules.
+          if (/^(https?|mailto):/i.test(href)) window.flintMain.openLink(link.href);
+          else void openAttachment(null, href);
           return;
         }
         const image = (event.target as HTMLElement).closest('img');
         if (image && onImage && box.current) {
-          const all = [...box.current.querySelectorAll('img')];
+          const all = [...box.current.querySelectorAll('img')].filter(
+            (item) => !item.closest('.fl-media.missing'),
+          );
           onImage(
             all.map((item) => item.getAttribute('src') ?? ''),
             all.indexOf(image),
@@ -264,11 +316,14 @@ export function BodyBlock(props: {
   readonly onImage?: ShowImage;
   /** D-80: a code block or an image removed with its trash button: the body to save. */
   readonly onRemovePart?: (body: string, kind: 'code' | 'image') => void;
+  /** D-84: Copy into Flint on a linked file: the body to save. */
+  readonly onRelink?: (body: string) => void;
   readonly placeholder?: string;
 }): ReactElement {
   const { body, inline, editing, editable, onEdit, onDone, onOpenPage, onImage, placeholder } =
     props;
   const onRemovePart = editable ? props.onRemovePart : undefined;
+  const onRelink = editable ? props.onRelink : undefined;
   const clip = useRef<HTMLDivElement>(null);
   const [long, setLong] = useState(false);
   useLayoutEffect(() => {
@@ -302,6 +357,7 @@ export function BodyBlock(props: {
             body={body}
             onImage={onImage}
             onRemovePart={onRemovePart}
+            onRelink={onRelink}
             onEdit={() => {
               if (long && onOpenPage) onOpenPage();
               else if (editable) onEdit();
