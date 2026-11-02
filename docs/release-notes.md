@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.16 (2 Nov 2026)
+
+- **A new editor for notes and task notes** (the first part of M5). It looks like the finished text: headings, bold, links, bullets, checkboxes, code blocks and pictures show formatted, and the markdown signs (`**`, `#`, a link's address) appear only on the line you are typing in. Click a link to open it, a checkbox to tick it, a picture to see it large. Task fields in a note show as small chips ("high", "30 Oct 15:00"). Lists continue on Enter, Tab indents, brackets close by themselves, and pasting code or a screenshot works as in the capture popup.
+- **Groups look as they did in 0.4.14** again: the small all-caps label with the count. An open group now sits on a soft card, and dragging a list over a group draws a white ring around it. Dragging feels as before (no wobble, no line under the dragged list). New groups still start at the top, dropping on a folded group still adds the list to its end, and the animations stay.
+- **Wide screens**: task lists grow with the window (up to about 1160 px); notes and task pages keep a comfortable reading width.
+- **Interface size**: Ctrl+= and Ctrl+− make everything larger or smaller, Ctrl+0 goes back to 100 %. Each monitor remembers its own size; the level shows for a moment when it changes. The capture popup stays as it is.
+
 ## 0.4.15 (2 Nov 2026)
 
 - **Pasting into the task box at the top** looks like the capture popup: code, JSON and stack traces show as a small code card (language, line count, the first lines; the chevron shows all, × removes it), a screenshot as a thumbnail chip. On Enter they become the task's notes. Nothing shows as raw `![](attachments/…)` or ``` text any more.

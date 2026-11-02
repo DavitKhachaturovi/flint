@@ -407,14 +407,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 12 | Every dragged task keeps its selection highlight | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 13 | Animated fold and unfold of bodies and subtasks while dragging | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 14 | Settings: Keyboard shortcuts section, global hotkeys rebound there, `?` shows the same list | APP-11, APP-08, NAV-02 · v1 · M8 | 02, 06 §2, D-80 |
-| — | M5 editor, first step: CodeMirror live preview for notes and task bodies (marks on the cursor's line only, inline images, field chips, CAP-06 paste) | NOTE-01, TASK-05, LIST-04, MEDIA-01 · Built, not yet in an installer | 02 NOTE-01, 06 §0, D-79 |
+| — | M5 editor, first step: CodeMirror live preview for notes and task bodies (marks on the cursor's line only, inline images, field chips, CAP-06 paste) | NOTE-01, TASK-05, LIST-04, MEDIA-01 · Done (0.4.16, first step) | 02 NOTE-01, 06 §0, D-79 |
 
 ## Q. Feedback on 0.4.15 (2 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | — | 0.4.15 confirmed except below; D-80's "my call" details accepted | Done | D-81 |
-| 1 | Group look and drag visuals back to 0.4.14; keep the expanded card, the white drop ring, the animations and the functional changes | LIST-05, LIST-06 · v1 · 0.4.16 | 02, 09 §8, D-81 |
-| 2a | Task-list column grows with the window (to ~1160 px) | UI-12, NAV-03 · v1 · 0.4.16 | 02, 09 §8, D-81 |
-| 2b | Notes and task pages keep a reading width | UI-12 · v1 · 0.4.16 | 02, 09 §8, D-81 |
-| 2c | App zoom Ctrl+= / Ctrl+− / Ctrl+0 per display, with a brief level pill; "Interface size" in M8 Settings | UI-12, APP-11 · v1 · 0.4.16 (setting M8) | 02, 03 §3, D-81 |
+| 1 | Group look and drag visuals back to 0.4.14; keep the expanded card, the white drop ring, the animations and the functional changes | LIST-05, LIST-06 · Done (0.4.16) | 02, 09 §8, D-81 |
+| 2a | Task-list column grows with the window (to ~1160 px) | UI-12, NAV-03 · Done (0.4.16) | 02, 09 §8, D-81 |
+| 2b | Notes and task pages keep a reading width | UI-12 · Done (0.4.16) | 02, 09 §8, D-81 |
+| 2c | App zoom Ctrl+= / Ctrl+− / Ctrl+0 per display, with a brief level pill; "Interface size" in M8 Settings | UI-12, APP-11 · Done (0.4.16; the setting M8) | 02, 03 §3, D-81 |
