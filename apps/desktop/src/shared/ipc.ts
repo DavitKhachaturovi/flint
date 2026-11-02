@@ -50,6 +50,8 @@ export const Channels = {
   mainOpenLink: 'main:open-link',
   /** Main window → main: new, rename or delete a list or note (LIST-01). */
   mainListAction: 'main:list-action',
+  /** Main window → main: Insert ▸ Image (NOTE-02, D-82): pick a picture, copy it into attachments/. */
+  mainPickImage: 'main:pick-image',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
   mainZoomed: 'main:zoomed',
   /** Main window → main: zoom in, out or back to 100 % (keys the main process didn't see first). */
@@ -268,7 +270,7 @@ export interface ChangeOutcome {
 }
 
 /** A text field's menu command, run by the main process on the sender (UI-08). */
-export type EditCommand = 'cut' | 'copy' | 'paste' | 'selectAll';
+export type EditCommand = 'cut' | 'copy' | 'paste' | 'pasteAndMatchStyle' | 'selectAll';
 
 /** LIST-01, D-52, D-55: what the sidebar asks of a list. */
 export type ListAction =

@@ -424,9 +424,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | — | Groups confirmed; the editor is tested when M5's editor work is complete | Done | D-82 |
-| 1 | Task column back to 820 px with 40 px sides; zoom per display and the reading column stay | UI-12 · v1 · next build | 02, 09 §8, D-82 |
+| 1 | Task column back to 820 px with 40 px sides; zoom per display and the reading column stay | UI-12 · Done (next build) | 02, 09 §8, D-82 |
 | 2 | A right-side panel for wide screens (Davit is designing it) | — · not specified yet | D-82 |
-| 3 | Right-click formatting menu in the editor | NOTE-02 · v1 · M5 (next step) | 02, D-72, D-82 |
-| 4 | Slash commands, `/` at line start or after a space | NOTE-03 · v1 · M5 (next step) | 02, D-82 |
-| 5 | Copy button on code blocks inside the editor | NOTE-05 · v1 · M5 (next step) | 02, D-82 |
-| 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · v1 · M5 (next step) | 02, D-82 |
+| 3 | Right-click formatting menu in the editor | NOTE-02 · Done (next build) | 02, D-72, D-82 |
+| 4 | Slash commands, `/` at line start or after a space | NOTE-03 · Done (next build) | 02, D-82 |
+| 5 | Copy button on code blocks inside the editor | NOTE-05 · Done (next build) | 02, D-82 |
+| 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · Done (next build) | 02, D-82 |

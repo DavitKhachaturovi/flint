@@ -4,9 +4,9 @@
 
 A fresh session can continue from this section, CLAUDE.md and the documents it points to.
 
-**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.16** (the D-81 fixes and the M5 editor's first step) (`docs/release-notes.md` lists what each build changed). Tests: 433 unit (Vitest, including the parsed-structure tests of D-80), 21 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
+**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.16** (the D-81 fixes and the M5 editor's first step) (`docs/release-notes.md` lists what each build changed). Tests: 438 unit (Vitest, including the parsed-structure tests of D-80), 21 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
 
-**In flight.** Nothing half-built. 0.4.16 goes to Davit for testing; his feedback comes back as a numbered list and becomes a decision entry before the next build.
+**In flight.** The M5 editor's second step is done (D-82: the right-click formatting menu, slash commands, the code card's copy button; `renderer/editor/commands.ts`, `slash.ts`); the task column is back to 820 px. Not in an installer yet: Davit tests the editor once M5's editor work is complete, so the next build comes with the rest of it (or when he asks).
 
 **Accepted by Davit (D-80, D-81):** 0.4.15 except the group look (reverted to 0.4.14's with an expanded card and a white drop ring, D-81); the lightbox on the solid ground, Alt+↑/↓ by keyboard focus, and the drag rules (with a clearly visible drop target). The open questions in §4 keep their proposed defaults.
 
@@ -17,7 +17,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 - The end-to-end tests run in order and depend on each other: one failure makes the later ones fail too, so fix the first one. They never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
 
 **Next steps.**
-1. Davit's 0.4.16 feedback, when it comes.
+1. The rest of the M5 editor (02 NOTE-01's "still to come"), then a build for Davit to test the editor as a whole.
 2. **The M5 editor, before step 9 (D-79):** first step done (`renderer/editor/`: `live-preview.ts`, `MarkdownEditor.tsx`, `editor.css`; `NoteEditor` and `BodyEditor` use it; CodeMirror 6 and seven language packages added under D-30, pinned). Next: Davit's look at it (0.4.16), then NOTE-02's menu, slash commands, the copy button in the editor's code cards.
 3. **M4 step 9:** two-finger swipe back/forward (NAV-04, D-79), multi-line paste (TASK-09), smart link titles (TASK-10), temporary sorts (TASK-08, D-72), find in task lists (NAV-06), the auto-archive offer (TASK-06).
 4. Then the rest of M5 and M6 to M8 (§2).

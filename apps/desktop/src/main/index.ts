@@ -1,9 +1,10 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   nativeImage,
   Notification,
@@ -114,6 +115,15 @@ function ensureDevShortcut(): void {
 }
 
 const devServerUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+
+/** NOTE-02, D-82: the picture types Insert ▸ Image takes (MEDIA-02), by file extension. */
+const PICKED_TYPES: Readonly<Record<string, string>> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
 /** Where a page loads from: the dev server while developing, otherwise `app://flint` (D-34). */
 const pageUrl = (page: string, host?: typeof MAIN_WINDOW_HOST): string =>
   devServerUrl ? `${devServerUrl}/${page}/index.html` : rendererPageUrl(page, host);
@@ -325,6 +335,7 @@ async function start(): Promise<void> {
     if (command === 'cut') contents.cut();
     else if (command === 'copy') contents.copy();
     else if (command === 'paste') contents.paste();
+    else if (command === 'pasteAndMatchStyle') contents.pasteAndMatchStyle();
     else if (command === 'selectAll') contents.selectAll();
   });
   ipcMain.on(Channels.mainOpenLink, (event, href: unknown) => {
@@ -360,6 +371,25 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  // NOTE-02, D-82: Insert ▸ Image: a picture from the file picker, copied into attachments/.
+  ipcMain.handle(Channels.mainPickImage, async (event) => {
+    if (!owns(event.sender)) return null;
+    const picked = await dialog.showOpenDialog(mainWindow, {
+      title: 'Insert image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+    });
+    const file = picked.filePaths[0];
+    if (picked.canceled || !file) return null;
+    const type = PICKED_TYPES[extname(file).toLowerCase()];
+    if (!type) return null;
+    try {
+      return await workspace.saveImage(new Uint8Array(await readFile(file)), type, new Date());
+    } catch (error) {
+      log(`could not insert the image: ${String(error)}`);
+      return null;
+    }
+  });
   ipcMain.handle(Channels.mainSidebar, (event) =>
     owns(event.sender) ? workspace.sidebar() : null,
   );

@@ -44,6 +44,10 @@ const main = {
   attach(bytes: Uint8Array, type: string): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainAttach, bytes, type) as Promise<string | null>;
   },
+  /** NOTE-02, D-82: Insert ▸ Image: the file picker; the picture's relative link, or null. */
+  pickImage(): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainPickImage) as Promise<string | null>;
+  },
   /** LIST-05, LIST-06: the sidebar's groups and order. */
   sidebar(): Promise<SidebarView | null> {
     return ipcRenderer.invoke(Channels.mainSidebar) as Promise<SidebarView | null>;

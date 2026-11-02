@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
+import { insertBlock } from './commands.js';
 import { editorExtensions, type PreviewHandlers } from './live-preview.js';
 
 /**
@@ -69,6 +70,19 @@ export function MarkdownEditor(props: {
               return true;
             },
             onPaste: (event, target) => paste(event, target),
+            // NOTE-02, NOTE-03 (D-82): the formatting menus, in the main window's terms.
+            commands: () => ({
+              pickImage: () => window.flintMain.pickImage(),
+              edit: (command) => window.flintMain.edit(command),
+              pastePlain: () => {
+                plainPaste = true;
+                window.flintMain.edit('pasteAndMatchStyle');
+                // A paste that brings no text fires no paste event: the next one is normal again.
+                window.setTimeout(() => {
+                  plainPaste = false;
+                }, 500);
+              },
+            }),
           }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
@@ -109,23 +123,14 @@ export function MarkdownEditor(props: {
   return <div ref={host} className={`md-editor ${className}`} />;
 }
 
-/** CAP-06 in the editor: a block on lines of its own at the cursor. */
-function insertBlock(view: EditorView, block: string): void {
-  const { from, to } = view.state.selection.main;
-  const doc = view.state.doc;
-  const before = doc.sliceString(Math.max(0, from - 2), from);
-  const after = doc.sliceString(to, to + 1);
-  const lead = from === 0 || before === '\n\n' ? '' : before.endsWith('\n') ? '\n' : '\n\n';
-  const trail = after === '' || after === '\n' ? '' : '\n';
-  const insert = lead + block + trail;
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + insert.length },
-    scrollIntoView: true,
-  });
-}
+/** Paste as plain text (NOTE-02): the next paste skips CAP-06's fencing. */
+let plainPaste = false;
 
 function paste(event: ClipboardEvent, view: EditorView): boolean {
+  if (plainPaste) {
+    plainPaste = false;
+    return false;
+  }
   const data = event.clipboardData;
   if (!data) return false;
   const image = [...data.items]

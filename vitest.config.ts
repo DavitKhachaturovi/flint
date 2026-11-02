@@ -18,6 +18,8 @@ export default defineConfig({
       'packages/*/test/**/*.test.ts',
       'apps/desktop/src/main/**/*.test.ts',
       'apps/desktop/src/shared/**/*.test.ts',
+      // M5: the note editor's commands (no DOM needed).
+      'apps/desktop/src/renderer/editor/**/*.test.ts',
     ],
     // Georgia (UTC+4, no daylight saving) is where Flint is used first. Time tests that need a
     // daylight-saving zone set process.env.TZ themselves.

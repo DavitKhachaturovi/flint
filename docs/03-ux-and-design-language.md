@@ -122,7 +122,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Note mode
 | Action | Key | Status |
 |---|---|---|
-| Slash command menu | / | Decided |
+| Slash command menu | / at a line's start or after a space; typing filters, Enter or Tab applies, Esc closes | Decided (D-82) |
+| Bold / italic in the editor | Ctrl+B / Ctrl+I | Proposed (D-82) |
+| Paste as plain text in the editor | Ctrl+Shift+V | Proposed (D-82) |
 | Formatting context menu | Right-click | Decided |
 | Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K inside a selection → link | Proposed (resolve Ctrl+K conflict: palette unless text is selected) |
 

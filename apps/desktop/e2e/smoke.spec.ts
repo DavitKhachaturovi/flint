@@ -706,11 +706,47 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
     .toMatch(/# Standup\nNika: DNS\n\*\*Decision:\*\* keep$/);
 
-  // Every text field keeps Cut / Copy / Paste / Select all, in the page (UI-08, D-64).
-  await main.locator('.note-editor').click({ button: 'right' });
-  await expect(menuItems).toHaveText(['Cut', 'Copy', 'Paste', 'Select all']);
+  // NOTE-03, D-82: "/" at a line's start opens the command menu; typing filters it, Enter applies.
+  await main.keyboard.press('End');
+  await main.keyboard.type('\n/');
+  const slash = main.locator('.fl-slash-menu');
+  await expect(slash).toBeVisible();
+  await main.keyboard.type('h2');
+  await expect(slash.locator('li')).toHaveText([/Heading 2\s*\/h2/]);
+  await main.keyboard.press('Enter');
+  await expect(slash).toHaveCount(0);
+  await main.keyboard.type('Next');
+  // In a path, "/" is just a slash.
+  await main.keyboard.type(' see a/b');
+  await expect(slash).toHaveCount(0);
+  await expect
+    .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
+    .toMatch(/keep\n## Next see a\/b$/);
+
+  // NOTE-02, D-72: the note's right-click menu: Format, Paragraph and Insert, then the text commands.
+  await main.locator('.note-editor .cm-fl-strong').click({ button: 'right' });
+  await expect(menuItems).toHaveText([
+    'Format',
+    'Paragraph',
+    'Insert',
+    'Cut',
+    'Copy',
+    'Paste',
+    'Paste as plain text',
+    'Select all',
+  ]);
   await main.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
+  // Insert ▸ Code block: a code card with its copy button (NOTE-05).
+  await main.locator('.note-editor .cm-fl-strong').click({ button: 'right' });
+  await menu.getByText('Insert', { exact: true }).hover();
+  await main.locator('.fl-submenu').getByText('Code block').click();
+  await main.keyboard.type('npm test');
+  await main.locator('h1').click();
+  await expect(main.locator('.note-editor .cm-fl-code-copy')).toHaveCount(1);
+  await expect
+    .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
+    .toContain('```\nnpm test\n```');
 
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
@@ -1454,7 +1490,7 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') + 1);
 });
 
-test('wide windows and the interface size (UI-12, D-81)', async () => {
+test('wide windows and the interface size (UI-12, D-81, D-82)', async () => {
   const main = app.windows().find((page) => page.url().includes('main-window'));
   if (!main) throw new Error('main window page not found');
   const sizeTo = (width: number, height: number): Promise<void> =>
@@ -1469,14 +1505,14 @@ test('wide windows and the interface size (UI-12, D-81)', async () => {
     );
   const width = (selector: string): Promise<number> =>
     main.locator(selector).evaluate((element) => element.getBoundingClientRect().width);
-  // The task list grows with a wide window; a note keeps its reading column.
+  // D-82: on a wide window the task list keeps its 820 px column, and so does a task's page.
   await main.locator('.nav', { hasText: 'Inbox' }).click();
   await sizeTo(1920, 1040);
-  await expect.poll(() => width('.content')).toBeGreaterThan(1100);
+  await expect.poll(() => width('.content')).toBe(820);
   await main.locator('.nav', { hasText: 'Bodies' }).click();
   await main.locator('.row', { hasText: 'Short body' }).click({ position: { x: 600, y: 10 } });
   await main.keyboard.press('Shift+Enter');
-  await expect.poll(() => width('.content.task-page')).toBeLessThan(900);
+  await expect.poll(() => width('.content.task-page')).toBe(820);
   await main.keyboard.press('Escape');
   await sizeTo(1120, 780);
 

@@ -34,6 +34,14 @@ import {
 import { tags } from '@lezer/highlight';
 import type { MarkdownConfig } from '@lezer/markdown';
 import { mediaUrl } from '../../shared/body-markdown.js';
+import { openMenu, type MenuEntry } from '../menu/menu.js';
+import {
+  EDITOR_COMMANDS,
+  SECTION_LABELS,
+  type CommandHost,
+  type CommandSection,
+} from './commands.js';
+import { slashCommands } from './slash.js';
 
 /**
  * The note editor (M5, NOTE-01, D-49, D-79): CodeMirror with an Obsidian-style live preview. The
@@ -239,6 +247,47 @@ function fieldText(key: string, value: string): string {
   }
 }
 
+const COPY_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
+
+/** NOTE-05, D-82: the code card's copy button, in its top-right corner, inside the editor too. */
+class CopyWidget extends WidgetType {
+  readonly code: string;
+  constructor(code: string) {
+    super();
+    this.code = code;
+  }
+  override eq(other: CopyWidget): boolean {
+    return other.code === this.code;
+  }
+  toDOM(): HTMLElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'cm-fl-code-copy';
+    button.title = 'Copy';
+    button.setAttribute('aria-label', 'Copy code');
+    button.innerHTML = COPY_ICON;
+    // The cursor stays where it is: a press on the button isn't a click in the text.
+    button.addEventListener('mousedown', (event) => event.preventDefault());
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void navigator.clipboard.writeText(this.code).then(() => {
+        button.classList.add('copied');
+        button.title = 'Copied';
+        window.setTimeout(() => {
+          button.classList.remove('copied');
+          button.title = 'Copy';
+        }, 1200);
+      });
+    });
+    return button;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+
 const hidden = Decoration.replace({});
 const mark = (className: string, attributes?: Record<string, string>): Decoration =>
   Decoration.mark({ class: className, ...(attributes && { attributes }) });
@@ -346,6 +395,13 @@ function decorate(view: EditorView): DecorationSet {
               ranges.push(line('cm-fl-code-end').range(end.from));
             for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
               codeLines.add(at);
+            const text = node.node.getChild('CodeText');
+            ranges.push(
+              Decoration.widget({
+                widget: new CopyWidget(text ? doc.sliceString(text.from, text.to) : ''),
+                side: 1,
+              }).range(doc.lineAt(node.from).to),
+            );
             const cursor = node.node.cursor();
             if (cursor.firstChild())
               do {
@@ -561,6 +617,8 @@ const flintTheme = EditorView.theme(
 
 export interface EditorOptions {
   readonly readOnly?: boolean;
+  /** NOTE-02, NOTE-03 (D-82): the formatting menus; without it, no menus (a read-only note). */
+  readonly commands?: () => CommandHost & MenuHost;
   readonly placeholder?: string;
   readonly handlers?: PreviewHandlers;
   /** Esc in the editor (a body's field saves and closes, D-49). */
@@ -581,12 +639,16 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
       { key: 'Tab', run: indentMore, shift: indentLess },
+      ...(options.commands ? formatKeys(options.commands) : []),
       ...closeBracketsKeymap,
       ...defaultKeymap,
       ...historyKeymap,
     ]),
     livePreview,
     previewClicks,
+    ...(options.commands && !options.readOnly
+      ? [slashCommands(options.commands), formatMenu(options.commands)]
+      : []),
     handlersFacet.of(options.handlers ?? {}),
     flintTheme,
     EditorView.contentAttributes.of({ spellcheck: 'false', 'aria-multiline': 'true' }),
@@ -600,4 +662,85 @@ export function editorExtensions(options: EditorOptions): Extension[] {
         ]
       : []),
   ];
+}
+
+/** What the right-click menu needs besides the commands: the text field's edit commands (UI-08). */
+export interface MenuHost {
+  readonly edit: (command: 'cut' | 'copy' | 'paste' | 'selectAll') => void;
+  /** Paste as plain text: without CAP-06's fencing. */
+  readonly pastePlain: () => void;
+}
+
+/** Ctrl+B and Ctrl+I (Proposed, D-82): bold and italic, as the menu's hints say. */
+function formatKeys(
+  host: () => CommandHost & MenuHost,
+): { key: string; run: (view: EditorView) => boolean }[] {
+  const run =
+    (id: string) =>
+    (view: EditorView): boolean => {
+      const command = EDITOR_COMMANDS.find((each) => each.id === id);
+      if (!command) return false;
+      command.run(view, host());
+      return true;
+    };
+  return [
+    { key: 'Mod-b', run: run('bold') },
+    { key: 'Mod-i', run: run('italic') },
+    {
+      key: 'Mod-Shift-v',
+      run: () => {
+        host().pastePlain();
+        return true;
+      },
+    },
+  ];
+}
+
+/**
+ * The note editor's right-click menu (NOTE-02, D-72): Format ▸, Paragraph ▸ and Insert ▸, then Cut /
+ * Copy / Paste / Paste as plain text / Select all. In the page like every Flint menu (UI-08).
+ */
+function formatMenu(host: () => CommandHost & MenuHost): Extension {
+  return EditorView.domEventHandlers({
+    contextmenu: (event, view) => {
+      event.preventDefault();
+      // Not also the window's text-field menu.
+      event.stopPropagation();
+      const commands = host();
+      const section = (name: CommandSection): MenuEntry => ({
+        label: SECTION_LABELS[name],
+        submenu: EDITOR_COMMANDS.filter((command) => command.section === name).map((command) => ({
+          label: command.label,
+          ...(command.hint ? { hint: command.hint } : {}),
+          action: () => command.run(view, commands),
+        })),
+      });
+      const selected = !view.state.selection.main.empty;
+      openMenu(
+        [
+          section('format'),
+          section('paragraph'),
+          section('insert'),
+          'divider',
+          { label: 'Cut', hint: 'Ctrl+X', disabled: !selected, action: () => commands.edit('cut') },
+          {
+            label: 'Copy',
+            hint: 'Ctrl+C',
+            disabled: !selected,
+            action: () => commands.edit('copy'),
+          },
+          { label: 'Paste', hint: 'Ctrl+V', action: () => commands.edit('paste') },
+          {
+            label: 'Paste as plain text',
+            hint: 'Ctrl+Shift+V',
+            action: () => commands.pastePlain(),
+          },
+          'divider',
+          { label: 'Select all', hint: 'Ctrl+A', action: () => commands.edit('selectAll') },
+        ],
+        { x: event.clientX, y: event.clientY },
+      );
+      return true;
+    },
+  });
 }
