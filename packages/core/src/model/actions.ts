@@ -18,7 +18,7 @@ export interface NewTask {
   readonly body?: string;
   readonly priority?: Priority | null;
   readonly reminder?: LocalDateTime | null;
-  readonly today?: boolean;
+  readonly pinned?: boolean;
 }
 
 export function newTaskNode(document: FlintDocument, task: NewTask): TaskNode {
@@ -30,7 +30,7 @@ export function newTaskNode(document: FlintDocument, task: NewTask): TaskNode {
     title: escapeTitle(task.title).trim(),
     fields: {
       ...(task.reminder ? { reminder: localDateTimeField(task.reminder) } : {}),
-      ...(task.today ? { today: flintField(true as const) } : {}),
+      ...(task.pinned ? { pinned: flintField(true as const) } : {}),
       ...(task.priority ? { priority: flintField(task.priority) } : {}),
       id: flintField(task.id),
     },
@@ -155,13 +155,13 @@ export function setMuted(list: string, key: string, muted: boolean): Op {
   };
 }
 
-/** TODAY-01: star or unstar. */
-export function setToday(list: string, key: string, starred: boolean): Op {
+/** TODAY-01, D-85: pin or unpin. */
+export function setPinned(list: string, key: string, pinned: boolean): Op {
   return {
     type: 'update',
     list,
     key,
-    changes: { fields: { today: starred ? flintField(true as const) : null } },
+    changes: { fields: { pinned: pinned ? flintField(true as const) : null } },
   };
 }
 

@@ -25,13 +25,13 @@ import {
   setPriority,
   setMuted,
   setReminder,
-  setToday,
+  setPinned,
   uncompleteTask,
 } from './actions.js';
 import { getBody } from './body.js';
-import { convertToNote, convertToTasks, duplicateDocument } from './convert.js';
+import { convertToNote, convertToTasks, duplicateDocument, taskAsNoteText } from './convert.js';
 import { applyOp, rebase, type Documents, type Op } from './ops.js';
-import { locate } from './tree.js';
+import { locate, topLevelTasks } from './tree.js';
 
 const RUNS = Number(process.env.FLINT_FUZZ_RUNS ?? 2000);
 const AT = { year: 2026, month: 10, day: 29, hour: 14, minute: 30, second: 0 };
@@ -90,11 +90,11 @@ describe('adding tasks (CAP-02, D-22)', () => {
         id: 'new1',
         title: 'New [id:: x]',
         priority: 'high',
-        today: true,
+        pinned: true,
       }),
     );
     expect(text(result)).toContain(
-      '# Unicorn\n\n- [ ] New \\[id:: x] [today:: true] [priority:: high] [id:: new1]\n- [ ] A [id:: aaaa]\n',
+      '# Unicorn\n\n- [ ] New \\[id:: x] [pinned:: true] [priority:: high] [id:: new1]\n- [ ] A [id:: aaaa]\n',
     );
   });
 
@@ -136,28 +136,28 @@ describe('editing (TASK-03, TASK-05, REM-01, TODAY-01)', () => {
     );
   });
 
-  it('sets reminder and star in canonical order, and clears them', () => {
+  it('sets reminder and pin in canonical order, and clears them', () => {
     let result = apply(
       documents,
       setReminder('a', 'cccc', { ...AT, day: 30, hour: 15, minute: 0 }),
     );
-    result = apply(result, setToday('a', 'cccc', true));
+    result = apply(result, setPinned('a', 'cccc', true));
     expect(text(result)).toContain(
-      '- [ ] C [reminder:: 2026-10-30T15:00] [today:: true] [id:: cccc]\n',
+      '- [ ] C [reminder:: 2026-10-30T15:00] [pinned:: true] [id:: cccc]\n',
     );
     result = apply(result, setReminder('a', 'cccc', null));
-    expect(text(result)).toContain('- [ ] C [today:: true] [id:: cccc]\n');
+    expect(text(result)).toContain('- [ ] C [pinned:: true] [id:: cccc]\n');
   });
 
   it('duplicates a task below it, open, with new IDs and without its reminder (TASK-16, D-74)', () => {
-    const source = `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [today:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Next [id:: cccc]\n`;
+    const source = `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [pinned:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Next [id:: cccc]\n`;
     const ids = ['new1', 'new2'];
     const result = apply(
       docs({ a: source }),
       duplicateTask(only(docs({ a: source })), 'a', 'aaaa', () => ids.shift() ?? 'none'),
     );
     expect(text(result)).toBe(
-      `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [today:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Ship it [priority:: high] [id:: new1]\n    Notes here.\n    - [ ] Sub [id:: new2]\n- [ ] Next [id:: cccc]\n`,
+      `---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [reminder:: 2026-10-30T09:00] [muted:: true] [pinned:: true] [priority:: high] [id:: aaaa] ^blk\n    Notes here.\n    - [ ] Sub [reminder:: 2026-10-30T10:00] [id:: bb11]\n- [ ] Ship it [priority:: high] [id:: new1]\n    Notes here.\n    - [ ] Sub [id:: new2]\n- [ ] Next [id:: cccc]\n`,
     );
   });
 
@@ -491,4 +491,16 @@ describe('property: every action undoes byte-for-byte', () => {
     },
     Math.max(10_000, RUNS * 5),
   );
+});
+
+describe('a task as a note (TASK-17, D-85)', () => {
+  it('keeps the body, turns subtasks into a checklist, and drops Flint fields', () => {
+    const source =
+      '---\nflint: 1\nid: l7c2\nmode: tasks\n---\n- [ ] Ship it [priority:: high] [id:: aaaa]\n    Notes here.\n\n    ```\n    code\n    ```\n    - [x] Sub one [reminder:: 2026-10-30T10:00] [id:: bb11]\n        Its note.\n    - [ ] Sub two [id:: bb12]\n';
+    const task = topLevelTasks(only(docs({ a: source })))[0];
+    if (!task) throw new Error('no task');
+    expect(taskAsNoteText(task)).toBe(
+      'Notes here.\n\n```\ncode\n```\n\n- [x] Sub one\n    Its note.\n- [ ] Sub two',
+    );
+  });
 });

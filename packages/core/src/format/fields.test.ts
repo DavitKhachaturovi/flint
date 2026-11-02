@@ -33,7 +33,28 @@ describe('parseTaskContent: Flint fields (D-21)', () => {
     const content = parseTaskContent('Call (Priority::HIGH) [TODAY:: True]');
     expect(content.title).toBe('Call');
     expect(content.fields.priority?.value).toBe('high');
-    expect(content.fields.today?.value).toBe(true);
+    expect(content.fields.pinned?.value).toBe(true);
+  });
+
+  it('reads `today`, the earlier name, as `pinned` and writes it as `pinned` (TODAY-01, D-85)', () => {
+    expect(parseTaskContent('Plan [pinned:: true]').fields.pinned?.value).toBe(true);
+    const old = parseTaskContent('Plan [today:: true] [id:: a1b2]');
+    expect(old.title).toBe('Plan');
+    expect(old.fields.pinned?.value).toBe(true);
+    expect(formatTaskContent(old)).toBe('Plan [pinned:: true] [id:: a1b2]');
+    // One pin: a second one, under either name, stays visible text.
+    expect(parseTaskContent('Plan [today:: true] [pinned:: true]').title).toBe(
+      'Plan [pinned:: true]',
+    );
+    expect(formatTaskContent(parseTaskContent('[today:: true] is a field'))).toBe(
+      'is a field [pinned:: true]',
+    );
+    // A title with `[today:: true]` as text is escaped, so it can't read back as a pin.
+    expect(
+      parseTaskContent(
+        formatTaskContent({ title: '[today:: true]', fields: {}, unknown: [], blockId: null }),
+      ).fields.pinned,
+    ).toBeUndefined();
   });
 
   it('reads Obsidian Tasks lowest/highest as low/high but keeps the raw text', () => {
@@ -135,13 +156,13 @@ describe('parseTaskContent: unknown fields and developer text (D-21)', () => {
 });
 
 describe('formatTaskContent (D-21 canonical order)', () => {
-  it('writes reminder, today, completion, priority, id, unknown fields, block ID', () => {
+  it('writes reminder, pinned, completion, priority, id, unknown fields, block ID', () => {
     const content = parseTaskContent(
       '[id:: a1b2] Rotate secret [due:: 2026-11-01] [priority:: medium] [completion:: 2026-10-28T14:03] [today:: true] ^blk',
     );
     // `[due:: …]` sits in the trailing run, so it is a field; the mid-line id moves to the end.
     expect(formatTaskContent(content)).toBe(
-      'Rotate secret [today:: true] [completion:: 2026-10-28T14:03] [priority:: medium] [id:: a1b2] [due:: 2026-11-01] ^blk',
+      'Rotate secret [pinned:: true] [completion:: 2026-10-28T14:03] [priority:: medium] [id:: a1b2] [due:: 2026-11-01] ^blk',
     );
   });
 

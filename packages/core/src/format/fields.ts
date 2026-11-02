@@ -7,7 +7,7 @@ import {
 import { codeSpanRanges, rangeContaining, type Range } from './code-spans.js';
 
 /** Flint's own field keys, in the order Flint writes them (D-21). */
-export const FLINT_KEYS = ['reminder', 'muted', 'today', 'completion', 'priority', 'id'] as const;
+export const FLINT_KEYS = ['reminder', 'muted', 'pinned', 'completion', 'priority', 'id'] as const;
 export type FlintKey = (typeof FLINT_KEYS)[number];
 
 export type Priority = 'low' | 'medium' | 'high';
@@ -34,7 +34,8 @@ export interface FlintFields {
   readonly reminder?: FieldValue<ParsedLocalDateTime>;
   /** REM-12, D-66: the reminder is turned off (kept, never fired). */
   readonly muted?: FieldValue<true>;
-  readonly today?: FieldValue<true>;
+  /** TODAY-01, D-85: pinned (the Today view in M6). Read also from `today`, its earlier name. */
+  readonly pinned?: FieldValue<true>;
   readonly completion?: FieldValue<ParsedLocalDateTime>;
   readonly priority?: FieldValue<Priority>;
   readonly id?: FieldValue<string>;
@@ -66,6 +67,14 @@ export function isFlintKey(key: string): key is FlintKey {
   return (FLINT_KEYS as readonly string[]).includes(key);
 }
 
+/** D-85: `today` is the earlier name of `pinned`; it reads as `pinned` and is written as `pinned`. */
+const ALIASES: Readonly<Record<string, FlintKey>> = { today: 'pinned' };
+
+/** The Flint key a lower-case field key stands for, aliases included, or null. */
+function flintKeyOf(key: string): FlintKey | null {
+  return isFlintKey(key) ? key : (ALIASES[key] ?? null);
+}
+
 export function readPriority(value: string): Priority | null {
   switch (value.toLowerCase()) {
     case 'low':
@@ -81,8 +90,8 @@ export function readPriority(value: string): Priority | null {
   }
 }
 
-/** `today` and `muted` (D-66): `true`, any letter case. */
-function readToday(value: string): true | null {
+/** `pinned` and `muted` (D-66, D-85): `true`, any letter case. */
+function readTrue(value: string): true | null {
   return /^true$/i.test(value) ? true : null;
 }
 
@@ -97,9 +106,9 @@ function isValidFlintValue(key: FlintKey, value: string): boolean {
     case 'reminder':
     case 'completion':
       return parseLocalDateTime(value) !== null;
-    case 'today':
+    case 'pinned':
     case 'muted':
-      return readToday(value) !== null;
+      return readTrue(value) !== null;
     case 'id':
       return readId(value) !== null;
   }
@@ -193,8 +202,8 @@ type Classified = Candidate & { readonly kind: 'flint' | 'unknown' | 'text' };
 function classify(candidates: readonly Candidate[]): Classified[] {
   const seen = new Set<FlintKey>();
   return candidates.map((candidate) => {
-    const key = candidate.key.toLowerCase();
-    if (isFlintKey(key)) {
+    const key = flintKeyOf(candidate.key.toLowerCase());
+    if (key) {
       // Only the first valid occurrence is the field; an invalid value or a repeat stays visible
       // as title text (D-21).
       if (!seen.has(key) && isValidFlintValue(key, candidate.value)) {
@@ -275,7 +284,7 @@ export function parseTaskContent(text: string): TaskContent {
   const fields: {
     reminder?: FieldValue<ParsedLocalDateTime>;
     muted?: FieldValue<true>;
-    today?: FieldValue<true>;
+    pinned?: FieldValue<true>;
     completion?: FieldValue<ParsedLocalDateTime>;
     priority?: FieldValue<Priority>;
     id?: FieldValue<string>;
@@ -286,7 +295,7 @@ export function parseTaskContent(text: string): TaskContent {
       unknown.push({ key: candidate.key, value: candidate.value });
       continue;
     }
-    const key = candidate.key.toLowerCase() as FlintKey;
+    const key = flintKeyOf(candidate.key.toLowerCase());
     switch (key) {
       case 'reminder':
       case 'completion': {
@@ -294,9 +303,13 @@ export function parseTaskContent(text: string): TaskContent {
         if (parsed) fields[key] = buildField(candidate, parsed);
         break;
       }
-      case 'today':
+      case 'pinned':
       case 'muted':
-        fields[key] = buildField(candidate, true);
+        // An alias (`today`) is written under its current name (D-85) the next time the line is.
+        fields[key] =
+          candidate.key.toLowerCase() === key
+            ? buildField(candidate, true)
+            : { value: true, raw: null };
         break;
       case 'priority': {
         const priority = readPriority(candidate.value);
@@ -317,7 +330,7 @@ function formatFlintValue(key: FlintKey, value: unknown): string {
     case 'reminder':
     case 'completion':
       return formatLocalDateTime((value as ParsedLocalDateTime).value);
-    case 'today':
+    case 'pinned':
     case 'muted':
       return 'true';
     case 'priority':
@@ -404,8 +417,8 @@ function escapeFieldOpeners(title: string, flintOnly: boolean): string {
   // Every occurrence, not just the first: once the first is escaped, a repeat would be read back.
   const indexes = findCandidates(title, title.length, code)
     .filter((candidate) => {
-      const key = candidate.key.toLowerCase();
-      if (isFlintKey(key)) return isValidFlintValue(key, candidate.value);
+      const key = flintKeyOf(candidate.key.toLowerCase());
+      if (key) return isValidFlintValue(key, candidate.value);
       return !flintOnly && candidate.spaced;
     })
     .map((candidate) => candidate.start);
@@ -454,7 +467,7 @@ function escapeEverything(title: string): string {
 
 /**
  * Writes task content canonically (D-21, D-66): title, then Flint's fields in the order `reminder`,
- * `muted`, `today`, `completion`, `priority`, `id`, then unknown fields, then the block ID.
+ * `muted`, `pinned`, `completion`, `priority`, `id`, then unknown fields, then the block ID.
  *
  * The written line must read back as the same task. When the title contains text that would then be
  * read as a field (a repeated Flint field that was visible text, say), the least escaping that

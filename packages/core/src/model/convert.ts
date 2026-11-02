@@ -15,6 +15,7 @@ import {
   type Fence,
 } from '../format/markdown-blocks.js';
 import { setFrontmatterValues } from '../format/save.js';
+import { getBody } from './body.js';
 import type { Op } from './ops.js';
 
 /**
@@ -176,7 +177,7 @@ export function duplicateDocument(
 ): string {
   const renew = (node: TaskNode): TaskNode => {
     const id = newId();
-    const { today, completion, priority } = node.line.fields;
+    const { pinned, completion, priority } = node.line.fields;
     return {
       ...node,
       key: id,
@@ -184,7 +185,7 @@ export function duplicateDocument(
       line: {
         ...node.line,
         fields: {
-          ...(today ? { today } : {}),
+          ...(pinned ? { pinned } : {}),
           ...(completion ? { completion } : {}),
           ...(priority ? { priority } : {}),
           id: flintField(id),
@@ -196,4 +197,22 @@ export function duplicateDocument(
   };
   const blocks = document.blocks.map((block) => (block.kind === 'task' ? renew(block) : block));
   return serializeDocument(setFrontmatterValues({ ...document, blocks }, { id: listId }));
+}
+
+/**
+ * TASK-17, D-85: what a task becomes as a note: its body, then its subtasks as a checklist with
+ * their own bodies under them. The title becomes the note's name; Flint's fields (priority,
+ * reminder, IDs) aren't carried over, since a note's fields are inert (LIST-04).
+ */
+export function taskAsNoteText(node: TaskNode): string {
+  const body = getBody(node);
+  const checklist = node.children.flatMap((child) => {
+    if (child.kind !== 'task') return [];
+    const mark = child.line.status === ' ' ? ' ' : 'x';
+    const text = getBody(child);
+    const under =
+      text === '' ? [] : text.split('\n').map((line) => (line === '' ? '' : `    ${line}`));
+    return [`- [${mark}] ${child.line.title.trim()}`, ...under];
+  });
+  return [body, checklist.join('\n')].filter((part) => part !== '').join('\n\n');
 }

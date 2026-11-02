@@ -9,7 +9,7 @@ export function benchmarkList(): string {
   for (let index = 0; index < 900; index++) {
     const fields = [
       index % 7 === 0 ? '[reminder:: 2026-11-02T09:00]' : '',
-      index % 5 === 0 ? '[today:: true]' : '',
+      index % 5 === 0 ? '[pinned:: true]' : '',
       index % 3 === 0 ? '[priority:: high]' : '',
       `[id:: t${index.toString(36).padStart(3, '0')}]`,
     ].filter(Boolean);

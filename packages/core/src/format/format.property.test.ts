@@ -59,6 +59,8 @@ const field = fc.constantFrom(
   '[id:: has space]',
   '[today:: true]',
   '[today:: false]',
+  '[pinned:: true]',
+  '[PINNED:: TRUE]',
   '[muted:: true]',
   '(muted::TRUE)',
   '[muted:: no]',
@@ -192,7 +194,7 @@ function sameContent(a: TaskContent, b: TaskContent): void {
   expect(isOriginalWithBackslashes(a.title, b.title), `${a.title} → ${b.title}`).toBe(true);
   expect(b.blockId).toBe(a.blockId);
   expect(b.unknown).toEqual(a.unknown);
-  for (const key of ['reminder', 'today', 'completion', 'priority', 'id'] as const) {
+  for (const key of ['reminder', 'pinned', 'completion', 'priority', 'id'] as const) {
     expect(b.fields[key]?.value).toEqual(a.fields[key]?.value);
   }
 }
