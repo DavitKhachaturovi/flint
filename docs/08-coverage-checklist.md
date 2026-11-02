@@ -418,3 +418,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2a | Task-list column grows with the window (to ~1160 px) | UI-12, NAV-03 · Done (0.4.16) | 02, 09 §8, D-81 |
 | 2b | Notes and task pages keep a reading width | UI-12 · Done (0.4.16) | 02, 09 §8, D-81 |
 | 2c | App zoom Ctrl+= / Ctrl+− / Ctrl+0 per display, with a brief level pill; "Interface size" in M8 Settings | UI-12, APP-11 · Done (0.4.16; the setting M8) | 02, 03 §3, D-81 |
+
+## R. Feedback on 0.4.16 (2 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Groups confirmed; the editor is tested when M5's editor work is complete | Done | D-82 |
+| 1 | Task column back to 820 px with 40 px sides; zoom per display and the reading column stay | UI-12 · v1 · next build | 02, 09 §8, D-82 |
+| 2 | A right-side panel for wide screens (Davit is designing it) | — · not specified yet | D-82 |
+| 3 | Right-click formatting menu in the editor | NOTE-02 · v1 · M5 (next step) | 02, D-72, D-82 |
+| 4 | Slash commands, `/` at line start or after a space | NOTE-03 · v1 · M5 (next step) | 02, D-82 |
+| 5 | Copy button on code blocks inside the editor | NOTE-05 · v1 · M5 (next step) | 02, D-82 |
+| 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · v1 · M5 (next step) | 02, D-82 |

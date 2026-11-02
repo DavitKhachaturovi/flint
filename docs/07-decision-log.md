@@ -588,3 +588,10 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - Checked at 1440 × 900 and 1920 × 1080 effective sizes, maximised and half-screen.
 - **Answers (grill, 2 Nov 2026):** ring only, no "Drop to add"; a folded group is the plain label; zoom for the main window only, Chrome's steps.
 - **Build:** 0.4.16 carries these and the M5 editor's first step.
+
+### D-82 — Feedback on 0.4.16; the next M5 editor step
+- **Date:** 2 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed:** the groups (D-81). The editor is tested once M5's editor work is complete.
+- **Wide screens (UI-12, supersedes D-81's growing column):** at 1160 px task rows just get long. The task column goes back to exactly its pre-0.4.16 width and margins (max 820 px, 40 px sides), the same column as notes and task pages. The app zoom per display stays. **Planned by Davit, not specified yet:** a right-side panel will use the empty space on wide screens; nothing is built for it until it is designed.
+- **Next M5 editor step:** the right-click formatting menu (NOTE-02, the item set of D-72), slash commands (NOTE-03) and the copy button on code blocks inside the editor (NOTE-05).
+- **Answers (grill, 2 Nov 2026):** Insert ▸ Image (and `/image`) opens the Windows file picker; the chosen picture is copied into `attachments/` and linked, like a pasted screenshot (MEDIA-02). `/` opens the command menu at the start of a line or after a space (never inside code), typing filters it, Enter or Tab applies, Esc closes and leaves the `/` as typed.

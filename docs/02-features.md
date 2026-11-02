@@ -388,9 +388,11 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - Then Cut / Copy / Paste / Paste as plain text / Select all.
   - Not included: Heading 4–6, math, comments, footnotes, callouts, internal links.
 - **Proposed:** `==text==` also renders as a highlight in task titles and bodies (LIST-02) from M5. Milestone M5.
+- **D-82:** Insert ▸ Image opens the Windows file picker (PNG, JPEG, GIF, WebP); the picture is copied into `attachments/` and linked, like a pasted screenshot. **Proposed:** Format items wrap the selection (or the word at the cursor) and unwrap it when it already has that format; Clear formatting removes the inline marks in the selection; Paragraph items set the line's kind (the current lines, replacing a bullet, number, checkbox, heading or quote prefix; Body removes it); Link wraps the selection as `[text](…)` with the cursor in the address; Table inserts a 3-column table with a header row; Code block a fence with the cursor inside; Horizontal rule `---` on its own line. Paste as plain text pastes without CAP-06's fencing. The same menu in task bodies while they are edited.
 
 ### NOTE-03 — Slash commands (v1)
 - Typing `/` opens a command menu: e.g. `/check` inserts a checkbox, `/code` a code block. Same items as the right-click menu.
+- **D-82:** `/` opens it at the start of a line or after a space, never inside code or inline code (so paths and URLs never trigger it); typing filters it (`/co` → Code, Code block); ↑/↓ move, Enter or Tab applies, Esc closes and leaves the `/` as typed. **Proposed:** each item has an icon tile, its name and its `/word` (mockup 04); the words are `/bold`, `/italic`, `/strike`, `/highlight`, `/code`, `/clear`, `/bullet`, `/number`, `/check`, `/h1`, `/h2`, `/h3`, `/body`, `/quote`, `/link`, `/image`, `/table`, `/codeblock`, `/rule`. Format items on an empty selection insert the marks with the cursor between them.
 - Slash commands are for keyboard users; the right-click menu stays for mouse users.
 
 ### NOTE-04 — Syntax-highlighted code blocks (v1)
@@ -666,7 +668,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.
 
 ### UI-12 — Wide screens and interface size (v1, D-81)
-- The task-list column grows with the window up to about 1160 px (**Proposed**); notes and task pages keep a reading width of about 820 px, centred.
+- **D-82 (supersedes D-81's growing column):** task lists, notes and task pages share one centred column of at most 820 px with 40 px sides, as before 0.4.16. A right-side panel for wide screens is being designed by Davit (not specified yet; nothing is built for it).
 - **App zoom:** Ctrl+= (Ctrl++), Ctrl+− and Ctrl+0 zoom the main window in Chrome's steps (67, 75, 80, 90, 100, 110, 125, 150, 175, 200 %), remembered **per display** (a laptop panel and a monitor each keep their own); the level shows briefly in a small pill when it changes. The capture popup stays at 100 % (**Proposed**: it has its own fixed size and latency budget).
 - **M8:** Settings gets an **Interface size** option for the same zoom (APP-11).
 
