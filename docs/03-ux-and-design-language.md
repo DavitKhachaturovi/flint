@@ -133,7 +133,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
 - Click a task's title text to edit it there, empty row space to select it, double-click to edit (D-71, §2); click the check to complete.
 - Right-click empty sidebar space for the **+** menu: New task list, New note, New group (D-69, D-73). Only the title-bar strip at the top drags the window.
-- Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; pin / unpin (D-85) and Convert to note (TASK-17, D-85); reminder joins in M6 (**Proposed** items).
+- Right-click anything for its menu (UI-08, D-55). **D-86:** inside a multi-selection the menu acts on all of it (a "3 selected" header, counted labels); outside it, the right-clicked item alone is selected first (Windows Explorer). A task: edit, open as page, priority, move, delete; pin / unpin (D-85) and Convert to note (TASK-17, D-85); reminder joins in M6 (**Proposed** items).
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
 - The mouse's back and forward buttons navigate (NAV-04).
 - Cursor: the arrow on every control, the hand only on links (UI-01).

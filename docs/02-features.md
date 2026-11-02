@@ -220,6 +220,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-76, the task page:** the title is white, weight 600, about 27 px; the back arrow lines up with its first line; editing the title keeps it wrapped in the same type (Enter saves; the title stays one line in the file). The page lists the task's **subtasks**, with **"Add subtask"**. "Add subtask" is also in the task's right-click menu.
 - **Built in M4 step 6 (1 Nov 2026, Proposed details):** the body indicator is a button on every task with a body, completed ones included; ← or the indicator closes an inline body. A click on a rendered body (not on a link, not while selecting text) turns it into the plain monospace field; Esc or leaving the field saves, Enter is a new line. On the page, a click on the title edits it, an empty body offers "Add notes, code or links", and Esc goes back to the list with the task selected. Code blocks are highlighted like the popup (JSON and stack traces, UI-06); images load from the Flint folder only (05 §3, `app://media`); other images show their text.
 
+- **D-86:** a task opened as a page has the note's card around its title and body (NOTE-01, D-85); its subtasks keep their own card below.
 ### TASK-06 — Completion, undo toast, completed section, auto-archive (v1)
 - Completing a task plays a small, satisfying completion animation and shows an **undo toast** instead of a confirmation dialog.
 - Completed tasks move to a **Completed section in the same list**; they do not disappear.
@@ -235,6 +236,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-59 (M4):** with **2+ tasks selected**, a **floating action bar** appears at the bottom of the list: the count, **Select all**, **Move**, **Priority**, **Star** (once Today exists, M6) and **Delete**, plus a clear (×). There is **no separate "edit mode"** and **no extra checkboxes** on rows (they would clash with the completion checkbox): selection looks like the single selected row. **Ctrl+A** in Navigate state selects the visible **open** tasks, never completed ones (D-77), so Ctrl+A then Delete can't wipe Completed. Esc clears the selection.
 - **Built in M4 step 7 (1 Nov 2026, Proposed details):** Shift+↑/↓ and Shift+click mark a range from the anchor (the last row clicked or moved to), Ctrl+click adds or removes one row; Ctrl+A marks every visible open task (D-77); Esc clears the marks first, then the selection. With marks, Space, 1/2/3/0 and Delete act on all of them, and a marked row's right-click menu offers the same for all; each bulk action is **one undo step**. Priority and Complete skip what they don't apply to (priority only on open tasks; Complete completes the open ones, or reopens all if none is open). Move with a new list name creates it once and moves them all there. The bar sits at the bottom centre of the window; Star joins it in M6. **D-77:** marked rows next to each other form one continuous rounded highlight; a mark on its own keeps its own. **D-78:** a marked task with a body (an expanded card) keeps the spacing used around subtasks, so its highlight never overlaps the task above. **D-79:** the vertical rhythm is identical above and below an expanded or marked task with a body and between normal tasks: the card's outline adds no space. Opening another list (Inbox included) clears the marks. Sidebar marks have no action bar; their right-click menu covers lists and notes.
 
+- **D-86, right-click like Windows Explorer:** right-clicking inside a multi-selection keeps it and the menu acts on all of it, saying so (a "3 selected" header, "Unpin 3 tasks"); right-clicking outside it selects just that task (or sidebar list) and acts on it alone. Marks stay after an action-bar action.
 ### TASK-08 — Temporary "sort by priority" (v1)
 - A one-off action that sorts the visible tasks by priority (high → none) **without destroying the manual order**.
 - Manual (drag) order stays the source of truth: the temporary sort is a view; leaving it, or reordering manually, returns to manual order. **Proposed:** a clear "Sorted by priority · Back to manual order" indicator while active.
@@ -274,6 +276,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### TASK-17 — Convert a task to a note (v1, D-85)
 - "Convert to note" in a task's right-click menu creates a note in the sidebar from the task: the title becomes the note's name (its title on the note card), the body its content, the subtasks a checklist (`- [ ]` / `- [x]`, their bodies indented under them). The task leaves its list. One undo step restores both (and removes the note while it is unchanged); a toast offers Undo.
+- **D-86:** afterwards the note opens with the cursor at the end of its text, ready to type (also after converting a whole task list, LIST-04).
 - **Proposed (built in 0.4.19):** the name is the title's plain text, without what Windows can't have in a file name, up to 80 characters ("Note" when nothing is left), with a number added when the name is taken; the task's priority, reminder and IDs are not carried over (a note's fields are inert, LIST-04); a task with subtasks converts as a whole, a subtask converts on its own. The note is written before the task leaves its list, so a crash in between leaves a copy, never a loss.
 
 ### TASK-13 — Stale-task fading (Later)
@@ -289,6 +292,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ## 4. Today
 
 ### TODAY-01 — Pinned tasks and the Today view (v1, D-85)
+- **D-86:** a click on a pin (on a row, in Up next, the panel's Pin chip) unpins the task.
 - **D-85: pinning replaces "star to Today"**, one concept instead of two. A task is **pinned** from any list: right-click **Pin** / **Unpin**, or **P** in Navigate state (and the multi-select bar's Pin). A pinned row shows a small pin indicator. Pinned tasks show in the context panel's **Pinned** section (NAV-07) whichever list is open (built with D-85), and in M6 they are the **Today** view.
 - Written `[pinned:: true]` (04 §3); `[today:: true]` from older files is read as a pin.
 - **D-85, done pins:** a completed pinned task stays pinned (faded) for the rest of the day; at the day change its pin is removed, whether or not the rollover prompt is on.
@@ -481,6 +485,15 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Note open:** the note keeps its 820 px reading column; the panel shows the **Outline** ("6 sections · 3 blocks") and **In this note** (checklist progress, last edited). The outline lists headings (indented by level, the current section marked, a click jumps there) and under each heading its blocks: code, JSON, stack traces and images, each with a small icon tile and a type tag on the right (`bash`, `json`, `image`…); a click scrolls to the block. Block titles: (1) an explicit title after the language in the fence's info string (```` ```bash Check gateway health ````), kept in the file and ignored by other editors; (2) the first comment line (`# …`, `// …`, `-- …`, `/* … */`); (3) JSON: its top-level keys (`{ region, retries, window }`), a stack trace: the exception's name; (4) the type ("Python block", "Code block"). Images: the alt text, else the file name.
 - **Task open as a page (D-83, grill):** the panel shows the outline of the page's body (headings and blocks, titled as for a note) and **In this task** (subtask progress, reminder, created and edited). A body without headings or blocks shows **Up next** instead. Selecting a subtask on the page doesn't change the panel.
 - **Motion:** slides and fades in when it appears; its height eases when its content changes; its content crossfades when the selection or state changes.
+- **D-86, after 0.4.19 (supersedes D-85's sticky position):**
+  - **Show / hide** slide and fade both ways (the panel stays until it has gone), and the column glides to its place; **Proposed:** about 320 ms, the page curve; a window resize switches at once.
+  - **Sticky:** starts level with the composer (or the note card), scrolls up with the page and sticks 16 px below the title bar (**Proposed**); no gap, never above where it started.
+  - **Up next rows:** title first at one left edge; on the right the icon (pin, bell, overdue bell with the white dot) beside the time or date, then the list name, as on task rows.
+  - **Clickable facts** in "In this note" and "In this task" (a task's page): open checklist items, code blocks, images, links, with counts; a click jumps to the first, the next click to the next (wrapping); the target flashes briefly (**Proposed**).
+  - **No scrollbar** during the panel's transitions; only when its content overflows at rest.
+  - **Extra sections** open and close in one smooth motion; Recently captured's rows line up with the others.
+  - **Attachments:** pictures open in the lightbox; other files in their default app (never a program).
+  - **Task details:** the notes are edited in the panel with the M5 editor; Add subtask adds it in the panel. A click on the Pin chip (**Proposed**) or on a pin in Up next unpins.
 - **D-85, after 0.4.18 (built in 0.4.19):**
   - **Responsive pair:** the full pair (820 / 28 / 440) when the main area fits it, else a **compact pair** (780 px column, 24 px gap, 380 px panel), so a 1536 px window (1920 px at 125 %) shows the panel at 100 %; below that, no panel. **Proposed** thresholds: a main area of 1336 px for the full pair and 1232 px for the compact one (24 px either side).
   - **Back:** a task reached from Up next or another panel link shows a back arrow in the panel header; it returns to the previous list and selection (as Alt+← and the mouse's back button do).
@@ -492,6 +505,15 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Motion** as above, plus the current-section marker sliding; covered by the motion regression test.
   - **Extra sections:** **Recently captured** (Up next: the last 5 popup captures, open or done, newest first, with their list), **References** (a task's or note's link chips: work items, PRs, URLs; clickable) and **Attachments** (file names; linked large files marked, missing ones flagged; a click opens the file as MEDIA-03 does). Each is one quiet collapsed line with a count ("References · 3"), opens on a click, remembers open or closed per section on this machine (**Proposed:** in the main window's local storage), is hidden when empty, and sits below the core content.
   - **Proposed details (0.4.19):** the crossfade keeps the previous content a moment, fading out over the new; the current-section marker is one bar that slides; the panel toggle shows the panel's state (a filled background while shown); the multi-select bar has Pin / Unpin; the blank-area menu and the panel's own menu have Show / Hide panel.
+
+### NAV-08 — The clipboard section of the context panel (v1, late: alongside M8, D-86)
+- A **Clipboard** section docked at the bottom of the context panel (NAV-07), apart from its scrolling content, so it stays reachable under long outlines.
+- It shows **Windows' own clipboard history** (`Clipboard.GetHistoryItemsAsync`, Windows 10 1809+), read while Flint is in the foreground: Flint never records the clipboard itself, and items that password managers exclude stay excluded.
+- Collapsed by default with the newest 3–4 items; scrollable when expanded; expanded state remembered (machine UI state).
+- A click inserts the item at the cursor; **Capture as task** makes it a task (as a capture, CAP-02).
+- Clipboard history off in Windows: a note with a button that opens `ms-settings:clipboard`; Flint never changes the setting. When a group policy turns it off, the note says it may be managed by the organisation.
+- **Screen sharing:** the design includes a caution, since clipboard items are visible to viewers (**open for the design**, e.g. contents hidden until hovered or a "hide contents" switch).
+- Needs a small native bridge to WinRT, chosen under D-30 when built.
 
 ### NAV-06 — Find in page (v1, D-72)
 - **Ctrl+F** opens a find bar in Flint's style (09 §8).

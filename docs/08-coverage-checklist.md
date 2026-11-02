@@ -477,3 +477,21 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 14 | References and Attachments sections, collapsed with a count, remembered, hidden when empty | NAV-07, MEDIA-03 · Done (0.4.19) | 02, D-85 |
 | 15 | Convert a task to a note, one undo step | TASK-17 · Done (0.4.19) | 02, D-85 |
 | 16 | Group fold lag: obvious cause looked for | LIST-05 · Done (0.4.19) | D-85 |
+
+## V. The context panel after 0.4.19, right-click, the clipboard section (3 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Show / hide slide and fade both ways; the column glides | NAV-07, UI-10 · v1 · D-86 fixes | 02, D-86 |
+| 2 | Standard sticky: from the composer / note card up to 16 px below the title bar, no gap | NAV-07 · v1 · D-86 fixes | 02, D-86 |
+| 3 | Up next rows: title at one left edge; icon, time, list on the right | NAV-07 · v1 · D-86 fixes | 02, 09 §8, D-86 |
+| 4 | Clickable facts in In this note / In this task (open checklist items, code, images, links) | NAV-07 · v1 · D-86 fixes | 02, D-86 |
+| 5 | No scrollbar in the panel during transitions | NAV-07, UI-02 · v1 · D-86 fixes | 02, D-86 |
+| 6 | Extra sections animate in one motion; Recently captured rows aligned | NAV-07 · v1 · D-86 fixes | 02, D-86 |
+| 7 | Attachments: pictures in the lightbox, other files in their default app | NAV-07, MEDIA-03 · v1 · D-86 fixes | 02, D-86 |
+| 8 | Task details: notes edited in the panel; Add subtask in the panel | NAV-07, TASK-04, TASK-05 · v1 · D-86 fixes | 02, D-86 |
+| 9 | A click on a pin unpins | TODAY-01 · v1 · D-86 fixes | 02, D-86 |
+| 10 | Right-click inside a selection acts on all (counted labels); outside selects just that item | TASK-07, LIST-01, UI-08 · v1 · D-86 fixes | 02, 03, D-86 |
+| 11 | After Convert to note (task or list) the note opens, cursor ready | TASK-17, LIST-04 · v1 · D-86 fixes | 02, D-86 |
+| 12 | A task's page on a card | TASK-05 · v1 · D-86 fixes | 02, 09 §8, D-86 |
+| 13 | Clipboard section: Windows clipboard history, docked, insert / Capture as task, settings note | NAV-08 · v1 · late (with M8) | 02, D-86 |
