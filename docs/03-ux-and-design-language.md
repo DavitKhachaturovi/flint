@@ -113,6 +113,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Find in page (NAV-06) | Ctrl+F; Enter / Shift+Enter next / previous match; Esc closes | Decided (D-72) |
 | Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓ with the focus in the sidebar, Manual sort only; with the focus in the task list it moves the selected task; nothing selected, nothing moves | Decided (D-73, D-79) |
 | Back / forward on a precision touchpad (NAV-04) | Two-finger horizontal swipe | Decided (D-79) |
+| Interface size (UI-12) | Ctrl+= (Ctrl++) / Ctrl+− / Ctrl+0, remembered per display | Decided (D-81) |
 
 ### All text fields
 - Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.

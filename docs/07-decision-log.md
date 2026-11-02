@@ -572,3 +572,19 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **M8 (APP-11, NAV-02, APP-08):** Settings gets a **Keyboard shortcuts** section listing every non-obvious shortcut (Tab / Shift+Tab, Shift+Enter for notes, Alt+↑/↓, Ctrl+Shift+Space, Ctrl+Shift+X, the mini-mode shortcut, back/forward, Ctrl+K, Ctrl+F…). The global hotkeys are rebound there (the Hotkeys window of D-44 moves into Settings). The `?` cheat sheet shows the same list, from one source.
 - **Answers (grill, 2 Nov 2026):** image deletion removes the link only; the composer's code card is a preview like the popup's; 0.4.15 ships these fixes before the editor, which follows as 0.4.16+.
 - **Next:** the M5 editor (D-79), then M4 step 9.
+
+### D-81 — Feedback on 0.4.15: the group look reverted, wide screens and app zoom
+- **Date:** 2 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed:** everything in 0.4.15 except the points below; the "my call" details of D-80 are accepted (a list dropped on a folded group goes to its end; body images at least 64 px; the group card grows and shrinks with its sliding lists while a list is dragged; a folded header holds still under a dragged list; a title is needed to add from the composer).
+- **Groups (LIST-05; supersedes D-80's visual redesign and mockup 10 on these points):** the group look and the sidebar drag visuals go back to how they were before D-80 (0.4.14), then only these stay from D-80:
+  - an **expanded** group has its highlighted card background by default; a **folded** group is the plain label row again (no card);
+  - while a list is dragged over a group, the group's card shows a **white outline ring** (a folded group shows the card and the ring only then); no "Drop to add" text, the count stays;
+  - D-80's animations that still apply (create, rename, delete, fold/open, Move to / Remove from group, sorting, rows sliding), and all functional changes (new groups at the top with the name field ready, a drop on a folded group adds to its end and the group pulses, the card growing with sliding lists, the reserved scrollbar space, Alt+↑/↓ by focus).
+  - **Reverted:** no folder tile in the header; the name back in the all-caps label style; the count just the number ("4", not "4 lists"); the previous drag feel and visuals: no lift scale, no shrinking over a folded header, no drop line, the card's edges without the spring's overshoot (it read as wobbly). The guide line and the name field's hint go too.
+- **Wide screens (NAV-03, UI-12):** on a 1920 × 1080 monitor at 100 % the fixed ~820 px column left a lot of empty space.
+  - The task-list column grows with the window up to **1160 px** (Proposed), with side padding that grows from 24 to 56 px.
+  - Notes and task pages keep a comfortable reading width (**820 px**, centred); prose never runs edge to edge.
+  - **App zoom (UI-12):** Ctrl+= (and Ctrl++), Ctrl+− and Ctrl+0 zoom the main window in Chrome's steps (67–200 %), **remembered per display**; the level shows briefly when it changes. The capture popup stays at 100 %: zoom is shared per origin in Chromium, so the main window gets its own (`app://main`). M8's Settings plan gets an **Interface size** option.
+  - Checked at 1440 × 900 and 1920 × 1080 effective sizes, maximised and half-screen.
+- **Answers (grill, 2 Nov 2026):** ring only, no "Drop to add"; a folded group is the plain label; zoom for the main window only, Chrome's steps.
+- **Build:** 0.4.16 carries these and the M5 editor's first step.
