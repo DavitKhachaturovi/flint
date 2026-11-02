@@ -2,6 +2,21 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.17 (2 Nov 2026)
+
+The note editor is complete; please test it as a whole.
+
+- **Right-click in a note or a task's notes** for Format (Bold, Italic, Strikethrough, Highlight, Code, Clear formatting), Paragraph (lists, checklist, headings, quote) and Insert (Link, Image from a file, Table, Code block, Horizontal rule). **Ctrl+B** and **Ctrl+I** for bold and italic, **Ctrl+Shift+V** pastes as plain text.
+- **Type `/`** at the start of a line or after a space for the same commands; keep typing to filter (`/co`), Enter or Tab to apply, Esc to close.
+- **Code blocks** have their copy button while editing too, and are highlighted for every common language (bash, PowerShell, C#, Go, Rust, SQL, YAML…), in notes and in task notes.
+- **Ctrl+F** finds in a note: Enter and Shift+Enter go through the matches.
+- **Monospace** for a note: in its right-click menu, or Ctrl+Shift+M.
+- **Videos** (MP4, WebM, MOV) and other files can be dragged in from Explorer or pasted. Videos play in place; one that can't (a phone's HEVC video) offers your default player.
+- **Large files (over 25 MB) are linked, not copied**, so your Flint folder stays small. A notice offers **Copy into Flint instead** and stays until you choose; a linked file shows a "Linked" badge, and "File not found" if the original moves.
+- `==highlighted text==` shows highlighted in task titles and notes too.
+- Link patterns (like `AB#1234` for Azure DevOps) are ready underneath; setting them up comes with Settings.
+- The task list is back to its 0.4.15 width.
+
 ## 0.4.16 (2 Nov 2026)
 
 - **A new editor for notes and task notes** (the first part of M5). It looks like the finished text: headings, bold, links, bullets, checkboxes, code blocks and pictures show formatted, and the markdown signs (`**`, `#`, a link's address) appear only on the line you are typing in. Click a link to open it, a checkbox to tick it, a picture to see it large. Task fields in a note show as small chips ("high", "30 Oct 15:00"). Lists continue on Enter, Tab indents, brackets close by themselves, and pasting code or a screenshot works as in the capture popup.

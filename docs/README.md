@@ -21,7 +21,7 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 
 ## Status
 
-- **Phase:** M4 (task lists) up to step 8 plus the D-80 and D-81 fixes, and the M5 editor's first step (0.4.16), on branch `m4-lists`; next the rest of the M5 editor, then M4 step 9. The current state is in [06 §0](06-roadmap-and-open-questions.md).
+- **Phase:** M4 (task lists) up to step 8, the D-80 to D-82 fixes and the M5 editor complete (0.4.17), on branch `m4-lists`; next the context panel (NAV-07), then M4 step 9. The current state is in [06 §0](06-roadmap-and-open-questions.md).
 - **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg` and `flint-taskbar-24.svg` (D-74).
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
 - **Repository:** `C:\Forge\flint`, Azure DevOps `DavitKhachaturovi/flint` (branch `main`).

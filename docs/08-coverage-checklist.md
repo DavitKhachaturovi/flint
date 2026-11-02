@@ -424,12 +424,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | — | Groups confirmed; the editor is tested when M5's editor work is complete | Done | D-82 |
-| 1 | Task column back to 820 px with 40 px sides; zoom per display and the reading column stay | UI-12 · Done (next build) | 02, 09 §8, D-82 |
+| 1 | Task column back to 820 px with 40 px sides; zoom per display and the reading column stay | UI-12 · Done (0.4.17) | 02, 09 §8, D-82 |
 | 2 | A right-side panel for wide screens (Davit is designing it) | — · not specified yet | D-82 |
-| 3 | Right-click formatting menu in the editor | NOTE-02 · Done (next build) | 02, D-72, D-82 |
-| 4 | Slash commands, `/` at line start or after a space | NOTE-03 · Done (next build) | 02, D-82 |
-| 5 | Copy button on code blocks inside the editor | NOTE-05 · Done (next build) | 02, D-82 |
-| 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · Done (next build) | 02, D-82 |
+| 3 | Right-click formatting menu in the editor | NOTE-02 · Done (0.4.17) | 02, D-72, D-82 |
+| 4 | Slash commands, `/` at line start or after a space | NOTE-03 · Done (0.4.17) | 02, D-82 |
+| 5 | Copy button on code blocks inside the editor | NOTE-05 · Done (0.4.17) | 02, D-82 |
+| 6 | Insert ▸ Image: file picker, copied into attachments/ | NOTE-02, MEDIA-02 · Done (0.4.17) | 02, D-82 |
 
 ## S. The editor's details and the context panel (2 Nov 2026)
 
@@ -448,11 +448,11 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Per-note Monospace (menu, Ctrl+Shift+M), this machine; global default in M8 | NOTE-06, APP-11 · v1 · M5 (setting M8) | 02, D-84 |
-| 2 | Link patterns engine (both ways), settings.json; the M8 editor with inference, preview, presets | NOTE-07, TASK-10, APP-11 · v1 · M5 (editor M8) | 02, D-84 |
-| 3 | Videos MP4/WebM/MOV inline with thumbnail; an unplayable one offers its default player | MEDIA-01 · v1 · M5 | 02, D-84 |
-| 4 | Files over 25 MB linked, sticky notice with Copy into Flint, Linked badge, File not found | MEDIA-03 · v1 · M5 | 02, 04, D-84 |
+| 1 | Per-note Monospace (menu, Ctrl+Shift+M), this machine; global default in M8 | NOTE-06, APP-11 · Done (0.4.17; setting M8) | 02, D-84 |
+| 2 | Link patterns engine (both ways), settings.json; the M8 editor with inference, preview, presets | NOTE-07, TASK-10, APP-11 · Done (0.4.17, engine; editor M8) | 02, D-84 |
+| 3 | Videos MP4/WebM/MOV inline with thumbnail; an unplayable one offers its default player | MEDIA-01 · Done (0.4.17) | 02, D-84 |
+| 4 | Files over 25 MB linked, sticky notice with Copy into Flint, Linked badge, File not found | MEDIA-03 · Done (0.4.17) | 02, 04, D-84 |
 | 5 | Linked files not in snapshots, export, sync; snapshots store each attachment once | DATA-04, DATA-06, SYNC-01 · v1 · M7 | 04, D-84 |
-| 6 | Programs and scripts are never launched from a link | MEDIA-03, APP-09 · v1 · M5 | 02, 05, D-84 |
-| 7 | Highlighting for all common languages, in the editor and in rendered bodies | NOTE-04, UI-06 · v1 · M5 | 02, D-84 |
-| 8 | Find in notes (Ctrl+F) | NAV-06 · v1 · M5 | 02, D-84 |
+| 6 | Programs and scripts are never launched from a link | MEDIA-03, APP-09 · Done (0.4.17) | 02, 05, D-84 |
+| 7 | Highlighting for all common languages, in the editor and in rendered bodies | NOTE-04, UI-06 · Done (0.4.17) | 02, D-84 |
+| 8 | Find in notes (Ctrl+F) | NAV-06 · Done (0.4.17, notes) | 02, D-84 |
