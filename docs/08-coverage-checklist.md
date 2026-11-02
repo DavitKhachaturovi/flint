@@ -456,3 +456,24 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Programs and scripts are never launched from a link | MEDIA-03, APP-09 · Done (0.4.17) | 02, 05, D-84 |
 | 7 | Highlighting for all common languages, in the editor and in rendered bodies | NOTE-04, UI-06 · Done (0.4.17) | 02, D-84 |
 | 8 | Find in notes (Ctrl+F) | NAV-06 · Done (0.4.17, notes) | 02, D-84 |
+
+## U. The context panel after 0.4.18, pins, task to note (2 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Responsive pair: full 820/28/440, compact 780/24/380 (1536 px at 100 %), else none | NAV-07 · v1 · D-85 fixes | 02, 09 §8, D-85 |
+| 2 | Panel back arrow for tasks reached from a panel link; Alt+← and mouse back too | NAV-07, NAV-04 · v1 · D-85 fixes | 02, D-85 |
+| 3 | Panel-toggle button at the top right; Show/Hide panel in right-click menus (Ctrl+K later) | NAV-07, UI-08, NAV-03 · v1 · D-85 fixes | 02, 09 §8, D-85 |
+| 4 | Panel top aligned with the composer (task lists) or the note card, sticky, never higher | NAV-07 · v1 · D-85 fixes | 02, D-85 |
+| 5 | In this note: Created and Edited; Up next footer without the Ctrl+\ hint | NAV-07 · v1 · D-85 fixes | 02, D-85 |
+| 6 | A click on blank space clears the selection (panel shows Up next) | NAV-07, TASK-07 · v1 · D-85 fixes | 02, D-85 |
+| 7 | Scroll-spy outline: last heading at the end, current entry kept in view, smooth jump | NAV-07 · v1 · D-85 fixes | 02, D-85 |
+| 8 | Panel motion plays (appear, height, crossfade, marker); in the motion regression test | NAV-07, UI-10 · v1 · D-85 fixes | 02, 03 §5, D-85 |
+| 9 | Notes on a card (title and body); the panel outside it | NOTE-01 · v1 · D-85 fixes | 02, 09 §8, D-85 |
+| 10 | Up next: Pinned, Today, Tomorrow, then a quiet Overdue | NAV-07, TODAY-01 · v1 · D-85 fixes | 02, D-85 |
+| 11 | Pins replace star to Today: Pin/Unpin menu, P, pin on the row, `pinned:: true` (reads `today`) | TODAY-01 · v1 · D-85 fixes (Today view M6) | 02, 03, 04, D-85 |
+| 12 | Done pins unpinned at the day change; rollover prompt "Roll over unfinished pinned tasks?" | TODAY-01, TODAY-02 · v1 · unpinning D-85 fixes, prompt M6 | 02, 06 Q-04, D-85 |
+| 13 | Recently captured (last 5 popup captures, `captured` in meta.json) | NAV-07, CAP-01 · v1 · D-85 fixes | 02, 04, D-85 |
+| 14 | References and Attachments sections, collapsed with a count, remembered, hidden when empty | NAV-07, MEDIA-03 · v1 · D-85 fixes | 02, D-85 |
+| 15 | Convert a task to a note, one undo step | TASK-17 · v1 · D-85 fixes | 02, D-85 |
+| 16 | Group fold lag: obvious cause looked for | LIST-05 · v1 · D-85 fixes | D-85 |

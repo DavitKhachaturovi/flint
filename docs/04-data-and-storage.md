@@ -76,7 +76,7 @@ mode: tasks
     NullReferenceException at TenantResolver.Resolve(...)
     ```
     - [ ] Add regression test [id:: m2p1]
-- [ ] Ask about staging DNS [today:: true] [id:: q8x2]
+- [ ] Ask about staging DNS [pinned:: true] [id:: q8x2]
 - [ ] Update CI agent image [priority:: low] [id:: r5t0]
 
 ## Completed
@@ -98,18 +98,18 @@ The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) re
 | `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
 | `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 10:00 (D-69; 09:00 before, Q-02). | Reminder time | REM-01 |
 | `muted` | `true`, any letter case (absent = the reminder is on) (D-66) | The reminder is turned off: kept, shown faint, never fired | REM-12 |
-| `today` | `true`, any letter case (absent = not starred) | Starred into Today | TODAY-01 |
+| `pinned` | `true`, any letter case (absent = not pinned). **D-85:** `today:: true` (the earlier name) is read as `pinned` and written as `pinned` when Flint next writes that line | Pinned (the Today view in M6) | TODAY-01 |
 | `completion` | written: `YYYY-MM-DDTHH:MM`; read: also `YYYY-MM-DD` (what Dataview and Obsidian Tasks write) and `…:SS` (**Proposed**) | Completion timestamp (completed tasks only) | TASK-06 |
 
-The app never shows fields as text; it renders them as the stripe, bell, star, and so on (unknown fields are kept but not shown). The capture shorthand (`!h ##list @15:00`, CAP-03) is input syntax only and is never written to disk.
+The app never shows fields as text; it renders them as the stripe, bell, pin, and so on (unknown fields are kept but not shown). The capture shorthand (`!h ##list @15:00`, CAP-03) is input syntax only and is never written to disk.
 
 ### Parsing and writing rules
 - **Tolerant reader (D-21):**
-  - **Flint's own fields** (`priority`, `reminder`, `muted`, `today`, `completion`, `id`) are recognised anywhere in the line, in `[]` or `()`, with or without a space after `::`, **only when the value is valid** for that key (see Fields).
+  - **Flint's own fields** (`priority`, `reminder`, `muted`, `pinned` (read also as `today`, D-85), `completion`, `id`) are recognised anywhere in the line, in `[]` or `()`, with or without a space after `::`, **only when the value is valid** for that key (see Fields).
   - **Unknown fields** are recognised only in the trailing run of fields at the end of the line, and only with whitespace after `::` (`[due:: 2026-11-02]`). Anywhere else, `[…::…]` and `(…::…)` are title text: `check [Vec::new] behaviour` keeps its text, visible and in place.
   - Nothing inside an inline code span is ever a field.
   - A trailing Obsidian block ID (`^a1b2`) at the very end of the line doesn't break the trailing run (D-29).
-- **Canonical writer (D-21, D-66):** `[]` fields at the end of the line in the order `reminder`, `muted`, `today`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (D-29).
+- **Canonical writer (D-21, D-66):** `[]` fields at the end of the line in the order `reminder`, `muted`, `pinned`, `completion`, `priority`, `id`, then unknown fields in their original order, then the block ID if there is one. Values of fields that didn't change keep their raw text, so `[priority:: highest]` is not rewritten as `high` (D-29).
 - **Only touch what changed.** Lines Flint didn't modify are written back byte-for-byte. Non-task content (headings, paragraphs, plain bullets, blank lines, HTML comments) is preserved exactly and stays in place (D-22). Parsing and serializing an untouched file returns it byte-for-byte, including one with missing IDs: repair only happens as part of a save caused by an edit.
 - **Missing IDs** (lines added by hand or by the CLI) are assigned on Flint's next save of that file. Until then the task has a provisional in-memory ID that stays stable across re-parses (D-29).
 - **Duplicate IDs** (e.g. a line copy-pasted in a text editor): within a file, the first keeps the ID and later ones get new IDs; across files, the older file (by creation time, then path) keeps them (D-23, **Proposed**).
@@ -139,8 +139,8 @@ The app never shows fields as text; it renders them as the stripe, bell, star, a
 
 ### Bookkeeping in `.flint/meta.json` and `.flint/today.json`
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
-- `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
-- `today.json`: the manual order of Today. Today membership itself is the `today` field in the line, so losing this file only loses the order.
+- `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion), and **D-85** `captured` (when it came from the capture popup, for Recently captured); per note ID its `created` (first sighting). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
+- `today.json`: the manual order of Today. Today membership itself is the `pinned` field in the line (D-85), so losing this file only loses the order.
 
 ### Sidebar groups in `.flint/sidebar.json` (LIST-05, LIST-06, D-73, Proposed format)
 - One file for the sidebar's groups and its manual order, kept in the Flint folder so it travels with the lists. Groups are not folders: the list files stay flat (D-23).
@@ -195,7 +195,7 @@ mode: note
 - Items older than 30 days are purged (then MEDIA-04 runs).
 
 ### Undo (DATA-03)
-- An in-app operation history (per session) covers text edits and structural operations: delete, move, reorder, priority, completion, star, conversion, bulk actions, multi-line paste.
+- An in-app operation history (per session) covers text edits and structural operations: delete, move, reorder, priority, completion, pin, conversion (TASK-17 too), bulk actions, multi-line paste.
 
 ### Snapshots (DATA-04)
 - Periodic zipped copies of the Flint folder (excluding nothing; it's small) in `%LOCALAPPDATA%\Flint\snapshots`, taken only when something changed. Restore from settings. Retention: Q-05 (**Proposed:** hourly for 48 h, then daily for 30 days).

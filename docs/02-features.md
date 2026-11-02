@@ -272,26 +272,32 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - "Duplicate" in a task's right-click menu.
 - **D-74:** the copy has the title, body and priority, but **not the reminder** (a duplicate must not fire the same reminder twice). **Proposed:** it appears right below the original, open, with a new ID (subtasks copied with new IDs), and is selected; offered for open tasks. Undoable. Built in M4 step 7.
 
+### TASK-17 — Convert a task to a note (v1, D-85)
+- "Convert to note" in a task's right-click menu creates a note in the sidebar from the task: the title becomes the note's title (heading and name), the body its content, the subtasks a checklist (`- [ ]` / `- [x]`, their bodies indented under them). The task leaves its list. One undo step restores both.
+- **Proposed:** the note is named like a new note (a number added when the name is taken) and placed where new notes go; the task's priority and reminder are not carried over (a note's fields are inert, LIST-04); a task with subtasks converts as a whole, a subtask converts on its own. Milestone: with the D-85 fixes.
+
 ### TASK-13 — Stale-task fading (Later)
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
 - Requires a per-task "last touched" timestamp, which **v1 must already record** (04) so this can ship without a migration.
 
 ### TASK-14 — Triage mode for Inbox (Later)
-- Steps through Inbox tasks one at a time: pick a list, priority, star to Today, or delete, all by keyboard.
+- Steps through Inbox tasks one at a time: pick a list, priority, pin (TODAY-01), or delete, all by keyboard.
 - Turns "sorted later, or never" into a 2-minute ritual.
 
 ---
 
 ## 4. Today
 
-### TODAY-01 — Today view of starred tasks (v1)
-- Users **star** tasks from any list into **Today**.
+### TODAY-01 — Pinned tasks and the Today view (v1, D-85)
+- **D-85: pinning replaces "star to Today"**, one concept instead of two. A task is **pinned** from any list: right-click **Pin** / **Unpin**, or **P** in Navigate state (and the multi-select bar's Pin). A pinned row shows a small pin indicator. Pinned tasks show in the context panel's **Pinned** section (NAV-07) whichever list is open (built with D-85), and in M6 they are the **Today** view.
+- Written `[pinned:: true]` (04 §3); `[today:: true]` from older files is read as a pin.
+- **D-85, done pins:** a completed pinned task stays pinned (faded) for the rest of the day; at the day change its pin is removed, whether or not the rollover prompt is on.
 - Today holds **references, not copies**: completing, editing, or changing priority of a task in Today changes it in its home list, and vice versa.
 - Each task in Today shows its home list subtly. **Proposed:** Today has its own manual order (drag to reorder) independent of home-list order.
 
 ### TODAY-02 — End-of-day rollover prompt (v1, optional)
-- At the end of the day, Flint can optionally prompt: **"Roll over unfinished?"** — keep unfinished tasks starred for tomorrow, or clear them from Today (they stay in their home lists).
-- The prompt is optional (can be turned off in settings). When and how the prompt appears is open question Q-04.
+- At the end of the day, Flint can optionally prompt: **"Roll over unfinished pinned tasks?"** (D-85): keep the unfinished pinned tasks pinned for tomorrow, or unpin them (they stay in their home lists).
+- The prompt is on by default and can be turned off in Settings. When and how the prompt appears is open question Q-04.
 
 ### TODAY-03 — Reminders section in Today (v1)
 - Today includes a **Reminders** section listing tasks with upcoming reminders (see REM-08), so users can see what's scheduled without opening each task.
@@ -471,9 +477,20 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - It appears by itself when the window is wide enough for both: the main area at least **1336 px** (820 + 28 + 440 and 24 px either side), a window of about **1580 px** with the sidebar (**Proposed**, tuned from "about 1400 px", which can't hold both next to the sidebar; D-83). A 1920 px screen at 125 % (1536 px) gets it at 90 % interface size (UI-12); **Ctrl+\** hides and shows it, remembered **per monitor** (like the interface size, UI-12). Below that width nothing changes.
 - **Task selected:** the selected task's details, following the selection (click or ↑/↓). Header: a "Task" label, **Open as page**, hide. The checkbox and the title (editable); chips for priority, list and reminder, each opening its picker (CAP-11); **Notes** in the M5 editor with code cards and image thumbnails (on wide screens the notes are edited here; the row doesn't expand inline); **Subtasks** with progress ("1 of 2"), toggling and **Add subtask**; a footer with the created and edited dates. On wide screens the row's own body / open-as-page control goes (the panel has it); on narrow windows inline expanding and the page view stay as they are (TASK-05).
 - **Nothing selected, "Up next":** overdue reminders first (the bell with the white dot, REM-11), then Today's and Tomorrow's reminders by time, then **Starred for today** (only once Today and starring exist, M6; until then reminders only). A footer hint: "Select a task to see its details here · Ctrl+\ hides the panel". Clicking an item selects (or opens) its task.
+  - **D-85 (supersedes the order and the hint):** **Pinned** first (TODAY-01; done ones faded until the day changes), then **Today** and **Tomorrow** by time, then **Overdue** as a quieter section at the bottom. The footer is "Select a task to see its details here".
 - **Note open:** the note keeps its 820 px reading column; the panel shows the **Outline** ("6 sections · 3 blocks") and **In this note** (checklist progress, last edited). The outline lists headings (indented by level, the current section marked, a click jumps there) and under each heading its blocks: code, JSON, stack traces and images, each with a small icon tile and a type tag on the right (`bash`, `json`, `image`…); a click scrolls to the block. Block titles: (1) an explicit title after the language in the fence's info string (```` ```bash Check gateway health ````), kept in the file and ignored by other editors; (2) the first comment line (`# …`, `// …`, `-- …`, `/* … */`); (3) JSON: its top-level keys (`{ region, retries, window }`), a stack trace: the exception's name; (4) the type ("Python block", "Code block"). Images: the alt text, else the file name.
 - **Task open as a page (D-83, grill):** the panel shows the outline of the page's body (headings and blocks, titled as for a note) and **In this task** (subtask progress, reminder, created and edited). A body without headings or blocks shows **Up next** instead. Selecting a subtask on the page doesn't change the panel.
 - **Motion:** slides and fades in when it appears; its height eases when its content changes; its content crossfades when the selection or state changes.
+- **D-85, after 0.4.18:**
+  - **Responsive pair:** the full pair (820 / 28 / 440) when the main area fits it, else a **compact pair** (780 px column, 24 px gap, 380 px panel), so a 1536 px window (1920 px at 125 %) shows the panel at 100 %; below that, no panel. **Proposed** thresholds: a main area of 1336 px for the full pair and 1232 px for the compact one (24 px either side).
+  - **Back:** a task reached from Up next or another panel link shows a back arrow in the panel header; it returns to the previous list and selection (as Alt+← and the mouse's back button do).
+  - **Toggle button:** a small panel button at the top right of the main area, near the window controls, shows or hides the panel whenever the window can fit it. "Show panel" / "Hide panel" is in the page's blank-area right-click menu and the panel's own menu (and Ctrl+K later).
+  - **Position:** in a task list the panel's top lines up with the composer's top and stays there while scrolling (sticky, never above it); in a note, with the note card's top.
+  - **In this note:** "Created 2 Nov · edited 11 min ago", as for a task. **Proposed:** a note's created date is its first sighting in `.flint/meta.json`.
+  - **Blank space:** a click on the main area outside a row clears the selection (the panel shows Up next).
+  - **Scroll-spy:** the current section is the last heading above a line 96 px below the top of the view (**Proposed**); scrolled to the end, the last heading is current. The outline keeps the current entry in view; a click smooth-scrolls (instantly under reduce-motion).
+  - **Motion** as above, plus the current-section marker sliding; covered by the motion regression test.
+  - **Extra sections:** **Recently captured** (Up next: the last 5 popup captures, open or done, newest first, with their list), **References** (a task's or note's link chips: work items, PRs, URLs; clickable) and **Attachments** (file names; linked large files marked, missing ones flagged; a click opens the file as MEDIA-03 does). Each is one quiet collapsed line with a count ("References · 3"), opens on a click, remembers open or closed per section on this machine, is hidden when empty, and sits below the core content.
 
 ### NAV-06 — Find in page (v1, D-72)
 - **Ctrl+F** opens a find bar in Flint's style (09 §8).

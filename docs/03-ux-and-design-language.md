@@ -85,7 +85,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Open task as page (TASK-05) | Shift+Enter | Proposed (D-53) |
 | Back from a task's page to its list | Esc (or the back arrow, Alt+←) | Proposed (D-53) |
 | Select all open tasks (TASK-07) | Ctrl+A (the visible open tasks; never completed ones) | Decided (D-77) |
-| Star to / unstar from Today | S | Proposed |
+| Pin / unpin (TODAY-01, D-85) | P | Proposed |
 | Set reminder | R | Proposed |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |
 | Delete (to Trash, undo toast) | Delete | Proposed |
@@ -133,7 +133,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
 - Click a task's title text to edit it there, empty row space to select it, double-click to edit (D-71, §2); click the check to complete.
 - Right-click empty sidebar space for the **+** menu: New task list, New note, New group (D-69, D-73). Only the title-bar strip at the top drags the window.
-- Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; star to Today and reminder join in M6 (**Proposed** items).
+- Right-click anything for its menu (UI-08, D-55). A task: edit, open as page, priority, move, delete; pin / unpin (D-85) and Convert to note (TASK-17, D-85); reminder joins in M6 (**Proposed** items).
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
 - The mouse's back and forward buttons navigate (NAV-04).
 - Cursor: the arrow on every control, the hand only on links (UI-01).
@@ -154,7 +154,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - No priority text is shown on rows.
 
 ### Row anatomy (task list)
-- Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), star (only if starred, **Proposed**).
+- Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), pin (only if pinned, D-85).
 - Task text renders its inline markdown; the raw syntax shows only while editing (LIST-02, D-52).
 - An overdue reminder: the bell with a small dot and the time in brighter text; no "Overdue" word, no red, no badge (REM-11, D-68).
 - The bell is a button: clicking it turns the reminder off (a strike line is drawn through the bell, the time turns faint, an overdue dot goes away) and on again; the bell never moves (REM-12, D-66, D-68). Clicking the **time** opens the date/time picker to change it (REM-01, D-68).
