@@ -72,6 +72,14 @@ const main = {
     ipcRenderer.on(Channels.mainChanged, () => listener());
   },
   /** A reminder's Open (REM-05): show this task. */
+  /** UI-12, D-81: zoom in, out or back to 100 % on this display. */
+  zoom(how: 'in' | 'out' | 'reset'): Promise<void> {
+    return ipcRenderer.invoke(Channels.mainZoom, how) as Promise<void>;
+  },
+  /** UI-12, D-81: the interface size changed (Ctrl+= / Ctrl+− / Ctrl+0, or another display). */
+  onZoomed(listener: (factor: number) => void): void {
+    ipcRenderer.on(Channels.mainZoomed, (_event, factor: number) => listener(factor));
+  },
   onReveal(listener: (target: { readonly listId: string; readonly key: string }) => void): void {
     ipcRenderer.on(Channels.mainReveal, (_event, target: { listId: string; key: string }) =>
       listener(target),

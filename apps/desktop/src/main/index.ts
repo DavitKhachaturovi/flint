@@ -8,6 +8,7 @@ import {
   nativeImage,
   Notification,
   protocol as schemes,
+  screen,
   session,
   shell,
 } from 'electron';
@@ -35,9 +36,11 @@ import { hotkeysWindow } from './hotkeys-window.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
+import { displayKey, stepZoom, zoomKey, ZoomFile, type ZoomStep } from './zoom.js';
 import {
   APP_SCHEME,
   contentType,
+  MAIN_WINDOW_HOST,
   rendererPageUrl,
   resolveMediaFile,
   resolveRendererFile,
@@ -112,8 +115,8 @@ function ensureDevShortcut(): void {
 
 const devServerUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 /** Where a page loads from: the dev server while developing, otherwise `app://flint` (D-34). */
-const pageUrl = (page: string): string =>
-  devServerUrl ? `${devServerUrl}/${page}/index.html` : rendererPageUrl(page);
+const pageUrl = (page: string, host?: typeof MAIN_WINDOW_HOST): string =>
+  devServerUrl ? `${devServerUrl}/${page}/index.html` : rendererPageUrl(page, host);
 
 configureAppPaths(IDENTITY.name);
 guardNodeNetworkForTests();
@@ -263,7 +266,8 @@ async function start(): Promise<void> {
       sandbox: true,
     },
   });
-  void mainWindow.loadURL(pageUrl('main-window'));
+  // D-81: its own origin, so its zoom (UI-12) never reaches the capture popup.
+  void mainWindow.loadURL(pageUrl('main-window', MAIN_WINDOW_HOST));
   // APP-02/03: closing hides; quitting is explicit (tray, M2).
   let quitting = false;
   mainWindow.on('close', (event) => {
@@ -277,6 +281,7 @@ async function start(): Promise<void> {
   });
   recoverFromCrashes(mainWindow, 'main window', log);
   void rememberWindowState(mainWindow, 'main', { x: 0, y: 0, width: 900, height: 640 });
+  setUpZoom(mainWindow);
   const showMain = (): void => {
     mainWindow.show();
     mainWindow.focus();
@@ -760,4 +765,58 @@ function waitFor<T>(waiters: ((value: T) => void)[], timeout: number): Promise<T
     }
     waiters.push(done);
   });
+}
+
+/**
+ * Interface size (UI-12, D-81): Ctrl+= (Ctrl++), Ctrl+− and Ctrl+0 zoom the main window, remembered
+ * per display; moving the window to another display takes that display's size. The level shows
+ * briefly in the window. The title bar's strip grows with the page, so Windows' caption buttons do
+ * too. Handled before the page and any menu sees the keys.
+ */
+function setUpZoom(window: BrowserWindow): void {
+  const zooms = new ZoomFile(join(app.getPath('userData'), 'zoom.json'));
+  const loaded = zooms.load();
+  const displayOf = (): string => displayKey(screen.getDisplayMatching(window.getBounds()));
+  let shownOn = '';
+  const apply = (show: boolean): void => {
+    if (window.isDestroyed()) return;
+    shownOn = displayOf();
+    const factor = zooms.get(shownOn);
+    window.webContents.setZoomFactor(factor);
+    window.setTitleBarOverlay({
+      color: '#0D0E10',
+      symbolColor: '#7C7F84',
+      height: Math.round(40 * factor),
+    });
+    if (show) window.webContents.send(Channels.mainZoomed, factor);
+  };
+  window.webContents.on('did-finish-load', () => void loaded.then(() => apply(false)));
+  let timer: NodeJS.Timeout | undefined;
+  window.on('move', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!window.isDestroyed() && displayOf() !== shownOn) apply(true);
+    }, 250);
+  });
+  const zoomBy = async (how: ZoomStep): Promise<void> => {
+    const display = displayOf();
+    await zooms
+      .set(display, stepZoom(zooms.get(display), how))
+      .catch((error: unknown) => log(`zoom not saved: ${String(error)}`));
+    apply(true);
+  };
+  // Real key presses: before the page and any menu sees them.
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !input.control || input.alt || input.meta) return;
+    const how = zoomKey(input.key, input.code);
+    if (!how) return;
+    event.preventDefault();
+    void zoomBy(how);
+  });
+  // Keys that reach the page anyway (synthesized ones, as in the end-to-end tests) ask here.
+  ipcMain.handle(Channels.mainZoom, (event, how: unknown) =>
+    event.sender === window.webContents && (how === 'in' || how === 'out' || how === 'reset')
+      ? zoomBy(how)
+      : undefined,
+  );
 }

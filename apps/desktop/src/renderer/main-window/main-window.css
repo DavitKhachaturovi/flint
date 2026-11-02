@@ -195,15 +195,23 @@ button:focus-visible {
   scrollbar-gutter: stable;
 }
 
+/* UI-12, D-81: task lists grow with the window up to 1160 px, with side room that grows from 24 to
+   56 px; notes and task pages keep an 820 px reading column (below). */
 .content {
+  --content-side: clamp(24px, 3.2vw, 56px);
   position: relative;
   width: 100%;
-  max-width: 820px;
+  max-width: 1160px;
   margin: 0 auto;
-  padding: 4px 40px 120px;
+  padding: 4px var(--content-side) 120px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.content.note-page,
+.content.task-page {
+  max-width: calc(740px + 2 * var(--content-side));
 }
 
 .list-header {
@@ -1797,8 +1805,10 @@ textarea:not([readonly], [disabled]) {
   color: var(--fl-text-faint);
 }
 
-/* LIST-05, D-80 (09 §8, mockup 10): a group is a soft card holding its header and its lists,
-   indented on a faint guide line; collapsed, it is one card row. Folding animates like Completed. */
+/* LIST-05, D-73, D-81 (09 §8): a group header in the section-label style with a chevron and the
+   list count; its lists indented under it; folding animates like Completed. An expanded group sits
+   on a highlighted card; a folded one is the plain label row. The padding is the same either way, so
+   folding moves nothing but the card's look. */
 .lists-label {
   gap: 2px;
 }
@@ -1810,46 +1820,46 @@ textarea:not([readonly], [disabled]) {
 .nav-group {
   position: relative;
   flex: 0 0 auto;
-  margin: 3px 0;
+  margin: 2px 0;
   padding: 3px;
   border-radius: 14px;
+  transition:
+    background-color var(--fl-dur-state) ease,
+    box-shadow var(--fl-dur-state) ease;
+}
+
+.nav-group:not(.collapsed) {
   background: var(--fl-ground-card);
   box-shadow:
     0 0 0 1px var(--fl-edge-divider),
     inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 3%, transparent);
-  transition:
-    background-color var(--fl-dur-fast),
-    box-shadow var(--fl-dur-fast);
 }
 
-.nav-group.collapsed:hover {
-  background: var(--fl-ground-hover);
+/* D-81: a list dragged over a group: the white ring around its card (a folded one gets the card). */
+.nav-group.drop-target {
+  background: var(--fl-ground-card);
+  box-shadow: 0 0 0 1.5px var(--fl-text-highlight);
 }
 
-.nav-group-head,
-.naming-head {
+.nav-group-head {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 4px 10px 4px 6px;
-  border-radius: 11px;
+  padding: 7px 10px 3px 6px;
+  border-radius: var(--fl-radius-row);
   text-align: left;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--fl-text-heading-soft);
+  font-size: var(--fl-size-label);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
   transition: color var(--fl-dur-fast);
 }
 
 .nav-group-head:hover,
-.nav-group.focus > .nav-group-head {
-  color: var(--fl-text-highlight);
-}
-
-.nav-group-head .tile,
-.naming-head .tile {
+.nav-group-head.focus {
   color: var(--fl-text-secondary);
 }
 
@@ -1867,12 +1877,12 @@ textarea:not([readonly], [disabled]) {
 }
 
 .nav-group-head .nav-count {
-  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .group-chevron {
   display: flex;
-  color: var(--fl-text-muted);
   transition: transform var(--fl-dur-base) var(--fl-ease-spring);
 }
 
@@ -1900,118 +1910,31 @@ textarea:not([readonly], [disabled]) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 0 0 14px;
-}
-
-/* The guide line, under the header's folder tile. */
-.group-inner::before {
-  content: '';
-  position: absolute;
-  left: 19px;
-  top: 2px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--fl-edge-card);
+  gap: 3px;
+  padding-left: 8px;
 }
 
 .group-lists.open .group-inner {
   padding-bottom: 2px;
 }
 
-/* Dragging a list over a group (D-80): the card lights up and says "Drop to add". */
-.drop-hint {
-  display: none;
-  font-family: var(--fl-font-mono);
-  font-size: var(--fl-size-meta);
-  font-weight: 400;
-  color: var(--fl-text-primary);
+.name-field.group .nav.on {
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
-.nav-group.drop-target {
-  background: var(--fl-ground-hover);
-  box-shadow:
-    0 0 0 1.5px var(--fl-accent),
-    0 0 0 5px color-mix(in srgb, var(--fl-accent) 10%, transparent);
+.name-field.group .tile {
+  width: 16px;
+  background: none;
+  box-shadow: none;
 }
 
-.nav-group.drop-target .group-count {
-  display: none;
-}
-
-.nav-group.drop-target .drop-hint {
-  display: inline;
-}
-
-.drop-line {
-  position: absolute;
-  z-index: 6;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--fl-text-primary);
-  pointer-events: none;
-  transition:
-    transform var(--fl-dur-fast) var(--fl-ease-spring),
-    left var(--fl-dur-fast) ease,
-    opacity var(--fl-dur-fast) ease;
-}
-
-.drop-line::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fl-text-primary);
-}
-
-.drop-line[hidden] {
-  display: block;
-  opacity: 0;
-}
-
-/* Over a folded group's header the dragged list shrinks a little, so the lit card shows around it. */
-.nav.drag-lift.drag-onto {
-  scale: 0.9;
-}
-
-/* A list dropped on a folded group goes into its card. */
+/* A list dropped on a folded group goes into it. */
 .nav.drop-into {
   opacity: 0;
-  scale: 0.9;
   transition:
     transform var(--fl-dur-fast) var(--fl-ease-spring),
-    opacity var(--fl-dur-fast) ease,
-    scale var(--fl-dur-fast) ease;
-}
-
-/* The group's name field (new or renamed), in the header's place (mockup 10). */
-.name-field.group {
-  display: flex;
-  flex-direction: column;
-}
-
-.naming-head .name-input {
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 8px;
-  background: var(--fl-ground-well);
-  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
-}
-
-.name-hint {
-  margin: 2px 8px 6px 46px;
-  font-size: 11.5px;
-  font-weight: 400;
-  color: var(--fl-text-faint);
-}
-
-.nav-group.naming {
-  box-shadow:
-    0 0 0 1px var(--fl-edge-float),
-    inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 5%, transparent);
+    opacity var(--fl-dur-fast) ease;
 }
 
 /* TASK-01, LIST-05, D-54: the locked, springy drag. The lifted item is raised and follows the
@@ -2083,23 +2006,19 @@ textarea:not([readonly], [disabled]) {
   pointer-events: none;
 }
 
-/* Where a dragged list will land: indented into a group, or flush out of one. */
+/* Where a dragged list will land: indented into a group, or flush out of one (the group card's
+   3 px padding and the lists' 8 px indent). */
 .nav.drag-lift {
-  scale: 1.02;
-  transition:
-    padding-left var(--fl-dur-fast) ease,
-    scale var(--fl-dur-fast) ease,
-    opacity var(--fl-dur-fast) ease;
+  transition: padding-left var(--fl-dur-fast) ease;
 }
 
-/* The group card's padding and its lists' indent (D-80): 3 + 14 px. */
 .nav.drag-indent {
-  padding-left: 24px;
+  padding-left: 18px;
 }
 
 .group-inner .nav.drag-outdent {
-  margin-left: -17px;
-  width: calc(100% + 17px);
+  margin-left: -11px;
+  width: calc(100% + 11px);
 }
 
 .nav.drag-drop {
@@ -2307,9 +2226,10 @@ textarea:not([readonly], [disabled]) {
   }
 }
 
-/* D-80: while a list is dragged in the sidebar, a group card's surface is drawn apart from it, from
-   its header to its last row or the landing slot (--card-top, --card-bottom, set by the drag), so
-   the card grows, shrinks and moves with its sliding rows. */
+/* D-80, D-81: while a list is dragged in the sidebar, a group card's surface is drawn apart from
+   it, from its header to its last row or the landing slot (--card-top, --card-bottom, set by the
+   drag), so the card grows, shrinks and moves with its sliding rows: without the spring's
+   overshoot, which made it wobble (D-81). A folded group shows a card only as the drop target. */
 .drag-scope .nav-group:not(.drag-lift) {
   background: transparent;
   box-shadow: none;
@@ -2323,24 +2243,56 @@ textarea:not([readonly], [disabled]) {
   top: var(--card-top, 0px);
   bottom: calc(0px - var(--card-bottom, 0px));
   border-radius: 14px;
-  background: var(--fl-ground-card);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-divider),
-    inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 3%, transparent);
   transition:
-    top var(--fl-dur-fast) var(--fl-ease-spring),
-    bottom var(--fl-dur-fast) var(--fl-ease-spring),
+    top var(--fl-dur-fast) cubic-bezier(0.2, 0.9, 0.3, 1),
+    bottom var(--fl-dur-fast) cubic-bezier(0.2, 0.9, 0.3, 1),
     background-color var(--fl-dur-fast),
     box-shadow var(--fl-dur-fast);
 }
 
-.drag-scope .nav-group.drop-target:not(.drag-lift)::before {
-  background: var(--fl-ground-hover);
+.drag-scope .nav-group:not(.drag-lift, .collapsed)::before {
+  background: var(--fl-ground-card);
   box-shadow:
-    0 0 0 1.5px var(--fl-accent),
-    0 0 0 5px color-mix(in srgb, var(--fl-accent) 10%, transparent);
+    0 0 0 1px var(--fl-edge-divider),
+    inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 3%, transparent);
 }
 
-.drag-scope .group-inner::before {
-  opacity: 0;
+.drag-scope .nav-group.drop-target:not(.drag-lift)::before {
+  background: var(--fl-ground-card);
+  box-shadow: 0 0 0 1.5px var(--fl-text-highlight);
+}
+
+/* UI-12, D-81: the interface size, shown briefly when it changes (Ctrl+= / Ctrl+− / Ctrl+0). */
+.zoom-pill {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  z-index: 70;
+  padding: 6px 14px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  font-family: var(--fl-font-mono);
+  font-size: 13px;
+  color: var(--fl-text-primary);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: zoom-pill 1400ms ease forwards;
+}
+
+@keyframes zoom-pill {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  12%,
+  75% {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+  100% {
+    opacity: 0;
+  }
 }

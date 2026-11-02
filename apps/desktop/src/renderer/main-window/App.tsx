@@ -47,7 +47,6 @@ import {
   CheckIcon,
   ChevronIcon,
   FlagIcon,
-  FolderIcon,
   ImageIcon,
   HashIcon,
   InboxIcon,
@@ -317,6 +316,38 @@ export function App(): ReactElement {
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
+  /** UI-12, D-81: the interface size, shown a moment when it changes. */
+  const [zoomShown, setZoomShown] = useState<{ readonly text: string; readonly id: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    // Zoom keys the main process didn't take first (it normally does, before the page).
+    const onKey = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+      const how =
+        event.key === '=' || event.key === '+' || event.code === 'NumpadAdd'
+          ? 'in'
+          : event.key === '-' || event.key === '_' || event.code === 'NumpadSubtract'
+            ? 'out'
+            : event.key === '0' || event.code === 'Numpad0'
+              ? 'reset'
+              : null;
+      if (!how) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void window.flintMain.zoom(how);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+  useEffect(() => {
+    let timer: number | undefined;
+    window.flintMain.onZoomed((factor) => {
+      window.clearTimeout(timer);
+      setZoomShown({ text: `${Math.round(factor * 100)}%`, id: Date.now() });
+      timer = window.setTimeout(() => setZoomShown(null), 1500);
+    });
+  }, []);
   /** D-79: the image lightbox, on one task's images. */
   const [lightbox, setLightbox] = useState<{ images: readonly string[]; start: number } | null>(
     null,
@@ -1544,7 +1575,7 @@ export function App(): ReactElement {
       key={key}
       initial={initial}
       placeholder="Group name"
-      icon={<FolderIcon />}
+      icon={<ChevronIcon size={12} />}
       group
       problem={namingProblem}
       onSubmit={(name) => void submitName(name)}
@@ -1745,8 +1776,6 @@ export function App(): ReactElement {
         card.style.setProperty('--card-bottom', `${bottom - card.offsetHeight}px`);
       }
     };
-    // D-80: the drop line, indented when the list would land in a group (made once dragging).
-    let dropLine: HTMLDivElement | null = null;
     /** A folded group whose header the dragged list is over: it goes into that group. */
     let onto: string | null = null;
     /** Folded headers held in place under the dragged list, with the shift the drag gave them. */
@@ -1761,7 +1790,7 @@ export function App(): ReactElement {
       peers: spots.map((spot) => spot.unit),
       scroller,
       canStart,
-      // Cues for where it will land: the group lights up, the line marks the spot, and the row
+      // Cues for where it will land (D-81): the group's card gets its white ring, and the row
       // shows indented in a group or flush at the top level.
       onOver: (index, offset, slot) => {
         // Onto a folded group's header: measured where the header rests, and the header is held
@@ -1789,40 +1818,21 @@ export function App(): ReactElement {
         }
         landing = onto ? { group: onto, index: listsCount(onto) } : destination(index, offset);
         stretchCards(landing, slot);
-        nav.classList.toggle('drag-onto', onto !== null);
         const into = landing.group !== null;
         nav.classList.toggle('drag-indent', into && !inGroup);
         nav.classList.toggle('drag-outdent', !into && inGroup);
         for (const card of aside.querySelectorAll('.nav-group.drop-target'))
           if (card !== cardOf(landing.group ?? '')) card.classList.remove('drop-target');
         if (landing.group) cardOf(landing.group)?.classList.add('drop-target');
-        if (!dropLine) {
-          dropLine = document.createElement('div');
-          dropLine.className = 'drop-line';
-          aside.append(dropLine);
-        }
-        const line = dropLine;
-        line.hidden = onto !== null;
-        if (onto) return;
-        const frame = aside.getBoundingClientRect();
-        const inner = landing.group
-          ? cardOf(landing.group)?.querySelector('.group-inner')?.getBoundingClientRect()
-          : null;
-        const left = (inner ? inner.left + 16 : frame.left + 16) - frame.left;
-        line.style.left = `${left}px`;
-        line.style.width = `${frame.width - left - 16}px`;
-        line.style.top = '0';
-        line.style.transform = `translateY(${slot.bottom - frame.top + aside.scrollTop}px)`;
       },
       onSettle: () => {
         for (const card of aside.querySelectorAll<HTMLElement>('.nav-group'))
           card.style.removeProperty('--card-top');
         for (const card of aside.querySelectorAll<HTMLElement>('.nav-group'))
           card.style.removeProperty('--card-bottom');
-        nav.classList.remove('drag-indent', 'drag-outdent', 'drag-onto', 'drop-into');
+        nav.classList.remove('drag-indent', 'drag-outdent', 'drop-into');
         for (const card of aside.querySelectorAll('.nav-group.drop-target'))
           card.classList.remove('drop-target');
-        dropLine?.remove();
       },
       onDrop: async (index, offset) => {
         const to = landing ?? destination(index, offset);
@@ -2085,7 +2095,7 @@ export function App(): ReactElement {
         </div>
         {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
         {naming?.kind === 'newGroup' && (
-          <div className="nav-group naming" data-flip="naming:group">
+          <div className="naming-group" data-flip="naming:group">
             {groupNameField('', 'new-group')}
           </div>
         )}
@@ -2333,6 +2343,12 @@ export function App(): ReactElement {
         </div>
       )}
 
+      {zoomShown && (
+        <div className="zoom-pill" role="status" key={zoomShown.id}>
+          {zoomShown.text}
+        </div>
+      )}
+
       {lightbox && (
         <Lightbox
           images={lightbox.images}
@@ -2362,11 +2378,10 @@ export function App(): ReactElement {
 }
 
 /**
- * LIST-05, D-73, D-74, D-80 (mockup 10): a group in the sidebar: a soft card with a header that
- * folds it (chevron, folder tile, name in normal case, number of lists) and its lists inside,
- * indented on a guide line. Collapsed, the card is one row whose count says "3 lists". Folding
- * animates; folded lists stay rendered, inert. While a list is dragged over it, the card lights up
- * and says "Drop to add" (`drop-target`, set by the drag).
+ * LIST-05, D-73, D-74, D-81: a group in the sidebar: a header in the section-label style that folds
+ * it (chevron, name, number of lists) and its lists, indented under it. An expanded group sits on a
+ * highlighted card; a list dragged over a group gives the card a white ring (`drop-target`, set by
+ * the drag). Folding animates; folded lists stay rendered, inert.
  */
 function NavGroup(props: {
   readonly group: SidebarGroup;
@@ -2380,17 +2395,17 @@ function NavGroup(props: {
   readonly children: ReactNode;
 }): ReactElement {
   const { group, collapsed, focused, header, onToggle, onMenu, children } = props;
-  const count = group.lists.length;
-  const classes = ['nav-group'];
-  if (collapsed) classes.push('collapsed');
-  if (focused) classes.push('focus');
   return (
-    <div className={classes.join(' ')} data-flip={`group:${group.id}`} data-group={group.id}>
+    <div
+      className={collapsed ? 'nav-group collapsed' : 'nav-group'}
+      data-flip={`group:${group.id}`}
+      data-group={group.id}
+    >
       {header ?? (
         <button
           type="button"
           data-key={group.id}
-          className="nav-group-head"
+          className={focused ? 'nav-group-head focus' : 'nav-group-head'}
           aria-expanded={!collapsed}
           onMouseDown={(event) => event.preventDefault()}
           onClick={onToggle}
@@ -2403,19 +2418,11 @@ function NavGroup(props: {
           <span className={collapsed ? 'group-chevron' : 'group-chevron open'}>
             <ChevronIcon size={12} />
           </span>
-          <span className="tile">
-            <FolderIcon />
-          </span>
           <span className="group-name">
             <MorphText text={group.name} />
           </span>
           <span className="nav-count group-count">
-            <MorphText
-              text={collapsed ? `${count} ${count === 1 ? 'list' : 'lists'}` : `${count}`}
-            />
-          </span>
-          <span className="drop-hint" aria-hidden="true">
-            Drop to add
+            <MorphText text={String(group.lists.length)} />
           </span>
         </button>
       )}
@@ -2883,7 +2890,7 @@ function NameField(props: {
   readonly initial: string;
   readonly placeholder?: string;
   readonly icon: ReactElement;
-  /** LIST-05, D-80: a group's name, in the group card's header (mockup 10). */
+  /** LIST-05: a group's name, in the group header's style. */
   readonly group?: boolean;
   /** D-80: the field's place in the sidebar's motion. */
   readonly flip?: string;
@@ -2893,45 +2900,31 @@ function NameField(props: {
 }): ReactElement {
   const { initial, placeholder, icon, group = false, flip, problem, onSubmit, onCancel } = props;
   const [name, setName] = useState(initial);
-  const input = (
-    <input
-      className="name-input"
-      autoFocus
-      value={name}
-      placeholder={placeholder}
-      spellCheck={false}
-      maxLength={group ? 60 : undefined}
-      onFocus={(event) => event.currentTarget.select()}
-      onChange={(event) => setName(event.target.value)}
-      onBlur={onCancel}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          onSubmit(name);
-        } else if (event.key === 'Escape') {
-          event.preventDefault();
-          onCancel();
-        }
-      }}
-    />
-  );
   return (
     <div className={group ? 'name-field group' : 'name-field'} {...(flip && { 'data-flip': flip })}>
-      {group ? (
-        <div className="naming-head">
-          <span className="group-chevron open">
-            <ChevronIcon size={12} />
-          </span>
-          <span className="tile">{icon}</span>
-          {input}
-        </div>
-      ) : (
-        <div className="nav on">
-          <span className="tile">{icon}</span>
-          {input}
-        </div>
-      )}
-      {group && !problem && <p className="name-hint">Enter saves · Esc cancels</p>}
+      <div className="nav on">
+        <span className="tile">{icon}</span>
+        <input
+          className="name-input"
+          autoFocus
+          value={name}
+          placeholder={placeholder}
+          spellCheck={false}
+          maxLength={group ? 60 : undefined}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={onCancel}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSubmit(name);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              onCancel();
+            }
+          }}
+        />
+      </div>
       {problem && <p className="name-problem">{problem}</p>}
     </div>
   );

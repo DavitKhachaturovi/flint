@@ -23,6 +23,14 @@ describe('app://flint renderer files (D-34)', () => {
     );
   });
 
+  it('serves the main window from its own host, for its own zoom (D-81, UI-12)', () => {
+    expect(rendererPageUrl('main-window', 'main')).toBe('app://main/main-window/index.html');
+    expect(resolveRendererFile('app://main/assets/main-1.js', root)).toBe(
+      join(root, 'assets', 'main-1.js'),
+    );
+    expect(resolveRendererFile('app://other/assets/main-1.js', root)).toBeNull();
+  });
+
   it('gives module scripts a JavaScript content type', () => {
     expect(contentType(join(root, 'assets', 'popup-1.JS'))).toBe('text/javascript; charset=utf-8');
     expect(contentType(join(root, 'fonts', 'Geist.woff2'))).toBe('font/woff2');

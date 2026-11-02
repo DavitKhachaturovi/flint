@@ -33,13 +33,31 @@ export function contentType(file: string): string {
   return CONTENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream';
 }
 
-export function rendererPageUrl(page: string): string {
-  return `${APP_ORIGIN}/${page}/index.html`;
+/**
+ * D-81: the main window is served from its own host, `app://main/…`, because Chromium shares a
+ * page's zoom with every window of the same origin: zooming the main window (UI-12) must not zoom
+ * the capture popup. Same files, same scheme.
+ */
+export const MAIN_WINDOW_HOST = 'main';
+const RENDERER_HOSTS = ['flint', MAIN_WINDOW_HOST] as const;
+
+export function rendererPageUrl(
+  page: string,
+  host: (typeof RENDERER_HOSTS)[number] = 'flint',
+): string {
+  return `${APP_SCHEME}://${host}/${page}/index.html`;
 }
 
-/** The file an `app://flint/…` request maps to, or null when it is anything else or leaves `root`. */
+/**
+ * The file an `app://flint/…` (or `app://main/…`) request maps to, or null when it is anything else
+ * or leaves `root`.
+ */
 export function resolveRendererFile(url: string, root: string): string | null {
-  return resolveIn(url, 'flint', root);
+  for (const host of RENDERER_HOSTS) {
+    const file = resolveIn(url, host, root);
+    if (file) return file;
+  }
+  return null;
 }
 
 /** Images task bodies may show (TASK-05, MEDIA-01). SVG stays out: an image, but also a document. */

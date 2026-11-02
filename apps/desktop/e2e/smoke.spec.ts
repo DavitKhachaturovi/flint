@@ -1285,10 +1285,10 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   await expect(head.first()).toHaveText(/Work\s*0/i);
   const home = main.locator('.nav-group', { hasText: 'Home' }).locator('.nav-group-head');
 
-  // The header folds the group; its lists stay in the file. Folded, its count says "1 list".
+  // The header folds the group; its lists stay in the file. Folded, the count stays a number.
   await home.click();
   await expect(home).toHaveAttribute('aria-expanded', 'false');
-  await expect(home.locator('.group-count')).toHaveText('1 list');
+  await expect(home.locator('.group-count')).toHaveText('1');
   await expect(
     main.locator('.nav-group', { hasText: 'Home' }).locator('.group-lists'),
   ).not.toHaveClass(/open/);
@@ -1410,8 +1410,8 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
     .poll(() => readFile(file, 'utf8'))
     .toContain('- [ ] two [id:: d2]\n    - [ ] two-b [id:: d2b]\n    - [ ] two-a [id:: d2a]\n');
 
-  // A list dragged just below an open group's header joins the group. D-80: on the way the group
-  // lights up ("Drop to add") and the drop line shows where it lands.
+  // A list dragged just below an open group's header joins the group. D-81: on the way the group's
+  // card gets its white ring.
   await main.locator('.add-list').click();
   await main.locator('.fl-menu').getByText('New group').click();
   await main.keyboard.type('Dragged');
@@ -1429,14 +1429,12 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
     await main.mouse.move(x, list.y + list.height / 2);
     await main.mouse.down();
     await main.mouse.move(x, list.y + list.height / 2 - 6, { steps: 2 });
-    await main.mouse.move(x, headBox.y + headBox.height + 4, { steps: 10 });
+    await main.mouse.move(x, headBox.y + headBox.height + 10, { steps: 10 });
     await expect(group).toHaveClass(/drop-target/);
-    await expect(group.locator('.drop-hint')).toBeVisible();
-    await expect(main.locator('.drop-line')).toHaveCount(1);
     await main.mouse.up();
   }
   await expect(group.locator('.nav')).toHaveText([/Drag/]);
-  await expect(main.locator('.drop-target, .drop-line')).toHaveCount(0);
+  await expect(main.locator('.drop-target')).toHaveCount(0);
   // The whole group dragged down one place (new groups start at the top, D-80).
   const order = (): Promise<string[]> =>
     main
@@ -1454,6 +1452,50 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   await drag(head, groupBox.y + groupBox.height / 2 + nextBox.height + 2);
   await expect.poll(order).not.toEqual(before);
   expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') + 1);
+});
+
+test('wide windows and the interface size (UI-12, D-81)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const sizeTo = (width: number, height: number): Promise<void> =>
+    app.evaluate(
+      ({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: 0, y: 0, ...size });
+      },
+      { width, height },
+    );
+  const width = (selector: string): Promise<number> =>
+    main.locator(selector).evaluate((element) => element.getBoundingClientRect().width);
+  // The task list grows with a wide window; a note keeps its reading column.
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await sizeTo(1920, 1040);
+  await expect.poll(() => width('.content')).toBeGreaterThan(1100);
+  await main.locator('.nav', { hasText: 'Bodies' }).click();
+  await main.locator('.row', { hasText: 'Short body' }).click({ position: { x: 600, y: 10 } });
+  await main.keyboard.press('Shift+Enter');
+  await expect.poll(() => width('.content.task-page')).toBeLessThan(900);
+  await main.keyboard.press('Escape');
+  await sizeTo(1120, 780);
+
+  // Ctrl+= / Ctrl+− / Ctrl+0 zoom the main window, show the level, and remember it per display.
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  const popupRatio = await popup?.evaluate(() => window.devicePixelRatio);
+  const before = await main.evaluate(() => window.innerWidth);
+  await main.keyboard.press('Control+Equal');
+  await expect(main.locator('.zoom-pill')).toHaveText('110%');
+  await expect.poll(() => main.evaluate(() => window.innerWidth)).toBeLessThan(before * 0.95);
+  // The popup has its own origin's zoom: it stays at 100 %.
+  if (popup) expect(await popup.evaluate(() => window.devicePixelRatio)).toBe(popupRatio);
+  await main.keyboard.press('Control+Minus');
+  await expect(main.locator('.zoom-pill')).toHaveText('100%');
+  await main.keyboard.press('Control+Minus');
+  await expect(main.locator('.zoom-pill')).toHaveText('90%');
+  await main.keyboard.press('Control+0');
+  await expect(main.locator('.zoom-pill')).toHaveText('100%');
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
