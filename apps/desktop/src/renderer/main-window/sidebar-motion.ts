@@ -72,9 +72,32 @@ export function sidebarMotion(aside: () => HTMLElement | null): SidebarMotion {
     const timing = { duration: duration(), easing: token('--fl-ease-spring', 'ease-out') };
     const moved = new Map<HTMLElement, { x: number; y: number }>();
     const seen = new Set<string>();
-    for (const element of root.querySelectorAll<HTMLElement>('[data-flip]')) {
+    const current = [...root.querySelectorAll<HTMLElement>('[data-flip]')];
+    // A row whose key changed in place (a list file that just got its ID: `file:Errands` → its ID)
+    // is the same row: it neither leaves nor arrives.
+    const departed = [...was.entries()].filter(
+      ([key]) => !current.some((element) => element.dataset['flip'] === key),
+    );
+    const same = new Set<string>();
+    for (const element of current) {
+      const key = element.dataset['flip'] ?? '';
+      if (was.has(key)) continue;
+      const now = measure(element, box, root.scrollTop);
+      const match = departed.find(
+        ([gone, shot]) =>
+          !same.has(gone) &&
+          Math.abs(shot.top - now.top) < 2 &&
+          shot.clone.textContent === element.textContent,
+      );
+      if (match) {
+        same.add(match[0]);
+        same.add(key);
+      }
+    }
+    for (const element of current) {
       const key = element.dataset['flip'] ?? '';
       seen.add(key);
+      if (same.has(key)) continue;
       const old = was.get(key);
       const now = measure(element, box, root.scrollTop);
       if (!old) {
@@ -121,7 +144,7 @@ export function sidebarMotion(aside: () => HTMLElement | null): SidebarMotion {
     // Rows that went away fade out where they were; a group's lists aren't in its ghost (they
     // slide out on their own).
     for (const [key, shot] of was) {
-      if (seen.has(key)) continue;
+      if (seen.has(key) || same.has(key)) continue;
       const parentGone = [...was.entries()].some(
         ([other, outer]) =>
           other !== key &&
