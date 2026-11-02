@@ -142,10 +142,11 @@ export function ContextPanel(props: {
     shown.current = { key: stateKey, node: content };
     if (before.key !== stateKey && !reducedMotion()) setGhost(before);
   });
-  // Gone once it has faded, whatever renders meanwhile.
+  // Gone once it has faded (its animation's end), whatever renders meanwhile; the timer is only a
+  // fallback for a fade that never ends (a hidden window doesn't animate).
   useEffect(() => {
     if (!ghost) return;
-    const timer = window.setTimeout(() => setGhost(null), durationOf(card.current, 260));
+    const timer = window.setTimeout(() => setGhost(null), 2 * durationOf(card.current, 260));
     return () => window.clearTimeout(timer);
   }, [ghost]);
   return (
@@ -169,6 +170,9 @@ export function ContextPanel(props: {
             key={`ghost:${ghost.key}`}
             aria-hidden="true"
             inert
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) setGhost(null);
+            }}
           >
             {ghost.node}
           </div>
