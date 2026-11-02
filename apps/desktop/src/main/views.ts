@@ -5,6 +5,7 @@ import {
   type FlintDocument,
   type TaskNode,
 } from '@flint/core';
+import { agoLabel, dayLabel } from './task-meta.js';
 import { classifyPaste, taskLabel } from '@flint/core/shorthand';
 import {
   atDefaultTime,
@@ -57,7 +58,12 @@ function codeSummary(body: string): TaskRow['code'] {
   };
 }
 
-function taskRow(task: TaskNode, now: Date): TaskRow {
+/** NAV-07, docs/04 §3: a task's bookkeeping, when there is any. */
+export type TaskStamps = (
+  key: string,
+) => { readonly created: string; readonly lastTouched: string } | undefined;
+
+function taskRow(task: TaskNode, now: Date, stamps?: TaskStamps): TaskRow {
   const { line } = task;
   const body = getBody(task);
   const title = line.title.trim();
@@ -86,8 +92,17 @@ function taskRow(task: TaskNode, now: Date): TaskRow {
     body,
     subtasks: task.children
       .filter((child): child is TaskNode => child.kind === 'task')
-      .map((child) => taskRow(child, now)),
+      .map((child) => taskRow(child, now, stamps)),
+    ...stampLabels(stamps?.(task.key), now),
   };
+}
+
+function stampLabels(
+  stamp: { readonly created: string; readonly lastTouched: string } | undefined,
+  now: Date,
+): { created?: string; edited?: string } {
+  if (!stamp) return {};
+  return { created: dayLabel(stamp.created, now), edited: agoLabel(stamp.lastTouched, now) };
 }
 
 export interface ListMeta {
@@ -97,7 +112,12 @@ export interface ListMeta {
   readonly readOnly: string | null;
 }
 
-export function listView(document: FlintDocument, meta: ListMeta, now: Date): ListView {
+export function listView(
+  document: FlintDocument,
+  meta: ListMeta,
+  now: Date,
+  stamps?: TaskStamps,
+): ListView {
   if (meta.mode === 'note') {
     return {
       ...meta,
@@ -135,7 +155,7 @@ export function listView(document: FlintDocument, meta: ListMeta, now: Date): Li
       flush();
       continue;
     }
-    const row = taskRow(block, now);
+    const row = taskRow(block, now, stamps);
     if (inCompleted) completed.push(row);
     else items.push({ kind: 'task', task: row });
   }

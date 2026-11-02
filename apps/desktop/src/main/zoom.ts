@@ -78,3 +78,39 @@ export class ZoomFile {
     });
   }
 }
+
+/**
+ * NAV-07, D-83: the displays where the context panel is hidden (Ctrl+\), in `panel.json` next to
+ * the zoom: the panel shows by default wherever it fits.
+ */
+export class PanelFile {
+  private hiddenOn = new Set<string>();
+  readonly path: string;
+
+  constructor(path: string) {
+    this.path = path;
+  }
+
+  async load(): Promise<void> {
+    try {
+      const parsed = JSON.parse(await readFile(this.path, 'utf8')) as unknown;
+      this.hiddenOn = new Set(
+        Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [],
+      );
+    } catch {
+      this.hiddenOn = new Set();
+    }
+  }
+
+  hidden(display: string): boolean {
+    return this.hiddenOn.has(display);
+  }
+
+  async set(display: string, hidden: boolean): Promise<void> {
+    if (hidden) this.hiddenOn.add(display);
+    else this.hiddenOn.delete(display);
+    await writeFileAtomic(this.path, `${JSON.stringify([...this.hiddenOn], null, 2)}\n`, {
+      tempDirectory: join(dirname(this.path), 'tmp'),
+    });
+  }
+}

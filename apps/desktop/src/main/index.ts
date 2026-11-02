@@ -39,7 +39,8 @@ import { hotkeysWindow } from './hotkeys-window.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
-import { displayKey, stepZoom, zoomKey, ZoomFile, type ZoomStep } from './zoom.js';
+import { displayKey, PanelFile, stepZoom, zoomKey, ZoomFile, type ZoomStep } from './zoom.js';
+import { upNext } from './up-next.js';
 import {
   APP_SCHEME,
   contentType,
@@ -438,6 +439,10 @@ async function start(): Promise<void> {
     const problem = await shell.openPath(path);
     return problem === '' ? 'opened' : 'refused';
   });
+  // NAV-07, D-83: the context panel's "Up next".
+  ipcMain.handle(Channels.mainUpNext, (event) =>
+    owns(event.sender) ? upNext(workspace.reminderTasks(), new Date()) : [],
+  );
   // NOTE-06, D-84: a note in monospace, on this machine.
   ipcMain.handle(Channels.mainNoteMono, async (event, id: unknown, on: unknown) => {
     if (!owns(event.sender) || typeof id !== 'string' || typeof on !== 'boolean') return;
@@ -882,7 +887,9 @@ function waitFor<T>(waiters: ((value: T) => void)[], timeout: number): Promise<T
  */
 function setUpZoom(window: BrowserWindow): void {
   const zooms = new ZoomFile(join(app.getPath('userData'), 'zoom.json'));
-  const loaded = zooms.load();
+  // NAV-07, D-83: the context panel hidden or not, per display too.
+  const panels = new PanelFile(join(app.getPath('userData'), 'panel.json'));
+  const loaded = Promise.all([zooms.load(), panels.load()]);
   const displayOf = (): string => displayKey(screen.getDisplayMatching(window.getBounds()));
   let shownOn = '';
   const apply = (show: boolean): void => {
@@ -896,7 +903,14 @@ function setUpZoom(window: BrowserWindow): void {
       height: Math.round(40 * factor),
     });
     if (show) window.webContents.send(Channels.mainZoomed, factor);
+    window.webContents.send(Channels.mainPanel, panels.hidden(shownOn));
   };
+  ipcMain.on(Channels.mainSetPanel, (event, hidden: unknown) => {
+    if (event.sender !== window.webContents || typeof hidden !== 'boolean') return;
+    void panels
+      .set(displayOf(), hidden)
+      .catch((error: unknown) => log(`panel not saved: ${String(error)}`));
+  });
   window.webContents.on('did-finish-load', () => void loaded.then(() => apply(false)));
   let timer: NodeJS.Timeout | undefined;
   window.on('move', () => {

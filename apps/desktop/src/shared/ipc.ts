@@ -60,6 +60,12 @@ export const Channels = {
   mainAttachmentExists: 'main:attachment-exists',
   /** Main window → main: an attachment in its default app, by the rules of D-84. */
   mainOpenAttachment: 'main:open-attachment',
+  /** Main window → main: the context panel's "Up next" (NAV-07, D-83). */
+  mainUpNext: 'main:up-next',
+  /** Main → main window: the context panel hidden or shown on this display (NAV-07, D-83). */
+  mainPanel: 'main:panel',
+  /** Main window → main: Ctrl+\ hid or showed the panel on this display. */
+  mainSetPanel: 'main:set-panel',
   /** Main window → main: a note in monospace or not (NOTE-06, D-84). */
   mainNoteMono: 'main:note-mono',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
@@ -191,6 +197,20 @@ export interface TaskRow {
   readonly completed: string | null;
   readonly body: string;
   readonly subtasks: readonly TaskRow[];
+  /** NAV-07, docs/04 §3: when Flint first saw it, and last changed it (`29 Oct`, `2 h ago`). */
+  readonly created?: string;
+  readonly edited?: string;
+}
+
+/** NAV-07, D-83: an item of the context panel's "Up next". */
+export interface UpNextItem {
+  readonly group: 'overdue' | 'today' | 'tomorrow';
+  readonly key: string;
+  readonly listId: string;
+  readonly listName: string;
+  readonly title: string;
+  /** `15:00`, or for an overdue one `Yest 17:00`. */
+  readonly when: string;
 }
 
 /** Something in a task list that isn't a task: shown read-only (TASK-15). */
@@ -212,6 +232,8 @@ export interface ListView {
   readonly noteText: string | null;
   /** NOTE-06, D-84: a note shown in monospace (this machine's choice). */
   readonly mono?: boolean;
+  /** NAV-07: when the file last changed (`just now`, `2 h ago`). */
+  readonly edited?: string;
 }
 
 /**

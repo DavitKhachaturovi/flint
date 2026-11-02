@@ -3,6 +3,7 @@ import type { LinkPattern } from '../shared/link-patterns.js';
 import {
   Channels,
   type AttachFileOutcome,
+  type UpNextItem,
   type OpenAttachmentOutcome,
   type ChangeOutcome,
   type EditCommand,
@@ -72,6 +73,17 @@ const main = {
   /** D-84: in its default app; never a program or script. */
   openAttachment(link: string): Promise<OpenAttachmentOutcome> {
     return ipcRenderer.invoke(Channels.mainOpenAttachment, link) as Promise<OpenAttachmentOutcome>;
+  },
+  /** NAV-07, D-83: the context panel's "Up next" (reminders). */
+  upNext(): Promise<readonly UpNextItem[]> {
+    return ipcRenderer.invoke(Channels.mainUpNext) as Promise<readonly UpNextItem[]>;
+  },
+  /** NAV-07, D-83: the panel hidden on this display (Ctrl+\), told on load and on a display change. */
+  onPanel(listener: (hidden: boolean) => void): void {
+    ipcRenderer.on(Channels.mainPanel, (_event, hidden: boolean) => listener(hidden));
+  },
+  setPanel(hidden: boolean): void {
+    ipcRenderer.send(Channels.mainSetPanel, hidden);
   },
   /** NOTE-06, D-84: a note in monospace or not (this machine). */
   noteMono(id: string, on: boolean): Promise<void> {

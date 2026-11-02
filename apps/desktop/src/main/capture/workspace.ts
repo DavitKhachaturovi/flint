@@ -71,6 +71,7 @@ import {
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
 import { listView } from '../views.js';
+import { agoLabel, localStamp, TaskMetaFile } from '../task-meta.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
 import {
@@ -164,6 +165,8 @@ export class Workspace {
 
   /** IDs in the trash stay taken (D-29). */
   private readonly trashed: Set<string>;
+  /** docs/04 §3, NAV-07: when each task was first seen and last changed (`.flint/meta.json`). */
+  readonly meta: TaskMetaFile;
 
   private constructor(
     folder: string,
@@ -177,6 +180,14 @@ export class Workspace {
     this.uiStatePath = uiStatePath;
     this.uiState = uiState;
     this.trashed = trashed;
+    this.meta = new TaskMetaFile(folder);
+  }
+
+  /** Every task ID of the lists, for the bookkeeping's first sight. */
+  private taskIds(): string[] {
+    return this.lists.flatMap(({ file }) =>
+      [...allTasks(file.document)].map(({ task }) => task.key),
+    );
   }
 
   /** Loads every list in the folder; `uiStatePath` keeps the most recently used lists (D-25). */
@@ -197,6 +208,8 @@ export class Workspace {
     workspace.sidebarFile = readSidebar(
       await readFile(workspace.sidebarPath, 'utf8').catch(() => null),
     );
+    await workspace.meta.load();
+    workspace.meta.seen(workspace.taskIds(), new Date());
     return workspace;
   }
 
@@ -387,6 +400,8 @@ export class Workspace {
    * another program are picked up; Flint's own writes come back unchanged (`ListFile.reload`).
    */
   fileChanged(path: string): Promise<void> {
+    // docs/04 §3: tasks added outside Flint are first seen now.
+    void Promise.resolve().then(() => this.meta.seen(this.taskIds(), new Date()));
     return this.serial(() => this.refresh(path));
   }
 
@@ -448,8 +463,19 @@ export class Workspace {
         readOnly: loaded.file.readOnly,
       },
       now,
+      (key) => this.meta.get(key),
     );
-    return this.monoNotes.includes(id) ? { ...view, mono: true } : view;
+    let edited: string | undefined;
+    try {
+      edited = agoLabel(localStamp(statSync(loaded.file.path).mtime), now);
+    } catch {
+      edited = undefined;
+    }
+    return {
+      ...view,
+      ...(this.monoNotes.includes(id) && { mono: true }),
+      ...(edited !== undefined && { edited }),
+    };
   }
 
   /**
@@ -1237,6 +1263,15 @@ export class Workspace {
     const applied = list.file.apply(op);
     if (!applied) throw new Error(`could not change ${list.entry.name}`);
     await list.file.save({ now: fromDate(now), isTaken: this.isTaken });
+    // docs/04 §3: what changed was touched; new tasks (with their IDs written now) are first seen.
+    this.meta.touch(
+      applied.touched.map((each) => each.key),
+      now,
+    );
+    this.meta.seen(
+      [...allTasks(list.file.document)].map(({ task }) => task.key),
+      now,
+    );
     // A conversion (LIST-04), or undoing one, changes the list's mode.
     list.entry = { ...list.entry, mode: documentMode(list.file.document) };
     return applied;
