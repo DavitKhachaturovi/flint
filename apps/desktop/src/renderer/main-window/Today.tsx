@@ -63,15 +63,20 @@ export function RolloverCard(props: {
   // Shown a moment longer while it folds away (03 §5).
   const [shown, setShown] = useState(tasks);
   const [leaving, setLeaving] = useState(false);
+  // Under reduce-motion nothing animates: it goes at once.
+  const leave = (): void => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setShown([]);
+    else setLeaving(true);
+  };
   useEffect(() => {
     if (tasks.length > 0) {
       setShown(tasks);
       setLeaving(false);
-    } else setLeaving(true);
+    } else leave();
   }, [tasks]);
   if (shown.length === 0) return null;
   const answer = (clear: boolean): void => {
-    setLeaving(true);
+    leave();
     onAnswer(clear);
   };
   return (

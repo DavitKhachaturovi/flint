@@ -1062,9 +1062,10 @@ export function App(): ReactElement {
       return;
     }
     setSortLine((current) => current && { ...current, leaving: true });
+    // Gone at its fade's end (onAnimationEnd); the timer only for a fade that never ends.
     const timer = window.setTimeout(
       () => setSortLine((current) => (current?.leaving ? null : current)),
-      durationMs('--fl-dur-state', 260),
+      2 * durationMs('--fl-dur-state', 260),
     );
     return () => window.clearTimeout(timer);
   }, [tempSort, listId]);
@@ -3619,6 +3620,10 @@ export function App(): ReactElement {
                     <div
                       className={sortLine.leaving ? 'sort-indicator leaving' : 'sort-indicator'}
                       role="status"
+                      onAnimationEnd={(event) => {
+                        if (sortLine.leaving && event.target === event.currentTarget)
+                          setSortLine(null);
+                      }}
                     >
                       <span>Sorted by {SORT_NAMES[sortLine.sort]}</span>
                       <span aria-hidden="true">·</span>
