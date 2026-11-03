@@ -710,3 +710,4 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **The composer's ## menu** was never built in the main window (only its chips); it now has the popup's menu and card, written for the composer. Matching (both places): after `##`, the longest run of two to eight words that spells an existing list's or note's name wins.
   - **Copy image** uses Electron 45's clipboard (`ClipboardItem` with a PNG). **Move to top** moves to the top of the list's group, or of the lists outside groups.
   - **A task page's paste:** handled outside text fields only; plain text waits for TASK-09.
+  - **Menu aim (D-79):** moving on toward an open submenu restarts its grace, so a slow move (or a slow machine) across other items keeps the submenu; only a pause on an item switches to it.

@@ -100,6 +100,8 @@ export function openMenu(
   // D-79, menu aim: the pointer's last place, and a move toward an open submenu waits a moment.
   let pointer = { x: at.x, y: at.y };
   let aiming: number | undefined;
+  /** D-87: the item the pointer is crossing on its way to an open submenu. */
+  let crossing: HTMLElement | null = null;
   const pick = (depth: number, index: number, byKeyboard: boolean): void => {
     const chosen = levels[depth]?.buttons[index];
     if (!chosen || chosen.item.disabled) return;
@@ -176,12 +178,31 @@ export function openMenu(
         // Crossing this item on the way to the open submenu doesn't close it; if the pointer
         // stays here, it switches after the grace delay.
         if (child && towards(pointer, to, child.menu.getBoundingClientRect())) {
+          crossing = button;
           aiming = window.setTimeout(() => {
+            crossing = null;
             if (levels[depth + 1] === child && child.menu.matches(':hover')) return;
             enter();
           }, AIM_GRACE_MS);
-        } else enter();
+        } else {
+          crossing = null;
+          enter();
+        }
         pointer = to;
+      });
+      // D-87: still moving toward the open submenu (slowly, or on a slow machine), the grace
+      // starts again; only a pause on the crossed item switches to it.
+      button.addEventListener('mousemove', (event) => {
+        const child = levels[depth + 1];
+        if (crossing !== button || !child) return;
+        const to = { x: event.clientX, y: event.clientY };
+        if (!towards(pointer, to, child.menu.getBoundingClientRect())) return;
+        window.clearTimeout(aiming);
+        aiming = window.setTimeout(() => {
+          crossing = null;
+          if (levels[depth + 1] === child && child.menu.matches(':hover')) return;
+          enter();
+        }, AIM_GRACE_MS);
       });
       // Mouse down keeps the focus (and the text selection) where it was.
       button.addEventListener('mousedown', (event) => event.preventDefault());
