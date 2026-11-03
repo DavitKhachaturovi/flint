@@ -2,6 +2,20 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.20 (3 Nov 2026)
+
+- **The panel slides in and out** when you show or hide it (Ctrl+\ or the panel button), and your tasks glide to their new place.
+- **The panel scrolls with the page** and then sticks just below the title bar, without a gap above it.
+- **Up next rows** start with the title; the pin, bell or overdue bell, the time and the list are on the right, as in your task list.
+- **"In this note" and "In this task" are clickable**: open checklist items, code blocks, images and links, with counts. Click to jump to the first, again for the next.
+- **Edit a task's notes right in the panel**, and add subtasks there too.
+- No more scrollbar flashing in the panel, and its sections (Recently captured, References, Attachments) open and close smoothly, all lined up.
+- **Pictures in Attachments** open in Flint's viewer; other files open in their app as before.
+- **Click a pin** (on a task, in Up next, or the panel's Pin chip) to unpin.
+- **Right-click works like Explorer**: inside a selection the menu acts on all of it and says so ("Unpin 3 tasks"); outside it, on just that task. Unpinning one task no longer unpins the others.
+- **After Convert to note** (a task or a whole list) the note opens, ready to type.
+- **A task's page** sits on a card like notes do.
+
 ## 0.4.19 (2 Nov 2026)
 
 - **The panel fits more screens.** A slightly narrower version of the side panel appears on windows from about 1480 px, so a 1920 px laptop screen at 125 % gets it at 100 % size.
