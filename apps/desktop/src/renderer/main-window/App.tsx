@@ -45,6 +45,7 @@ import type {
   SidebarSort,
   SidebarView,
   TaskRow,
+  TodayReminder,
 } from '../../shared/ipc.js';
 import {
   BackIcon,
@@ -538,10 +539,12 @@ export function App(): ReactElement {
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   /**
-   * D-92: on wide screens Today's column shows Timeline, Done and Captured; Shift+Enter or the
-   * notes icon puts a task's details there instead (this task), until back, Esc or another task.
+   * D-92, D-93: on wide screens Today's column shows Timeline, Done and Captured, and the selected
+   * task's details instead; back, Esc or the notes icon return to Today's sections for that task
+   * (`todayDismissed`), until another one is selected.
    */
-  const [todayDetails, setTodayDetails] = useState<string | null>(null);
+  const [todayDismissed, setTodayDismissed] = useState<string | null>(null);
+  const todayDetailsRef = useRef<string | null>(null);
   const todayWideRef = useRef(false);
   /** D-92: "Show all N" of Focus's high-priority group, for the session. */
   const [highAll, setHighAll] = useState(false);
@@ -770,14 +773,16 @@ export function App(): ReactElement {
     readonly mode: 'smooth' | 'instant';
     readonly flash: boolean;
   } | null>(null);
-  /** D-91: a reminder's Open, and Today's timeline: the task in its list, centred and flashed. */
+  /** D-93: a new arrival, also of the task that is already selected. */
+  const [arrival, setArrival] = useState(0);
+  /**
+   * D-91: a reminder's Open, and Today's timeline: the task in its list, centred and flashed. D-93:
+   * at once (never a long smooth scroll, which flashed the row before it was in view).
+   */
   const reveal = useCallback(
     (list: string, key: string): void => {
-      arriving.current = {
-        key,
-        mode: list === listIdRef.current ? 'smooth' : 'instant',
-        flash: true,
-      };
+      arriving.current = { key, mode: 'instant', flash: true };
+      setArrival((count) => count + 1);
       go({ list, page: null }, key);
     },
     [go],
@@ -802,7 +807,7 @@ export function App(): ReactElement {
         flash(row);
         return;
       }
-      arriving.current = { key, mode: 'smooth', flash: true };
+      arriving.current = { key, mode: 'instant', flash: true };
       setSelected(key);
     },
     [reveal],
@@ -922,10 +927,12 @@ export function App(): ReactElement {
     (task: TaskRow): void => {
       const without = (keys: ReadonlySet<string>): Set<string> =>
         new Set([...keys].filter((key) => key !== task.key));
-      // D-92: in Today on a wide screen, the column shows the task's details (or Today's again).
+      // D-92, D-93: in Today on a wide screen, the column shows the task's details, or Today's
+      // sections again when they are showing.
       if (todayWideRef.current && !expanded.has(task.key)) {
+        const showing = todayDetailsRef.current === task.key;
         setSelected(task.key);
-        setTodayDetails((current) => (current === task.key ? null : task.key));
+        setTodayDismissed(showing ? task.key : null);
         return;
       }
       // NAV-07, D-83: with the context panel, the body is read and edited there: select the task.
@@ -954,7 +961,7 @@ export function App(): ReactElement {
   const openNotes = useCallback((key: string): void => {
     // D-89: with the context panel, in the panel's notes editor instead (D-92: Today's column).
     if (panelShownRef.current) {
-      if (todayWideRef.current) setTodayDetails(key);
+      if (todayWideRef.current) setTodayDismissed(null);
       panelNotesFor.current = key;
       setEditing(null);
       setSelected(key);
@@ -1587,6 +1594,31 @@ export function App(): ReactElement {
       );
     },
     [change, showToast],
+  );
+
+  /**
+   * D-93: a reminder dragged on Today's timeline: the same day at its new time, in the task's own
+   * list; one undo step, as from the picker.
+   */
+  const moveReminder = useCallback(
+    (reminder: TodayReminder, minutes: number): void => {
+      const day = parseLocalDateTime(reminder.at)?.value;
+      if (!day) return;
+      const at = {
+        year: day.year,
+        month: day.month,
+        day: day.day,
+        hour: Math.floor(minutes / 60),
+        minute: minutes % 60,
+        second: 0,
+      };
+      void window.flintMain
+        .change(reminder.listId, { kind: 'reminder', key: reminder.key, at })
+        .then((outcome) => {
+          if (outcome) showToast(outcome.label, true);
+        });
+    },
+    [showToast],
   );
 
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
@@ -2410,7 +2442,7 @@ export function App(): ReactElement {
         // Esc clears the marks first, then the selection (TASK-07). D-89: with the context panel,
         // a body open inline anyway closes first.
         if (marked.size > 0) setMarked(NOTHING);
-        else if (todayDetails !== null) setTodayDetails(null);
+        else if (todayDetailsRef.current !== null) setTodayDismissed(todayDetailsRef.current);
         else if (row && panelShownRef.current && expanded.has(row.key)) showBody(row);
         else setSelected(null);
       }
@@ -2792,7 +2824,11 @@ export function App(): ReactElement {
   const rowProps: RowHandlers = {
     selected,
     editing,
-    onSelect: selectRow,
+    onSelect: (key, how) => {
+      // D-93: a click on a task in Today shows its details in the column, again too.
+      if (todayWideRef.current) setTodayDismissed(null);
+      selectRow(key, how);
+    },
     marked,
     markJoins,
     onToggle: (key) => void toggle(key),
@@ -2806,6 +2842,9 @@ export function App(): ReactElement {
     expanded,
     onBody: (task) => showBody(task),
     onImages: (task) => showImage(bodyImages(task.body), 0),
+    onHome: (task) => {
+      if (task.home) reveal(task.home.listId, task.key);
+    },
   };
   const saveBody = (key: string, body: string): void => {
     setEditingBody(null);
@@ -3062,16 +3101,20 @@ export function App(): ReactElement {
     );
     if (!row) return;
     arriving.current = null;
-    if (target.flash) flash(row);
     const area = scroller.current?.getBoundingClientRect();
     const box = row.getBoundingClientRect();
     // Only a row that is out of view (a click or a menu never moves the list).
-    if (area && box.top >= area.top && box.bottom <= area.bottom) return;
-    row.scrollIntoView({
-      block: target.flash ? 'center' : 'nearest',
-      behavior: target.mode === 'instant' || reducedMotion() ? 'instant' : 'smooth',
-    });
-  }, [selected, view]);
+    if (!area || box.top < area.top || box.bottom > area.bottom)
+      row.scrollIntoView({
+        block: target.flash ? 'center' : 'nearest',
+        behavior: target.mode === 'instant' || reducedMotion() ? 'instant' : 'smooth',
+      });
+    // D-93: the flash where the row landed; a window that isn't showing yet flashes when it shows.
+    if (!target.flash) return;
+    flash(row);
+    if (document.visibilityState !== 'visible')
+      document.addEventListener('visibilitychange', () => flash(row), { once: true });
+  }, [selected, view, arrival]);
 
   // D-91: a place shown again is where it was left, at once (no smooth scroll); a new one at the top.
   const restored = useRef<string | null>(null);
@@ -3246,15 +3289,15 @@ export function App(): ReactElement {
 
   // NAV-07, D-83: what the context panel shows.
   const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
-  // D-92: Today has its own column; a task's details only after Shift+Enter or its notes icon.
+  // D-92, D-93: Today has its own column; the selected task's details take its place.
   const todayWide = panelShown && view?.id === TODAY_ID && !pageTask;
   todayWideRef.current = todayWide;
   const todayDetailsRow =
-    todayWide && todayDetails !== null && selectedRow?.key === todayDetails ? selectedRow : null;
+    todayWide && selectedRow && selectedRow.key !== todayDismissed ? selectedRow : null;
+  todayDetailsRef.current = todayDetailsRow?.key ?? null;
   useEffect(() => {
-    if (todayDetails !== null && (selected !== todayDetails || listId !== TODAY_ID))
-      setTodayDetails(null);
-  }, [selected, listId, todayDetails]);
+    if (todayDismissed !== null && selected !== todayDismissed) setTodayDismissed(null);
+  }, [selected, todayDismissed]);
   const todayColumn = todayWide && !todayDetailsRow;
   const panelState: PanelState | null =
     !panelShown || !view || todayColumn
@@ -3392,7 +3435,11 @@ export function App(): ReactElement {
   });
   const panelHandlers: PanelHandlers = {
     onHide: togglePanel,
-    onBack: todayDetailsRow ? () => setTodayDetails(null) : panelBack ? () => travel(-1) : null,
+    onBack: todayDetailsRow
+      ? () => setTodayDismissed(todayDetailsRow.key)
+      : panelBack
+        ? () => travel(-1)
+        : null,
     onMenu: (at) => panelMenu(at),
     onOpenPage: openPage,
     onToggle: (key) => void toggle(key),
@@ -3835,6 +3882,7 @@ export function App(): ReactElement {
                       extras={view.today}
                       stacked
                       onOpen={openFromToday}
+                      onMoveReminder={moveReminder}
                       onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
                     />
                   )}
@@ -3929,6 +3977,7 @@ export function App(): ReactElement {
                 extras={view.today}
                 stacked={false}
                 onOpen={openFromToday}
+                onMoveReminder={moveReminder}
                 onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
               />
             )}
@@ -4837,6 +4886,8 @@ interface RowHandlers {
   readonly onBody: (task: TaskRow) => void;
   /** D-79: the image indicator opens the lightbox on the task's images. */
   readonly onImages: (task: TaskRow) => void;
+  /** D-93: Today's list chip opens the task's own list, the task selected there. */
+  readonly onHome: (task: TaskRow) => void;
 }
 
 /**
@@ -5221,7 +5272,20 @@ function Row(
           </button>
         )}
         {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
-        {task.home && !task.done && <span className="chip home-list">{task.home.listName}</span>}
+        {task.home && !task.done && (
+          <button
+            type="button"
+            className="chip home-list"
+            title={`Open ${task.home.listName}`}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onHome(task);
+            }}
+          >
+            {task.home.listName}
+          </button>
+        )}
       </span>
     </div>
   );

@@ -315,6 +315,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each task in Today shows its home list subtly. **Proposed:** Today has its own manual order (drag to reorder) independent of home-list order.
 
 - **Built (0.4.24, D-90):** Today is first in the sidebar and the window opens on it: a greeting, the rollover card, today's reminder cards, a composer that adds pinned tasks to Inbox, and Focus, the pinned tasks of every list as ordinary rows with their home list as a chip; every change goes to the home list. **Proposed:** its own order (Alt+↑/↓, drag) in `.flint/today.json`, Flint's new pins on top, pins found in files at the end; a pinned subtask on its own row unless its parent is pinned; done pins in Today's Completed section until the day changes.
+- **D-93 (0.4.27):** a click on a task in Focus shows its details in the Today column (the editable panel, replacing the Timeline); Esc, the panel's back arrow or a click on empty space return to Today's sections. Done today and Captured today always show ("· 0" and a quiet line when empty); "Sort Inbox · N" is the primary button; the list chip on a row lights up on hover and opens that list with the task selected.
 - **D-92 (mockup 12, 0.4.26):** Focus has "Focus · pinned" (done pins stay, faded, "done 11:20", until the day changes; no Completed section in Today) and below it "High priority · not pinned": open high-priority tasks that aren't pinned, as full rows in the sidebar's list order, the first five and "Show all N"; only pinned tasks reorder; P pins one. The greeting puts the count in white and has a progress line, "X of Y done" (today's pinned and reminder tasks). The composer reads "Add a task to today…". On wide screens a Today column takes the context panel's place: Timeline, Done today, Captured today (with "Sort Inbox · N"); Shift+Enter or the notes icon shows a task's details there instead, back or Esc returns. On narrow windows the sections stack under Focus and fold.
 
 ### TODAY-02 — End-of-day rollover prompt (v1, optional)
@@ -331,6 +332,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 - **First part built (0.4.24, D-90, Proposed):** the reminders still to come today as cards, two a row (time, "in 2 h", title, list), as in mockup 03; overdue ones and the full section (REM-11) come with the rest of M6.
 - **D-92:** the cards follow the clock (a passed reminder's card folds away, the countdowns tick); the next one is wider and brighter with "Next", later ones quieter; three a row, more behind "+N more" (**Proposed**). The Today column's Timeline shows all of today's reminders on an hour rail with a moving now line.
+- **D-93:** dragging a reminder up or down on the Timeline changes its time (quarter hours, 5 minutes with Alt), shown live; it slides into place, or back when dropped in the past; one undo step. The keyboard way is Change reminder….
 
 ## 5. Reminders
 
@@ -370,6 +372,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-64 (Davit, 31 Oct 2026):** pulled forward to **M4 step 3**, the first item: reminders fire as this toast while Flint runs; a reminder missed while Flint wasn't running or the PC slept is shown once at the next start (or wake) as a toast labelled "Missed". **Proposed:** more than 3 missed at once show as one toast, "N reminders you missed", whose Open shows the main window; the full REM-07 list comes in M6. A shown reminder is remembered in `reminders-state.json` (04 §2), so it is never shown twice.
 - **D-68:** the toast says **"Reminder"** (or "Missed reminder") and the task name, with Done / Snooze 10m / Open: no time, no list name, no large logo image (the small app icon in its header stays).
 - **D-91:** Open goes to the task's list, scrolls it into view, selects it (the panel shows it on wide screens; on narrow windows the body stays closed) and flashes it once.
+- **D-93:** all of it at once (an instant scroll, never a long smooth one), also when the task is already selected; the flash plays where the row landed.
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).

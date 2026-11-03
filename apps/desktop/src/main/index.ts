@@ -33,7 +33,7 @@ import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
 import { showMissedSummary, showReminderToast } from './notifications.js';
 import { DraftFile } from './capture/drafts.js';
-import { captureSelection } from './capture/selection.js';
+import { captureSelection, restoreClipboard, saveClipboard } from './capture/selection.js';
 import { displayAccelerator } from '../shared/accelerator.js';
 import { HotkeyRegistry } from './hotkey-registry.js';
 import { acceleratorKeys } from './hotkeys.js';
@@ -710,6 +710,16 @@ async function start(): Promise<void> {
   });
   const hooks = e2eHooks();
   if (hooks) hooks.showPopup = () => popup.show(epochNow());
+  if (hooks) {
+    let kept: Awaited<ReturnType<typeof saveClipboard>> = null;
+    hooks.saveClipboard = async () => {
+      kept = await saveClipboard();
+    };
+    hooks.restoreClipboard = async () => {
+      await restoreClipboard(kept);
+      kept = null;
+    };
+  }
 
   recoverFromCrashes(popup.window, 'capture popup', log);
 

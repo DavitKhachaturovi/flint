@@ -59,6 +59,12 @@ export interface E2EHooks {
   /** A toast button's activation URL, as Windows would hand it over (REM-05). */
   activate?: (url: string) => void;
   showHotkeys?: () => void;
+  /**
+   * D-93: tests never leave a mark on the user's clipboard: a step that writes to it (a copy
+   * button) saves it first and puts it back after.
+   */
+  saveClipboard?: () => Promise<void>;
+  restoreClipboard?: () => Promise<void>;
 }
 
 export function e2eHooks(): E2EHooks | undefined {

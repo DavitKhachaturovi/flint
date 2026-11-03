@@ -38,7 +38,12 @@ async function until(condition: () => boolean, timeoutMs: number, stepMs = 10): 
   return condition();
 }
 
-async function save(): Promise<SavedClipboard> {
+/**
+ * The clipboard as it is, to put back afterwards (also the end-to-end tests' save and restore
+ * around a step that writes to it, D-93). Null when it can't be read: then nothing is put back
+ * (an unread clipboard must never be cleared).
+ */
+export async function saveClipboard(): Promise<SavedClipboard | null> {
   try {
     const items = await clipboard.read();
     return await Promise.all(
@@ -51,11 +56,12 @@ async function save(): Promise<SavedClipboard> {
       }),
     );
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function restore(saved: SavedClipboard): Promise<void> {
+export async function restoreClipboard(saved: SavedClipboard | null): Promise<void> {
+  if (!saved) return;
   if (saved.length === 0) clipboard.clear();
   else await clipboard.write(saved.map((item) => new ClipboardItem(item)));
 }
@@ -65,7 +71,7 @@ export async function captureSelection(hotkey: HotkeyKeys): Promise<Selection> {
   // Ctrl+C sent while Shift is still held would reach the app as Ctrl+Shift+C (docs/05 §5).
   if (!(await until(() => keys.every((key) => !isKeyDown(key)), 600))) releaseKeys(keys);
 
-  const saved = await save();
+  const saved = await saveClipboard();
   const before = clipboardSequence();
   pressKeys([VirtualKey.control], KEY_C);
   const copied = await until(() => clipboardSequence() !== before, 300);
@@ -81,6 +87,6 @@ export async function captureSelection(hotkey: HotkeyKeys): Promise<Selection> {
     const text = await clipboard.readText();
     return text.trim() === '' ? { kind: 'empty' } : { kind: 'text', text };
   } finally {
-    await restore(saved);
+    await restoreClipboard(saved);
   }
 }

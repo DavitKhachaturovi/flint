@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { TodayEntry, TodayExtras, TodayReminder } from '../../shared/ipc.js';
 import { BellIcon, CheckIcon, ChevronIcon, CloseIcon, HashIcon } from './icons.js';
+import { useScrollsWhenTaller } from './scrolls.js';
 
 /**
  * The Today view's own parts (TODAY-01, TODAY-02, TODAY-03; M6, D-89, D-92; mockups 03 and 12):
@@ -446,35 +447,112 @@ function railOf(times: readonly number[]): {
 }
 const two = (value: number): string => String(value).padStart(2, '0');
 
+/** D-93: a dragged reminder snaps to quarter hours, to 5 minutes with Alt held. */
+const SNAP = 15;
+const FINE_SNAP = 5;
+/** How far the pointer moves before a press on a reminder becomes a drag (else it's a click). */
+const DRAG_START = 4;
+
+type Rail = ReturnType<typeof railOf>;
+
+/** A reminder being dragged on the timeline: where it started, and where it is now. */
+interface TimelineDrag {
+  readonly key: string;
+  readonly pointer: number;
+  readonly startY: number;
+  readonly fromTop: number;
+  readonly from: number;
+  readonly rail: Rail;
+  readonly moved: boolean;
+  readonly top: number;
+  readonly minutes: number;
+}
+
 /**
  * D-92: today's reminders on a slim hour rail: past ones faded and struck through, the next one
- * highlighted, a white line at the current time that moves as the clock does.
+ * highlighted, a white line at the current time that moves as the clock does. D-93: a reminder
+ * dragged up or down gets a new time (quarter hours, 5 minutes with Alt), shown as it moves; let
+ * go, it slides into place, or back where it was when the time has passed.
  */
 function Timeline(props: {
   readonly reminders: readonly TodayReminder[];
   readonly now: Date;
   readonly folds: boolean;
   readonly onOpen: (reminder: TodayReminder) => void;
+  readonly onMove: (reminder: TodayReminder, minutes: number) => void;
 }): ReactElement {
-  const { reminders, now, folds, onOpen } = props;
+  const { reminders, now, folds, onOpen, onMove } = props;
+  const [drag, setDrag] = useState<TimelineDrag | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  // Dropped: shown at its new time until the list brings it (or a moment has passed).
+  const [placed, setPlaced] = useState<{ readonly key: string; readonly minutes: number } | null>(
+    null,
+  );
+  const dragged = useRef(false);
   const nowAt = minutesOf(now);
-  const times = reminders.map((reminder) => {
+  const timeOf = (reminder: TodayReminder): number => {
     const when = parseAt(reminder.at);
     return when ? minutesOf(when) : nowAt;
-  });
-  const { start, end, step, scale } = railOf([...times, nowAt]);
+  };
+  useEffect(() => {
+    if (!placed) return;
+    const reminder = reminders.find((each) => each.key === placed.key);
+    if (!reminder || timeOf(reminder) === placed.minutes) {
+      setPlaced(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setPlaced(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [reminders, placed]);
+  const times = reminders.map((reminder) =>
+    placed?.key === reminder.key ? placed.minutes : timeOf(reminder),
+  );
+  // While dragging, the rail keeps its scale (it only grows downwards, for a later time).
+  const rail: Rail = drag
+    ? {
+        ...drag.rail,
+        end: Math.min(
+          24 * 60,
+          Math.max(drag.rail.end, Math.ceil((drag.minutes + 30) / drag.rail.step) * drag.rail.step),
+        ),
+      }
+    : railOf([...times, nowAt]);
+  const { start, end, step, scale } = rail;
   const y = (minutes: number): number => (minutes - start) * scale;
   const next = reminders.find((reminder) => isComing(reminder, now))?.key;
-  // Centred on their time, pushed down where they would overlap.
+  // Centred on their time, pushed down where they would overlap; in order of time, the dragged
+  // one aside (it follows the pointer, above the others).
+  const order = reminders
+    .map((reminder, index) => ({ reminder, index, minutes: times[index] ?? nowAt }))
+    .filter(({ reminder }) => reminder.key !== drag?.key || !drag.moved)
+    .sort((a, b) => a.minutes - b.minutes);
+  const tops = new Map<string, number>();
   let below = -Infinity;
-  const tops = times.map((minutes) => {
+  for (const { reminder, minutes } of order) {
     const top = Math.max(y(minutes) - EVENT / 2, below + EVENT_GAP);
     below = top + EVENT;
-    return top;
-  });
+    tops.set(reminder.key, top);
+  }
+  if (drag?.moved) tops.set(drag.key, drag.top);
   const labels: number[] = [];
   for (let at = start; at <= end; at += step) labels.push(at);
-  const height = Math.max(y(end), below) + EVENT / 2;
+  const height = Math.max(y(end), below, drag?.moved ? drag.top + EVENT : 0) + EVENT / 2;
+  const isPast = (minutes: number): boolean => minutes * 60 <= nowAt * 60 + now.getSeconds();
+  const clock = (minutes: number): string =>
+    `${two(Math.floor(minutes / 60))}:${two(minutes % 60)}`;
+  const release = (cancelled: boolean): void => {
+    const current = dragRef.current;
+    setDrag(null);
+    if (!current?.moved) return;
+    dragged.current = true;
+    const reminder = reminders.find((each) => each.key === current.key);
+    // In the past, or where it was: it slides back.
+    if (cancelled || !reminder || isPast(current.minutes) || current.minutes === current.from)
+      return;
+    setPlaced({ key: current.key, minutes: current.minutes });
+    onMove(reminder, current.minutes);
+  };
   return (
     <Section
       id="timeline"
@@ -490,20 +568,85 @@ function Timeline(props: {
           </div>
         ))}
         {reminders.map((reminder, index) => {
-          const past = !isComing(reminder, now);
-          const state = reminder.key === next ? 'next' : past ? 'past' : 'later';
+          const moving = drag?.key === reminder.key && drag.moved ? drag : null;
+          const shownAt = placed?.key === reminder.key ? placed.minutes : null;
+          const past = moving ? isPast(moving.minutes) : !isComing(reminder, now);
+          const state = !moving && reminder.key === next ? 'next' : past ? 'past' : 'later';
           return (
             <button
               key={reminder.key}
               type="button"
-              className={`timeline-event ${state}${reminder.done ? ' done' : ''}`}
-              style={{ top: `${tops[index] ?? 0}px` }}
-              title={`${reminder.time} · ${reminder.title} · ${reminder.listName}`}
-              onClick={() => onOpen(reminder)}
+              className={[
+                'timeline-event',
+                state,
+                reminder.done ? 'done' : '',
+                moving ? 'dragging' : '',
+              ].join(' ')}
+              style={{ top: `${tops.get(reminder.key) ?? 0}px` }}
+              title={`${reminder.time} · ${reminder.title} · ${reminder.listName}${reminder.done ? '' : ' (drag to change the time)'}`}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || reminder.done || drag) return;
+                try {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                } catch {
+                  // Not a live pointer (a synthetic event): it follows without capture.
+                }
+                const minutes = times[index] ?? nowAt;
+                setDrag({
+                  key: reminder.key,
+                  pointer: event.pointerId,
+                  startY: event.clientY,
+                  fromTop: tops.get(reminder.key) ?? 0,
+                  from: minutes,
+                  rail,
+                  moved: false,
+                  top: tops.get(reminder.key) ?? 0,
+                  minutes,
+                });
+              }}
+              onPointerMove={(event) => {
+                const current = dragRef.current;
+                if (current?.key !== reminder.key || current.pointer !== event.pointerId) return;
+                const dy = event.clientY - current.startY;
+                if (!current.moved && Math.abs(dy) < DRAG_START) return;
+                const snap = event.altKey ? FINE_SNAP : SNAP;
+                const raw = current.from + dy / current.rail.scale;
+                const minutes = Math.min(
+                  24 * 60 - snap,
+                  Math.max(current.rail.start, Math.round(raw / snap) * snap),
+                );
+                setDrag({
+                  ...current,
+                  moved: true,
+                  top: Math.max(-EVENT / 2, current.fromTop + dy),
+                  minutes,
+                });
+              }}
+              onPointerUp={(event) => {
+                if (dragRef.current?.pointer === event.pointerId) release(false);
+              }}
+              onPointerCancel={(event) => {
+                if (dragRef.current?.pointer === event.pointerId) release(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && dragRef.current) {
+                  event.stopPropagation();
+                  release(true);
+                }
+              }}
+              onClick={() => {
+                // A drag isn't a click.
+                if (dragged.current) {
+                  dragged.current = false;
+                  return;
+                }
+                onOpen(reminder);
+              }}
             >
               <span className="timeline-dot" />
               <span className="timeline-text">
-                {reminder.time} · {reminder.title}
+                {moving ? clock(moving.minutes) : shownAt !== null ? clock(shownAt) : reminder.time}{' '}
+                · {reminder.title}
               </span>
             </button>
           );
@@ -560,18 +703,22 @@ function Entries(props: {
 }
 
 /**
- * D-92 (mockup 12): Today's column: Timeline, Done today and Captured today, each hidden while
- * empty. Beside Focus on wide screens (in the context panel's place, sticky as it is); stacked
- * under Focus on narrow windows, where the timeline folds too. Opening an entry opens its task.
+ * D-92 (mockup 12): Today's column: Timeline (while there are reminders today), Done today and
+ * Captured today (always, D-93: "· 0" and a quiet line when empty). Beside Focus on wide screens
+ * (in the context panel's place, sticky as it is); stacked under Focus on narrow windows, where
+ * the timeline folds too. Opening an entry opens its task.
  */
 export function TodayColumn(props: {
   readonly extras: TodayExtras;
   readonly stacked: boolean;
   readonly onOpen: (key: string, listId: string) => void;
+  readonly onMoveReminder: (reminder: TodayReminder, minutes: number) => void;
   readonly onSortInbox: () => void;
 }): ReactElement | null {
-  const { extras, stacked, onOpen, onSortInbox } = props;
+  const { extras, stacked, onOpen, onMoveReminder, onSortInbox } = props;
   const now = useNow(1000);
+  const column = useRef<HTMLElement>(null);
+  useScrollsWhenTaller(column);
   const sections: ReactElement[] = [];
   if (extras.reminders.length > 0)
     sections.push(
@@ -581,43 +728,45 @@ export function TodayColumn(props: {
         now={now}
         folds={stacked}
         onOpen={(reminder) => onOpen(reminder.key, reminder.listId)}
+        onMove={onMoveReminder}
       />,
     );
-  if (extras.done.length > 0)
-    sections.push(
-      <Section key="done" id="done" label={`Done today · ${extras.done.length}`} folds>
-        <Entries
-          entries={extras.done}
-          kind="done"
-          onOpen={(entry) => onOpen(entry.key, entry.listId)}
-        />
-      </Section>,
-    );
-  if (extras.captured.length > 0)
-    sections.push(
-      <Section
-        key="captured"
-        id="captured"
-        label={`Captured today · ${extras.captured.length}`}
-        folds
-      >
-        <Entries
-          entries={extras.captured}
-          kind="captured"
-          onOpen={(entry) => onOpen(entry.key, entry.listId)}
-        />
-        {extras.inbox.open > 0 && (
-          <div className="today-sort-inbox">
-            <button type="button" className="soft-button" onClick={onSortInbox}>
-              Sort Inbox · {extras.inbox.open}
-            </button>
-          </div>
-        )}
-      </Section>,
-    );
-  if (sections.length === 0 && stacked) return null;
+  sections.push(
+    <Section key="done" id="done" label={`Done today · ${extras.done.length}`} folds>
+      {extras.done.length === 0 && <p className="today-none">Nothing done yet today.</p>}
+      <Entries
+        entries={extras.done}
+        kind="done"
+        onOpen={(entry) => onOpen(entry.key, entry.listId)}
+      />
+    </Section>,
+  );
+  sections.push(
+    <Section
+      key="captured"
+      id="captured"
+      label={`Captured today · ${extras.captured.length}`}
+      folds
+    >
+      {extras.captured.length === 0 && <p className="today-none">Nothing captured today.</p>}
+      <Entries
+        entries={extras.captured}
+        kind="captured"
+        onOpen={(entry) => onOpen(entry.key, entry.listId)}
+      />
+      {extras.inbox.open > 0 && (
+        <div className="today-sort-inbox">
+          {/* D-93: the column's one primary action. */}
+          <button type="button" className="primary-button" onClick={onSortInbox}>
+            Sort Inbox · {extras.inbox.open}
+          </button>
+        </div>
+      )}
+    </Section>,
+  );
   return (
     <aside
+      ref={column}
       className={stacked ? 'today-column stacked' : 'today-column'}
       aria-label="Today at a glance"
     >

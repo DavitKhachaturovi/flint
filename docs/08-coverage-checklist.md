@@ -581,3 +581,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | The next reminder's card wider and brighter; three a row, "+N more" | TODAY-03 · Done (0.4.26) | 09, D-92 |
 | 8 | "Add a task to today…" | TODAY-01 · Done (0.4.26) | D-92 |
 | 9 | Motion for all of it | UI-10 · Done (0.4.26) | 03 §5, D-92 |
+
+## AC. Fixes after 0.4.25 and 0.4.26 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A reminder's Open scrolls, selects and flashes at once, also for the selected task | REM-05 · Done (0.4.27) | 02, D-93 |
+| 2 | No scrollbar while the Timeline and the column's sections appear | TODAY-03 · Done (0.4.27) | 09 §8, D-93 |
+| 3 | The details in the column: no scrolling past the top, no shift as they appear | NAV-07 · Done (0.4.27) | 09 §8, D-93 |
+| 4 | Reminder cards: the card hover lift, a close shadow | TODAY-03 · Done (0.4.27) | 09, D-93 |
+| 5 | A click on a Focus task shows its details in the column; Esc, back, empty space return | TODAY-01, NAV-07 · Done (0.4.27) | 02, D-93 |
+| 6 | Done today and Captured today always, "· 0" with a quiet line | TODAY-01 · Done (0.4.27) | 02, 09, D-93 |
+| 7 | "Sort Inbox · N" the primary button | TODAY-01 · Done (0.4.27) | 09, D-93 |
+| 8 | The list chip on Focus rows: hover, a click opens the list with the task selected | TODAY-01 · Done (0.4.27) | 02, 03 §4, D-93 |
+| 9 | Dragging a reminder on the Timeline changes its time (15 min, Alt 5), live, undoable | TODAY-03, REM-01 · Done (0.4.27) | 02, D-93 |
+| 10 | Tests and probes never touch the real clipboard | — · Done (0.4.27) | CLAUDE.md, D-93 |

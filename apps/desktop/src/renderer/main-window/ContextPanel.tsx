@@ -7,6 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { useScrollsWhenTaller } from './scrolls.js';
 import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { mediaUrl } from '../../shared/body-markdown.js';
@@ -106,6 +107,7 @@ export function ContextPanel(props: {
   const { state, upNext, current, handlers } = props;
   const card = useRef<HTMLElement>(null);
   const inner = useRef<HTMLDivElement>(null);
+  useScrollsWhenTaller(card);
   const stateKey =
     state.kind === 'task'
       ? `task:${state.task.key}`

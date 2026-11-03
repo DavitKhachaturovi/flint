@@ -1943,12 +1943,14 @@ test('M4 step 9: smart link titles, temporary sorts, find in lists, multi-line p
   await expect(main.locator('.row.sel .title')).toHaveText('High one');
 
   // TASK-09: several lines pasted into the list are tasks below the selection; Keep as one.
-  await app.evaluate(async ({ clipboard }) => {
-    await clipboard.writeText(
-      ['- first pasted', '- second pasted !h'].join(String.fromCharCode(10)),
+  // D-93: a synthetic paste, never the real clipboard.
+  await main.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData('text/plain', ['- first pasted', '- second pasted !h'].join('\n'));
+    window.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
     );
   });
-  await main.keyboard.press('Control+v');
   await expect(main.locator('.toast')).toContainText('Added 2 tasks');
   await expect
     .poll(titles)
@@ -2122,8 +2124,19 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
   // A copy button turns into a checkmark for a moment (D-89).
   await main.locator('.row', { hasText: 'Parent' }).locator('.body-toggle').click();
   const copy = main.locator('.row-body .code-copy, .row-body .cm-fl-code-copy').first();
+  // D-93: the copy reaches the real clipboard, so it is saved first and put back after.
+  await app.evaluate(() =>
+    (
+      globalThis as { __flintE2E?: { saveClipboard?: () => Promise<void> } }
+    ).__flintE2E?.saveClipboard?.(),
+  );
   await copy.click();
   await expect(copy).toHaveClass(/copied/);
+  await app.evaluate(() =>
+    (
+      globalThis as { __flintE2E?: { restoreClipboard?: () => Promise<void> } }
+    ).__flintE2E?.restoreClipboard?.(),
+  );
   await expect(copy.locator('.fl-copy-done')).toHaveCount(1);
   await main.locator('.row', { hasText: 'Parent' }).locator('.body-toggle').click();
 
@@ -2411,14 +2424,24 @@ test('Today redesign: high priority not pinned, progress, the column and its sec
   // Only the pinned tasks reorder: Alt+↑ on a high-priority row nudges it.
   const urgentRow = main.locator('.row', { hasText: 'Urgent thing 2' });
   await urgentRow.click({ position: { x: 400, y: 10 } });
-  await main.evaluate(() =>
-    window.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }),
+  // Watched in the page, frame by frame: the nudge is short enough to end between two polls.
+  expect(
+    await urgentRow.evaluate(
+      (row) =>
+        new Promise<boolean>((resolve) => {
+          const until = performance.now() + 2000;
+          const look = (): void => {
+            if (row.getAnimations().length > 0) resolve(true);
+            else if (performance.now() > until) resolve(false);
+            else requestAnimationFrame(look);
+          };
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }),
+          );
+          look();
+        }),
     ),
-  );
-  await expect
-    .poll(() => urgentRow.evaluate((row) => row.getAnimations().length))
-    .toBeGreaterThan(0);
+  ).toBe(true);
   // P pins it: it joins the pinned tasks, above the high-priority group.
   await main.keyboard.press('p');
   await expect(urgentRow.locator('.pin-ind')).toHaveCount(1);
@@ -2437,7 +2460,8 @@ test('Today redesign: high priority not pinned, progress, the column and its sec
   await expect(urgentRow.locator('.pin-ind')).toHaveCount(0);
 
   // Narrow: Timeline, Done and Captured stack under Focus; the next reminder's card stands out.
-  await expect(main.locator('.today-column.stacked')).toHaveCount(today ? 1 : 0);
+  // D-93: the column is always there (Done and Captured always show).
+  await expect(main.locator('.today-column.stacked')).toHaveCount(1);
   if (today) {
     await expect(main.locator('.today-column.stacked .today-timeline')).toContainText(
       'Remind me later',
@@ -2449,7 +2473,10 @@ test('Today redesign: high priority not pinned, progress, the column and its sec
   // Wide: the column in the panel's place; notes put the task's details there, Esc and back return.
   await size(1800, 900);
   const column = main.locator('.today-column:not(.stacked)');
-  if (today) await expect(column).toBeVisible();
+  // D-93: the selected task's details are in the column; Esc brings Today's sections back.
+  await expect(column).toHaveCount(0);
+  await main.keyboard.press('Escape');
+  await expect(column).toBeVisible();
   const pinned = main.locator('.row', { hasText: 'Pinned for the redesign' });
   await pinned.click({ button: 'right', position: { x: 400, y: 10 } });
   await main.locator('.fl-menu .fl-menu-item', { hasText: 'Add' }).hover();
@@ -2459,11 +2486,165 @@ test('Today redesign: high priority not pinned, progress, the column and its sec
   await expect(column).toHaveCount(0);
   await main.locator('.context-panel .panel-back').click();
   await expect(main.locator('.context-panel')).toHaveCount(0);
-  if (today) await expect(column).toBeVisible();
-  // Selecting another task keeps the column as it is.
+  await expect(column).toBeVisible();
+  // D-93: selecting another task shows its details in the column.
   await urgentRow.click({ position: { x: 400, y: 10 } });
+  await expect(panel).toContainText('Urgent thing 2');
+  await main.keyboard.press('Escape');
   await expect(main.locator('.context-panel')).toHaveCount(0);
   await size(1120, 780);
+});
+
+test('fixes after 0.4.26: a reminder opens and flashes at once, the column follows the selection, Done and Captured always, the list chip, the timeline drag (REM-05, TODAY-01, TODAY-03, D-93)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const stamp = (d: Date): string =>
+    `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`;
+  const now = new Date();
+  const soon = new Date(now.getTime() + 2 * 3600_000);
+  const today = soon.getDate() === now.getDate() && now.getHours() >= 1;
+  const tasks = Array.from({ length: 50 }, (_, i) => `- [ ] Flash filler ${i + 1} [id:: ff${i}]`);
+  await writeFile(
+    join(flint, 'Flash.md'),
+    `---\nflint: 1\nid: fls1\nmode: tasks\n---\n${tasks.join('\n')}\n- [ ] Drag me on the timeline [reminder:: ${stamp(soon)}] [pinned:: true] [id:: drg1]\n`,
+  );
+  const activate = (url: string): Promise<void> =>
+    app.evaluate(
+      (_electron, link) =>
+        (
+          globalThis as { __flintE2E?: { activate?: (url: string) => void } }
+        ).__flintE2E?.activate?.(link),
+      url,
+    );
+  // REM-05: Open, while the same task is already selected in its list: at once, and flashed.
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Flash' }).click();
+  await expect(main.locator('h1')).toContainText('Flash');
+  const last = main.locator('.row', { hasText: 'Drag me on the timeline' });
+  await last.click({ position: { x: 400, y: 10 } });
+  await main.evaluate(() =>
+    document.querySelector('.scroller')?.scrollTo({ top: 0, behavior: 'instant' }),
+  );
+  await main.evaluate(() => {
+    (window as { flashes?: string[] }).flashes = [];
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const row = record.target as HTMLElement;
+        if (row.classList.contains('fl-flash'))
+          (window as { flashes?: string[] }).flashes?.push(row.dataset.key ?? '');
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
+  await activate('flint-dev://reminder/open?id=drg1');
+  await expect
+    .poll(() => main.evaluate(() => (window as { flashes?: string[] }).flashes))
+    .toContain('drg1');
+  await expect(last).toBeInViewport();
+
+  // Today on a wide screen: Done and Captured always show; Sort Inbox is the primary button.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: -6000, y: 0, width: 1800, height: 900 });
+  });
+  await main.locator('.sidebar > .nav').first().click();
+  await expect(main.locator('.today-greeting')).toContainText('in focus');
+  const column = main.locator('.today-column:not(.stacked)');
+  await expect(column.locator('.today-done .panel-label')).toHaveText(/^Done today · \d+$/);
+  await expect(column.locator('.today-captured .panel-label')).toHaveText(/^Captured today · \d+$/);
+  expect(
+    await column
+      .locator('.today-sort-inbox button')
+      .evaluateAll((buttons) =>
+        buttons.every((button) => button.classList.contains('primary-button')),
+      ),
+  ).toBe(true);
+
+  // TODAY-01: a click on a Focus task puts its details in the column; Esc and back return.
+  const row = main.locator('.card.tasks .row', { hasText: 'Drag me on the timeline' });
+  await row.click({ position: { x: 300, y: 10 } });
+  const panel = main.locator('.context-panel .panel-state:not(.panel-ghost)');
+  await expect(panel).toContainText('Drag me on the timeline');
+  await expect(column).toHaveCount(0);
+  await main.keyboard.press('Escape');
+  await expect(column).toBeVisible();
+  await expect(main.locator('.row.sel')).toContainText('Drag me on the timeline');
+  await row.click({ position: { x: 300, y: 10 } });
+  await expect(panel).toContainText('Drag me on the timeline');
+  await main.locator('.context-panel .panel-back').click();
+  await expect(column).toBeVisible();
+  // The panel's content never narrows for a scrollbar: its gutter is kept.
+  expect(
+    await main.evaluate(
+      () => getComputedStyle(document.querySelector('.today-column') as Element).scrollbarGutter,
+    ),
+  ).toBe('stable');
+
+  if (today) {
+    // D-93: a reminder dragged on the timeline: a new time in quarter hours, saved, undoable.
+    const event = column.locator('.timeline-event', { hasText: 'Drag me on the timeline' });
+    const box = await event.boundingBox();
+    if (!box) throw new Error('no timeline event');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await main.mouse.move(x, y);
+    await main.mouse.down();
+    for (let step = 1; step <= 8; step++) await main.mouse.move(x, y + step * 6);
+    await expect(event).toHaveClass(/dragging/);
+    await expect(event.locator('.timeline-text')).toHaveText(/^\d\d:(00|15|30|45) · /);
+    await main.mouse.up();
+    await expect(event).not.toHaveClass(/dragging/);
+    await expect
+      .poll(
+        async () =>
+          /\[reminder:: [^\]]+\]/.exec(await readFile(join(flint, 'Flash.md'), 'utf8'))?.[0],
+      )
+      .toMatch(/T\d\d:(00|15|30|45)\]/);
+    const moved = /\[reminder:: [^\]]+\]/.exec(
+      await readFile(join(flint, 'Flash.md'), 'utf8'),
+    )?.[0];
+    expect(moved).not.toBe(`[reminder:: ${stamp(soon)}]`);
+    await expect(main.locator('.toast')).toContainText('Reminder set');
+    // The task row's time follows at once.
+    await expect(row.locator('.reminder-time')).toContainText(/(00|15|30|45)$/);
+    // Dropped in the past: it slides back, nothing changes.
+    const again = await event.boundingBox();
+    if (!again) throw new Error('no timeline event');
+    await main.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
+    await main.mouse.down();
+    for (let step = 1; step <= 10; step++)
+      await main.mouse.move(again.x + again.width / 2, again.y + again.height / 2 - step * 60);
+    await expect(event).toHaveClass(/past/);
+    await main.mouse.up();
+    await expect(event).not.toHaveClass(/past/);
+    expect(/\[reminder:: [^\]]+\]/.exec(await readFile(join(flint, 'Flash.md'), 'utf8'))?.[0]).toBe(
+      moved,
+    );
+    // One undo step brings the old time back.
+    await main.keyboard.press('Control+z');
+    await expect
+      .poll(
+        async () =>
+          /\[reminder:: [^\]]+\]/.exec(await readFile(join(flint, 'Flash.md'), 'utf8'))?.[0],
+      )
+      .toBe(`[reminder:: ${stamp(soon)}]`);
+  }
+
+  // D-93: the list chip on a Focus row opens that list, the task selected and flashed there.
+  await main
+    .locator('.card.tasks .row', { hasText: 'Drag me on the timeline' })
+    .locator('.chip.home-list')
+    .click();
+  await expect(main.locator('h1')).toContainText('Flash');
+  await expect(main.locator('.row.sel')).toContainText('Drag me on the timeline');
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: -6000, y: 0, width: 1120, height: 780 });
+  });
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

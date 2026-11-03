@@ -2613,6 +2613,15 @@ a.auto-link {
   margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
   overflow-y: auto;
+  /* D-93: its scrollbar's room is always kept (inside the card's right padding), so the content
+     never narrows when the scrollbar comes or goes. */
+  scrollbar-gutter: stable;
+}
+
+/* D-93 (scrolls.ts): it scrolls only while its content is really taller than it. */
+.context-panel:not(.scrolls),
+.today-column:not(.stacked):not(.scrolls) {
+  overflow-y: hidden;
 }
 
 /* D-86, D-87: hidden, a copy of the panel slides out with the column (App.tsx animates both);
@@ -2641,7 +2650,8 @@ a.auto-link {
 
 .panel-inner {
   position: relative;
-  padding: 16px 14px 14px 20px;
+  /* 4 px and the 10 px scrollbar gutter: 14 px on the right, as before (D-93). */
+  padding: 16px 4px 14px 20px;
 }
 
 .panel-state {
@@ -2660,7 +2670,7 @@ a.auto-link {
 /* D-85: the previous content fades out over the new (a real crossfade, never in the way). */
 .panel-ghost {
   position: absolute;
-  inset: 16px 14px auto 20px;
+  inset: 16px 4px auto 20px;
   max-height: calc(100% - 30px);
   overflow: hidden;
   pointer-events: none;
@@ -3761,6 +3771,8 @@ a.auto-link {
     background-color var(--fl-dur-state) ease;
 }
 
+/* D-93: the card hover lift (09 §8), its shadow kept close to the card so it never spills over
+   the cards beside it or the Focus card below. */
 .reminder-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--fl-shadow-card-hover);
@@ -3770,7 +3782,13 @@ a.auto-link {
   background: var(--fl-ground-float);
   box-shadow:
     0 0 0 1px var(--fl-edge-float),
-    var(--fl-shadow-float);
+    var(--fl-shadow-card);
+}
+
+.reminder-card.next:hover {
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-card-hover);
 }
 
 .reminder-card.leaving {
@@ -3934,7 +3952,10 @@ a.auto-link {
 .today-column {
   position: sticky;
   top: min(16px, var(--panel-top, 4px));
-  flex: 0 0 440px;
+  /* D-93: 440 px of sections, its scrollbar's room kept outside them on the right. */
+  flex: 0 0 calc(440px + var(--fl-scroll-size));
+  margin-right: calc(-1 * var(--fl-scroll-size));
+  scrollbar-gutter: stable;
   max-height: calc(100vh - 40px - 32px);
   margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
@@ -3942,6 +3963,10 @@ a.auto-link {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* D-93: as tall as its sections, so their 6 px rise as they appear would overflow it for a
+     moment and flash a scrollbar; this room takes it (the margin gives it back). */
+  padding-bottom: 8px;
+  margin-bottom: -8px;
   animation: today-column-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
@@ -3953,14 +3978,16 @@ a.auto-link {
 }
 
 .pair.compact > .today-column {
-  flex-basis: 380px;
+  flex-basis: calc(380px + var(--fl-scroll-size));
 }
 
 .today-column.stacked {
   position: static;
   max-height: none;
   margin-top: 0;
+  margin-right: 0;
   overflow: visible;
+  scrollbar-gutter: auto;
   animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
@@ -4066,6 +4093,26 @@ a.auto-link {
   background: var(--fl-ground-hover);
 }
 
+/* D-93: a reminder being dragged to a new time: lifted, above the others, following the pointer
+   (no easing while it moves; it eases into place when let go). */
+.timeline-event.dragging {
+  z-index: 2;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-selected);
+  color: var(--fl-text-highlight);
+  cursor: grabbing;
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.timeline-event.dragging.past {
+  background: var(--fl-ground-well);
+  color: var(--fl-text-faint);
+}
+
 .timeline-text {
   min-width: 0;
   overflow: hidden;
@@ -4147,6 +4194,19 @@ a.auto-link {
   margin-top: 8px;
 }
 
+/* D-93: an empty Done or Captured section says so, quietly. */
+.today-none {
+  margin: 8px 0 0;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--fl-text-faint);
+  animation: fade-in var(--fl-dur-state) ease-out;
+}
+
+.today-none + .today-entries {
+  margin-top: 0;
+}
+
 .today-entry {
   display: flex;
   align-items: center;
@@ -4206,22 +4266,22 @@ a.auto-link {
   margin-top: 10px;
 }
 
-.soft-button {
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 10px;
-  background: var(--fl-ground-hover);
-  box-shadow: inset 0 1px 0 var(--fl-edge-chip);
-  font-size: 13px;
-  color: var(--fl-text-primary);
-  transition: transform var(--fl-dur-fast) var(--fl-ease-spring);
-}
-
-.soft-button:active {
-  transform: scale(0.97);
-}
-
+/* D-93: a button opening the task's list; it lights up on hover. */
 .chip.home-list {
   height: 22px;
   color: var(--fl-text-secondary);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    box-shadow var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.chip.home-list:hover {
+  background: var(--fl-ground-hover);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  color: var(--fl-text-primary);
+}
+
+.chip.home-list:active {
+  transform: scale(0.97);
 }

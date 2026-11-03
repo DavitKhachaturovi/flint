@@ -34,6 +34,7 @@ Flint is a minimalist, keyboard-first quick-capture notes and task app for devel
 ## Working conventions
 
 - TypeScript strict mode everywhere. Vitest for `packages/core`, Playwright for Electron end-to-end tests.
+- **Tests and probes never touch Davit's real clipboard (D-93):** use synthetic paste events (`ClipboardEvent` with a `DataTransfer`); a step that must write to the clipboard (a copy button) saves it first and puts it back right after (`saveClipboard` / `restoreClipboard` in the e2e hooks).
 - **Dependencies (D-30, docs/05 §1):** Node 24.22.1+ on the 24.x line (`.node-version`, engine-strict). Use the latest stable version the rest of the toolchain supports, pinned exactly; never adopt a version published less than 7 days ago (`min-release-age=7`, `scripts/check-release-age.mjs` in CI) unless it is a security fix from the project's official maintainers, which you record in D-30 and the script's allowlist. CI fails on high/critical `npm audit` findings. Adopt Node and Electron security releases promptly and record them in docs/07. Electron 45.1.0+ (embeds Node 24.22.1).
 - Before a non-trivial change, stress-test the plan with the **grill-me** routine. Note: grill-me's company-specific conventions do not apply to Flint; Flint's conventions are the ones in `docs/05` and this file.
 - Keep commits small and scoped to one feature ID or milestone step.
