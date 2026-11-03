@@ -54,6 +54,7 @@ import type {
   ListSummary,
   ListView,
   TaskRow,
+  TodayEntry,
   TodayReminder,
 } from '../../shared/ipc.js';
 import { TODAY_ID } from '../../shared/ipc.js';
@@ -1088,67 +1089,148 @@ export class Workspace {
    * each task's home list; the done ones in its Completed section until the day changes (D-85);
    * the reminders still to come today; and the rollover prompt's tasks (unfinished, pinned before
    * today) until it is answered today (Q-04).
+   *
+   * D-92 (mockup 12): the done pinned tasks stay among them, faded, "done 11:20", until the day
+   * changes; after them the open high-priority tasks that aren't pinned (the sidebar's list order);
+   * all of today's reminders (the timeline), the tasks done today, today's captures, Inbox's count
+   * and the day's progress (today's pinned and reminder tasks, and how many are done today).
    */
   private todayView(now: Date): ListView {
     const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
     const today = dayStamp(now);
     const open: { readonly row: TaskRow; readonly day: string }[] = [];
-    const completed: TaskRow[] = [];
+    const donePinned: { readonly row: TaskRow; readonly at: number }[] = [];
+    const high: { readonly row: TaskRow; readonly rank: number }[] = [];
     const reminders: TodayReminder[] = [];
+    const done: (TodayEntry & { readonly at: number })[] = [];
+    const counted = new Map<string, boolean>();
     const two = (value: number): string => String(value).padStart(2, '0');
+    const clock = (when: Date): string => `${two(when.getHours())}:${two(when.getMinutes())}`;
+    const order = arrange(this.sidebarFile, this.sidebarLists(), this.sidebarSort).flatMap(
+      (item) => (item.kind === 'group' ? item.lists : [item.id]),
+    );
+    const labels = new Map<string, TodayEntry>();
+    let inbox = { id: INBOX_ID, open: 0 };
     for (const { entry, file } of this.lists) {
       if (entry.mode === 'note') continue;
       const listId = this.listId(entry);
       const home = { listId, listName: names.get(listId) ?? entry.name };
+      const listRank = entry.id === INBOX_ID ? -1 : order.indexOf(listId);
+      let openHere = 0;
       for (const { task, parent } of allTasks(file.document)) {
-        const done = task.line.status !== ' ';
+        const isDone = task.line.status !== ' ';
+        if (!isDone && !parent) openHere++;
+        const title = taskLabel(titlePlain(task.line.title.trim()), getBody(task));
+        labels.set(task.key, { key: task.key, ...home, title, time: '' });
+        const completion = task.line.fields.completion?.value.value;
+        const doneAt = isDone && completion ? toDate(completion) : null;
+        const doneToday = doneAt !== null && dayStamp(doneAt) === today;
+        if (doneToday)
+          done.push({ key: task.key, ...home, title, time: clock(doneAt), at: doneAt.getTime() });
         const field = task.line.fields.reminder;
         const at = field ? atDefaultTime(field.value) : null;
-        if (at && !done && !task.line.fields.muted) {
+        if (at && !task.line.fields.muted) {
           const when = toDate(at);
-          if (when.getTime() > now.getTime() && dayStamp(when) === today)
+          if (dayStamp(when) === today && (!isDone || doneToday)) {
             reminders.push({
               key: task.key,
               ...home,
-              title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
-              time: `${two(when.getHours())}:${two(when.getMinutes())}`,
+              title,
+              time: clock(when),
               at: formatLocalDateTime(at),
+              done: isDone,
             });
+            counted.set(task.key, isDone);
+          }
         }
-        if (!task.line.fields.pinned || parent?.line.fields.pinned) continue;
+        const pinnedHere = task.line.fields.pinned && !parent?.line.fields.pinned;
+        const highHere =
+          !isDone &&
+          !task.line.fields.pinned &&
+          task.line.fields.priority?.value === 'high' &&
+          !parent?.line.fields.pinned &&
+          parent?.line.fields.priority?.value !== 'high';
+        if (!pinnedHere && !highHere) continue;
         const row: TaskRow = { ...taskRow(task, now, (key) => this.meta.get(key)), home };
-        if (done) completed.push(row);
-        else open.push({ row, day: this.today.pinnedDay(task.key, now) });
+        if (highHere) high.push({ row, rank: listRank });
+        else if (isDone) {
+          donePinned.push({
+            row: doneAt ? { ...row, completed: `done ${clock(doneAt)}` } : row,
+            at: doneAt?.getTime() ?? 0,
+          });
+          if (doneToday) counted.set(task.key, true);
+        } else {
+          open.push({ row, day: this.today.pinnedDay(task.key, now) });
+          counted.set(task.key, counted.get(task.key) ?? false);
+        }
       }
+      if (entry.id === INBOX_ID) inbox = { id: listId, open: openHere };
     }
     // Tasks Today hasn't placed yet (pinned in a file, or before M6) go last, in file order; a
     // task pinned in Flint goes first (TodayFile.pinnedNow).
-    const order = this.today.order();
+    const todayOrder = this.today.order();
     const rank = (key: string): number => {
-      const at = order.indexOf(key);
+      const at = todayOrder.indexOf(key);
       return at < 0 ? Number.MAX_SAFE_INTEGER : at;
     };
     open.sort((a, b) => rank(a.row.key) - rank(b.row.key));
     const placed = open.map(({ row }) => row.key);
-    if (placed.join() !== order.join()) this.today.setOrder(placed);
+    if (placed.join() !== todayOrder.join()) this.today.setOrder(placed);
     reminders.sort((a, b) => a.at.localeCompare(b.at));
+    donePinned.sort((a, b) => a.at - b.at);
+    // Stable: the same list keeps its file order.
+    high.sort((a, b) => a.rank - b.rank);
     const rollover =
       this.today.answered() === today
         ? []
         : open
             .filter((task) => task.day < today)
             .map(({ row }) => ({ key: row.key, title: titlePlain(row.title) || row.label }));
+    const captured = this.meta.captures().flatMap((id): TodayEntry[] => {
+      const stamp = this.meta.get(id)?.captured;
+      const label = labels.get(id);
+      if (!stamp || !label || !stamp.startsWith(today)) return [];
+      return [{ ...label, time: stamp.slice(11, 16) }];
+    });
+    const rows = [...open, ...donePinned, ...high].map(({ row }) => row);
     return {
       id: TODAY_ID,
       name: 'Today',
       mode: 'tasks',
       open: open.length,
-      items: open.map(({ row }) => ({ kind: 'task', task: row })),
-      completed,
+      items: rows.map((row) => ({ kind: 'task', task: row })),
+      completed: [],
       readOnly: null,
       noteText: null,
-      today: { reminders, rollover },
+      today: {
+        reminders,
+        rollover,
+        high: high.map(({ row }) => row.key),
+        done: done
+          .sort((a, b) => b.at - a.at)
+          .map(({ key, listId, listName, title, time }) => ({
+            key,
+            listId,
+            listName,
+            title,
+            time,
+          })),
+        captured,
+        inbox,
+        progress: {
+          done: [...counted.values()].filter(Boolean).length,
+          total: counted.size,
+        },
+      },
     };
+  }
+
+  /** D-92: Today's open pinned tasks, in Today's order: the only ones Alt+↑/↓ and drag move. */
+  private todayPinned(now: Date): string[] {
+    const view = this.todayView(now);
+    return view.items
+      .slice(0, view.open)
+      .flatMap((item) => (item.kind === 'task' ? [item.task.key] : []));
   }
 
   /**
@@ -1177,9 +1259,8 @@ export class Workspace {
       }
       case 'move':
       case 'place': {
-        const keys = (this.todayView(now).items as readonly { task?: TaskRow }[]).flatMap((item) =>
-          item.task ? [item.task.key] : [],
-        );
+        // D-92: only the open pinned tasks have an order; a done or high-priority row nudges.
+        const keys = this.todayPinned(now);
         const from = keys.indexOf(change.key);
         if (from < 0) return null;
         const next = keys.filter((key) => key !== change.key);

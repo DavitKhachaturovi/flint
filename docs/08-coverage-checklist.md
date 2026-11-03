@@ -567,3 +567,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Whole-line selection not inset when a note starts with a code card | NOTE-01 · Done (0.4.25) | D-91 |
 | 6 | The note's find bar placed as the list's, fading out | NAV-06 · Done (0.4.25) | 02, D-91 |
 | 7 | The task menu in groups (Add ▸, More ▸, Reminder ▸) | UI-08 · Done (0.4.25) | 02, 03 §4, D-91 |
+
+## AB. The Today redesign (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The rollover card stays until Roll over, Clear or × | TODAY-02 · Done (0.4.26) | 02, D-92 |
+| 2 | Focus · pinned with done pins faded ("done 11:20"); High priority · not pinned, five and "Show all N" | TODAY-01 · Done (0.4.26) | 02, 03 §4, 09, D-92 |
+| 3 | Reminder cards follow the clock; countdowns tick | TODAY-03 · Done (0.4.26) | 02, D-92 |
+| 4 | The Today column: Timeline with the now line, Done today, Captured today with Sort Inbox; stacked and folding on narrow windows | TODAY-01, TODAY-03 · Done (0.4.26) | 02, 09, D-92 |
+| 5 | A task's details in the Today column after Shift+Enter or its notes icon; back, Esc | TODAY-01, NAV-07 · Done (0.4.26) | 02, D-92 |
+| 6 | The progress line, "X of Y done" | TODAY-01 · Done (0.4.26) | 02, 09, D-92 |
+| 7 | The next reminder's card wider and brighter; three a row, "+N more" | TODAY-03 · Done (0.4.26) | 09, D-92 |
+| 8 | "Add a task to today…" | TODAY-01 · Done (0.4.26) | D-92 |
+| 9 | Motion for all of it | UI-10 · Done (0.4.26) | 03 §5, D-92 |

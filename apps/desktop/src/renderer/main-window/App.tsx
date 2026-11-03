@@ -66,7 +66,7 @@ import {
   SortIcon,
   SunIcon,
 } from './icons.js';
-import { ReminderCards, RolloverCard, TodayGreeting } from './Today.js';
+import { ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
@@ -199,6 +199,8 @@ const tasksCount = (count: number): string => (count === 1 ? '1 task' : `${count
 const ARCHIVE_DAYS = 14;
 const ARCHIVE_OFFER_AT = 50;
 const ARCHIVE_DISMISSED = 'flint.archive.dismissed';
+/** D-92: Focus shows the first five high-priority tasks that aren't pinned, then "Show all N". */
+const HIGH_SHOWN = 5;
 
 /** NAV-04, D-88: how far a two-finger swipe goes (in wheel pixels) before it steps. */
 const SWIPE_DISTANCE = 240;
@@ -535,6 +537,14 @@ export function App(): ReactElement {
   const [page, setPage] = useState<string | null>(null);
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * D-92: on wide screens Today's column shows Timeline, Done and Captured; Shift+Enter or the
+   * notes icon puts a task's details there instead (this task), until back, Esc or another task.
+   */
+  const [todayDetails, setTodayDetails] = useState<string | null>(null);
+  const todayWideRef = useRef(false);
+  /** D-92: "Show all N" of Focus's high-priority group, for the session. */
+  const [highAll, setHighAll] = useState(false);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
   const [editingBody, setEditingBody] = useState<string | null>(null);
@@ -774,6 +784,29 @@ export function App(): ReactElement {
   );
   const revealRef = useRef(reveal);
   revealRef.current = reveal;
+  /**
+   * D-92: a task opened from Today (a reminder card, the timeline, Done, Captured): selected and
+   * flashed where it is in Today, or else in its own list (as a reminder's Open).
+   */
+  const openFromToday = useCallback(
+    (key: string, list: string): void => {
+      const row = scroller.current?.querySelector(
+        `.card.tasks .row[data-key="${CSS.escape(key)}"]`,
+      );
+      if (!row) {
+        reveal(list, key);
+        return;
+      }
+      setMarked(NOTHING);
+      if (selectedRef.current === key) {
+        flash(row);
+        return;
+      }
+      arriving.current = { key, mode: 'smooth', flash: true };
+      setSelected(key);
+    },
+    [reveal],
+  );
   const followFromPanel = useCallback(
     (list: string, key: string): void => {
       const trail = history.current;
@@ -889,6 +922,12 @@ export function App(): ReactElement {
     (task: TaskRow): void => {
       const without = (keys: ReadonlySet<string>): Set<string> =>
         new Set([...keys].filter((key) => key !== task.key));
+      // D-92: in Today on a wide screen, the column shows the task's details (or Today's again).
+      if (todayWideRef.current && !expanded.has(task.key)) {
+        setSelected(task.key);
+        setTodayDetails((current) => (current === task.key ? null : task.key));
+        return;
+      }
       // NAV-07, D-83: with the context panel, the body is read and edited there: select the task.
       // D-89: one open inline anyway closes.
       if (panelShownRef.current && !expanded.has(task.key)) {
@@ -913,8 +952,9 @@ export function App(): ReactElement {
   const panelNotesFor = useRef<string | null>(null);
   /** D-78: a task's body opened inline and in its field, for Shift+Enter and "Add notes". */
   const openNotes = useCallback((key: string): void => {
-    // D-89: with the context panel, in the panel's notes editor instead.
+    // D-89: with the context panel, in the panel's notes editor instead (D-92: Today's column).
     if (panelShownRef.current) {
+      if (todayWideRef.current) setTodayDetails(key);
       panelNotesFor.current = key;
       setEditing(null);
       setSelected(key);
@@ -1109,10 +1149,23 @@ export function App(): ReactElement {
     setTempSort(pendingSort.current);
     pendingSort.current = null;
   }, [listId]);
-  const shownView = useMemo(
-    () => (view && tempSort ? { ...view, items: sortedItems(view.items, tempSort) } : view),
-    [view, tempSort],
-  );
+  const shownView = useMemo((): ListView | null => {
+    if (!view) return view;
+    const high = new Set(view.today?.high ?? []);
+    const isHigh = (item: ListView['items'][number]): boolean =>
+      item.kind === 'task' && high.has(item.task.key);
+    let pinned = view.items.filter((item) => !isHigh(item));
+    let rest = view.items.filter(isHigh);
+    if (tempSort) {
+      pinned = sortedItems(pinned, tempSort);
+      rest = sortedItems(rest, tempSort);
+    }
+    if (!highAll) rest = rest.slice(0, HIGH_SHOWN);
+    const items = [...pinned, ...rest];
+    return items.length === view.items.length && items.every((item, at) => item === view.items[at])
+      ? view
+      : { ...view, items };
+  }, [view, tempSort, highAll]);
   const rows = useMemo(() => visibleRows(shownView, completedOpen), [shownView, completedOpen]);
 
   // A row that went away hands the selection to the row now in its place; a task just added isn't
@@ -2357,6 +2410,7 @@ export function App(): ReactElement {
         // Esc clears the marks first, then the selection (TASK-07). D-89: with the context panel,
         // a body open inline anyway closes first.
         if (marked.size > 0) setMarked(NOTHING);
+        else if (todayDetails !== null) setTodayDetails(null);
         else if (row && panelShownRef.current && expanded.has(row.key)) showBody(row);
         else setSelected(null);
       }
@@ -2851,6 +2905,13 @@ export function App(): ReactElement {
       );
     };
     cardRows.push(...ghostRows(ghosts, 'open', null, rowProps));
+    const highKeys = new Set(view.today?.high ?? []);
+    let firstHigh: string | null = null;
+    for (const item of (shownView ?? view).items)
+      if (item.kind === 'task' && highKeys.has(item.task.key)) {
+        firstHigh = item.task.key;
+        break;
+      }
     (shownView ?? view).items.forEach((item, index) => {
       if (item.kind === 'heading')
         cardRows.push(
@@ -2865,6 +2926,24 @@ export function App(): ReactElement {
           </p>,
         );
       else {
+        // D-92: Today's high-priority tasks that aren't pinned, a quieter group after the pins.
+        if (item.task.key === firstHigh && view.today) {
+          const count = view.today.high.length;
+          cardRows.push(
+            <div key="focus-high" className="focus-head focus-high">
+              <span className="panel-label">High priority · not pinned</span>
+              {count > HIGH_SHOWN && (
+                <button
+                  type="button"
+                  className="focus-hint focus-more"
+                  onClick={() => setHighAll(!highAll)}
+                >
+                  {highAll ? 'Show fewer' : `Show all ${count}`}
+                </button>
+              )}
+            </div>,
+          );
+        }
         cardRows.push(
           withBody(
             <Row
@@ -3167,22 +3246,39 @@ export function App(): ReactElement {
 
   // NAV-07, D-83: what the context panel shows.
   const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
+  // D-92: Today has its own column; a task's details only after Shift+Enter or its notes icon.
+  const todayWide = panelShown && view?.id === TODAY_ID && !pageTask;
+  todayWideRef.current = todayWide;
+  const todayDetailsRow =
+    todayWide && todayDetails !== null && selectedRow?.key === todayDetails ? selectedRow : null;
+  useEffect(() => {
+    if (todayDetails !== null && (selected !== todayDetails || listId !== TODAY_ID))
+      setTodayDetails(null);
+  }, [selected, listId, todayDetails]);
+  const todayColumn = todayWide && !todayDetailsRow;
   const panelState: PanelState | null =
-    !panelShown || !view
+    !panelShown || !view || todayColumn
       ? null
-      : view.mode === 'note'
-        ? { kind: 'note', text: view.noteText ?? '', edited: view.edited, created: view.created }
-        : // D-89: on a task's page, a selected subtask shows its own details (its notes too).
-          pageTask && (!selectedRow || selectedRow.key === pageTask.key)
-          ? { kind: 'page', task: pageTask }
-          : selectedRow
-            ? {
-                kind: 'task',
-                task: selectedRow,
-                listName: selectedRow.home?.listName ?? view.name,
-                readOnly: view.readOnly !== null,
-              }
-            : { kind: 'upnext' };
+      : todayDetailsRow
+        ? {
+            kind: 'task',
+            task: todayDetailsRow,
+            listName: todayDetailsRow.home?.listName ?? view.name,
+            readOnly: view.readOnly !== null,
+          }
+        : view.mode === 'note'
+          ? { kind: 'note', text: view.noteText ?? '', edited: view.edited, created: view.created }
+          : // D-89: on a task's page, a selected subtask shows its own details (its notes too).
+            pageTask && (!selectedRow || selectedRow.key === pageTask.key)
+            ? { kind: 'page', task: pageTask }
+            : selectedRow
+              ? {
+                  kind: 'task',
+                  task: selectedRow,
+                  listName: selectedRow.home?.listName ?? view.name,
+                  readOnly: view.readOnly !== null,
+                }
+              : { kind: 'upnext' };
   const [upNextItems, setUpNextItems] = useState<readonly UpNextItem[]>([]);
   const wantsUpNext = panelState?.kind === 'upnext' || panelState?.kind === 'page';
   useEffect(() => {
@@ -3192,7 +3288,8 @@ export function App(): ReactElement {
   selectedRef.current = selected;
   const herePlace = history.current.places[history.current.at];
   const panelBack =
-    herePlace?.fromPanel === true && history.current.at > 0 && herePlace.select === selected;
+    todayDetailsRow !== null ||
+    (herePlace?.fromPanel === true && history.current.at > 0 && herePlace.select === selected);
   // The outline's current section (D-85, a scroll-spy): the last heading above a line 96 px below
   // the top of the view; scrolled to the end, the last heading.
   const panelText =
@@ -3259,7 +3356,7 @@ export function App(): ReactElement {
     const measure = (): void => {
       // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .rollover, .content > .today-reminders, .content > .composer, .content > .note-card',
+        '.content > .rollover, .content > .today-reminders-wrap, .content > .composer, .content > .note-card',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -3295,7 +3392,7 @@ export function App(): ReactElement {
   });
   const panelHandlers: PanelHandlers = {
     onHide: togglePanel,
-    onBack: panelBack ? () => travel(-1) : null,
+    onBack: todayDetailsRow ? () => setTodayDetails(null) : panelBack ? () => travel(-1) : null,
     onMenu: (at) => panelMenu(at),
     onOpenPage: openPage,
     onToggle: (key) => void toggle(key),
@@ -3524,7 +3621,7 @@ export function App(): ReactElement {
         >
           {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
           <div
-            className={panelState ? `pair ${pairSize ?? ''}` : 'pair single'}
+            className={panelState || todayColumn ? `pair ${pairSize ?? ''}` : 'pair single'}
             style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
           >
             {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
@@ -3608,7 +3705,11 @@ export function App(): ReactElement {
                   prompt and today's reminders, above the composer and Focus. */}
               {view && !pageTask && view.id === TODAY_ID && (
                 <>
-                  <TodayGreeting open={view.open} reminders={view.today?.reminders.length ?? 0} />
+                  <TodayGreeting
+                    open={view.open}
+                    reminders={view.today?.reminders ?? []}
+                    progress={view.today?.progress}
+                  />
                   <RolloverCard
                     tasks={view.today?.rollover ?? []}
                     onAnswer={(clear) =>
@@ -3619,13 +3720,7 @@ export function App(): ReactElement {
                   />
                   <ReminderCards
                     reminders={view.today?.reminders ?? []}
-                    onOpen={(reminder) =>
-                      view.items.some(
-                        (item) => item.kind === 'task' && item.task.key === reminder.key,
-                      )
-                        ? setSelected(reminder.key)
-                        : go({ list: reminder.listId, page: null }, reminder.key)
-                    }
+                    onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
                   />
                 </>
               )}
@@ -3680,6 +3775,7 @@ export function App(): ReactElement {
                       lists={lists}
                       inputRef={composer}
                       onAdd={addFromComposer}
+                      {...(view.id === TODAY_ID && { placeholder: 'Add a task to today…' })}
                     />
                   )}
 
@@ -3714,10 +3810,17 @@ export function App(): ReactElement {
                     />
                     {view.id === TODAY_ID && (
                       <div className="focus-head">
-                        <span className="panel-label">Focus</span>
+                        <span className="panel-label">Focus · pinned</span>
                         {view.open > 1 && <span className="focus-hint">drag to reorder</span>}
                       </div>
                     )}
+                    {view.id === TODAY_ID &&
+                      view.items.length > 0 &&
+                      view.items.length === (view.today?.high.length ?? 0) && (
+                        <p className="empty focus-empty">
+                          Nothing pinned yet. Press P on a task to bring it here.
+                        </p>
+                      )}
                     {view.items.length === 0 && (
                       <p className="empty">
                         {view.id === TODAY_ID
@@ -3727,6 +3830,14 @@ export function App(): ReactElement {
                     )}
                     {cardRows}
                   </section>
+                  {view.id === TODAY_ID && !panelShown && view.today && (
+                    <TodayColumn
+                      extras={view.today}
+                      stacked
+                      onOpen={openFromToday}
+                      onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
+                    />
+                  )}
 
                   {(view.completed.length > 0 ||
                     ghosts.some((ghost) => ghost.section === 'done')) && (
@@ -3811,6 +3922,14 @@ export function App(): ReactElement {
                 current={outlineCurrent}
                 back={panelBack}
                 handlers={panelHandlers}
+              />
+            )}
+            {todayColumn && view?.today && (
+              <TodayColumn
+                extras={view.today}
+                stacked={false}
+                onOpen={openFromToday}
+                onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
               />
             )}
           </div>
@@ -4117,8 +4236,10 @@ function Composer(props: {
   readonly inputRef: RefObject<HTMLInputElement | null>;
   /** `chooseNewList`: the close-match card was flipped to a new list (Tab, D-25). */
   readonly onAdd: (text: string, chooseNewList: boolean) => Promise<void>;
+  /** D-92: Today's "Add a task to today…". */
+  readonly placeholder?: string;
 }): ReactElement {
-  const { listId, lists, inputRef, onAdd } = props;
+  const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…' } = props;
   const text = useInertText('', false);
   /** D-78: notes under the title (Shift+Enter, as in the capture popup): the new task's body. */
   const [notes, setNotes] = useState<string | null>(null);
@@ -4303,7 +4424,7 @@ function Composer(props: {
       <input
         ref={inputRef}
         className="composer-input"
-        placeholder="Add a task…"
+        placeholder={placeholder}
         value={value}
         spellCheck={false}
         aria-controls="composer-suggestions"
@@ -5025,7 +5146,7 @@ function Row(
         <Title task={task} />
       )}
       <span className="ind">
-        {task.pinned && !task.home && (
+        {task.pinned && !(task.home && task.done) && (
           // D-86: the pin unpins.
           <button
             type="button"
@@ -5100,7 +5221,7 @@ function Row(
           </button>
         )}
         {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
-        {task.home && <span className="chip home-list">{task.home.listName}</span>}
+        {task.home && !task.done && <span className="chip home-list">{task.home.listName}</span>}
       </span>
     </div>
   );

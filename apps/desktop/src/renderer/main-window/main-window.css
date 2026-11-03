@@ -3537,7 +3537,6 @@ a.auto-link {
 
 .today-greeting {
   margin: 0;
-  max-width: 460px;
   font-size: 36px;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -3555,9 +3554,50 @@ a.auto-link {
   color: var(--fl-text-muted);
 }
 
+/* D-92: the day's progress: a slim line that fills as Today's tasks are done. */
+.today-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.today-progress-track {
+  flex: 1;
+  max-width: 360px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+
+.today-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--fl-strong-bg);
+  transform: scaleX(var(--fill, 0));
+  transform-origin: left center;
+  transition: transform var(--fl-dur-page) cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: progress-in var(--fl-dur-page) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes progress-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.today-progress-text {
+  font-family: var(--fl-font-mono);
+  font-size: 12px;
+  color: var(--fl-text-secondary);
+}
+
 /* TODAY-02 (Q-04, D-89): the rollover card; it rises in and folds away once answered. */
 .rollover {
-  padding: 18px 18px 16px 20px;
+  padding: 16px 16px 14px 20px;
   overflow: hidden;
   animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
 }
@@ -3618,11 +3658,19 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
+.rollover-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
 .rollover-tasks {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 0 0 14px;
+  gap: 4px;
+  margin: 0;
   padding: 0;
   list-style: none;
   line-height: 1.55;
@@ -3648,6 +3696,7 @@ a.auto-link {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-left: auto;
 }
 
 .rollover-clear {
@@ -3675,14 +3724,31 @@ a.auto-link {
   transform: scale(0.97);
 }
 
-/* TODAY-03 (D-89): today's reminders, two cards a row; they lift a little on hover. */
+/* TODAY-03 (D-89, D-92, mockup 12): today's reminders, three a row; the next one wider and
+   brighter, the later ones quieter; a card lifts a little on hover and folds away when its time
+   comes. */
+.today-reminders-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .today-reminders {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1.25fr 1fr 1fr;
   gap: 14px;
 }
 
+.today-reminders[data-columns='2'] {
+  grid-template-columns: 1.25fr 1fr;
+}
+
+.today-reminders[data-columns='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .reminder-card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3691,12 +3757,32 @@ a.auto-link {
   animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
   transition:
     transform var(--fl-dur-fast) var(--fl-ease-spring),
-    box-shadow var(--fl-dur-fast) ease;
+    box-shadow var(--fl-dur-fast) ease,
+    background-color var(--fl-dur-state) ease;
 }
 
 .reminder-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--fl-shadow-card-hover);
+}
+
+.reminder-card.next {
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+}
+
+.reminder-card.leaving {
+  pointer-events: none;
+  animation: reminder-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes reminder-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
 }
 
 .reminder-card-when {
@@ -3709,31 +3795,84 @@ a.auto-link {
   width: 30px;
   height: 30px;
   border-radius: 9px;
+  transition:
+    background-color var(--fl-dur-state) ease,
+    color var(--fl-dur-state) ease;
 }
 
 .reminder-card-time {
   font-family: var(--fl-font-mono);
-  font-size: 15px;
+  font-size: 16px;
   color: var(--fl-text-secondary);
 }
 
-.reminder-card:first-child .reminder-card-time {
+.reminder-card.next .reminder-card-time {
+  font-size: 20px;
   color: var(--fl-text-highlight);
 }
 
-.reminder-card-until {
-  font-size: 12px;
-  color: var(--fl-text-faint);
+.reminder-card-next {
+  margin-left: auto;
+  font-size: var(--fl-size-label);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-secondary);
 }
 
 .reminder-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--fl-text-body);
+}
+
+.reminder-card.next .reminder-card-title {
+  font-size: 15px;
   font-weight: 500;
-  color: var(--fl-text-primary);
+  color: var(--fl-text-highlight);
+}
+
+.reminder-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
 .reminder-card-list {
-  align-self: flex-start;
+  min-width: 0;
+  overflow: hidden;
   gap: 6px;
+}
+
+.reminder-card-until {
+  flex: 0 0 auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+
+.reminder-card.next .reminder-card-until {
+  font-size: 12px;
+  color: var(--fl-text-secondary);
+}
+
+.reminder-more {
+  align-self: flex-end;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.reminder-more:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
 }
 
 /* TODAY-01 (mockup 03): the Focus card's head, and a row's home list. */
@@ -3747,6 +3886,339 @@ a.auto-link {
 .focus-hint {
   font-size: 12px;
   color: var(--fl-text-faint);
+}
+
+/* D-92 (mockup 12): Today's high-priority tasks that aren't pinned, a quieter group below. */
+.focus-high {
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fl-edge-divider);
+  animation: fade-in var(--fl-dur-state) ease-out;
+}
+
+.focus-more {
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.focus-more:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.focus-high ~ .row:not(.sel) .title,
+.focus-high ~ .row-group .row:not(.sel) .title {
+  color: var(--fl-text-secondary);
+}
+
+.focus-high ~ .row .stripe,
+.focus-high ~ .row-group .stripe {
+  opacity: 0.55;
+}
+
+.focus-high ~ .row:not(.sel) .check,
+.focus-high ~ .row-group .row:not(.sel) .check {
+  opacity: 0.75;
+}
+
+.focus-empty {
+  padding: 4px 12px 10px;
+}
+
+/* D-92 (mockup 12): Today's column: Timeline, Done today and Captured today, in the context
+   panel's place (its width, sticky as it is), or stacked under Focus on narrow windows. */
+.today-column {
+  position: sticky;
+  top: min(16px, var(--panel-top, 4px));
+  flex: 0 0 440px;
+  max-height: calc(100vh - 40px - 32px);
+  margin-top: var(--panel-top, 4px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: today-column-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes today-column-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+
+.pair.compact > .today-column {
+  flex-basis: 380px;
+}
+
+.today-column.stacked {
+  position: static;
+  max-height: none;
+  margin-top: 0;
+  overflow: visible;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.today-section {
+  flex: 0 0 auto;
+  padding: 16px 20px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.pair.compact > .today-column .today-section {
+  padding: 14px 16px;
+}
+
+.today-section-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  text-align: left;
+}
+
+.today-section-head .panel-label {
+  color: var(--fl-text-secondary);
+}
+
+.today-section-head .chev {
+  display: inline-flex;
+  color: var(--fl-text-muted);
+}
+
+.today-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity var(--fl-dur-state) ease;
+}
+
+.today-fold.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.today-fold-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The timeline: hour labels on hairlines, the reminders on them, the now line across. */
+.timeline {
+  position: relative;
+  margin: 14px 0 2px;
+  transition: height var(--fl-dur-state) ease;
+}
+
+.timeline-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateY(-50%);
+}
+
+.timeline-hour-label {
+  width: 40px;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.timeline-hour-line {
+  flex: 1;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.timeline-event {
+  position: absolute;
+  left: 52px;
+  right: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--fl-ground-tile);
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--fl-text-body);
+  transition:
+    top var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    background-color var(--fl-dur-state) ease,
+    color var(--fl-dur-state) ease,
+    opacity var(--fl-dur-state) ease;
+  animation: fade-in var(--fl-dur-state) ease-out;
+}
+
+.timeline-event:hover {
+  background: var(--fl-ground-hover);
+}
+
+.timeline-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fl-text-muted);
+  transition: background-color var(--fl-dur-state) ease;
+}
+
+.timeline-event.past {
+  background: var(--fl-ground-well);
+  color: var(--fl-text-faint);
+}
+
+.timeline-event.past .timeline-text,
+.timeline-event.done .timeline-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--fl-edge-chip);
+}
+
+.timeline-event.past .timeline-dot {
+  background: var(--fl-edge-chip);
+}
+
+.timeline-event.next {
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  color: var(--fl-text-highlight);
+}
+
+.timeline-event.next .timeline-dot {
+  background: var(--fl-text-highlight);
+}
+
+.timeline-now {
+  position: absolute;
+  left: 52px;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+  transition: top 1s linear;
+}
+
+.timeline-now-line {
+  position: absolute;
+  left: 0;
+  right: 52px;
+  top: 0;
+  border-top: 1.5px solid var(--fl-text-highlight);
+}
+
+.timeline-now-time {
+  position: absolute;
+  right: 0;
+  top: -8px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--fl-strong-bg);
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--fl-strong-fg);
+}
+
+/* Done today and Captured today. */
+.today-entries {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.today-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--fl-text-body);
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: background-color var(--fl-dur-fast);
+}
+
+.today-entry:hover {
+  background: var(--fl-ground-hover);
+}
+
+.today-entry.leaving {
+  pointer-events: none;
+  animation: reminder-out var(--fl-dur-state) ease-in forwards;
+}
+
+.today-done .today-entry {
+  color: var(--fl-text-muted);
+}
+
+.today-entry-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: var(--fl-accent);
+  color: var(--fl-strong-fg);
+}
+
+.today-entry-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-entry-meta {
+  flex: 0 0 auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.today-sort-inbox {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.soft-button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--fl-ground-hover);
+  box-shadow: inset 0 1px 0 var(--fl-edge-chip);
+  font-size: 13px;
+  color: var(--fl-text-primary);
+  transition: transform var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+.soft-button:active {
+  transform: scale(0.97);
 }
 
 .chip.home-list {

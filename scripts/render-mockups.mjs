@@ -27,6 +27,8 @@ const SCREENS = {
     height: 1140,
     states: ['details', 'upnext', 'note'],
   },
+  // D-92: Davit's Today redesign, wide screen.
+  12: { file: '12-today-redesign', width: 1920, height: 1140 },
 };
 
 const args = process.argv.slice(2);

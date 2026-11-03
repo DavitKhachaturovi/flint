@@ -231,13 +231,42 @@ export interface TodayReminder {
   readonly time: string;
   /** The reminder as written (`YYYY-MM-DDTHH:MM`), for "in 2 h". */
   readonly at: string;
+  /** D-92: the task is done (struck through on the timeline). */
+  readonly done: boolean;
+}
+
+/** D-92: a task in Today's Done today or Captured today, with the time it was done or captured. */
+export interface TodayEntry {
+  readonly key: string;
+  readonly listId: string;
+  readonly listName: string;
+  readonly title: string;
+  /** `11:20`. */
+  readonly time: string;
 }
 
 /** TODAY-01, TODAY-02, TODAY-03: what Today shows besides its tasks. */
 export interface TodayExtras {
+  /**
+   * D-92: all of today's reminders (not turned off), done and passed ones too, by time; the cards
+   * show the ones still to come, the timeline all of them, as the clock moves.
+   */
   readonly reminders: readonly TodayReminder[];
   /** TODAY-02, Q-04: unfinished tasks pinned before today, until the prompt is answered today. */
   readonly rollover: readonly { readonly key: string; readonly title: string }[];
+  /**
+   * D-92: the "High priority · not pinned" rows, the last of the view's items (after the pinned
+   * tasks, open then done), in the sidebar's list order.
+   */
+  readonly high: readonly string[];
+  /** D-92: tasks completed today in any list, newest first. */
+  readonly done: readonly TodayEntry[];
+  /** D-92: today's captures from the popup, newest first. */
+  readonly captured: readonly TodayEntry[];
+  /** D-92: Inbox, for "Sort Inbox · N". */
+  readonly inbox: { readonly id: string; readonly open: number };
+  /** D-92: today's pinned tasks and today's reminder tasks; how many of them are done today. */
+  readonly progress: { readonly done: number; readonly total: number };
 }
 
 /**

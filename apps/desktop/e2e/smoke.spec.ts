@@ -2260,17 +2260,30 @@ test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Wi
   await main.keyboard.press('Escape');
   await expect(main.locator('.lightbox')).toHaveCount(0);
 
-  // The note's find bar: level with the title at the top, takes no room, then the panel's top.
+  // The note's find bar: level with the title at the top, takes no room; scrolled, 16 px below
+  // the top (the panel's line).
+  await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
   await editor.locator('.cm-line', { hasText: 'Line 3' }).first().click();
+  await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
   const before = await editor.locator('.cm-line').first().boundingBox();
   await main.keyboard.press('Control+f');
   const bar = main.locator('.note-editor .fl-find');
   await expect(bar).toBeVisible();
-  const title = await main.locator('.note-card h1').boundingBox();
-  const box = await bar.boundingBox();
-  if (!title || !box || !before) throw new Error('no boxes');
-  expect(Math.abs(box.y + box.height / 2 - (title.y + title.height / 2))).toBeLessThan(3);
-  expect((await editor.locator('.cm-line').first().boundingBox())?.y).toBe(before.y);
+  const centre = async (selector: string): Promise<number> => {
+    const box = await main.locator(selector).first().boundingBox();
+    return box ? box.y + box.height / 2 : Number.NaN;
+  };
+  await expect
+    .poll(async () =>
+      Math.abs((await centre('.note-editor .fl-find')) - (await centre('.note-card h1'))),
+    )
+    .toBeLessThan(3);
+  expect((await editor.locator('.cm-line').first().boundingBox())?.y).toBe(before?.y);
+  const area = await scroller.boundingBox();
+  await scroller.evaluate((element) => element.scrollTo({ top: 400, behavior: 'instant' }));
+  await expect
+    .poll(async () => Math.round(((await bar.boundingBox())?.y ?? 0) - (area?.y ?? 0)))
+    .toBe(16);
   await main.keyboard.press('Escape');
   await expect(bar).toHaveCount(0);
 });
@@ -2346,6 +2359,111 @@ test('Today: pinned tasks of every list, its order, its composer, reminder cards
   await expect.poll(file).toMatch(/- \[x\] Write the design note/);
   await main.keyboard.press('Control+z');
   await expect.poll(file).toMatch(/- \[ \] Write the design note/);
+});
+
+test('Today redesign: high priority not pinned, progress, the column and its sections, details in the column (TODAY-01, TODAY-02, TODAY-03, D-92)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const now = new Date();
+  const soon = new Date(now.getTime() + 90 * 60_000);
+  const today = soon.getDate() === now.getDate();
+  const at = `${soon.getFullYear()}-${two(soon.getMonth() + 1)}-${two(soon.getDate())}T${two(soon.getHours())}:${two(soon.getMinutes())}`;
+  const urgent = Array.from(
+    { length: 6 },
+    (_, i) => `- [ ] Urgent thing ${i + 1} [priority:: high] [id:: trh${i}]`,
+  );
+  await writeFile(
+    join(flint, 'Redesign.md'),
+    `---\nflint: 1\nid: rdsg\nmode: tasks\n---\n- [ ] Pinned for the redesign [pinned:: true] [id:: trp1]\n- [ ] Remind me later [reminder:: ${at}] [id:: trr1]\n${urgent.join('\n')}\n`,
+  );
+  const size = (width: number, height: number) =>
+    app.evaluate(
+      ({ BrowserWindow }, bounds) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: -6000, y: 0, ...bounds });
+      },
+      { width, height },
+    );
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Redesign' }).click();
+  await expect(main.locator('h1')).toContainText('Redesign');
+  await main.locator('.sidebar > .nav').first().click();
+  await expect(main.locator('.today-greeting')).toContainText('in focus');
+
+  // The composer adds to today; the day's progress line; Focus's two groups.
+  await expect(main.locator('.composer-input')).toHaveAttribute(
+    'placeholder',
+    'Add a task to today…',
+  );
+  await expect(main.locator('.today-progress-text')).toHaveText(/^\d+ of \d+ done$/);
+  await expect(main.locator('.focus-head').first()).toContainText('Focus · pinned');
+  const high = main.locator('.focus-high');
+  await expect(high).toContainText('High priority · not pinned');
+  const more = high.locator('.focus-more');
+  await expect(more).toHaveText(/^Show all \d+$/);
+  await expect(main.locator('.row', { hasText: 'Urgent thing 6' })).toHaveCount(0);
+  await more.click();
+  await expect(more).toHaveText('Show fewer');
+  await expect(main.locator('.row', { hasText: 'Urgent thing 6' })).toHaveCount(1);
+  // Only the pinned tasks reorder: Alt+↑ on a high-priority row nudges it.
+  const urgentRow = main.locator('.row', { hasText: 'Urgent thing 2' });
+  await urgentRow.click({ position: { x: 400, y: 10 } });
+  await main.evaluate(() =>
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }),
+    ),
+  );
+  await expect
+    .poll(() => urgentRow.evaluate((row) => row.getAnimations().length))
+    .toBeGreaterThan(0);
+  // P pins it: it joins the pinned tasks, above the high-priority group.
+  await main.keyboard.press('p');
+  await expect(urgentRow.locator('.pin-ind')).toHaveCount(1);
+  expect(
+    await main.evaluate(() => {
+      const row = [...document.querySelectorAll('.card.tasks .row')].find((each) =>
+        each.textContent?.includes('Urgent thing 2'),
+      );
+      const head = document.querySelector('.focus-high');
+      return (
+        !!row && !!head && !!(row.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING)
+      );
+    }),
+  ).toBe(true);
+  await main.keyboard.press('Control+z');
+  await expect(urgentRow.locator('.pin-ind')).toHaveCount(0);
+
+  // Narrow: Timeline, Done and Captured stack under Focus; the next reminder's card stands out.
+  await expect(main.locator('.today-column.stacked')).toHaveCount(today ? 1 : 0);
+  if (today) {
+    await expect(main.locator('.today-column.stacked .today-timeline')).toContainText(
+      'Remind me later',
+    );
+    await expect(main.locator('.timeline-now')).toHaveCount(1);
+    await expect(main.locator('.reminder-card.next')).toHaveCount(1);
+  }
+
+  // Wide: the column in the panel's place; notes put the task's details there, Esc and back return.
+  await size(1800, 900);
+  const column = main.locator('.today-column:not(.stacked)');
+  if (today) await expect(column).toBeVisible();
+  const pinned = main.locator('.row', { hasText: 'Pinned for the redesign' });
+  await pinned.click({ button: 'right', position: { x: 400, y: 10 } });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Add' }).hover();
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Notes' }).click();
+  const panel = main.locator('.context-panel .panel-state:not(.panel-ghost)');
+  await expect(panel).toContainText('Pinned for the redesign');
+  await expect(column).toHaveCount(0);
+  await main.locator('.context-panel .panel-back').click();
+  await expect(main.locator('.context-panel')).toHaveCount(0);
+  if (today) await expect(column).toBeVisible();
+  // Selecting another task keeps the column as it is.
+  await urgentRow.click({ position: { x: 400, y: 10 } });
+  await expect(main.locator('.context-panel')).toHaveCount(0);
+  await size(1120, 780);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

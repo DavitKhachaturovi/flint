@@ -804,12 +804,15 @@ describe('auto-archive (TASK-06, Q-13, D-88)', () => {
   });
 });
 
-describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89)', () => {
+describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89, D-92)', () => {
   const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
-  const keys = (workspace: Workspace, at = now): string[] =>
+  const all = (workspace: Workspace, at = now): string[] =>
     (workspace.view(TODAY_ID, at)?.items ?? []).flatMap((item) =>
       item.kind === 'task' ? [item.task.key] : [],
     );
+  /** The open pinned tasks: Today's order. */
+  const keys = (workspace: Workspace, at = now): string[] =>
+    all(workspace, at).slice(0, workspace.view(TODAY_ID, at)?.open ?? 0);
   beforeEach(async () => {
     await writeFile(
       join(folder, 'Work.md'),
@@ -822,10 +825,13 @@ describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89)', () => {
     const view = workspace.view(TODAY_ID, now);
     expect(view).toMatchObject({ name: 'Today', mode: 'tasks', open: 2 });
     expect(keys(workspace)).toEqual(['aaaa', 'cccc']);
-    expect(view?.completed.map((task) => task.key)).toEqual(['dddd']);
+    // D-92: a done pin stays in Focus, after the open ones, with its time, until the day changes.
+    expect(all(workspace)).toEqual(['aaaa', 'cccc', 'dddd']);
+    expect(view?.items[2]).toMatchObject({ task: { done: true, completed: 'done 09:00' } });
+    expect(view?.completed).toEqual([]);
     expect(view?.items[0]).toMatchObject({ task: { home: { listId: 'wrk1', listName: 'Work' } } });
     expect(view?.today?.reminders).toEqual([
-      expect.objectContaining({ key: 'bbbb', time: '16:00', listName: 'Work' }),
+      expect.objectContaining({ key: 'bbbb', time: '16:00', listName: 'Work', done: false }),
     ]);
     await workspace.change('wrk1', { kind: 'pin', key: 'bbbb', pinned: true }, now);
     expect(keys(workspace)).toEqual(['bbbb', 'aaaa']);
@@ -851,6 +857,46 @@ describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89)', () => {
     expect(await workspace.change(TODAY_ID, { kind: 'indent', key: 'cccc' }, now)).toBeNull();
     expect(await workspace.toggleDone(TODAY_ID, 'aaaa', now)).toBe('Completed');
     expect(await work()).toMatch(/- \[x\] Plan/);
+  });
+
+  it('D-92: high priority not pinned, done today, captured today, the timeline and progress', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Plan [pinned:: true] [id:: aaaa]\n- [ ] Urgent [priority:: high] [id:: eeee]\n    - [ ] Urgent child [priority:: high] [id:: eeef]\n- [ ] Ship [reminder:: 2026-10-29T16:00] [id:: bbbb]\n- [x] Morning call [reminder:: 2026-10-29T08:00] [completion:: 2026-10-29T08:30] [id:: gggg]\n- [ ] Stand-up [reminder:: 2026-10-29T10:00] [id:: hhhh]\n- [ ] Muted [reminder:: 2026-10-29T11:00] [muted:: true] [id:: iiii]\n- [x] Old [completion:: 2026-10-28T17:00] [id:: jjjj]\n',
+    );
+    await writeFile(
+      join(folder, 'Inbox.md'),
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] Inbox urgent [priority:: high] [id:: ffff]\n',
+    );
+    const workspace = await open();
+    await workspace.capture({ text: 'from the popup', chooseNewList: false }, now);
+    const view = workspace.view(TODAY_ID, now);
+    const today = view?.today;
+    // Inbox before the sidebar's lists; a high subtask under its high parent, not on its own.
+    expect(today?.high).toEqual(['ffff', 'eeee']);
+    expect(all(workspace)).toEqual(['aaaa', 'ffff', 'eeee']);
+    expect(today?.reminders.map((each) => [each.key, each.done])).toEqual([
+      ['gggg', true],
+      ['hhhh', false],
+      ['bbbb', false],
+    ]);
+    expect(today?.done).toEqual([
+      { key: 'gggg', listId: 'wrk1', listName: 'Work', title: 'Morning call', time: '08:30' },
+    ]);
+    expect(today?.captured).toEqual([
+      expect.objectContaining({ title: 'from the popup', listName: 'Inbox', time: '14:30' }),
+    ]);
+    expect(today?.inbox).toEqual({ id: 'inbox', open: 2 });
+    // Today's pinned (aaaa) and reminder tasks (gggg, hhhh, bbbb): one of four done today.
+    expect(today?.progress).toEqual({ done: 1, total: 4 });
+    // Only the pinned tasks have an order; a high one nudges (null), P brings it to the top.
+    expect(
+      await workspace.change(TODAY_ID, { kind: 'move', key: 'ffff', direction: 'up' }, now),
+    ).toBeNull();
+    await workspace.change(TODAY_ID, { kind: 'pin', key: 'ffff', pinned: true }, now);
+    expect(keys(workspace)).toEqual(['ffff', 'aaaa']);
+    expect(workspace.view(TODAY_ID, now)?.today?.high).toEqual(['eeee']);
+    expect(workspace.view(TODAY_ID, now)?.today?.progress).toEqual({ done: 1, total: 5 });
   });
 
   it('asks about unfinished pins from before today once a day: Roll over or Clear', async () => {

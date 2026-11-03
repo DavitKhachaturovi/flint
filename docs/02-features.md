@@ -315,17 +315,23 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Each task in Today shows its home list subtly. **Proposed:** Today has its own manual order (drag to reorder) independent of home-list order.
 
 - **Built (0.4.24, D-90):** Today is first in the sidebar and the window opens on it: a greeting, the rollover card, today's reminder cards, a composer that adds pinned tasks to Inbox, and Focus, the pinned tasks of every list as ordinary rows with their home list as a chip; every change goes to the home list. **Proposed:** its own order (Alt+↑/↓, drag) in `.flint/today.json`, Flint's new pins on top, pins found in files at the end; a pinned subtask on its own row unless its parent is pinned; done pins in Today's Completed section until the day changes.
+- **D-92 (mockup 12, 0.4.26):** Focus has "Focus · pinned" (done pins stay, faded, "done 11:20", until the day changes; no Completed section in Today) and below it "High priority · not pinned": open high-priority tasks that aren't pinned, as full rows in the sidebar's list order, the first five and "Show all N"; only pinned tasks reorder; P pins one. The greeting puts the count in white and has a progress line, "X of Y done" (today's pinned and reminder tasks). The composer reads "Add a task to today…". On wide screens a Today column takes the context panel's place: Timeline, Done today, Captured today (with "Sort Inbox · N"); Shift+Enter or the notes icon shows a task's details there instead, back or Esc returns. On narrow windows the sections stack under Focus and fold.
+
 ### TODAY-02 — End-of-day rollover prompt (v1, optional)
 - At the end of the day, Flint can optionally prompt: **"Roll over unfinished pinned tasks?"** (D-85): keep the unfinished pinned tasks pinned for tomorrow, or unpin them (they stay in their home lists).
 - The prompt is on by default and can be turned off in Settings. When and how the prompt appears is open question Q-04.
 
 - **Built (0.4.24, D-90, Q-04):** on the first open of Today on a new day, "Unfinished from yesterday" with **Clear** (unpins them, one undo step) and **Roll over**; × is Roll over. Turning it off comes with Settings (M8).
+- **D-92:** the card stays on every open that day until Roll over, Clear or × is chosen.
+
 ### TODAY-03 — Reminders section in Today (v1)
 - Today includes a **Reminders** section listing tasks with upcoming reminders (see REM-08), so users can see what's scheduled without opening each task.
 
 ---
 
 - **First part built (0.4.24, D-90, Proposed):** the reminders still to come today as cards, two a row (time, "in 2 h", title, list), as in mockup 03; overdue ones and the full section (REM-11) come with the rest of M6.
+- **D-92:** the cards follow the clock (a passed reminder's card folds away, the countdowns tick); the next one is wider and brighter with "Next", later ones quieter; three a row, more behind "+N more" (**Proposed**). The Today column's Timeline shows all of today's reminders on an hour rail with a moving now line.
+
 ## 5. Reminders
 
 ### REM-01 — A reminder on any task (v1)

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today redesign, wide screen — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.td *{box-sizing:border-box}
+:where(.td button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.card{background:#151619;border-radius:18px;box-shadow:0 0 0 1px #232529,inset 0 1px 0 rgba(255,255,255,.045),0 1px 2px rgba(0,0,0,.45),0 14px 34px -12px rgba(0,0,0,.6)}
+.tile{width:26px;height:26px;border-radius:8px;background:#1F2124;box-shadow:inset 0 0 0 1px #2A2C30;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#B9BDC4}
+.tile.strong{background:#ECEDEE;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#0E0F11}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 7px;border-radius:12px;color:#C9CCCF;font-size:14px}
+.nav.on{background:#1A1B1E;box-shadow:0 0 0 1px #26282C,inset 0 1px 0 rgba(255,255,255,.05);color:#FFFFFF;font-weight:500}
+.cnt{font-family:'Geist Mono',monospace;font-size:12px;color:#7C7F84}
+.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#75787D}
+.mono{font-family:'Geist Mono',monospace}
+.row{position:relative;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:12px;font-size:14px;color:#E3E4E6}
+.stripe{position:absolute;left:3px;top:10px;bottom:10px;border-radius:3px}
+.check{width:20px;height:20px;border-radius:7px;border:1.5px solid #4A4D52;flex:0 0 auto}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:7px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;font-family:'Geist Mono',monospace;font-size:11.5px;color:#C9CCCF;white-space:nowrap}
+.ind{color:#8E9196;display:flex;align-items:center;gap:10px;font-family:'Geist Mono',monospace;font-size:12px}
+.dot{width:6px;height:6px;border-radius:2px;background:#9AA0AB;flex:0 0 auto;margin-top:9px}
+.hr{position:relative;height:30px;display:flex;align-items:flex-start;gap:12px}
+.hr .t{width:40px;font-family:'Geist Mono',monospace;font-size:11px;color:#5F6267;transform:translateY(-7px)}
+.hr .l{flex:1;border-top:1px solid #1F2124}
+.ev{position:absolute;left:52px;right:0;display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:8px;font-size:12.5px}
+.urow{display:flex;align-items:center;gap:10px;padding:7px 4px;font-size:13.5px;color:#E3E4E6}
+</style>
+</head>
+<body>
+<div class="td" style="box-sizing: border-box; width: 1920px; height: 1140px; background: #070708; font-family: 'Onest', system-ui, sans-serif; color: #E8E9EB; display: flex; flex-direction: column">
+<div style="height: 60px; display: flex; align-items: center; justify-content: center; gap: 14px"><span style="font-size: 13.5px; color: #C9CCCF; font-weight: 500">Today redesign</span><span style="font-size: 13px; color: #6E7176">1920 × 1080 at 100% scaling · 16:12</span></div>
+
+<div style="flex: 1; display: flex; background: #0D0E10; position: relative">
+<aside style="width: 236px; flex: 0 0 auto; background: #111214; border-right: 1px solid #1C1E21; padding: 14px 12px; display: flex; flex-direction: column; gap: 3px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px 8px"><img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo" style="width: 30px; height: 30px; display: block"><span style="font-weight: 600; font-size: 16px; color: #ECEDEE">Flint</span></div>
+<div class="nav on"><span class="tile strong"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></span><span style="flex: 1">Today</span><span class="cnt" style="color: #C9CCCF">5</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span><span style="flex: 1">Inbox</span><span class="cnt">14</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 10px 6px 10px"><span class="lbl">Lists</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Backend</span><span class="cnt">5</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Infra</span><span class="cnt">2</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg></span><span style="flex: 1">Sprint planning</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span><span style="flex: 1">Personal</span><span class="cnt">4</span></div>
+</aside>
+
+<div style="position: absolute; right: 6px; top: 0; height: 40px; display: flex; align-items: center; color: #7C7F84">
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"></path></svg></span>
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect></svg></span>
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"></path></svg></span>
+</div>
+
+<div style="flex: 1; min-width: 0; display: flex; justify-content: center; gap: 28px; padding: 44px 32px 24px 32px">
+
+<div style="width: 820px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 0 4px 6px 4px">
+<span style="font-size: 36px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: #B9BDC4">Good afternoon. <span style="color: #FFFFFF">Five tasks</span> are in focus.</span>
+<span style="color: #8E9196; font-size: 14px">Tuesday, 3 November · 3 reminders left today</span>
+<div style="display: flex; align-items: center; gap: 14px; margin-top: 4px">
+<div style="flex: 1; max-width: 360px; height: 6px; border-radius: 3px; background: #1F2124; overflow: hidden; box-shadow: inset 0 0 0 1px #26282C"><div style="width: 28.5%; height: 100%; border-radius: 3px; background: #ECEDEE"></div></div>
+<span class="mono" style="font-size: 12px; color: #C9CCCF">2 of 7 done</span>
+</div>
+</div>
+
+<div class="card" style="padding: 16px 16px 14px 20px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px"><span style="font-weight: 600; color: #ECEDEE">Unfinished from yesterday</span><span style="width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #8E9196"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></span></div>
+<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px; color: #C9CCCF; line-height: 1.55; font-size: 14px">
+<div style="display: flex; gap: 10px"><span class="dot"></span><span>Pair with the intern on pipeline YAML</span></div>
+<div style="display: flex; gap: 10px"><span class="dot"></span><span>Check VPN gateway logs after the call</span></div>
+</div>
+<div style="display: flex; gap: 8px; flex: 0 0 auto"><span style="height: 34px; padding: 0 14px; border-radius: 10px; color: #A4A7AB; display: flex; align-items: center; font-size: 13.5px">Clear</span><span style="height: 34px; padding: 0 16px; border-radius: 10px; background: #ECEDEE; color: #0E0F11; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,.5); display: flex; align-items: center; font-size: 13.5px">Roll over</span></div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 14px">
+<div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; background: #1A1C1F; box-shadow: 0 0 0 1px #2C2E33, inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.45), 0 22px 44px -14px rgba(0,0,0,.75)">
+<div style="display: flex; align-items: center; gap: 10px"><span class="tile strong" style="width: 30px; height: 30px; border-radius: 9px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span><span class="mono" style="font-size: 20px; color: #FFFFFF">17:30</span><span class="lbl" style="color: #A4A7AB; margin-left: auto">Next</span></div>
+<span style="color: #FFFFFF; font-weight: 500; font-size: 15px">Deploy hotfix to staging</span>
+<div style="display: flex; align-items: center; justify-content: space-between"><span class="chip">Backend</span><span class="mono" style="font-size: 12px; color: #C9CCCF">in 1 h 18 min</span></div>
+</div>
+<div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px"><span class="tile" style="width: 30px; height: 30px; border-radius: 9px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span><span class="mono" style="font-size: 16px; color: #C9CCCF">19:00</span></div>
+<span style="color: #E3E4E6; font-size: 14px">Review PR 42</span>
+<div style="display: flex; align-items: center; justify-content: space-between"><span class="chip">Backend</span><span class="mono" style="font-size: 11.5px; color: #75787D">in 2 h 48</span></div>
+</div>
+<div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px"><span class="tile" style="width: 30px; height: 30px; border-radius: 9px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span><span class="mono" style="font-size: 16px; color: #C9CCCF">21:30</span></div>
+<span style="color: #E3E4E6; font-size: 14px">Rotate storage keys</span>
+<div style="display: flex; align-items: center; justify-content: space-between"><span class="chip">Infra</span><span class="mono" style="font-size: 11.5px; color: #75787D">in 5 h 18</span></div>
+</div>
+</div>
+
+<div class="card" style="height: 92px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between"><span style="color: #6E7176; font-size: 14.5px">Add a task to today…</span><span style="display: flex; gap: 16px; color: #8E9196"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></span></div>
+
+<div class="card" style="padding: 6px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px 12px"><span class="lbl" style="color: #A4A7AB">Focus · pinned</span><span style="font-size: 12px; color: #6E7176">drag to reorder</span></div>
+<div class="row" style="background: #1E2023; box-shadow: 0 0 0 1px #2A2C30, inset 0 1px 0 rgba(255,255,255,.05)"><span class="stripe" style="width: 4px; background: #FFFFFF"></span><span class="check"></span><span style="flex: 1; color: #ECEDEE">Deploy hotfix to staging</span><span class="ind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg><span class="chip">Backend</span></span></div>
+<div class="row"><span class="stripe" style="width: 3px; background: #9AA0AB"></span><span class="check"></span><span style="flex: 1">Finish search reindex job</span><span class="ind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg><span class="chip">Backend</span></span></div>
+<div class="row"><span class="check"></span><span style="flex: 1">Pair with the intern on pipeline YAML</span><span class="ind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg><span class="chip">Infra</span></span></div>
+<div class="row" style="color: #75787D"><span style="width: 20px; height: 20px; border-radius: 7px; background: #9AA0AB; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0E0F11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span style="flex: 1">Reply to the vendor about licences</span><span class="ind"><span class="mono" style="font-size: 11.5px; color: #5F6267">done 11:20</span></span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 12px 6px 12px; border-top: 1px solid #1C1E21; margin-top: 6px"><span class="lbl">High priority · not pinned</span><span style="font-size: 12px; color: #8E9196">Show all 9</span></div>
+<div class="row" style="color: #A4A7AB"><span class="stripe" style="width: 4px; background: #FFFFFF; opacity: .55"></span><span class="check" style="border-color: #3A3D42"></span><span style="flex: 1">Fix null ref in tenant resolver</span><span class="ind"><span class="chip" style="color: #8E9196">Inbox</span></span></div>
+<div class="row" style="color: #A4A7AB"><span class="stripe" style="width: 4px; background: #FFFFFF; opacity: .55"></span><span class="check" style="border-color: #3A3D42"></span><span style="flex: 1">Rotate the storage account keys</span><span class="ind"><span class="chip" style="color: #8E9196">Infra</span></span></div>
+</div>
+</div>
+
+<div style="width: 440px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 124px">
+<div class="card" style="padding: 18px 20px">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px"><span class="lbl" style="color: #A4A7AB">Timeline</span><span class="mono" style="font-size: 11.5px; color: #6E7176">10–22</span></div>
+<div style="position: relative">
+<div class="hr"><span class="t">10:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">12:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">14:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">16:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">18:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">20:00</span><span class="l"></span></div>
+<div class="hr"><span class="t">22:00</span><span class="l"></span></div>
+<span class="ev" style="top: 3px; color: #6E7176; background: #121315; text-decoration: line-through; text-decoration-color: #3A3D42"><span style="width: 6px; height: 6px; border-radius: 50%; background: #4A4D52"></span>10:30 · Stand-up notes to the team</span>
+<span class="ev" style="top: 63px; color: #8E9196; background: #121315"><span style="width: 6px; height: 6px; border-radius: 50%; background: #6E7176"></span>14:15 · Call with the network team</span>
+<span style="position: absolute; left: 52px; right: 52px; top: 98px; height: 0; border-top: 1.5px solid #FFFFFF"></span>
+<span class="mono" style="position: absolute; right: 0; top: 90px; height: 16px; padding: 0 5px; border-radius: 5px; background: #ECEDEE; color: #0E0F11; font-size: 10.5px; font-weight: 500; display: flex; align-items: center">16:12</span>
+<span class="ev" style="top: 112px; color: #FFFFFF; background: #1E2023; box-shadow: inset 0 0 0 1px #2C2E33"><span style="width: 6px; height: 6px; border-radius: 50%; background: #FFFFFF"></span>17:30 · Deploy hotfix to staging</span>
+<span class="ev" style="top: 141px; color: #C9CCCF; background: #18191C"><span style="width: 6px; height: 6px; border-radius: 50%; background: #9AA0AB"></span>19:00 · Review PR 42</span>
+<span class="ev" style="top: 179px; color: #C9CCCF; background: #18191C"><span style="width: 6px; height: 6px; border-radius: 50%; background: #9AA0AB"></span>21:30 · Rotate storage keys</span>
+</div>
+</div>
+
+<div class="card" style="padding: 16px 20px">
+<div style="display: flex; align-items: center; justify-content: space-between"><span style="display: flex; align-items: center; gap: 8px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="lbl" style="color: #A4A7AB">Done today · 2</span></span><span class="mono" style="font-size: 11.5px; color: #6E7176">+1 since noon</span></div>
+<div style="display: flex; flex-direction: column; margin-top: 8px">
+<span class="urow" style="color: #75787D"><span style="width: 16px; height: 16px; border-radius: 5px; background: #9AA0AB; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0E0F11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span style="flex: 1">Reply to the vendor about licences</span><span class="mono" style="font-size: 11px">11:20</span></span>
+<span class="urow" style="color: #75787D"><span style="width: 16px; height: 16px; border-radius: 5px; background: #9AA0AB; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0E0F11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span style="flex: 1">Stand-up notes to the team</span><span class="mono" style="font-size: 11px">10:34</span></span>
+</div>
+</div>
+
+<div class="card" style="padding: 16px 20px">
+<div style="display: flex; align-items: center; justify-content: space-between"><span style="display: flex; align-items: center; gap: 8px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span class="lbl" style="color: #A4A7AB">Captured today · 3</span></span></div>
+<div style="display: flex; flex-direction: column; margin-top: 8px">
+<span class="urow"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">401 errors on lifecycle page if idle</span><span class="mono" style="font-size: 11px; color: #75787D">Inbox · 15:02</span></span>
+<span class="urow"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">JSON · died_at, exit_code…</span><span class="mono" style="font-size: 11px; color: #75787D">Inbox · 14:31</span></span>
+<span class="urow"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Ask about the staging DNS timeout</span><span class="mono" style="font-size: 11px; color: #75787D">Inbox · 14:20</span></span>
+</div>
+<div style="display: flex; justify-content: flex-end; margin-top: 10px"><span style="height: 32px; padding: 0 14px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #D9DADC; display: flex; align-items: center; font-size: 13px">Sort Inbox · 14</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
