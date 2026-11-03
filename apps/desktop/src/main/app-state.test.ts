@@ -30,17 +30,22 @@ describe('settings (APP-11)', () => {
     expect(readSettings({ hideNotificationText: true }).hideNotificationText).toBe(true);
   });
 
+  it("REM-06, D-94: Flint's own reminder sound is off unless turned on", () => {
+    expect(readSettings({}).reminderSound).toBe(false);
+    expect(readSettings({ reminderSound: true }).reminderSound).toBe(true);
+  });
+
   it('falls back per key on invalid values', () => {
     expect(
       readSettings({
         startWithWindows: 'yes',
-        sound: false,
+        reminderSound: 'on',
         flintFolder: '',
         hideNotificationText: 1,
       }),
     ).toMatchObject({
       startWithWindows: true,
-      sound: false,
+      reminderSound: false,
       hideNotificationText: false,
       flintFolder: join(homedir(), 'Flint'),
     });
@@ -51,12 +56,12 @@ describe('settings (APP-11)', () => {
     await writeFile(path, '{ broken');
     const file = new SettingsFile(path);
     expect(await file.load()).toEqual(defaultSettings());
-    await writeFile(path, JSON.stringify({ futureSetting: 42, sound: false }));
+    await writeFile(path, JSON.stringify({ futureSetting: 42, reminderSound: true }));
     await file.load();
     await file.update({ notifications: false });
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({
       futureSetting: 42,
-      sound: false,
+      reminderSound: true,
       notifications: false,
       version: 1,
     });

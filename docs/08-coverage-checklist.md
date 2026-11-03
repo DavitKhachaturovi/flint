@@ -596,3 +596,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 8 | The list chip on Focus rows: hover, a click opens the list with the task selected | TODAY-01 · Done (0.4.27) | 02, 03 §4, D-93 |
 | 9 | Dragging a reminder on the Timeline changes its time (15 min, Alt 5), live, undoable | TODAY-03, REM-01 · Done (0.4.27) | 02, D-93 |
 | 10 | Tests and probes never touch the real clipboard | — · Done (0.4.27) | CLAUDE.md, D-93 |
+
+## AD. The rest of M6 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The Overdue card in Today: missed and overdue reminders, quieter, folding, remembered | REM-07, REM-11, TODAY-03 · Done (0.4.28) | 02, 09, D-94 |
+| 2 | Done, Snooze ▸ (In 1 hour, Tomorrow 10:00, Pick a time…), a click opens the task | REM-04, REM-07 · Done (0.4.28) | 02, D-94 |
+| 3 | "N reminders you missed" opens Today's Overdue card | REM-07, REM-05 · Done (0.4.28) | 02, D-94 |
+| 4 | R sets or changes the selected task's reminder anywhere | REM-01 · Done (0.4.28) | 02, 03 §3, D-94 |
+| 5 | Flint's own chime, off by default (`reminderSound`) | REM-06 · Done (0.4.28; the switch in Settings with M8) | 02, 04 §2, D-94 |
+| 6 | The in-app alert when a reminder fires | REM-06 · v1 · M8 (with mini mode) | 02, D-94 |
+| 7 | The Focus Assist note in Settings | REM-06 · v1 · M8 | 02, D-94 |

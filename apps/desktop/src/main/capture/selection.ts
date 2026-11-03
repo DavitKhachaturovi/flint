@@ -62,8 +62,10 @@ export async function saveClipboard(): Promise<SavedClipboard | null> {
 
 export async function restoreClipboard(saved: SavedClipboard | null): Promise<void> {
   if (!saved) return;
-  if (saved.length === 0) clipboard.clear();
-  else await clipboard.write(saved.map((item) => new ClipboardItem(item)));
+  // An item without any format (seen on the build agent's empty clipboard) can't be written back.
+  const items = saved.filter((item) => Object.keys(item).length > 0);
+  if (items.length === 0) clipboard.clear();
+  else await clipboard.write(items.map((item) => new ClipboardItem(item)));
 }
 
 export async function captureSelection(hotkey: HotkeyKeys): Promise<Selection> {

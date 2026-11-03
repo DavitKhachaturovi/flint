@@ -899,6 +899,45 @@ describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89, D-92)', () => {
     expect(workspace.view(TODAY_ID, now)?.today?.progress).toEqual({ done: 1, total: 5 });
   });
 
+  it('REM-07, REM-11, D-94: overdue reminders of any day, oldest first, until done, snoozed or off', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Ship [reminder:: 2026-10-29T16:00] [id:: bbbb]\n- [x] Morning call [reminder:: 2026-10-29T08:00] [completion:: 2026-10-29T08:30] [id:: gggg]\n- [ ] Stand-up [reminder:: 2026-10-29T10:00] [id:: hhhh]\n- [ ] Muted [reminder:: 2026-10-29T11:00] [muted:: true] [id:: iiii]\n- [ ] Missed yesterday [reminder:: 2026-10-28T17:00] [id:: kkkk]\n    - [ ] A subtask too [reminder:: 2026-10-29T09:00] [id:: kkkl]\n',
+    );
+    const workspace = await open();
+    const overdue = (): string[] =>
+      workspace.view(TODAY_ID, now)?.today?.overdue.map((each) => each.key) ?? [];
+    expect(overdue()).toEqual(['kkkk', 'kkkl', 'hhhh']);
+    expect(workspace.view(TODAY_ID, now)?.today?.overdue[0]).toEqual({
+      key: 'kkkk',
+      listId: 'wrk1',
+      listName: 'Work',
+      title: 'Missed yesterday',
+      time: '17:00',
+      at: '2026-10-28T17:00',
+      done: false,
+    });
+    // Snoozed (a new time), done, or turned off: it leaves.
+    await workspace.change(
+      'wrk1',
+      {
+        kind: 'reminder',
+        key: 'kkkk',
+        at: { year: 2026, month: 10, day: 29, hour: 15, minute: 30, second: 0 },
+      },
+      now,
+    );
+    await workspace.toggleDone('wrk1', 'hhhh', now);
+    await workspace.change('wrk1', { kind: 'mute', key: 'kkkl', muted: true }, now);
+    expect(overdue()).toEqual([]);
+    // As the clock passes a reminder, it is overdue.
+    expect(
+      workspace
+        .view(TODAY_ID, new Date(2026, 9, 29, 16, 1))
+        ?.today?.overdue.map((each) => each.key),
+    ).toEqual(['kkkk', 'bbbb']);
+  });
+
   it('asks about unfinished pins from before today once a day: Roll over or Clear', async () => {
     const workspace = await open();
     expect(workspace.view(TODAY_ID, now)?.today?.rollover).toEqual([]);

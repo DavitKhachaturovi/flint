@@ -7,3 +7,4 @@ packages/core/test/fixtures/** -text
 
 *.png binary
 *.ico binary
+*.wav binary

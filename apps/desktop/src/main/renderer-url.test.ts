@@ -46,6 +46,7 @@ describe('app://flint renderer files (D-34)', () => {
   it('gives module scripts a JavaScript content type', () => {
     expect(contentType(join(root, 'assets', 'popup-1.JS'))).toBe('text/javascript; charset=utf-8');
     expect(contentType(join(root, 'fonts', 'Geist.woff2'))).toBe('font/woff2');
+    expect(contentType(join(root, 'assets', 'chime-1.wav'))).toBe('audio/wav');
     expect(contentType(join(root, 'notes.unknown'))).toBe('application/octet-stream');
   });
 

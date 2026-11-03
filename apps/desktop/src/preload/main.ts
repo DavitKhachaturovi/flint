@@ -153,6 +153,14 @@ const main = {
       listener(target),
     );
   },
+  /** REM-07, D-94: the missed-reminders toast's Open: show Today's Overdue card. */
+  onShowOverdue(listener: () => void): void {
+    ipcRenderer.on(Channels.mainOverdue, () => listener());
+  },
+  /** REM-06, D-94: a reminder fired with Flint's own sound on. */
+  onChime(listener: () => void): void {
+    ipcRenderer.on(Channels.mainChime, () => listener());
+  },
 };
 
 export type MainBridge = typeof main;

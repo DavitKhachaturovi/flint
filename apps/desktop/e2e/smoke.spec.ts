@@ -2230,6 +2230,17 @@ test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Wi
   // A reminder's Open: the task's list, the task selected, in view and flashed.
   await nav('Paste note').click();
   await expect(main.locator('.note-card h1')).toHaveText('Paste note');
+  // The flash is recorded as it happens (it lasts 900 ms, less than the checks before it may take).
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as { revealFlashes?: string[] }).revealFlashes = seen;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const row = record.target as HTMLElement;
+        if (row.classList.contains('fl-flash')) seen.push(row.dataset.key ?? '');
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
   await app.evaluate((_electron, argument) => {
     (globalThis as { __flintE2E?: { activate?: (url: string) => void } }).__flintE2E?.activate?.(
       argument,
@@ -2238,7 +2249,9 @@ test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Wi
   const revealed = main.locator('.row', { hasText: 'Long list task 56' });
   await expect(revealed).toHaveClass(/\bsel\b/);
   await expect(revealed).toBeInViewport();
-  await expect(revealed).toHaveClass(/fl-flash/);
+  await expect
+    .poll(() => main.evaluate(() => (window as { revealFlashes?: string[] }).revealFlashes))
+    .toContain('ll55');
 
   // Code copied on Windows (CRLF) pastes into a note as a code block, never as nothing.
   await nav('Paste note').click();
@@ -2645,6 +2658,98 @@ test('fixes after 0.4.26: a reminder opens and flashes at once, the column follo
     );
     win?.setBounds({ x: -6000, y: 0, width: 1120, height: 780 });
   });
+});
+
+test('the rest of M6: the Overdue card, Snooze, the missed toast, R, the chime (REM-07, REM-11, REM-04, REM-01, REM-06, D-94)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const stamp = (d: Date): string =>
+    `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`;
+  const hooks = (): Promise<{ chimes: number; toasts: string[] }> =>
+    app.evaluate(() => {
+      const found = (globalThis as { __flintE2E?: { chimes?: number; toasts: string[] } })
+        .__flintE2E;
+      return { chimes: found?.chimes ?? 0, toasts: found?.toasts ?? [] };
+    });
+  // REM-06: Flint's own sound is off by default; on (as from settings.json), a firing asks for it.
+  await app.evaluate(() => {
+    const found = (globalThis as { __flintE2E?: { reminderSound?: boolean } }).__flintE2E;
+    if (found) found.reminderSound = true;
+  });
+  const chimesBefore = (await hooks()).chimes;
+  const yesterday = new Date(Date.now() - 24 * 3600_000);
+  const earlier = new Date(Date.now() - 2 * 3600_000);
+  const file = join(flint, 'Overdue.md');
+  await writeFile(
+    file,
+    [
+      '---\nflint: 1\nid: ovd0\nmode: tasks\n---',
+      `- [ ] Missed while away [reminder:: ${stamp(yesterday)}] [id:: ovd1]`,
+      `- [ ] Overdue this morning [reminder:: ${stamp(earlier)}] [id:: ovd2]`,
+      `- [ ] Third overdue one [reminder:: ${stamp(earlier)}] [id:: ovd3]`,
+      '- [ ] No reminder yet [id:: ovd4]',
+      '',
+    ].join('\n'),
+  );
+  await expect
+    .poll(async () => (await hooks()).toasts.filter((toast) => toast.includes('Missed')).length)
+    .toBeGreaterThan(0);
+  await expect.poll(async () => (await hooks()).chimes).toBeGreaterThan(chimesBefore);
+  await app.evaluate(() => {
+    const found = (globalThis as { __flintE2E?: { reminderSound?: boolean } }).__flintE2E;
+    if (found) found.reminderSound = false;
+  });
+
+  // REM-07, REM-11: Today's Overdue card, under the rollover card, oldest first.
+  await main.locator('.sidebar > .nav').first().click();
+  const card = main.locator('.card.overdue');
+  await expect(card.locator('.panel-label')).toHaveText(/^Overdue · \d+$/);
+  const row = (title: string) => card.locator('.overdue-row:not(.leaving)', { hasText: title });
+  await expect(row('Missed while away')).toContainText('Yesterday');
+  await expect(row('Overdue this morning')).toHaveCount(1);
+  // It folds, and stays folded (remembered).
+  await card.locator('.overdue-head').click();
+  await expect(card.locator('.today-fold')).not.toHaveClass(/open/);
+  expect(await main.evaluate(() => localStorage.getItem('flint.today.overdue'))).toBe('closed');
+  await card.locator('.overdue-head').click();
+  await expect(card.locator('.today-fold')).toHaveClass(/open/);
+
+  // REM-04: Snooze ▸ In 1 hour: a new time, the reminder on; the row leaves.
+  await row('Missed while away').locator('.overdue-action', { hasText: 'Snooze' }).click();
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'In 1 hour' }).click();
+  await expect(row('Missed while away')).toHaveCount(0);
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain(`[reminder:: ${stamp(yesterday)}]`);
+  await expect(main.locator('.toast')).toContainText('Snoozed');
+  // Done completes it in its own list.
+  await row('Overdue this morning').locator('.overdue-action', { hasText: 'Done' }).click();
+  await expect(row('Overdue this morning')).toHaveCount(0);
+  await expect.poll(() => readFile(file, 'utf8')).toMatch(/- \[x\] Overdue this morning/);
+
+  // The missed-reminders toast's Open: Today, the card open (even folded) and in view.
+  await card.locator('.overdue-head').click();
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Overdue' }).click();
+  await expect(main.locator('h1')).toContainText('Overdue');
+  await app.evaluate((_electron, url) => {
+    (globalThis as { __flintE2E?: { activate?: (url: string) => void } }).__flintE2E?.activate?.(
+      url,
+    );
+  }, 'flint-dev://reminder/open?id=*');
+  await expect(main.locator('.today-greeting')).toBeVisible();
+  await expect(card.locator('.today-fold')).toHaveClass(/open/);
+  await expect(row('Third overdue one')).toBeInViewport();
+  // A click on a row opens its task (in its own list, selected).
+  await row('Third overdue one').locator('.overdue-open').click();
+  await expect(main.locator('h1')).toContainText('Overdue');
+  await expect(main.locator('.row.sel')).toContainText('Third overdue one');
+
+  // REM-01: R on a selected task opens the date and time picker for it.
+  await main.locator('.row', { hasText: 'No reminder yet' }).click({ position: { x: 300, y: 10 } });
+  await main.keyboard.press('r');
+  await expect(main.locator('.fl-picker')).toBeVisible();
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.fl-picker')).toHaveCount(0);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

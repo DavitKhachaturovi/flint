@@ -22,7 +22,7 @@ import {
   type ListInfo,
   type TokenKind,
 } from '@flint/core/shorthand';
-import { parseLocalDateTime } from '@flint/core/time';
+import { parseLocalDateTime, type LocalDateTime } from '@flint/core/time';
 import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
 import {
   openListPicker,
@@ -67,7 +67,7 @@ import {
   SortIcon,
   SunIcon,
 } from './icons.js';
-import { ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
+import { OverdueCard, ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
@@ -319,6 +319,9 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 }
 
 /** NAV-07, D-85: what isn't blank space in the main area (a click there keeps the selection). */
+/** REM-06, D-94: Flint's own reminder sound (`scripts/make-chime.mjs`), bundled, never fetched. */
+const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
+
 const BLANK_EXCEPT =
   '.row, .context-panel, .composer, .body-card, .inline-body, .completed-head, button, a, input, textarea, [contenteditable], .menu, .picker';
 
@@ -683,6 +686,17 @@ export function App(): ReactElement {
     // A reminder's Open (D-91): its list, the task scrolled into view, selected and flashed once
     // the rows are there; the panel shows it on wide screens, the body stays closed.
     window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
+    // REM-07, D-94: "N reminders you missed": Today, its Overdue card open and in view.
+    window.flintMain.onShowOverdue(() => {
+      goRef.current({ list: TODAY_ID, page: null });
+      setOverdueCalled(true);
+    });
+    // REM-06, D-94: Flint's own sound, when it is turned on (main decides).
+    window.flintMain.onChime(() => {
+      const sound = new Audio(CHIME_URL);
+      sound.volume = 0.7;
+      void sound.play().catch(() => undefined);
+    });
   }, []);
 
   /**
@@ -775,6 +789,8 @@ export function App(): ReactElement {
   } | null>(null);
   /** D-93: a new arrival, also of the task that is already selected. */
   const [arrival, setArrival] = useState(0);
+  /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
+  const [overdueCalled, setOverdueCalled] = useState(false);
   /**
    * D-91: a reminder's Open, and Today's timeline: the task in its list, centred and flashed. D-93:
    * at once (never a long smooth scroll, which flashed the row before it was in view).
@@ -1621,6 +1637,59 @@ export function App(): ReactElement {
     [showToast],
   );
 
+  /** REM-07, D-94: an overdue reminder's Done: its task completed in its own list, with Undo. */
+  const completeOverdue = useCallback(
+    (reminder: TodayReminder): void => {
+      void window.flintMain.toggle(reminder.listId, reminder.key).then((label) => {
+        if (label) showToast(label, true);
+      });
+    },
+    [showToast],
+  );
+  /**
+   * REM-04, REM-07, D-94: an overdue reminder's Snooze ▸: in an hour, tomorrow at 10:00 (D-69's
+   * default time), or a time from the picker; the reminder is on again, with Undo.
+   */
+  const snoozeOverdue = useCallback(
+    (reminder: TodayReminder, anchor: DOMRect): void => {
+      const set = (at: Date | LocalDateTime): void => {
+        const value =
+          at instanceof Date
+            ? {
+                year: at.getFullYear(),
+                month: at.getMonth() + 1,
+                day: at.getDate(),
+                hour: at.getHours(),
+                minute: at.getMinutes(),
+                second: 0,
+              }
+            : at;
+        void window.flintMain
+          .change(reminder.listId, { kind: 'reminder', key: reminder.key, at: value })
+          .then((outcome) => {
+            if (outcome) showToast('Snoozed', true);
+          });
+      };
+      const now = new Date();
+      // Whole minutes, rounded up (D-69).
+      const inHour = new Date(Math.ceil((now.getTime() + 3_600_000) / 60_000) * 60_000);
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10);
+      openMenu(
+        [
+          { label: 'In 1 hour', action: () => set(inHour) },
+          { label: 'Tomorrow 10:00', action: () => set(tomorrow) },
+          'divider',
+          {
+            label: 'Pick a time…',
+            action: () => openTimePicker({ anchor, returnFocus: null }, new Date(), null, set),
+          },
+        ],
+        { x: anchor.left, y: anchor.bottom + 4 },
+      );
+    },
+    [showToast],
+  );
+
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
     (row: TaskRow, at: Point, keepSelection = false): void => {
@@ -1679,6 +1748,7 @@ export function App(): ReactElement {
                   submenu: [
                     {
                       label: row.reminder ? 'Change…' : 'Set…',
+                      hint: 'R',
                       action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
                     },
                     // REM-12, D-66.
@@ -2417,6 +2487,15 @@ export function App(): ReactElement {
         const targets = marked.size > 1 ? rows.filter((other) => marked.has(other.key)) : [row];
         const tasks = targets.filter((task): task is TaskRow => task !== undefined);
         void pin(tasks, !tasks.every((task) => task.pinned));
+      } else if (key === 'r' && !event.shiftKey && marked.size <= 1 && open) {
+        // REM-01, D-94: R sets or changes the selected task's reminder, in any list and in Today.
+        event.preventDefault();
+        const element = document.querySelector(`.row[data-key="${CSS.escape(open.key)}"]`);
+        const anchor =
+          element?.querySelector('.reminder-time')?.getBoundingClientRect() ??
+          element?.querySelector('.title')?.getBoundingClientRect() ??
+          new DOMRect(300, 200, 0, 0);
+        changeReminder(open, anchor);
       } else if (key === 'n' && !event.shiftKey) {
         event.preventDefault();
         composer.current?.focus();
@@ -3399,7 +3478,7 @@ export function App(): ReactElement {
     const measure = (): void => {
       // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .rollover, .content > .today-reminders-wrap, .content > .composer, .content > .note-card',
+        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -3764,6 +3843,15 @@ export function App(): ReactElement {
                         if (label) showToast(label, true);
                       })
                     }
+                  />
+                  <OverdueCard
+                    overdue={view.today?.overdue ?? []}
+                    reminders={view.today?.reminders ?? []}
+                    called={overdueCalled}
+                    onCalled={() => setOverdueCalled(false)}
+                    onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
+                    onDone={completeOverdue}
+                    onSnooze={snoozeOverdue}
                   />
                   <ReminderCards
                     reminders={view.today?.reminders ?? []}

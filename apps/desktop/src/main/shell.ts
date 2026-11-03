@@ -53,6 +53,10 @@ export interface E2EHooks {
   readonly captured: string[];
   /** Reminder toasts, recorded instead of shown in tests (`label | title`). */
   readonly toasts: string[];
+  /** REM-06, D-94: Flint's own sound, how often it was asked for (it plays in the window). */
+  chimes?: number;
+  /** D-94: tests turn Flint's own sound on (it is off by default). */
+  reminderSound?: boolean;
   /** Links and files a click would open in the browser or their app, recorded instead. */
   readonly opened: string[];
   showPopup?: () => void;

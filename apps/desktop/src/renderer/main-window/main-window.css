@@ -3636,6 +3636,145 @@ a.auto-link {
   }
 }
 
+/* REM-07, REM-11, D-94: "Overdue · N", under the rollover card and quieter than it: one ground
+   down (the sidebar's), a hairline ring, a folding section label, secondary rows. */
+.card.overdue {
+  padding: 12px 12px 8px 16px;
+  background: var(--fl-ground-sidebar);
+  box-shadow: 0 0 0 1px var(--fl-edge-divider);
+  overflow: hidden;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.card.overdue.leaving {
+  pointer-events: none;
+  animation: rollover-out var(--fl-dur-state) ease-in forwards;
+}
+
+.overdue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.overdue-head .panel-label {
+  color: var(--fl-text-secondary);
+}
+
+.overdue-head .chev {
+  display: inline-flex;
+  color: var(--fl-text-muted);
+}
+
+.overdue-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+
+.overdue-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 10px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.overdue-row:hover {
+  background: var(--fl-ground-hover);
+}
+
+.overdue-row.leaving {
+  pointer-events: none;
+  animation: overdue-row-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes overdue-row-out {
+  from {
+    max-height: 40px;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+.overdue-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+/* The overdue bell: the bell with its small white dot (REM-11, 09 §8). */
+.overdue-bell {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--fl-text-muted);
+}
+
+.overdue-bell::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fl-text-highlight);
+}
+
+.overdue-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  color: var(--fl-text-secondary);
+}
+
+.overdue-meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.overdue-action {
+  flex: 0 0 auto;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.overdue-action:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.overdue-action:active {
+  transform: scale(0.97);
+}
+
 .rollover-head {
   display: flex;
   align-items: center;

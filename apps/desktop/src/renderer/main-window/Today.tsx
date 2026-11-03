@@ -267,6 +267,138 @@ export function RolloverCard(props: {
   );
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** When an overdue reminder was: "14:00" today, "Yesterday 17:00", "Mon 2 Nov 09:30". */
+function overdueWhen(at: string, now: Date): string {
+  const when = parseAt(at);
+  if (!when) return '';
+  const clock = `${two(when.getHours())}:${two(when.getMinutes())}`;
+  const day = new Date(when.getFullYear(), when.getMonth(), when.getDate()).getTime();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (day === today) return clock;
+  if (day === today - 86_400_000) return `Yesterday ${clock}`;
+  const weekday = when.toLocaleDateString('en-GB', { weekday: 'short' });
+  return `${weekday} ${when.getDate()} ${MONTHS[when.getMonth()] ?? ''} ${clock}`;
+}
+
+/**
+ * REM-07, REM-11 (D-94): "Overdue · N": the open tasks whose reminder has passed (missed while
+ * Flint was off or the PC slept, or simply not done yet), oldest first, under the rollover card;
+ * quieter than it, folding, its open or closed state remembered. Each row: Done, Snooze ▸, and a
+ * click opens the task; it leaves when its task is done or snoozed or its reminder turned off.
+ * Today's reminders join it as their time passes. `called` (the missed-reminders toast's Open)
+ * opens it and brings it into view, once it is there (`onCalled`).
+ */
+export function OverdueCard(props: {
+  readonly overdue: readonly TodayReminder[];
+  readonly reminders: readonly TodayReminder[];
+  readonly called: boolean;
+  readonly onCalled: () => void;
+  readonly onOpen: (reminder: TodayReminder) => void;
+  readonly onDone: (reminder: TodayReminder) => void;
+  readonly onSnooze: (reminder: TodayReminder, anchor: DOMRect) => void;
+}): ReactElement | null {
+  const { overdue, reminders, called, onCalled, onOpen, onDone, onSnooze } = props;
+  const now = useNow(1000);
+  const [open, toggle, setOpen] = useFold('overdue');
+  // Today's reminders become overdue as the clock passes them, before the list says so.
+  const known = new Set(overdue.map((reminder) => reminder.key));
+  const passed = reminders.filter(
+    (reminder) => !reminder.done && !known.has(reminder.key) && !isComing(reminder, now),
+  );
+  const items = [...overdue, ...passed].sort((a, b) => a.at.localeCompare(b.at));
+  const { entries, gone } = usePresence(items, (reminder) => reminder.key);
+  const card = useRef<HTMLElement>(null);
+  // Shown a moment longer while it folds away (03 §5), like the rollover card.
+  const [leaving, setLeaving] = useState(false);
+  const [shown, setShown] = useState(items.length > 0);
+  useEffect(() => {
+    if (items.length > 0) {
+      setShown(true);
+      setLeaving(false);
+    } else if (shown) {
+      if (reducedMotion()) setShown(false);
+      else setLeaving(true);
+    }
+  }, [items.length > 0]);
+  useEffect(() => {
+    const element = card.current;
+    if (!called || !element) return;
+    onCalled();
+    setOpen(true);
+    element.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    element.classList.remove('fl-flash');
+    void element.offsetWidth;
+    element.classList.add('fl-flash');
+    window.setTimeout(() => element.classList.remove('fl-flash'), 900);
+  }, [called, shown]);
+  if (!shown) return null;
+  return (
+    <section
+      ref={card}
+      className={leaving ? 'card overdue leaving' : 'card overdue'}
+      aria-label="Overdue reminders"
+      inert={leaving}
+      onAnimationEnd={(event) => {
+        if (leaving && event.target === event.currentTarget) setShown(false);
+      }}
+    >
+      <button type="button" className="overdue-head" aria-expanded={open} onClick={toggle}>
+        <span className={open ? 'chev open' : 'chev'}>
+          <ChevronIcon size={10} />
+        </span>
+        <span className="panel-label">Overdue · {items.length}</span>
+      </button>
+      <div className={open ? 'today-fold open' : 'today-fold'} inert={!open}>
+        <div className="today-fold-inner">
+          <div className="overdue-rows">
+            {entries.map(({ item, key, leaving: going }) => (
+              <div
+                key={key}
+                className={going ? 'overdue-row leaving' : 'overdue-row'}
+                inert={going}
+                onAnimationEnd={(event) => {
+                  if (going && event.target === event.currentTarget) gone(key);
+                }}
+              >
+                <button
+                  type="button"
+                  className="overdue-open"
+                  title={`Open ${item.title}`}
+                  onClick={() => onOpen(item)}
+                >
+                  <span className="overdue-bell">
+                    <BellIcon size={12} />
+                  </span>
+                  <span className="overdue-title">{item.title}</span>
+                  <span className="overdue-meta">
+                    {item.listName} · {overdueWhen(item.at, now)}
+                  </span>
+                </button>
+                <button type="button" className="overdue-action" onClick={() => onDone(item)}>
+                  <CheckIcon size={10} />
+                  Done
+                </button>
+                <button
+                  type="button"
+                  className="overdue-action"
+                  data-picker-trigger
+                  aria-haspopup="menu"
+                  onClick={(event) => onSnooze(item, event.currentTarget.getBoundingClientRect())}
+                >
+                  Snooze
+                  <ChevronIcon size={9} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** "in 2 h 30 min" ("in 2 h 30" when `short`), "in 5 min", "in 40 s", "now". */
 function untilLabel(at: string, now: Date, short = false): string {
   const when = parseAt(at);
@@ -350,7 +482,7 @@ export function ReminderCards(props: {
 }
 
 /** D-92: a section's open or closed state, remembered on this machine. */
-function useFold(id: string): [boolean, () => void] {
+function useFold(id: string): [boolean, () => void, (open: boolean) => void] {
   const storage = `flint.today.${id}`;
   const [open, setOpen] = useState(() => {
     try {
@@ -359,6 +491,17 @@ function useFold(id: string): [boolean, () => void] {
       return true;
     }
   });
+  const set = useCallback(
+    (next: boolean): void => {
+      try {
+        window.localStorage.setItem(storage, next ? 'open' : 'closed');
+      } catch {
+        // Not remembered, still changed.
+      }
+      setOpen(next);
+    },
+    [storage],
+  );
   const toggle = useCallback((): void => {
     setOpen((current) => {
       try {
@@ -369,7 +512,7 @@ function useFold(id: string): [boolean, () => void] {
       return !current;
     });
   }, [storage]);
-  return [open, toggle];
+  return [open, toggle, set];
 }
 
 /** One of the column's cards: a head (folding it, when it folds) and its rows. */

@@ -20,7 +20,11 @@ export interface Settings {
   readonly startWithWindows: boolean;
   /** REM-06. */
   readonly notifications: boolean;
-  readonly sound: boolean;
+  /**
+   * REM-06, D-94: Flint's own chime when a reminder fires, besides the toast's Windows sound. Off
+   * by default (the reminder toast already sounds); turned on in Settings from M8.
+   */
+  readonly reminderSound: boolean;
   /** REM-10: toasts say only "Flint reminder", for screen sharing. Default off. */
   readonly hideNotificationText: boolean;
   /** NOTE-07, TASK-10, D-84: the user's link patterns (edited in M8's Settings). */
@@ -40,7 +44,7 @@ export function defaultSettings(development = false): Settings {
     captureSelectionHotkey: 'Control+Shift+X',
     startWithWindows: true,
     notifications: true,
-    sound: true,
+    reminderSound: false,
     hideNotificationText: false,
     linkPatterns: [],
     autoArchiveDays: null,
@@ -77,7 +81,7 @@ export function readSettings(stored: Stored, development = false): Settings {
     ),
     startWithWindows: pick(stored, 'startWithWindows', isBoolean, defaults.startWithWindows),
     notifications: pick(stored, 'notifications', isBoolean, defaults.notifications),
-    sound: pick(stored, 'sound', isBoolean, defaults.sound),
+    reminderSound: pick(stored, 'reminderSound', isBoolean, defaults.reminderSound),
     hideNotificationText: pick(
       stored,
       'hideNotificationText',

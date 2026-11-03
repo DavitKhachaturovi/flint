@@ -31,6 +31,8 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
   '.ttf': 'font/ttf',
+  // REM-06, D-94: Flint's reminder chime.
+  '.wav': 'audio/wav',
 };
 
 export function contentType(file: string): string {

@@ -816,6 +816,14 @@ async function start(): Promise<void> {
   const toastOptions = (): ToastOptions | null =>
     protocol ? { protocol, hideText: settings.hideNotificationText } : null;
   const showReminders = (plan: ToastPlan): void => {
+    // REM-06, D-94: Flint's own chime, once for what fires together, when it is turned on.
+    if (
+      (plan.separate.length > 0 || plan.summary) &&
+      (hooks?.reminderSound ?? settings.reminderSound)
+    ) {
+      if (hooks) hooks.chimes = (hooks.chimes ?? 0) + 1;
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChime);
+    }
     const options = toastOptions();
     for (const toast of plan.separate) {
       if (hooks) hooks.toasts.push(`${toast.label} | ${toast.title}`);
@@ -849,6 +857,12 @@ async function start(): Promise<void> {
     if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
     else send();
   };
+  /** REM-07, D-94: "N reminders you missed": Today, its Overdue card open, in view. */
+  const showOverdue = (): void => {
+    const send = (): void => mainWindow.webContents.send(Channels.mainOverdue);
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  };
   const handleActivation = (activation: ReminderActivation | null): void => {
     if (!activation) return;
     log(`toast action "${activation.action}" for task ${activation.id}`);
@@ -856,6 +870,7 @@ async function start(): Promise<void> {
     if (activation.action === 'open') {
       showMain();
       if (activation.id !== MISSED_SUMMARY_ID) reveal(activation.id);
+      else showOverdue();
       return;
     }
     const run =

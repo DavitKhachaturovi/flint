@@ -332,6 +332,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 - **First part built (0.4.24, D-90, Proposed):** the reminders still to come today as cards, two a row (time, "in 2 h", title, list), as in mockup 03; overdue ones and the full section (REM-11) come with the rest of M6.
 - **D-92:** the cards follow the clock (a passed reminder's card folds away, the countdowns tick); the next one is wider and brighter with "Next", later ones quieter; three a row, more behind "+N more" (**Proposed**). The Today column's Timeline shows all of today's reminders on an hour rail with a moving now line.
+- **D-94:** overdue reminders are the Overdue card under the rollover card (REM-07, REM-11).
 - **D-93:** dragging a reminder up or down on the Timeline changes its time (quarter hours, 5 minutes with Alt), shown live; it slides into place, or back when dropped in the past; one undo step. The keyboard way is Change reminder….
 
 ## 5. Reminders
@@ -342,6 +343,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - One reminder per task (**Proposed**). No recurring reminders (Non-goals).
 - **D-68 (pulled into M4):** clicking a task's reminder time opens the date/time picker for that task (CAP-11), also for a reminder that already fired; the bell next to it stays the off/on toggle (REM-12). The task's right-click menu has "Change reminder…", and "Set reminder…" for a task without one (**Proposed**).
 - **D-69:** when the time changes, the old text crossfades into the new (its width eases along) instead of jumping (D-67's state band).
+- **D-94 (0.4.28):** **R** sets or changes the selected task's reminder in any list and in Today (the picker opens at the task); the menu's Set… / Change… shows R.
 
 ### REM-02 — Natural-language times (v1)
 - Accepted in both the reminder picker and the capture box.
@@ -361,6 +363,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-04 — Lightweight snooze presets (v1)
 - Quick presets such as **"in 1h"** and **"tomorrow"** in the reminder picker and in the missed-reminders list. (The notification itself has the fixed Done / Snooze 10m / Open buttons, REM-05.) This is the ceiling for time features (Non-goals).
+- **D-94:** the picker's In 10 minutes, In 1 hour and Tomorrow 10:00; the Overdue card's Snooze ▸ has In 1 hour, Tomorrow 10:00 and Pick a time….
 
 ### REM-05 — Actionable notifications (v1)
 - The toast has three buttons: **Done**, **Snooze 10m**, **Open**.
@@ -376,12 +379,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
+- **D-94 (0.4.28):** Flint's own sound is a short soft chime made for Flint, **off by default** (the reminder toast already plays Windows' sound); until Settings (M8) it is `reminderSound: true` in `settings.json`. The in-app alert comes with mini mode (M8).
 - Windows **Focus Assist / Do Not Disturb silently suppresses ordinary toasts**, and people often enable it during exactly the calls where they capture tasks.
 - **Decided (D-35, verified 29 Oct 2026, docs/06 §1):** reminder toasts use Windows' reminder scenario (`scenario="reminder"`): they stay on screen until acted on, and with Windows' default priority settings ("reminders" allowed) they still appear during Do Not Disturb, where an ordinary toast is suppressed. Flint's own sound and in-app alert remain for users who turn that setting off. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
 
 ### REM-07 — Missed-reminder recovery (v1)
 - If the app was closed or the PC was asleep when a reminder was due, Flint shows **"N reminders you missed"** on next launch / wake, listing them with the same actions (Done / Snooze / Open).
 - Silent misses destroy trust in reminders faster than anything else.
+- **D-94 (0.4.28):** the list is Today's **Overdue** card (below the rollover card, quieter, folding, "Overdue · 3", its state remembered): every open task whose reminder has passed, missed or not, oldest first, each with Done, Snooze ▸ and a click that opens the task; a row leaves when done, snoozed or turned off. The "N reminders you missed" toast's Open shows Today with the card open.
 
 ### REM-08 — Bell indicator (v1)
 - Tasks with a reminder show a small **bell** indicator on the row (and the time on hover/selection). Combined with TODAY-03, users can see what's scheduled without opening each task.
@@ -398,7 +403,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-68 (replaces D-58's label):** no "Overdue" word. The bell stays, with a **small white dot** on it. **D-69:** the time is **not** highlighted: it keeps the bell's tone. **No red** and no warm colours (brand), **no badges** or counts. Visual spec in 09 §8.
 - The label turns overdue on its own when the time passes (the view checks every minute, **Proposed**).
 - **Completing** the task or **snoozing** the reminder clears it. Completed tasks are never overdue.
-- In Today, overdue items sit at the **top of the Reminders section** (TODAY-03).
+- In Today, overdue items sit at the **top of the Reminders section** (TODAY-03). **D-94:** as the Overdue card, under the rollover card and above the reminder cards (REM-07).
 - Milestones: the row display in M4; the Today grouping and snooze presets in M6. Reminders fire as notifications from M4 step 3 (D-64, REM-05).
 - A reminder turned off (REM-12) is never overdue.
 

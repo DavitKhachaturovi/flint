@@ -46,6 +46,10 @@ export const Channels = {
   mainChanged: 'main:changed',
   /** Main → main window: show this task (a reminder's Open, REM-05). */
   mainReveal: 'main:reveal',
+  /** REM-07, D-94: the missed-reminders toast's Open: Today, its Overdue card open. */
+  mainOverdue: 'main:overdue',
+  /** REM-06, D-94: a reminder fired and Flint's own sound is on: play it. */
+  mainChime: 'main:chime',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',
   /** Main window → main: new, rename or delete a list or note (LIST-01). */
@@ -267,6 +271,11 @@ export interface TodayExtras {
   readonly inbox: { readonly id: string; readonly open: number };
   /** D-92: today's pinned tasks and today's reminder tasks; how many of them are done today. */
   readonly progress: { readonly done: number; readonly total: number };
+  /**
+   * REM-07, REM-11, D-94: open tasks whose reminder (on) has passed, any day, oldest first: Today's
+   * Overdue card. The window adds today's reminders that pass while it shows.
+   */
+  readonly overdue: readonly TodayReminder[];
 }
 
 /**

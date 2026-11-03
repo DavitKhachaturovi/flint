@@ -1102,6 +1102,7 @@ export class Workspace {
     const donePinned: { readonly row: TaskRow; readonly at: number }[] = [];
     const high: { readonly row: TaskRow; readonly rank: number }[] = [];
     const reminders: TodayReminder[] = [];
+    const overdue: TodayReminder[] = [];
     const done: (TodayEntry & { readonly at: number })[] = [];
     const counted = new Map<string, boolean>();
     const two = (value: number): string => String(value).padStart(2, '0');
@@ -1131,6 +1132,16 @@ export class Workspace {
         const at = field ? atDefaultTime(field.value) : null;
         if (at && !task.line.fields.muted) {
           const when = toDate(at);
+          // REM-07, REM-11, D-94: an open task whose reminder has passed, whatever the day.
+          if (!isDone && when.getTime() <= now.getTime())
+            overdue.push({
+              key: task.key,
+              ...home,
+              title,
+              time: clock(when),
+              at: formatLocalDateTime(at),
+              done: false,
+            });
           if (dayStamp(when) === today && (!isDone || doneToday)) {
             reminders.push({
               key: task.key,
@@ -1177,6 +1188,7 @@ export class Workspace {
     const placed = open.map(({ row }) => row.key);
     if (placed.join() !== todayOrder.join()) this.today.setOrder(placed);
     reminders.sort((a, b) => a.at.localeCompare(b.at));
+    overdue.sort((a, b) => a.at.localeCompare(b.at));
     donePinned.sort((a, b) => a.at - b.at);
     // Stable: the same list keeps its file order.
     high.sort((a, b) => a.rank - b.rank);
@@ -1221,6 +1233,7 @@ export class Workspace {
           done: [...counted.values()].filter(Boolean).length,
           total: counted.size,
         },
+        overdue,
       },
     };
   }
