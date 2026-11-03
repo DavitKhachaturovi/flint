@@ -86,19 +86,23 @@
   color: var(--fl-text-faint);
 }
 
+/* D-91: no line has side padding: CodeMirror measures a whole-line selection from the first line's
+   padding, so insets are transparent borders, and the quote's bar a background. */
 .cm-fl-quote {
-  padding-left: 12px !important;
-  border-left: 2px solid var(--fl-edge-chip);
+  border-left: 14px solid transparent;
+  background: linear-gradient(var(--fl-edge-chip), var(--fl-edge-chip)) left / 2px 100% no-repeat
+    border-box;
   color: var(--fl-text-secondary);
 }
 
 /* Fenced code as a code card (mockup 04): the well, a ring, the language as its label. */
 .cm-fl-code {
-  padding: 0 14px !important;
+  border-inline: 14px solid transparent;
   background: var(--fl-ground-well);
+  /* D-91: the ring just outside the card (an inset one would sit inside the borders). */
   box-shadow:
-    inset 1px 0 0 var(--fl-edge-card),
-    inset -1px 0 0 var(--fl-edge-card);
+    -1px 0 0 var(--fl-edge-card),
+    1px 0 0 var(--fl-edge-card);
   font-family: var(--fl-font-mono);
   font-size: var(--fl-size-meta);
   line-height: 1.65;
@@ -109,23 +113,23 @@
   padding-top: 6px !important;
   border-radius: 12px 12px 0 0;
   box-shadow:
-    inset 1px 0 0 var(--fl-edge-card),
-    inset -1px 0 0 var(--fl-edge-card),
-    inset 0 1px 0 var(--fl-edge-card);
+    -1px 0 0 var(--fl-edge-card),
+    1px 0 0 var(--fl-edge-card),
+    0 -1px 0 var(--fl-edge-card);
 }
 
 .cm-fl-code-last {
   padding-bottom: 6px !important;
   border-radius: 0 0 12px 12px;
   box-shadow:
-    inset 1px 0 0 var(--fl-edge-card),
-    inset -1px 0 0 var(--fl-edge-card),
-    inset 0 -1px 0 var(--fl-edge-card);
+    -1px 0 0 var(--fl-edge-card),
+    1px 0 0 var(--fl-edge-card),
+    0 1px 0 var(--fl-edge-card);
 }
 
 .cm-fl-code-first.cm-fl-code-last {
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
 }
 
 .cm-fl-code-end {
@@ -141,7 +145,7 @@
 }
 
 .cm-fl-code-start + .cm-line {
-  padding-right: 40px !important;
+  border-right-width: 40px;
 }
 
 .cm-fl-code-start .cm-fl-code-copy {
@@ -251,7 +255,8 @@
 .cm-fl-code-copy {
   position: absolute;
   top: 4px;
-  right: 6px;
+  /* 6 px from the card's edge, outside its 14 px border. */
+  right: -8px;
   width: 26px;
   height: 26px;
   display: flex;
@@ -365,6 +370,30 @@
 .md-editor .cm-panels-top {
   top: 8px;
   border: 0;
+}
+
+/* D-91: on a page the bar takes no room; find.ts places it level with the title, then the panel. */
+.md-editor .cm-panels-top.fl-find-page {
+  top: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.fl-find-page .fl-find {
+  margin-bottom: 0;
+}
+
+.fl-find.fl-find-ghost {
+  z-index: 30;
+  pointer-events: none;
+  animation: find-out var(--fl-dur-base) ease-in forwards;
+}
+
+@keyframes find-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .fl-find {

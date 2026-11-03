@@ -91,6 +91,7 @@ function findBar(view: EditorView): Panel {
       view.focus();
     }),
   );
+  let unplace = (): void => undefined;
   return {
     dom,
     top: true,
@@ -98,6 +99,11 @@ function findBar(view: EditorView): Panel {
       input.focus();
       input.select();
       count.textContent = countText(view);
+      unplace = placeOnPage(view, dom);
+    },
+    destroy: () => {
+      unplace();
+      leave(dom);
     },
     update: (update: ViewUpdate) => {
       if (
@@ -108,6 +114,55 @@ function findBar(view: EditorView): Panel {
         count.textContent = countText(view);
     },
   };
+}
+
+/**
+ * D-91: on a note's (or a task's) page the bar sits as the task list's does: level with the title
+ * row at the top, then level with the context panel's top (or 16 px) while the page scrolls. It
+ * takes no room in the note (`.fl-find-page`). Elsewhere (a body, the panel) it stays in the editor.
+ */
+function placeOnPage(view: EditorView, bar: HTMLElement): () => void {
+  const page = view.dom.closest<HTMLElement>('.content.note-page, .content.task-page');
+  const root = page?.closest<HTMLElement>('.scroller');
+  const holder = bar.parentElement;
+  if (!page || !root || !holder) return () => undefined;
+  holder.classList.add('fl-find-page');
+  const place = (): void => {
+    const title = page.querySelector<HTMLElement>('h1');
+    const panel = root.querySelector<HTMLElement>('.context-panel:not(.panel-ghost)');
+    const area = root.getBoundingClientRect();
+    const stuck = area.top + (panel ? parseFloat(getComputedStyle(panel).top) || 16 : 16);
+    const box = title?.getBoundingClientRect();
+    const level = box ? box.top + (box.height - bar.offsetHeight) / 2 : stuck;
+    bar.style.translate = `0 ${Math.max(stuck, level) - holder.getBoundingClientRect().top}px`;
+  };
+  place();
+  root.addEventListener('scroll', place, { passive: true });
+  window.addEventListener('resize', place);
+  return () => {
+    root.removeEventListener('scroll', place);
+    window.removeEventListener('resize', place);
+  };
+}
+
+/** D-89, D-91: the bar fades away where it was (CodeMirror removes it at once). */
+function leave(bar: HTMLElement): void {
+  if (!bar.isConnected || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box = bar.getBoundingClientRect();
+  const ghost = bar.cloneNode(true) as HTMLElement;
+  ghost.classList.add('fl-find-ghost');
+  Object.assign(ghost.style, {
+    position: 'fixed',
+    left: `${box.left}px`,
+    top: `${box.top}px`,
+    width: `${box.width}px`,
+    margin: '0',
+    translate: 'none',
+  });
+  ghost.inert = true;
+  document.body.append(ghost);
+  ghost.addEventListener('animationend', () => ghost.remove());
+  window.setTimeout(() => ghost.remove(), 600);
 }
 
 export function findInNote(): Extension {

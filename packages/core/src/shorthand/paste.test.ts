@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFixture } from '../../test/fixtures.js';
 import { parseCapture } from './parse.js';
 import {
   blockFor,
@@ -6,6 +7,7 @@ import {
   composeCapture,
   fencedBlock,
   isCodeBlock,
+  normalizeNewlines,
   taskLabel,
   titleFromPaste,
 } from './paste.js';
@@ -113,6 +115,50 @@ describe('paste-to-capture (CAP-06)', () => {
     expect(parsed.title).toBe('deploy failed');
     expect(parsed.target).toEqual({ kind: 'new', name: 'infra' });
     expect(parsed.body).toBe(`\`\`\`\n${python}\n\`\`\``);
+  });
+});
+
+describe('code copied on Windows and code on one line (CAP-06, D-91)', () => {
+  // Davit's sample: playwright.config.ts as VS Code copies it (CRLF), and the same as one line.
+  const crlf = readFixture('paste-typescript-crlf.txt');
+  const oneLine = readFixture('paste-typescript-one-line.txt');
+
+  it('recognises both as code', () => {
+    expect(crlf).toContain('\r\n');
+    expect(classifyPaste(crlf)).toBe('code');
+    expect(classifyPaste(oneLine)).toBe('code');
+    expect(classifyPaste('const total = items.reduce((sum, item) => sum + item.price, 0);')).toBe(
+      'code',
+    );
+    expect(classifyPaste('SELECT id, name FROM tenants WHERE active = 1;')).toBe('code');
+    expect(classifyPaste('std::vector<int> values = {1, 2, 3};')).toBe('code');
+    expect(classifyPaste('if (user && user.id) { refresh(user); }')).toBe('code');
+  });
+
+  it('keeps prose with brackets, semicolons and links as text', () => {
+    for (const prose of [
+      'Fix null ref in tenant resolver',
+      'Call the vendor (re: licences); then email Ana.',
+      'Use foo() and bar() here',
+      'TODO: check the `npm run build` output',
+      'https://dev.azure.com/acme/web/_git/platform/pullrequest/42',
+      'Read [the docs](https://example.com/docs) first',
+      'Review the PR [priority:: high] [id:: k3f9]',
+      'Plan the Q4 roadmap (draft) and share it',
+      'See [[Sprint planning]] and [[Backend]]',
+    ])
+      expect(classifyPaste(prose), prose).toBe('text');
+  });
+
+  it('fences CRLF text with \n line endings only, and keeps every line', () => {
+    const block = blockFor(crlf);
+    expect(block.kind).toBe('code');
+    expect(block.text).not.toContain('\r');
+    const fenced = fencedBlock(crlf);
+    expect(fenced).not.toContain('\r');
+    expect(fenced.split('\n')).toHaveLength(9);
+    expect(fenced).toBe(`\`\`\`\n${normalizeNewlines(crlf).trim()}\n\`\`\``);
+    expect(normalizeNewlines('a\r\nb\rc\nd')).toBe('a\nb\nc\nd');
   });
 });
 

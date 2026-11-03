@@ -23,8 +23,32 @@ function lines(text: string): string[] {
   return text.split(/\r\n|\r|\n/);
 }
 
+/** D-91: pasted text with Windows (or old Mac) line endings, as the editors keep it: `\n` only. */
+export function normalizeNewlines(text: string): string {
+  return text.replace(/\r\n?/g, '\n');
+}
+
+/**
+ * D-91 (CAP-06): one or two lines of code (a config copied as one line, a call, a declaration),
+ * too few lines to judge by their endings: a line that starts like code (a keyword, a comment)
+ * with code punctuation and a code-only mark (`=>`, `({`, `});`, `===`, `a::b`, `x = 1`…), or
+ * with two such marks. Prose with a bracket or a semicolon has neither (**Proposed**).
+ */
+const CODE_START =
+  /^\s*(?:\/\*|\/\/|(?:export|import|const|let|var|function|class|interface|type|enum|return|async|await|def|public|private|protected|static|package|using|namespace|fn|impl|struct|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\b)/;
+const CODE_MARK = /=>|\(\{|\}\)|\);|\};|===|!==|\w::\w|&&|\|\||\w\s*=\s*[\w'"`[{(]/g;
+/** Dataview fields (`[id::x]`) are Flint's own text, not code. */
+const FIELD = /\[[\w-]+::[^\]]*\]/g;
+
+function shortCode(line: string): boolean {
+  const text = line.replace(FIELD, '');
+  if (text.trim().length < 12 || /^\s*\S+:\/\/\S+\s*$/.test(text)) return false;
+  const marks = text.match(CODE_MARK)?.length ?? 0;
+  return marks >= 2 || (marks >= 1 && CODE_START.test(text) && /[{}()[\];=]/.test(text));
+}
+
 export function classifyPaste(text: string): PasteKind {
-  const trimmed = text.trim();
+  const trimmed = normalizeNewlines(text).trim();
   // D-79: markdown already (a fenced block, an image link) stays markdown; only raw code is fenced.
   if (MARKDOWN_FENCE.test(trimmed) || MARKDOWN_IMAGE.test(trimmed)) return 'text';
   if (/^[[{]/.test(trimmed)) {
@@ -47,12 +71,13 @@ export function classifyPaste(text: string): PasteKind {
       (line) => /^(\t| {2,})\S/.test(line) || /[;{}()]\s*$/.test(line) || /^\s*[}\])]/.test(line),
     ).length;
     if (codeLike / all.length >= 0.5) return 'code';
-  }
+  } else if (all.length > 0 && all.every(shortCode)) return 'code';
   return 'text';
 }
 
 /** A fence longer than any backtick run in the text, so the block can't end early. */
-export function fencedBlock(text: string, language = ''): string {
+export function fencedBlock(raw: string, language = ''): string {
+  const text = normalizeNewlines(raw);
   const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((match) => match[0].length));
   const fence = '`'.repeat(Math.max(3, longest + 1));
   return `${fence}${language}\n${text.replace(/\s+$/, '')}\n${fence}`;
@@ -105,7 +130,8 @@ export function isCodeBlock(kind: BlockKind): boolean {
 }
 
 /** A pasted or selected piece of text as a block (CAP-06, CAP-07). */
-export function blockFor(text: string): CaptureBlock {
+export function blockFor(raw: string): CaptureBlock {
+  const text = normalizeNewlines(raw);
   const kind = classifyPaste(text);
   return { kind, text: kind === 'text' ? text.trim() : text.replace(/^\s*\n|\s+$/g, '') };
 }

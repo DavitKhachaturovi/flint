@@ -184,7 +184,12 @@ function paste(event: ClipboardEvent, view: EditorView): boolean {
   const kind = classifyPaste(pasted);
   if (kind === 'text') return false;
   event.preventDefault();
-  insertBlock(view, fencedBlock(blockFor(pasted).text, kind === 'json' ? 'json' : ''));
+  try {
+    insertBlock(view, fencedBlock(blockFor(pasted).text, kind === 'json' ? 'json' : ''));
+  } catch {
+    // D-91: a paste always lands: as it is, when the code block can't be made.
+    view.dispatch(view.state.replaceSelection(pasted.replace(/\r\n?/g, '\n')));
+  }
   return true;
 }
 

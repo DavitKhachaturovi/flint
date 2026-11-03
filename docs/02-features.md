@@ -132,6 +132,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - This is how bugs actually show up, so it is high-value for developers.
 
 - **D-89 (Proposed):** in a task list, code pasted on a selected task whose notes are open inline goes into those notes.
+- **D-91:** pasted text is normalised to `\n` line endings first (code copied on Windows pasted nothing into a note's main editor), and a paste always lands: if a code block can't be made, the text goes in as it is. **Proposed:** code on one or two lines is recognised by how it starts (a keyword, a comment) and code-only marks (`=>`, `({`, `});`, `===`…); prose, links, Dataview fields and wikilinks stay text.
+
 ### CAP-07 — Capture-selection hotkey (v1)
 - A **second global hotkey** (**Ctrl+Shift+X**, D-37) captures the currently selected text in any app (an error in a terminal, a line in a Teams chat) and opens the capture popup **prefilled** with it.
 - **D-39:** on a closed popup it starts fresh with the new selection; an earlier draft is set aside and shown as "Previous draft · Restore", so it is never lost (Restore swaps the two). On a popup that is open (also one left open without focus, D-41) the selection is appended to the selection area, to collect from several places.
@@ -361,6 +363,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Buttons must work while the toast is on screen and from Action Center. Implementation notes in 05.
 - **D-64 (Davit, 31 Oct 2026):** pulled forward to **M4 step 3**, the first item: reminders fire as this toast while Flint runs; a reminder missed while Flint wasn't running or the PC slept is shown once at the next start (or wake) as a toast labelled "Missed". **Proposed:** more than 3 missed at once show as one toast, "N reminders you missed", whose Open shows the main window; the full REM-07 list comes in M6. A shown reminder is remembered in `reminders-state.json` (04 §2), so it is never shown twice.
 - **D-68:** the toast says **"Reminder"** (or "Missed reminder") and the task name, with Done / Snooze 10m / Open: no time, no list name, no large logo image (the small app icon in its header stays).
+- **D-91:** Open goes to the task's list, scrolls it into view, selects it (the panel shows it on wide screens; on narrow windows the body stays closed) and flashes it once.
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
@@ -457,6 +460,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 - **D-87:** a picture's right-click menu (body and note thumbnails, the composer's chips, and the image viewer, which gets one): **Copy image**, **Open in viewer**, **Open in default app**, **Show in folder**.
 - **D-89:** the image viewer's right-click menu works (Copy image, Open in default app, Show in folder); other files' menus have Open in default app and Show in folder.
+- **D-91:** "Open in viewer" in a picture's menu in a note or the panel opens the viewer (it did nothing).
+
 ### MEDIA-03 — Large files are linked, not copied (v1, D-84)
 - ~~Warn when adding a file above a size threshold.~~ **D-84 (replaces the warning):** no hard size limit. Up to **25 MB** a file is copied into `attachments/`; above it, it is added **as a link to its original location** at once (nothing copied).
 - A notice says **"Large file, linked to its original location"** with **Copy into Flint instead**. It stays until acted on or dismissed (it never fades) and never blocks input. Hovering the button, or the small info icon beside it, explains: large files are linked by default because copying them makes the Flint folder, snapshots, exports and future sync slow and big; copying keeps the file safe if the original is moved or deleted.
@@ -492,6 +497,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Milestone M4, with the page view.
 
 - **Swipe built (0.4.22, D-88, Proposed details):** about 240 px of horizontal touchpad scroll steps; the arrow grows at that edge; not over sideways-scrolling content, not with Ctrl, only when there is somewhere to go.
+- **D-91:** each list, note and task page keeps its scroll position for the session; coming back to it restores the position at once (no smooth scroll).
+
 ### NAV-05 — Tabs bar (Later, D-62)
 - Obsidian-style tabs for several open lists and pages. Later: it needs careful design to fit the visual language. v1 has one view at a time with back/forward (NAV-04).
 
@@ -544,6 +551,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 - **Built for task lists (0.4.22, D-88):** as proposed above; the matches are highlighted with the CSS Custom Highlight API; a jump opens Completed or a body under its row.
 - **D-89:** in task lists the bar opens and closes with motion, its count crossfades, the match's row lights up; at the list's top it is level with the title row, scrolled it sits level with the context panel's top.
+- **D-91:** the note's find bar sits as the list's: level with the title at the top, level with the panel's top while scrolling, never pushing the note down; it fades out when closed.
+
 ### MINI-01 — Mini mode (v1)
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
 - **Proposed:** supports adding a task, completing, and seeing reminders; everything else opens the main window.
@@ -742,6 +751,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Menus show only actions that exist; items join as features land (e.g. Star to Today and Reminder in M6).
 - **D-64:** menus are drawn **in the page**, with the tokens, **everywhere**, the capture popup included: while a menu is open there, the popup makes room for it (e.g. by enlarging its transparent margin or window). The native dark Windows menu is only a fallback if that genuinely doesn't work, and Davit is told if it comes to that.
 - Milestones: M4; note-specific items (NOTE-02) in M5.
+- **D-91, the task menu in groups:** Complete · Edit · Open as page / Priority ▸ · Reminder ▸ · Pin / Add ▸ (Subtask, Notes) / Move to… · Duplicate / More ▸ (Indent, Outdent, Format as code, Convert to note) / Delete, shortcut hints kept (**Proposed:** Reminder ▸ holds Set… or Change… and Turn off/on).
 
 ### UI-09 — Auto-closing brackets and quotes (v1, D-57)
 - Like Obsidian: typing `(` inserts `()` with the cursor inside; typing `)` right before an auto-inserted `)` just steps over it. Same for `[]`, `{}`, `""`, `''` and ``` `` ```.

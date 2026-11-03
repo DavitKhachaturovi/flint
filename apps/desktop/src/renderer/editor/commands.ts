@@ -190,7 +190,10 @@ function setLineKind(view: EditorView, kind: LineKind): void {
 }
 
 /** A block on lines of its own at the cursor; `caret` is where the cursor goes inside it. */
-export function insertBlock(view: EditorView, block: string, caret = block.length): void {
+export function insertBlock(view: EditorView, raw: string, caret?: number): void {
+  // D-91: the editor keeps `\n` only; a `\r` would put the caret past the end (and throw).
+  const block = raw.replace(/\r\n?/g, '\n');
+  const at = Math.min(caret ?? block.length, block.length);
   const { from, to } = view.state.selection.main;
   const doc = view.state.doc;
   const before = doc.sliceString(Math.max(0, from - 2), from);
@@ -199,7 +202,7 @@ export function insertBlock(view: EditorView, block: string, caret = block.lengt
   const trail = after === '' || after === '\n' ? '' : '\n';
   view.dispatch({
     changes: { from, to, insert: lead + block + trail },
-    selection: { anchor: from + lead.length + caret },
+    selection: { anchor: from + lead.length + at },
     scrollIntoView: true,
     userEvent: 'input.format',
   });

@@ -359,6 +359,11 @@ function nudge(key: string, direction: 'left' | 'right' | 'up' | 'down'): void {
 }
 
 /** D-86: the place a jump landed on lights up a moment. */
+/** D-91: a place's key in the scroll memory. */
+function placeKey(list: string, page: string | null): string {
+  return page === null ? list : `${list}/${page}`;
+}
+
 function flash(element: Element): void {
   element.classList.remove('fl-flash');
   void (element as HTMLElement).offsetWidth;
@@ -662,10 +667,9 @@ export function App(): ReactElement {
   }, []);
   useEffect(() => {
     window.flintMain.onChanged(() => void refreshRef.current());
-    // A reminder's Open: its list, with the task selected once the rows are there.
-    window.flintMain.onReveal(({ listId: id, key }) => {
-      goRef.current({ list: id, page: null }, key);
-    });
+    // A reminder's Open (D-91): its list, the task scrolled into view, selected and flashed once
+    // the rows are there; the panel shows it on wide screens, the body stays closed.
+    window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
   }, []);
 
   /**
@@ -680,7 +684,17 @@ export function App(): ReactElement {
   const [heading, setHeading] = useState<'forward' | 'back' | null>(null);
   const pageRef = useRef(page);
   pageRef.current = page;
+  const listIdRef = useRef(listId);
+  listIdRef.current = listId;
+  /**
+   * D-91: each list's, note's and page's scroll position for the session, restored at once when it
+   * is shown again (back, or its sidebar row).
+   */
+  const scrollMemory = useRef(new Map<string, number>());
   const show = useCallback((place: Place, select: string | null = null, back = false): void => {
+    const root = scroller.current;
+    if (root)
+      scrollMemory.current.set(placeKey(listIdRef.current, pageRef.current), root.scrollTop);
     const pages = place.page !== null || pageRef.current !== null;
     setHeading(!pages ? null : back || !place.page ? 'back' : 'forward');
     setListId(place.list);
@@ -740,6 +754,26 @@ export function App(): ReactElement {
    * 'instant' while ↑/↓ is held, so the list keeps up with the key repeat.
    */
   const followSelection = useRef<false | 'smooth' | 'instant'>(false);
+  /** D-91: a selection to bring into view (and flash) once its row is on screen. */
+  const arriving = useRef<{
+    readonly key: string;
+    readonly mode: 'smooth' | 'instant';
+    readonly flash: boolean;
+  } | null>(null);
+  /** D-91: a reminder's Open, and Today's timeline: the task in its list, centred and flashed. */
+  const reveal = useCallback(
+    (list: string, key: string): void => {
+      arriving.current = {
+        key,
+        mode: list === listIdRef.current ? 'smooth' : 'instant',
+        flash: true,
+      };
+      go({ list, page: null }, key);
+    },
+    [go],
+  );
+  const revealRef = useRef(reveal);
+  revealRef.current = reveal;
   const followFromPanel = useCallback(
     (list: string, key: string): void => {
       const trail = history.current;
@@ -1522,78 +1556,27 @@ export function App(): ReactElement {
         hint,
         action: () => void change({ kind: 'priority', key: row.key, priority: value }),
       });
+      const topLevel = view?.items.some(
+        (item) => item.kind === 'task' && item.task.key === row.key,
+      );
+      // D-79: fencing a body's unfenced code or JSON on purpose (never by itself on render).
+      const unfenced = open && hasBody(row) && !/^ {0,3}(```|~~~)/m.test(row.body);
+      const add: MenuEntry[] = open
+        ? [
+            ...(topLevel ? [{ label: 'Subtask', action: () => addSubtask(row) }] : []),
+            { label: 'Notes', action: () => openNotes(row.key) },
+          ]
+        : [];
+      // D-91: the menu in groups: the task, its properties, additions, moves, the rest, deleting.
       openMenu(
         [
-          ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
-          { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
-          ...(open
-            ? [
-                {
-                  label: 'Duplicate',
-                  action: () =>
-                    void change({ kind: 'duplicate', key: row.key }).then((outcome) => {
-                      if (!outcome) return;
-                      showToast(outcome.label, true);
-                      if (outcome.key) setSelected(outcome.key);
-                    }),
-                },
-              ]
-            : []),
-          ...(open && view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
-            ? [{ label: 'Add subtask', action: () => addSubtask(row) }]
-            : []),
-          ...(open ? [{ label: 'Add notes', action: () => openNotes(row.key) }] : []),
-          // TODAY-01, D-85.
-          {
-            label: row.pinned ? 'Unpin' : 'Pin',
-            hint: 'P',
-            action: () => void pin([row], !row.pinned),
-          },
-          // D-79: Shift+Tab and Tab, made findable.
-          ...(open
-            ? [
-                view?.items.some((item) => item.kind === 'task' && item.task.key === row.key)
-                  ? {
-                      label: 'Indent',
-                      hint: 'Tab',
-                      // D-89: an impossible one nudges the row, as from the keyboard.
-                      action: () =>
-                        void change({ kind: 'indent', key: row.key }).then((outcome) => {
-                          if (!outcome) nudge(row.key, 'right');
-                        }),
-                    }
-                  : {
-                      label: 'Outdent',
-                      hint: 'Shift+Tab',
-                      action: () =>
-                        void change({ kind: 'outdent', key: row.key }).then((outcome) => {
-                          if (!outcome) nudge(row.key, 'left');
-                        }),
-                    },
-              ]
-            : []),
-          // D-79: fencing a body's unfenced code or JSON on purpose (never by itself on render).
-          ...(open && hasBody(row) && !/^ {0,3}(```|~~~)/m.test(row.body)
-            ? [
-                {
-                  label: 'Format as code',
-                  action: () =>
-                    void change({
-                      kind: 'body',
-                      key: row.key,
-                      body: fencedBlock(
-                        row.body.trim(),
-                        classifyPaste(row.body) === 'json' ? 'json' : '',
-                      ),
-                    }),
-                },
-              ]
-            : []),
           {
             label: open ? 'Complete' : 'Reopen',
             hint: 'Space',
             action: () => void toggle(row.key),
           },
+          ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
+          { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
           'divider',
           ...(open
             ? [
@@ -1606,24 +1589,34 @@ export function App(): ReactElement {
                     priority('None', '0', null),
                   ],
                 },
-              ]
-            : []),
-          ...(open
-            ? [
                 {
-                  label: row.reminder ? 'Change reminder…' : 'Set reminder…',
-                  action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
+                  label: 'Reminder',
+                  submenu: [
+                    {
+                      label: row.reminder ? 'Change…' : 'Set…',
+                      action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
+                    },
+                    // REM-12, D-66.
+                    ...(row.reminder
+                      ? [
+                          {
+                            label: row.reminderState === 'muted' ? 'Turn on' : 'Turn off',
+                            action: () => void mute(row.key, row.reminderState !== 'muted'),
+                          },
+                        ]
+                      : []),
+                  ],
                 },
               ]
             : []),
-          ...(open && row.reminder
-            ? [
-                {
-                  label: row.reminderState === 'muted' ? 'Turn reminder on' : 'Turn reminder off',
-                  action: () => void mute(row.key, row.reminderState !== 'muted'),
-                },
-              ]
-            : []),
+          // TODAY-01, D-85.
+          {
+            label: row.pinned ? 'Unpin' : 'Pin',
+            hint: 'P',
+            action: () => void pin([row], !row.pinned),
+          },
+          ...(add.length > 0 ? ['divider' as const, { label: 'Add', submenu: add }] : []),
+          'divider',
           {
             label: 'Move to…',
             action: () =>
@@ -1641,17 +1634,73 @@ export function App(): ReactElement {
                   ),
               ),
           },
-          // TASK-17, D-85.
+          ...(open
+            ? [
+                {
+                  label: 'Duplicate',
+                  action: () =>
+                    void change({ kind: 'duplicate', key: row.key }).then((outcome) => {
+                      if (!outcome) return;
+                      showToast(outcome.label, true);
+                      if (outcome.key) setSelected(outcome.key);
+                    }),
+                },
+              ]
+            : []),
+          'divider',
           {
-            label: 'Convert to note',
-            action: () =>
-              void change({ kind: 'toNote', key: row.key }).then((outcome) => {
-                if (!outcome) return;
-                showToast(outcome.label, true);
-                // D-86: the new note opens, ready to type.
-                setFocusNote(outcome.listId);
-                go({ list: outcome.listId, page: null });
-              }),
+            label: 'More',
+            submenu: [
+              // D-79: Tab and Shift+Tab, made findable; D-89: an impossible one nudges the row.
+              ...(open
+                ? [
+                    {
+                      label: 'Indent',
+                      hint: 'Tab',
+                      action: () =>
+                        void change({ kind: 'indent', key: row.key }).then((outcome) => {
+                          if (!outcome) nudge(row.key, 'right');
+                        }),
+                    },
+                    {
+                      label: 'Outdent',
+                      hint: 'Shift+Tab',
+                      action: () =>
+                        void change({ kind: 'outdent', key: row.key }).then((outcome) => {
+                          if (!outcome) nudge(row.key, 'left');
+                        }),
+                    },
+                  ]
+                : []),
+              ...(unfenced
+                ? [
+                    {
+                      label: 'Format as code',
+                      action: () =>
+                        void change({
+                          kind: 'body',
+                          key: row.key,
+                          body: fencedBlock(
+                            row.body.trim(),
+                            classifyPaste(row.body) === 'json' ? 'json' : '',
+                          ),
+                        }),
+                    },
+                  ]
+                : []),
+              // TASK-17, D-85.
+              {
+                label: 'Convert to note',
+                action: () =>
+                  void change({ kind: 'toNote', key: row.key }).then((outcome) => {
+                    if (!outcome) return;
+                    showToast(outcome.label, true);
+                    // D-86: the new note opens, ready to type.
+                    setFocusNote(outcome.listId);
+                    go({ list: outcome.listId, page: null });
+                  }),
+              },
+            ],
           },
           'divider',
           { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
@@ -2919,23 +2968,42 @@ export function App(): ReactElement {
 
   // D-87: a row selected with ↑/↓ (or from a link in the panel) is scrolled into view, smoothly;
   // a click or a right-click never moves the list.
+  // D-91: also in another list, once its rows are there (`view`).
   useEffect(() => {
     const follow = followSelection.current;
     followSelection.current = false;
-    if (!selected || !follow) return;
+    if (follow && selected) arriving.current = { key: selected, mode: follow, flash: false };
+    const target = arriving.current;
+    if (!target || target.key !== selected) {
+      arriving.current = null;
+      return;
+    }
     const row = scroller.current?.querySelector<HTMLElement>(
-      `.row[data-key="${CSS.escape(selected)}"]`,
+      `.row[data-key="${CSS.escape(target.key)}"]`,
     );
     if (!row) return;
+    arriving.current = null;
+    if (target.flash) flash(row);
     const area = scroller.current?.getBoundingClientRect();
     const box = row.getBoundingClientRect();
     // Only a row that is out of view (a click or a menu never moves the list).
     if (area && box.top >= area.top && box.bottom <= area.bottom) return;
     row.scrollIntoView({
-      block: 'nearest',
-      behavior: follow === 'instant' || reducedMotion() ? 'instant' : 'smooth',
+      block: target.flash ? 'center' : 'nearest',
+      behavior: target.mode === 'instant' || reducedMotion() ? 'instant' : 'smooth',
     });
-  }, [selected]);
+  }, [selected, view]);
+
+  // D-91: a place shown again is where it was left, at once (no smooth scroll); a new one at the top.
+  const restored = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const root = scroller.current;
+    if (!root || view?.id !== listId) return;
+    const key = placeKey(listId, page);
+    if (restored.current === key) return;
+    restored.current = key;
+    root.scrollTo({ top: scrollMemory.current.get(key) ?? 0, behavior: 'instant' });
+  }, [view, listId, page]);
 
   /**
    * TASK-09 (D-88, Proposed): text pasted into a task list (not into a field): each non-empty line

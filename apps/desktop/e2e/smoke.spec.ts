@@ -637,7 +637,28 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
 
   // Right-click a task: its menu; Move to… opens the list picker; a new name makes a new list.
   await main.locator('.row', { hasText: 'Fix the gate' }).click({ button: 'right' });
-  await expect(menuItems).toContainText(['Edit', 'Complete', 'Priority', 'Move to…', 'Delete']);
+  // D-91: in groups: Complete · Edit · Open as page / Priority ▸ · Reminder ▸ · Pin / Add ▸ /
+  // Move to… · Duplicate / More ▸ / Delete.
+  await expect(menuItems).toHaveText([
+    'Complete',
+    'Edit',
+    'Open as page',
+    'Priority',
+    'Reminder',
+    'Pin',
+    'Add',
+    'Move to…',
+    'Duplicate',
+    'More',
+    'Delete',
+  ]);
+  await expect(main.locator('.fl-menu:not(.fl-submenu) > .fl-menu-divider')).toHaveCount(5);
+  await menu.getByText('More', { exact: true }).hover();
+  await expect(main.locator('.fl-submenu .fl-menu-item > span:first-child')).toHaveText([
+    'Indent',
+    'Outdent',
+    'Convert to note',
+  ]);
   // D-78: Priority is a submenu.
   await menu.getByText('Priority', { exact: true }).hover();
   await expect(main.locator('.fl-submenu .fl-menu-item')).toContainText([
@@ -1805,7 +1826,8 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
 
   // Convert to note (TASK-17): a note named after the task; one undo brings the task back.
   await main.locator('.row', { hasText: 'Write it up' }).click({ button: 'right' });
-  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Convert to note' }).click();
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'More' }).hover();
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Convert to note' }).click();
   await expect(main.locator('.nav', { hasText: 'Write it up' })).toHaveCount(1);
   await expect(main.locator('.row', { hasText: 'Write it up' })).toHaveCount(0);
   await expect
@@ -2026,7 +2048,8 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
   // The menu's impossible Indent nudges the row, as Tab does.
   await resetMotion();
   await main.locator('.row', { hasText: 'First' }).click({ button: 'right' });
-  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Indent' }).click();
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'More' }).hover();
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Indent' }).click();
   expect(
     await main.locator('.row', { hasText: 'First' }).evaluate((row) => row.getAnimations().length),
   ).toBeGreaterThan(0);
@@ -2152,6 +2175,104 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
     );
     win?.setBounds({ x: 0, y: 0, width: 1120, height: 780 });
   });
+});
+
+test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Windows, the picture menu, the note find bar (REM-05, NAV-04, CAP-06, MEDIA-02, NAV-06, D-91)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const tasks = Array.from({ length: 60 }, (_, i) => `- [ ] Long list task ${i + 1} [id:: ll${i}]`);
+  await writeFile(
+    join(flint, 'Long list.md'),
+    `---\nflint: 1\nid: lng1\nmode: tasks\n---\n${tasks.join('\n')}\n`,
+  );
+  const lines = Array.from({ length: 40 }, (_, i) => `Line ${i + 1}`).join('\n\n');
+  await writeFile(
+    join(flint, 'Paste note.md'),
+    `---\nflint: 1\nid: pst1\nmode: note\n---\nFirst line\n\n![](attachments/d91.png)\n\n${lines}\n`,
+  );
+  await mkdir(join(flint, 'attachments'), { recursive: true });
+  await writeFile(
+    join(flint, 'attachments', 'd91.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
+  const scroller = main.locator('.scroller');
+  const top = (): Promise<number> => scroller.evaluate((element) => Math.round(element.scrollTop));
+  const nav = (name: string) => main.locator('.nav:not(.flip-ghost)', { hasText: name });
+
+  // Each place keeps its scroll position for the session, restored at once.
+  await nav('Long list').click();
+  await expect(main.locator('h1')).toContainText('Long list');
+  await scroller.evaluate((element) => element.scrollTo({ top: 600, behavior: 'instant' }));
+  await nav('Paste note').click();
+  await expect(main.locator('.note-card h1')).toHaveText('Paste note');
+  await expect.poll(top).toBe(0);
+  await nav('Long list').click();
+  await expect(main.locator('h1')).toContainText('Long list');
+  await expect.poll(top).toBe(600);
+
+  // A reminder's Open: the task's list, the task selected, in view and flashed.
+  await nav('Paste note').click();
+  await expect(main.locator('.note-card h1')).toHaveText('Paste note');
+  await app.evaluate((_electron, argument) => {
+    (globalThis as { __flintE2E?: { activate?: (url: string) => void } }).__flintE2E?.activate?.(
+      argument,
+    );
+  }, 'flint-dev://reminder/open?id=ll55');
+  const revealed = main.locator('.row', { hasText: 'Long list task 56' });
+  await expect(revealed).toHaveClass(/\bsel\b/);
+  await expect(revealed).toBeInViewport();
+  await expect(revealed).toHaveClass(/fl-flash/);
+
+  // Code copied on Windows (CRLF) pastes into a note as a code block, never as nothing.
+  await nav('Paste note').click();
+  const editor = main.locator('.note-editor .cm-content');
+  await editor.locator('.cm-line', { hasText: 'First line' }).click();
+  await main.keyboard.press('End');
+  const sample = [
+    '/** End-to-end tests against the built Electron app (docs/05 §6). Run `npm run build` first. */',
+    'export default defineConfig({',
+    "  testDir: 'e2e',",
+    '  workers: 1,',
+    '});',
+  ].join('\r\n');
+  await editor.evaluate((element, text) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    element.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  }, sample);
+  await expect
+    .poll(() => readFile(join(flint, 'Paste note.md'), 'utf8'))
+    .toContain('First line\n\n```\n/** End-to-end tests');
+  expect(await readFile(join(flint, 'Paste note.md'), 'utf8')).toContain(
+    "export default defineConfig({\n  testDir: 'e2e',\n  workers: 1,\n});\n```",
+  );
+
+  // The picture's menu: Open in viewer opens the viewer, as its click does.
+  await main.locator('.note-editor .cm-fl-image img').click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Open in viewer' }).click();
+  await expect(main.locator('.lightbox')).toBeVisible();
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.lightbox')).toHaveCount(0);
+
+  // The note's find bar: level with the title at the top, takes no room, then the panel's top.
+  await editor.locator('.cm-line', { hasText: 'Line 3' }).first().click();
+  const before = await editor.locator('.cm-line').first().boundingBox();
+  await main.keyboard.press('Control+f');
+  const bar = main.locator('.note-editor .fl-find');
+  await expect(bar).toBeVisible();
+  const title = await main.locator('.note-card h1').boundingBox();
+  const box = await bar.boundingBox();
+  if (!title || !box || !before) throw new Error('no boxes');
+  expect(Math.abs(box.y + box.height / 2 - (title.y + title.height / 2))).toBeLessThan(3);
+  expect((await editor.locator('.cm-line').first().boundingBox())?.y).toBe(before.y);
+  await main.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
 });
 
 test('Today: pinned tasks of every list, its order, its composer, reminder cards (TODAY-01, TODAY-03, M6, D-90)', async () => {

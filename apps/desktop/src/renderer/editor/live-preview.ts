@@ -584,6 +584,15 @@ const livePreview = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 );
 
+/** MEDIA-02: the note's pictures in the viewer, at this one. */
+function openInViewer(view: EditorView, image: HTMLImageElement): void {
+  const all = [...view.contentDOM.querySelectorAll<HTMLImageElement>('.cm-fl-image img')];
+  view.state.facet(handlersFacet).openImage?.(
+    all.map((each) => each.dataset['src'] ?? ''),
+    all.indexOf(image),
+  );
+}
+
 /** Clicks on rendered parts: a link opens, an image opens the lightbox, a checkbox toggles. */
 const previewClicks = EditorView.domEventHandlers({
   mousedown(event, view) {
@@ -596,14 +605,10 @@ const previewClicks = EditorView.domEventHandlers({
       handlers.openLink(link.dataset['href'] ?? '');
       return true;
     }
-    const image = target.closest('.cm-fl-image img');
+    const image = target.closest<HTMLImageElement>('.cm-fl-image img');
     if (image && handlers.openImage) {
       event.preventDefault();
-      const all = [...view.contentDOM.querySelectorAll<HTMLImageElement>('.cm-fl-image img')];
-      handlers.openImage(
-        all.map((each) => each.dataset['src'] ?? ''),
-        all.indexOf(image as HTMLImageElement),
-      );
+      openInViewer(view, image);
       return true;
     }
     const box = target.closest('.cm-fl-checkbox');
@@ -752,9 +757,9 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       const attachment: MenuEntry[] =
         media && link !== ''
           ? [
-              // MEDIA-02, D-87: a picture's menu; Open in viewer is the picture's own click.
+              // MEDIA-02, D-87: a picture's menu (D-91: Open in viewer as its click does).
               ...(picture
-                ? imageMenuItems(link, () => picture.click())
+                ? imageMenuItems(link, () => openInViewer(view, picture))
                 : fileMenuItems(link, media)),
               ...(isLinkedFile(link)
                 ? [

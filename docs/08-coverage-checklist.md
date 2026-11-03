@@ -555,3 +555,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Today's composer adds pinned tasks to Inbox (or `##list`) | TODAY-01 · Done (0.4.24) | 02, D-90 |
 | 5 | Rollover prompt on the first open of a new day: Clear, Roll over, × | TODAY-02 · Done (0.4.24; off in Settings M8) | 02, 06 Q-04, D-90 |
 | 6 | Today's reminder cards | TODAY-03 · Done (0.4.24, first part; overdue and the section with M6) | 02, D-90 |
+
+## AA. Fixes after 0.4.23 and 0.4.24 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A reminder's Open: the task's list, scrolled into view, selected, flashed | REM-05 · Done (0.4.25) | 02, D-91 |
+| 2 | Scroll position kept per list, note and page for the session, restored at once | NAV-04 · Done (0.4.25) | 02, D-91 |
+| 3 | CRLF code pastes into a note; a paste always lands; one-line code recognised; the sample as a fixture | CAP-06 · Done (0.4.25) | 02, D-91 |
+| 4 | Open in viewer from a picture's menu in an editor | MEDIA-02 · Done (0.4.25) | 02, D-91 |
+| 5 | Whole-line selection not inset when a note starts with a code card | NOTE-01 · Done (0.4.25) | D-91 |
+| 6 | The note's find bar placed as the list's, fading out | NAV-06 · Done (0.4.25) | 02, D-91 |
+| 7 | The task menu in groups (Add ▸, More ▸, Reminder ▸) | UI-08 · Done (0.4.25) | 02, 03 §4, D-91 |
