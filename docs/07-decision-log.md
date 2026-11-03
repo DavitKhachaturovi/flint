@@ -701,3 +701,12 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   11. A list's or note's right-click menu has **Move to top**, only under the Manual sort; under another sort it is disabled with the usual "Switch to Manual" hint.
 - **Builds (grill answer):** 0.4.21 with these fixes, then M4 step 9 as 0.4.22.
 - The Trash screen (restoring deleted tasks, lists and notes, 30-day expiry) stays as planned for M7.
+- **Built (0.4.21), what was found (Proposed details):**
+  - **Lost notes:** the panel's notes were saved only when the editor was left; a click elsewhere made the panel move on first, and the editor went without being left. All notes editors (the panel, inline bodies, a task's page) now save 600 ms after typing stops, when left, and when they go. A task's page uses the same always-open editor as the panel and notes.
+  - **Choreography:** the column and the panel (or, hiding, a copy of it) are animated together from the same distance with the same curve (`--fl-dur-page`); the end-to-end test samples every frame and checks the gap never closes.
+  - **Cut-off code cards:** a code card's 1 px ring lay outside it and the body's clipping cut it when the body started with code; cards of a task and its subtask, both open, now keep 6 px apart.
+  - **Code blocks in the editor:** a closed fence without a language is only the card's top edge; its copy button keeps room on the first line.
+  - **Selection kept in view:** a selection made with ↑/↓ or from a panel link scrolls into view; a click or a right-click never moves the list (the menu would move with it).
+  - **The composer's ## menu** was never built in the main window (only its chips); it now has the popup's menu and card, written for the composer. Matching (both places): after `##`, the longest run of two to eight words that spells an existing list's or note's name wins.
+  - **Copy image** uses Electron 45's clipboard (`ClipboardItem` with a PNG). **Move to top** moves to the top of the list's group, or of the lists outside groups.
+  - **A task page's paste:** handled outside text fields only; plain text waits for TASK-09.

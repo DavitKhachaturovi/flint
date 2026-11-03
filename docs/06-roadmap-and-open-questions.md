@@ -1,12 +1,12 @@
 # 06 — Roadmap & Open Questions
 
-## 0. Handoff (3 Nov 2026, 0.4.20: the context panel after 0.4.19)
+## 0. Handoff (3 Nov 2026, 0.4.21: fixes after 0.4.20)
 
 A fresh session can continue from this section, CLAUDE.md and the documents it points to.
 
-**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.20** (the context panel after Davit's 0.4.19 feedback, right-click like Explorer: D-86); before it **0.4.19** (the context panel after 0.4.18, pins replacing starring, a task converting to a note: D-85; before it 0.4.18, the context panel, and 0.4.17, the M5 editor complete) (`docs/release-notes.md` lists what each build changed). Tests: 468 unit (Vitest, including the parsed-structure tests of D-80), 23 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
+**Status.** M1 to M3 were built on `m1-core`, `m2-shell` and `m3-capture` (each branch continues the one before; §2 has what each milestone covers); M4 (task lists) is built up to **step 8** on `m4-lists`, pushed to Azure DevOps and not merged into `main` (no PR open; ask Davit before opening one or marking one ready). The latest installer is **0.4.21** (fixes after 0.4.20: notes never lost, the panel's choreography, subtasks in the panel, the composer's ## menu, picture menus: D-87); before it **0.4.20** (the context panel after Davit's 0.4.19 feedback, right-click like Explorer: D-86); before it **0.4.19** (the context panel after 0.4.18, pins replacing starring, a task converting to a note: D-85; before it 0.4.18, the context panel, and 0.4.17, the M5 editor complete) (`docs/release-notes.md` lists what each build changed). Tests: 470 unit (Vitest, including the parsed-structure tests of D-80), 23 end-to-end (Playwright, `apps/desktop/e2e/smoke.spec.ts`).
 
-**In flight.** Nothing half-built. 0.4.20 has D-86 for Davit to test; next is M4 step 9. The Clipboard section (NAV-08) waits for late v1 (with M8).
+**In flight.** 0.4.21 has D-87 for Davit to test; M4 step 9 is next, as 0.4.22 (D-87). The Clipboard section (NAV-08) waits for late v1 (with M8).
 
 **Accepted by Davit (D-80, D-81):** 0.4.15 except the group look (reverted to 0.4.14's with an expanded card and a white drop ring, D-81); the lightbox on the solid ground, Alt+↑/↓ by keyboard focus, and the drag rules (with a clearly visible drop target). The open questions in §4 keep their proposed defaults.
 

@@ -2,6 +2,20 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.21 (3 Nov 2026)
+
+- **Notes are never lost**: in the panel, under a task in the list, and on a task's page, notes are saved as you type, also when you click somewhere else right away.
+- **Showing and hiding the panel** moves your tasks and the panel together, without them overlapping.
+- **Subtasks in the panel** show their priority, reminder and pin, and right-click gives the same menu as in the list. Adding a subtask uses Flint's own editing field.
+- **Notes in the panel** keep their spacing after a code block and line up with the rest of the panel; code blocks no longer start with an empty line.
+- **A task's page**: its notes look and work like a note's text (no inner card), and pasting code, JSON or a stack trace adds it as a code block to the selected subtask's notes (or the task's own).
+- Code in notes under a task is no longer cut off at the top, and an open task and its open subtask no longer overlap.
+- **↑/↓ keep the selected task in view**, scrolling the list along.
+- **Moves that can't happen** (indenting the first task, Alt+↑ on the top one…) give the task a small nudge.
+- **The "Add a task" box** has the `##` list menu and the close-match card again, like the quick capture. `##new list 2` now always finds "new list 2", here and in the quick capture.
+- **Right-click a picture** (in notes, under tasks, in the "Add a task" box or in the image viewer): Copy image, Open in viewer, Open in default app, Show in folder.
+- **Move to top** for a list or note in the sidebar (with the Manual sort).
+
 ## 0.4.20 (3 Nov 2026)
 
 - **The panel slides in and out** when you show or hide it (Ctrl+\ or the panel button), and your tasks glide to their new place.
