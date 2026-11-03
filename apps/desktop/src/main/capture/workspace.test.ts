@@ -782,3 +782,23 @@ describe('pins, captures and a task as a note (TODAY-01, TASK-17, D-85)', () => 
     expect(await work()).not.toContain('Fix the resolver');
   });
 });
+
+describe('auto-archive (TASK-06, Q-13, D-88)', () => {
+  it('moves tasks completed before the cutoff, with their subtasks, to .flint/archive', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Open [id:: aaaa]\n- [x] Old [completion:: 2026-10-01T09:00] [id:: bbbb]\n    - [x] Old sub [id:: bbb2]\n- [x] Recent [completion:: 2026-10-28T09:00] [id:: cccc]\n',
+    );
+    const workspace = await open();
+    expect(await workspace.archiveDone(now, 14)).toBe(1);
+    const work = await readFile(join(folder, 'Work.md'), 'utf8');
+    expect(work).not.toContain('Old');
+    expect(work).toContain('Recent');
+    const archived = await readFile(join(folder, '.flint', 'archive', 'wrk1.md'), 'utf8');
+    expect(archived).toMatch(
+      /- \[x\] Old \[completion:: 2026-10-01T09:00\] \[id:: bbbb\]\n {4}- \[x\] Old sub/,
+    );
+    // Nothing left to archive the second time.
+    expect(await workspace.archiveDone(now, 14)).toBe(0);
+  });
+});

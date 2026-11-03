@@ -31,7 +31,7 @@ import {
   mediaElement,
   openAttachment,
 } from '../media/media.js';
-import { activeLinkPatterns, findShortForms, shortFormOf } from '../../shared/link-patterns.js';
+import { activeLinkPatterns, findShortForms, linkTitle } from '../../shared/link-patterns.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
   EDITOR_COMMANDS,
@@ -497,8 +497,10 @@ function decorate(view: EditorView): DecorationSet {
             const parent = node.node.parent?.name;
             if (parent === 'Link' || parent === 'Image') return;
             const href = doc.sliceString(node.from, node.to);
-            // D-84 (TASK-10): a URL one of the link patterns knows shows as its short form.
-            const short = isActive(node.from) ? null : shortFormOf(href, activeLinkPatterns());
+            // TASK-10 (D-84, D-88): a bare URL shows its smart title (a link pattern's short form,
+            // a built-in one, or its domain and path); the line being typed shows the URL.
+            const title = linkTitle(href, activeLinkPatterns());
+            const short = isActive(node.from) || title === href ? null : title;
             ranges.push(
               short
                 ? Decoration.replace({ widget: new ShortLinkWidget(short, href) }).range(

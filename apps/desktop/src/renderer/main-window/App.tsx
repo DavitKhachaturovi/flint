@@ -13,6 +13,7 @@ import {
 import {
   blockFor,
   classifyPaste,
+  escapeInert,
   fencedBlock,
   listToken,
   listTokenAt,
@@ -35,6 +36,7 @@ import type {
   ListActionOutcome,
   ListChange,
   ListSummary,
+  ListItem,
   ListView,
   UpNextItem,
   SidebarAction,
@@ -77,6 +79,7 @@ import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
+import { ListFind } from './ListFind.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -151,6 +154,8 @@ interface Toast {
   readonly text: string;
   readonly undo: boolean;
   readonly id: number;
+  /** TASK-09, D-88: another way out ("Keep as one"), next to Undo. */
+  readonly action?: { readonly label: string; readonly run: () => void };
   /** D-77: playing its way out. */
   readonly leaving?: boolean;
 }
@@ -186,6 +191,14 @@ const NOTHING: ReadonlySet<string> = new Set();
 
 /** `1 task`, `3 tasks`. */
 const tasksCount = (count: number): string => (count === 1 ? '1 task' : `${count} tasks`);
+
+/** TASK-06, Q-13: auto-archive's days when turned on from the offer, and when it is offered. */
+const ARCHIVE_DAYS = 14;
+const ARCHIVE_OFFER_AT = 50;
+const ARCHIVE_DISMISSED = 'flint.archive.dismissed';
+
+/** NAV-04, D-88: how far a two-finger swipe goes (in wheel pixels) before it steps. */
+const SWIPE_DISTANCE = 240;
 
 /** The new row's key for the editing highlight (D-76): it has no task yet. */
 const NEW_ROW = 'new-row';
@@ -314,6 +327,11 @@ function pageFactTargets(root: HTMLElement, kind: FactKind): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(selector)];
 }
 
+/** D-45, D-88: pasted text as typed text whose `!`, `##` and `@` stay text (inert). */
+function pastedText(text: string): string {
+  return escapeInert(text, [{ start: 0, end: text.length }]).text;
+}
+
 /** D-87: a move that can't happen (the first task's indent, say): the row nudges that way. */
 function nudge(key: string, direction: 'left' | 'right' | 'up' | 'down'): void {
   if (reducedMotion()) return;
@@ -384,6 +402,42 @@ function findRow(view: ListView, key: string): TaskRow | null {
 const hasBody = (task: TaskRow): boolean => task.body.trim() !== '';
 
 /** The rows the keyboard moves through, top to bottom (Navigate state, docs/03 §2). */
+/** TASK-08, D-72, D-88: a temporary sort of a list's open tasks; the file's order stays. */
+type TempSort = 'priority' | 'reminder' | 'added';
+
+const SORT_NAMES: Readonly<Record<TempSort, string>> = {
+  priority: 'priority',
+  reminder: 'reminder time',
+  added: 'date added',
+};
+
+/**
+ * TASK-08 (D-72, D-88, Proposed): the open tasks in the temporary order, subtasks under their
+ * parents, headings and other text left out while sorted. Priority: high first, none last;
+ * reminder time: soonest first, without one last; date added: newest first, file order where it is
+ * unknown. Ties keep the file's order (a stable sort).
+ */
+function sortedItems(items: readonly ListItem[], sort: TempSort): ListItem[] {
+  const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const time = (stamp: string | null | undefined): number =>
+    stamp ? Date.parse(stamp) || Infinity : Infinity;
+  const key = (task: TaskRow): number =>
+    sort === 'priority'
+      ? (rank[task.priority ?? ''] ?? 3)
+      : sort === 'reminder'
+        ? time(task.reminderAt)
+        : task.createdAt
+          ? -time(task.createdAt)
+          : Infinity;
+  return items
+    .filter((item): item is Extract<ListItem, { kind: 'task' }> => item.kind === 'task')
+    .sort((a, b) => {
+      const x = key(a.task);
+      const y = key(b.task);
+      return x < y ? -1 : x > y ? 1 : 0;
+    });
+}
+
 function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
   if (!view) return [];
   const rows: TaskRow[] = [];
@@ -796,9 +850,9 @@ export function App(): ReactElement {
     );
   }, []);
   const showToast = useCallback(
-    (text: string, undo: boolean): void => {
+    (text: string, undo: boolean, action?: Toast['action']): void => {
       window.clearTimeout(toastTimer.current);
-      setToast({ text, undo, id: Date.now() });
+      setToast({ text, undo, id: Date.now(), ...(action && { action }) });
       toastTimer.current = window.setTimeout(hideToast, TOAST_MS);
     },
     [hideToast],
@@ -826,7 +880,107 @@ export function App(): ReactElement {
     [listId],
   );
 
-  const rows = useMemo(() => visibleRows(view, completedOpen), [view, completedOpen]);
+  /**
+   * TASK-06 (Q-13, D-88, Proposed): auto-archive is off until turned on; a Completed section of 50
+   * or more offers it (14 days), once per list ("Not now" is remembered on this machine).
+   */
+  const [archiveDays, setArchiveDays] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    void window.flintMain.autoArchive().then(setArchiveDays);
+  }, []);
+  const [archiveDismissed, setArchiveDismissed] = useState<ReadonlySet<string>>(() => {
+    try {
+      const stored: unknown = JSON.parse(window.localStorage.getItem(ARCHIVE_DISMISSED) ?? '[]');
+      return new Set(Array.isArray(stored) ? stored.filter((id) => typeof id === 'string') : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const dismissArchive = (id: string): void => {
+    const next = new Set([...archiveDismissed, id]);
+    setArchiveDismissed(next);
+    try {
+      window.localStorage.setItem(ARCHIVE_DISMISSED, JSON.stringify([...next]));
+    } catch {
+      // Not remembered; the offer goes for now.
+    }
+  };
+  const archiveOffer =
+    archiveDays === null &&
+    view?.mode === 'tasks' &&
+    !view.readOnly &&
+    view.completed.length >= ARCHIVE_OFFER_AT &&
+    !archiveDismissed.has(view.id);
+
+  /**
+   * NAV-04 (D-79, D-88): a two-finger horizontal swipe on a precision touchpad goes back or
+   * forward, as in the browser: the horizontal scroll adds up (never over something that scrolls
+   * sideways itself), an arrow grows at the window's edge, and past the threshold the step happens.
+   */
+  const [swipe, setSwipe] = useState<{ back: boolean; progress: number } | null>(null);
+  useEffect(() => {
+    let total = 0;
+    let done = false;
+    let timer = 0;
+    const reset = (): void => {
+      total = 0;
+      done = false;
+      setSwipe(null);
+    };
+    const sideways = (target: EventTarget | null): boolean => {
+      if (!(target instanceof Element)) return false;
+      for (let at: Element | null = target; at && at !== document.body; at = at.parentElement) {
+        if (at.scrollWidth <= at.clientWidth + 1) continue;
+        const overflow = getComputedStyle(at).overflowX;
+        if (overflow === 'auto' || overflow === 'scroll') return true;
+      }
+      return false;
+    };
+    const onWheel = (event: WheelEvent): void => {
+      if (event.ctrlKey || Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 1.5) return;
+      if (sideways(event.target) || document.querySelector('.lightbox')) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(reset, 220);
+      if (done) return;
+      total += event.deltaX;
+      const back = total < 0;
+      const trail = history.current;
+      if (!trail.places[trail.at + (back ? -1 : 1)]) {
+        setSwipe(null);
+        return;
+      }
+      const progress = Math.min(1, Math.abs(total) / SWIPE_DISTANCE);
+      if (progress < 1) {
+        setSwipe({ back, progress });
+        return;
+      }
+      done = true;
+      setSwipe(null);
+      travel(back ? -1 : 1);
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.clearTimeout(timer);
+    };
+  }, [travel]);
+
+  /** NAV-06, D-88: the list's find bar: 0 closed; a new number focuses it again (Ctrl+F). */
+  const [finding, setFinding] = useState(0);
+  useEffect(() => setFinding(0), [listId]);
+  /** TASK-08, D-88: a temporary sort of the open list (a view; the file's order stays). */
+  const [tempSort, setTempSort] = useState<TempSort | null>(null);
+  /** A sort chosen from another list's menu, applied once that list is open. */
+  const pendingSort = useRef<TempSort | null>(null);
+  useEffect(() => {
+    setTempSort(pendingSort.current);
+    pendingSort.current = null;
+  }, [listId]);
+  const shownView = useMemo(
+    () => (view && tempSort ? { ...view, items: sortedItems(view.items, tempSort) } : view),
+    [view, tempSort],
+  );
+  const rows = useMemo(() => visibleRows(shownView, completedOpen), [shownView, completedOpen]);
 
   // A row that went away hands the selection to the row now in its place; a task just added isn't
   // in the rows until the next refresh, so it is waited for.
@@ -1613,6 +1767,26 @@ export function App(): ReactElement {
       }
       setMarkedLists(NOTHING);
       const other = list.mode === 'note' ? 'tasks' : 'note';
+      // TASK-08, D-88: the list's temporary sorts (it opens first when it isn't open).
+      const sorting: MenuEntry[] =
+        list.mode === 'tasks'
+          ? [
+              {
+                label: 'Sort tasks by',
+                submenu: (['priority', 'reminder', 'added'] as const).map((sort) => ({
+                  label: SORT_NAMES[sort][0]?.toUpperCase() + SORT_NAMES[sort].slice(1),
+                  checked: list.id === listId && tempSort === sort,
+                  action: () => {
+                    if (list.id === listId) setTempSort(sort);
+                    else {
+                      pendingSort.current = sort;
+                      openList(list.id);
+                    }
+                  },
+                })),
+              },
+            ]
+          : [];
       // LIST-05: into a group, or out of one.
       const groups = (sidebarView?.items ?? []).filter(
         (item): item is SidebarGroup => item.kind === 'group',
@@ -1691,6 +1865,7 @@ export function App(): ReactElement {
                 }),
           },
           'divider',
+          ...sorting,
           ...grouping,
           'divider',
           {
@@ -1717,6 +1892,7 @@ export function App(): ReactElement {
       reorderable,
       setNaming,
       go,
+      tempSort,
     ],
   );
 
@@ -1802,6 +1978,19 @@ export function App(): ReactElement {
       }
       // Typing in a text field or the note editor (contenteditable) is never a command.
       if (isTextField(event.target)) return;
+      // NAV-06, D-88: Ctrl+F in a task list opens its find bar.
+      if (
+        key === 'f' &&
+        event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        view?.mode === 'tasks' &&
+        !page
+      ) {
+        event.preventDefault();
+        setFinding((count) => count + 1);
+        return;
+      }
       // NAV-06, D-84: Ctrl+F on a note's page finds in the note (the editor has it when focused).
       if (
         key === 'f' &&
@@ -1887,7 +2076,12 @@ export function App(): ReactElement {
       }
       if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !event.shiftKey) {
         event.preventDefault();
-        // Alt+↑/↓ reorders (TASK-02); single keys never reach Windows.
+        // Alt+↑/↓ reorders (TASK-02); single keys never reach Windows. TASK-08, D-88: while
+        // sorted, reordering returns to the manual order first.
+        if (tempSort) {
+          setTempSort(null);
+          return;
+        }
         if (open)
           void change({
             kind: 'move',
@@ -1968,6 +2162,7 @@ export function App(): ReactElement {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [
+    tempSort,
     wide,
     togglePanel,
     sidebarFocus,
@@ -2064,6 +2259,8 @@ export function App(): ReactElement {
    */
   const startRowDrag = (event: React.MouseEvent, card: HTMLElement | null): void => {
     if (event.button !== 0 || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // TASK-08, D-88: reordering happens in the manual order; while sorted, nothing drags.
+    if (tempSort) return;
     if (!card || !view || view.readOnly !== null || editing || editingBody) return;
     const target = event.target as HTMLElement;
     if (target.closest('button, a, input, textarea, .body-block')) return;
@@ -2449,7 +2646,7 @@ export function App(): ReactElement {
       );
     };
     cardRows.push(...ghostRows(ghosts, 'open', null, rowProps));
-    view.items.forEach((item, index) => {
+    (shownView ?? view).items.forEach((item, index) => {
       if (item.kind === 'heading')
         cardRows.push(
           <h2 key={`heading-${index}`} className="read-heading">
@@ -2581,6 +2778,76 @@ export function App(): ReactElement {
     row.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
   }, [selected]);
 
+  /**
+   * TASK-09 (D-88, Proposed): text pasted into a task list (not into a field): each non-empty line
+   * becomes a task, below the selected task or at the top, as one undo step, with "Keep as one" in
+   * the toast (one task: the first line its title, the rest its notes). Code, JSON or a stack trace
+   * (CAP-06) is one untitled task with it as a code block (D-45). List markers and checkboxes at the
+   * start of a line go.
+   */
+  useEffect(() => {
+    if (view?.mode !== 'tasks' || page || view.readOnly) return;
+    const onPaste = (event: ClipboardEvent): void => {
+      if (isTextField(event.target) || !event.clipboardData) return;
+      const text = event.clipboardData.getData('text/plain');
+      if (text.trim() === '') return;
+      event.preventDefault();
+      const after = rows.find((row) => row.key === selected && !row.done)?.key;
+      const kind = classifyPaste(text);
+      if (kind !== 'text') {
+        void change({
+          kind: 'add',
+          text: `\n${fencedBlock(blockFor(text).text, kind === 'json' ? 'json' : '')}`,
+          where: after ? { after } : 'top',
+        }).then((outcome) => {
+          if (!outcome) return;
+          showToast(outcome.label, true);
+          if (outcome.key) setSelected(outcome.key);
+        });
+        return;
+      }
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^\s*(?:[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').trim())
+        .filter((line) => line !== '');
+      void (async () => {
+        const ids = await Promise.all(lines.map(() => window.flintMain.reserveId()));
+        if (ids.some((id) => id === null)) return;
+        const keys = ids as string[];
+        // Each pasted line is typed text: escaped, so its `!`, `##` and `@` stay text (D-45).
+        const changes: ListChange[] = lines.map((line, index) => ({
+          kind: 'add',
+          text: pastedText(line),
+          where: index === 0 ? (after ? { after } : 'top') : { after: keys[index - 1] ?? '' },
+          id: keys[index] ?? '',
+        }));
+        const label = lines.length === 1 ? 'Added' : `Added ${tasksCount(lines.length)}`;
+        const outcome = await change({ kind: 'many', label, changes });
+        if (!outcome) return;
+        setSelected(keys.at(-1) ?? null);
+        if (lines.length === 1) {
+          showToast(outcome.label, true);
+          return;
+        }
+        showToast(outcome.label, true, {
+          label: 'Keep as one',
+          run: () =>
+            void undo().then(() =>
+              change({
+                kind: 'add',
+                text: `${pastedText(lines[0] ?? '')}\n${lines.slice(1).join('\n')}`,
+                where: after ? { after } : 'top',
+              }).then((one) => {
+                if (one?.key) setSelected(one.key);
+              }),
+            ),
+        });
+      })();
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [view?.mode, view?.readOnly, page, rows, selected, change, showToast, undo]);
+
   /** D-86: a subtask added in the panel: below the last subtask, or as the first one. */
   const addSubtaskIn = async (task: TaskRow, text: string): Promise<void> => {
     if (text.trim() === '') return;
@@ -2642,6 +2909,21 @@ export function App(): ReactElement {
         ]
       : [];
   const panelMenu = (at: Point): void => openMenu(panelItem(), at);
+  /** TASK-08, D-88: the open task list's temporary sorts (the page's menu, the list's menu). */
+  const sortItems = (): MenuEntry[] =>
+    view?.mode === 'tasks' && !pageTask
+      ? [
+          {
+            label: 'Sort tasks by',
+            submenu: (['priority', 'reminder', 'added'] as const).map((sort) => ({
+              label: SORT_NAMES[sort][0]?.toUpperCase() + SORT_NAMES[sort].slice(1),
+              checked: tempSort === sort,
+              action: () => setTempSort(sort),
+            })),
+          },
+          ...(tempSort ? [{ label: 'Back to manual order', action: () => setTempSort(null) }] : []),
+        ]
+      : [];
 
   // NAV-07, D-83: what the context panel shows.
   const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
@@ -2956,7 +3238,13 @@ export function App(): ReactElement {
           }}
           onContextMenu={(event) => {
             if (event.defaultPrevented || (event.target as Element).closest(BLANK_EXCEPT)) return;
-            const items = panelItem();
+            const sorts = sortItems();
+            const panel = panelItem();
+            const items: MenuEntry[] = [
+              ...sorts,
+              ...(sorts.length > 0 && panel.length > 0 ? ['divider' as const] : []),
+              ...panel,
+            ];
             if (items.length === 0) return;
             event.preventDefault();
             openMenu(items, { x: event.clientX, y: event.clientY });
@@ -3053,6 +3341,31 @@ export function App(): ReactElement {
 
               {view?.mode === 'tasks' && !pageTask && (
                 <>
+                  {finding > 0 && (
+                    <ListFind
+                      key={finding}
+                      rows={visibleRows(shownView, true)}
+                      root={scroller.current}
+                      version={[view, expanded, completedOpen, tempSort]}
+                      onJump={(match) => {
+                        // A match in a folded place opens it (Completed, a body under its row).
+                        if (
+                          view.completed.some(
+                            (task) =>
+                              task.key === match.row.key ||
+                              task.subtasks.some((sub) => sub.key === match.row.key),
+                          )
+                        )
+                          setCompletedOpen(true);
+                        if (match.where === 'body' && !panelShownRef.current)
+                          setExpanded((current) => new Set([...current, match.row.key]));
+                        followSelection.current = true;
+                        setMarked(NOTHING);
+                        setSelected(match.row.key);
+                      }}
+                      onClose={() => setFinding(0)}
+                    />
+                  )}
                   {!view.readOnly && (
                     <Composer
                       key={view.id}
@@ -3063,6 +3376,16 @@ export function App(): ReactElement {
                     />
                   )}
 
+                  {/* TASK-08, D-88: while sorted, what the order is and the way back. */}
+                  {tempSort && (
+                    <div className="sort-indicator" role="status">
+                      <span>Sorted by {SORT_NAMES[tempSort]}</span>
+                      <span aria-hidden="true">·</span>
+                      <button type="button" onClick={() => setTempSort(null)}>
+                        Back to manual order
+                      </button>
+                    </div>
+                  )}
                   <section
                     className="card tasks"
                     aria-label="Tasks"
@@ -3105,6 +3428,34 @@ export function App(): ReactElement {
                         <span>Completed</span>
                         <span className="chip">{view.completed.length}</span>
                       </button>
+                      {/* TASK-06, Q-13, D-88: a large Completed section offers auto-archive. */}
+                      {archiveOffer && (
+                        <div className="archive-offer" role="note">
+                          <span>
+                            Archive tasks completed more than {ARCHIVE_DAYS} days ago,
+                            automatically?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void window.flintMain.setAutoArchive(ARCHIVE_DAYS).then((count) => {
+                                setArchiveDays(ARCHIVE_DAYS);
+                                showToast(
+                                  count > 0
+                                    ? `Auto-archive on · archived ${tasksCount(count)}`
+                                    : 'Auto-archive on',
+                                  false,
+                                );
+                              })
+                            }
+                          >
+                            Turn on
+                          </button>
+                          <button type="button" onClick={() => dismissArchive(view.id)}>
+                            Not now
+                          </button>
+                        </div>
+                      )}
                       {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
                       <div
                         className={completedOpen ? 'completed-rows open' : 'completed-rows'}
@@ -3239,6 +3590,17 @@ export function App(): ReactElement {
         </div>
       )}
 
+      {/* NAV-04, D-79, D-88: the swipe's arrow at the window's edge, growing with the swipe. */}
+      {swipe && (
+        <div
+          className={swipe.back ? 'swipe-arrow back' : 'swipe-arrow forward'}
+          style={{ '--swipe': swipe.progress } as CSSProperties}
+          aria-hidden="true"
+        >
+          <ChevronIcon size={18} />
+        </div>
+      )}
+
       {zoomShown && (
         <div className="zoom-pill" role="status" key={zoomShown.id}>
           {zoomShown.text}
@@ -3262,6 +3624,17 @@ export function App(): ReactElement {
           key={toast.id}
         >
           <span>{toast.text}</span>
+          {toast.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.action?.run();
+                hideToast();
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
           {toast.undo && (
             <button type="button" onClick={() => void undo().then(hideToast)}>
               Undo

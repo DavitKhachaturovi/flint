@@ -13,7 +13,8 @@ describe('inline markdown in titles (LIST-02, D-52)', () => {
       'see <a href="https://dev.azure.com/x/pr/42">the PR</a>',
     );
     expect(titleHtml('docs at https://example.com/a')).toBe(
-      'docs at <a href="https://example.com/a">https://example.com/a</a>',
+      // TASK-10 (D-88): a pasted URL shows its smart title; the URL is its tooltip.
+      'docs at <a href="https://example.com/a" title="https://example.com/a">example.com/a</a>',
     );
   });
 

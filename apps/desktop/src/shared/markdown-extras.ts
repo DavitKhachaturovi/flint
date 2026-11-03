@@ -1,5 +1,5 @@
 import type { MarkdownIt, StateInline, Token } from 'markdown-it';
-import { activeLinkPatterns, findShortForms, shortFormOf } from './link-patterns.js';
+import { activeLinkPatterns, findShortForms, linkTitle } from './link-patterns.js';
 
 /**
  * Flint's additions to markdown in task titles and bodies (M5, D-84), the same as in the note
@@ -11,7 +11,6 @@ export function flintMarkdown(md: MarkdownIt): void {
   md.inline.ruler.before('emphasis', 'flint_mark', highlightRule);
   md.core.ruler.after('linkify', 'flint_link_patterns', (state) => {
     const patterns = activeLinkPatterns();
-    if (patterns.length === 0) return;
     for (const block of state.tokens) {
       if (block.type !== 'inline' || !block.children) continue;
       const out: Token[] = [];
@@ -22,11 +21,17 @@ export function flintMarkdown(md: MarkdownIt): void {
         if (!token) continue;
         if (token.type === 'link_open') {
           inLink++;
-          // A link whose text is its URL (a pasted URL) shows the short form (TASK-10).
+          // TASK-10 (D-88): a link whose text is its URL (a pasted URL) shows its smart title,
+          // with the full URL as its tooltip.
           const href = String(token.attrGet('href') ?? '');
           const text = children[at + 1];
-          const short = shortFormOf(href, patterns);
-          if (short && text?.type === 'text' && text.content === href) text.content = short;
+          if (
+            text?.type === 'text' &&
+            (text.content === href || `http://${text.content}` === href)
+          ) {
+            text.content = linkTitle(href, patterns);
+            token.attrSet('title', href);
+          }
         }
         if (token.type === 'link_close') inLink--;
         if (token.type !== 'text' || inLink > 0) {

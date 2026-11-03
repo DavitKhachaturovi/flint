@@ -25,6 +25,11 @@ export interface Settings {
   readonly hideNotificationText: boolean;
   /** NOTE-07, TASK-10, D-84: the user's link patterns (edited in M8's Settings). */
   readonly linkPatterns: readonly LinkPattern[];
+  /**
+   * TASK-06, Q-13, D-88: completed tasks older than this many days move to `.flint/archive/`; null
+   * is off (the default; Flint offers it when a Completed section grows large).
+   */
+  readonly autoArchiveDays: number | null;
 }
 
 /** Development builds default to their own folder, so they never write into the real one. */
@@ -38,6 +43,7 @@ export function defaultSettings(development = false): Settings {
     sound: true,
     hideNotificationText: false,
     linkPatterns: [],
+    autoArchiveDays: null,
   };
 }
 
@@ -55,6 +61,8 @@ function pick<T>(
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+const isDays = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 365;
 
 export function readSettings(stored: Stored, development = false): Settings {
   const defaults = defaultSettings(development);
@@ -77,6 +85,7 @@ export function readSettings(stored: Stored, development = false): Settings {
       defaults.hideNotificationText,
     ),
     linkPatterns: readLinkPatterns(stored['linkPatterns']),
+    autoArchiveDays: isDays(stored['autoArchiveDays']) ? stored['autoArchiveDays'] : null,
   };
 }
 

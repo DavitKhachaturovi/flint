@@ -3304,3 +3304,113 @@ a.auto-link {
   font-size: var(--fl-size-label);
   color: var(--fl-text-secondary);
 }
+
+/* TASK-08, D-88: the temporary sort's line above the tasks. */
+.sort-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 4px -4px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.sort-indicator button {
+  color: var(--fl-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sort-indicator button:hover {
+  color: var(--fl-text-primary);
+}
+
+/* TASK-10, D-88: a long link never wraps a row; it ends in an ellipsis. */
+.row .title a {
+  display: inline-block;
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* NAV-06, D-88: the task list's find bar, floating at the top right of the list as it scrolls. */
+.list-find {
+  position: sticky;
+  top: 8px;
+  z-index: 6;
+  margin: 0 0 -46px auto;
+}
+
+.list-find .fl-find-button.up svg {
+  transform: rotate(-90deg);
+}
+
+.list-find .fl-find-button.down svg {
+  transform: rotate(90deg);
+}
+
+::highlight(flint-find) {
+  background-color: color-mix(in srgb, var(--fl-accent) 22%, transparent);
+}
+
+::highlight(flint-find-current) {
+  background-color: var(--fl-selection);
+  color: var(--fl-selection-text);
+}
+
+/* TASK-06, D-88: auto-archive's offer under a large Completed section. */
+.archive-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 2px 12px 8px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.archive-offer button {
+  color: var(--fl-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.archive-offer button:hover {
+  color: var(--fl-text-primary);
+}
+
+/* NAV-04, D-79, D-88: the swipe's arrow, growing at the edge it comes from. */
+.swipe-arrow {
+  position: fixed;
+  top: 50%;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  color: var(--fl-text-primary);
+  opacity: var(--swipe);
+  pointer-events: none;
+}
+
+.swipe-arrow.back {
+  left: 12px;
+  transform: translate(calc((var(--swipe) - 1) * 32px), -50%) scale(calc(0.6 + var(--swipe) * 0.4));
+}
+
+.swipe-arrow.back svg {
+  transform: rotate(180deg);
+}
+
+.swipe-arrow.forward {
+  right: 12px;
+  transform: translate(calc((1 - var(--swipe)) * 32px), -50%) scale(calc(0.6 + var(--swipe) * 0.4));
+}

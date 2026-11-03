@@ -81,6 +81,14 @@ const main = {
   imageAction(source: string, action: 'copy' | 'show' | 'open'): Promise<boolean> {
     return ipcRenderer.invoke(Channels.mainImageAction, source, action) as Promise<boolean>;
   },
+  /** TASK-06, D-88: the days after which completed tasks are archived; null when it is off. */
+  autoArchive(): Promise<number | null> {
+    return ipcRenderer.invoke(Channels.mainAutoArchive) as Promise<number | null>;
+  },
+  /** TASK-06, D-88: turns auto-archive on (and archives now) or off; how many were archived. */
+  setAutoArchive(days: number | null): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainSetAutoArchive, days) as Promise<number>;
+  },
   /** NAV-07, D-83: the context panel's "Up next" (reminders). */
   upNext(): Promise<readonly UpNextItem[]> {
     return ipcRenderer.invoke(Channels.mainUpNext) as Promise<readonly UpNextItem[]>;

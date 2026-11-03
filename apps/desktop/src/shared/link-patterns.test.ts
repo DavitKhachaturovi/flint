@@ -3,6 +3,7 @@ import {
   compileLinkPatterns,
   findShortForms,
   inferLinkPattern,
+  linkTitle,
   patternFromPreset,
   readLinkPatterns,
   shortFormOf,
@@ -112,7 +113,7 @@ describe('link patterns and ==highlight== in titles and bodies (D-84)', () => {
       'fix <a href="https://dev.azure.com/acme/web/_workitems/edit/1234" class="auto-link">AB#1234</a> now',
     );
     expect(titleHtml('see https://dev.azure.com/acme/web/_workitems/edit/9')).toBe(
-      'see <a href="https://dev.azure.com/acme/web/_workitems/edit/9">AB#9</a>',
+      'see <a href="https://dev.azure.com/acme/web/_workitems/edit/9" title="https://dev.azure.com/acme/web/_workitems/edit/9">AB#9</a>',
     );
     expect(titleHtml('a ==marked== word')).toBe('a <mark>marked</mark> word');
     expect(titleHtml('`AB#1` stays code')).toBe('<code>AB#1</code> stays code');
@@ -121,5 +122,32 @@ describe('link patterns and ==highlight== in titles and bodies (D-84)', () => {
     );
     setLinkPatterns([]);
     expect(titleHtml('fix AB#1234')).toBe('fix AB#1234');
+  });
+});
+
+describe('smart link titles (TASK-10, D-88)', () => {
+  const user = compileLinkPatterns([
+    { short: 'TK-{id}', url: 'https://tracker.example.com/tickets/{id}' },
+  ]);
+  it('uses the user’s pattern, then the built-in recognizers', () => {
+    expect(linkTitle('https://tracker.example.com/tickets/77', user)).toBe('TK-77');
+    expect(linkTitle('https://dev.azure.com/acme/web/_git/api/pullrequest/42', user)).toBe('PR 42');
+    expect(linkTitle('https://dev.azure.com/acme/web/_workitems/edit/1234', user)).toBe('AB#1234');
+    expect(linkTitle('https://github.com/octo/flint/issues/12', user)).toBe('flint#12');
+    expect(linkTitle('https://github.com/octo/flint/pull/9', user)).toBe('flint!9');
+    expect(linkTitle('https://acme.atlassian.net/browse/OPS-5', user)).toBe('OPS-5');
+  });
+  it('shows other addresses as the domain and a shortened path', () => {
+    expect(linkTitle('https://www.example.com/', user)).toBe('example.com');
+    expect(linkTitle('https://example.com/docs/setup?x=1#top', user)).toBe(
+      'example.com/docs/setup',
+    );
+    expect(
+      linkTitle(
+        'https://learn.example.com/en-us/windows/apps/develop/clipboard-history-guide',
+        user,
+      ),
+    ).toBe('learn.example.com/en-us/…/clipboard-his…');
+    expect(linkTitle('not a url', user)).toBe('not a url');
   });
 });

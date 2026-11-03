@@ -306,3 +306,55 @@ function lastToken(text: string, token: string): number {
   for (const match of text.matchAll(TOKEN)) if (match[0] === token) found = match.index;
   return found;
 }
+
+/**
+ * TASK-10, D-84, D-88: the presets as built-in recognizers, for smart link titles (every part of
+ * their URLs varies: they hold no company's address).
+ */
+const BUILT_IN = compileLinkPatterns(
+  LINK_PRESETS.map((preset) => ({
+    short: preset.short,
+    url: preset.url,
+    kinds: Object.fromEntries(
+      placeholders(preset.url).map((name) => [name, preset.kinds?.[name] ?? 'digits'] as const),
+    ),
+  })),
+);
+
+/** The most characters a smart link title of another address shows (TASK-10). */
+const TITLE_LIMIT = 40;
+
+/**
+ * TASK-10 (D-88): how a pasted URL shows: the user's link pattern's short form (D-84), else a
+ * built-in recognizer's (`PR 42`, `AB#1234`, `web#12`), else its domain and a shortened path
+ * (`example.com/docs/…/setup`). Only the display: the full URL stays in the file.
+ */
+export function linkTitle(url: string, compiled: readonly CompiledPattern[]): string {
+  const known = shortFormOf(url, compiled) ?? shortFormOf(url, BUILT_IN);
+  if (known) return known;
+  let parsed: URL;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    return url;
+  }
+  if (!/^https?:$/.test(parsed.protocol)) return url;
+  const host = parsed.hostname.replace(/^www\./, '');
+  const parts = parsed.pathname
+    .split('/')
+    .filter((part) => part !== '')
+    .map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
+  const whole = [host, ...parts].join('/');
+  if (whole.length <= TITLE_LIMIT) return whole;
+  const first = parts[0] ?? '';
+  const last = parts.at(-1) ?? '';
+  const room = Math.max(8, TITLE_LIMIT - host.length - first.length - 4);
+  const end = last.length > room ? `${last.slice(0, room - 1)}…` : last;
+  return parts.length <= 1 ? `${host}/${end}` : `${host}/${first}/…/${end}`;
+}

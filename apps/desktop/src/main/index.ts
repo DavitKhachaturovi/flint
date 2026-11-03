@@ -561,12 +561,31 @@ async function start(): Promise<void> {
   workspace.onChange(() => {
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
   });
-  // TODAY-01, D-85: completed pinned tasks lose their pin once their day is over.
+  // TODAY-01, D-85: completed pinned tasks lose their pin once their day is over. TASK-06, D-88:
+  // with auto-archive on, old completed tasks go to the archive at the same moments.
+  let archiveDays = settings.autoArchiveDays;
+  const archive = (): Promise<number> =>
+    archiveDays === null
+      ? Promise.resolve(0)
+      : workspace.archiveDone(new Date(), archiveDays).catch((error: unknown) => {
+          log(`archive failed: ${String(error)}`);
+          return 0;
+        });
   const unpin = (): void => {
     workspace
       .unpinDone(new Date())
       .catch((error: unknown) => log(`unpin failed: ${String(error)}`));
+    void archive();
   };
+  ipcMain.handle(Channels.mainAutoArchive, (event) => (owns(event.sender) ? archiveDays : null));
+  ipcMain.handle(Channels.mainSetAutoArchive, async (event, days: unknown) => {
+    if (!owns(event.sender)) return 0;
+    if (days !== null && (typeof days !== 'number' || !Number.isInteger(days) || days < 1))
+      return 0;
+    archiveDays = days;
+    await settingsFile.update({ autoArchiveDays: days });
+    return archive();
+  });
   let pinDay = new Date().toDateString();
   unpin();
   setInterval(() => {

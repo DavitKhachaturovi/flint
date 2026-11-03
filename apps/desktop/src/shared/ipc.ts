@@ -60,6 +60,9 @@ export const Channels = {
   mainAttachmentExists: 'main:attachment-exists',
   /** Main window → main: an attachment in its default app, by the rules of D-84. */
   mainOpenAttachment: 'main:open-attachment',
+  /** TASK-06, D-88: auto-archive's days (null: off), and turning it on or off. */
+  mainAutoArchive: 'main:auto-archive',
+  mainSetAutoArchive: 'main:set-auto-archive',
   /** MEDIA-02, D-87: a picture's menu: copy it, show it in its folder, open it in its app. */
   mainImageAction: 'main:image-action',
   /** Main window → main: the context panel's "Up next" (NAV-07, D-83). */
@@ -202,6 +205,8 @@ export interface TaskRow {
   /** NAV-07, docs/04 §3: when Flint first saw it, and last changed it (`29 Oct`, `2 h ago`). */
   readonly created?: string;
   readonly edited?: string;
+  /** TASK-08, D-88: when Flint first saw it (`YYYY-MM-DDTHH:MM`), for the sort by date added. */
+  readonly createdAt?: string;
   /** TODAY-01, D-85: pinned (the Today view in M6). */
   readonly pinned?: boolean;
 }

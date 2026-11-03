@@ -102,9 +102,14 @@ function taskRow(task: TaskNode, now: Date, stamps?: TaskStamps): TaskRow {
 function stampLabels(
   stamp: { readonly created: string; readonly lastTouched: string } | undefined,
   now: Date,
-): { created?: string; edited?: string } {
+): { created?: string; edited?: string; createdAt?: string } {
   if (!stamp) return {};
-  return { created: dayLabel(stamp.created, now), edited: agoLabel(stamp.lastTouched, now) };
+  return {
+    created: dayLabel(stamp.created, now),
+    edited: agoLabel(stamp.lastTouched, now),
+    // TASK-08, D-88: for the temporary sort by date added.
+    createdAt: stamp.created,
+  };
 }
 
 export interface ListMeta {

@@ -646,7 +646,7 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   const lowBox = await main.locator('.fl-submenu').getByText('Low').boundingBox();
   if (!priorityBox || !lowBox) throw new Error('no menu boxes');
   await main.mouse.move(priorityBox.x + 20, priorityBox.y + priorityBox.height / 2);
-  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 12 });
+  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 6 });
   await expect(main.locator('.fl-submenu .fl-menu-item.active')).toHaveText(/Low/);
   await menu.getByText('Move to…').click();
   await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
@@ -1854,6 +1854,106 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
     .toBe(780);
   await sizeTo(1120, 780);
   await expect(panel).toHaveCount(0);
+});
+
+test('M4 step 9: smart link titles, temporary sorts, find in lists, multi-line paste, swipe, the auto-archive offer (TASK-10, TASK-08, NAV-06, TASK-09, NAV-04, TASK-06, D-88)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const at = (days: number): string => {
+    const day = new Date(Date.now() - days * 86_400_000);
+    return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}T09:00`;
+  };
+  const done = Array.from(
+    { length: 50 },
+    (_, index) => `- [x] Old chore ${index + 1} [completion:: ${at(30)}] [id:: oc${index}]`,
+  ).join('\n');
+  await writeFile(
+    join(flint, 'Step nine.md'),
+    `---\nflint: 1\nid: st9\nmode: tasks\n---\n- [ ] Low one [priority:: low] [id:: s1]\n- [ ] Review https://github.com/octo/flint/pull/9 [id:: s2]\n- [ ] High one [priority:: high] [id:: s3]\n    The beta notes.\n- [ ] Medium one [priority:: medium] [id:: s4]\n\n## Completed\n${done}\n`,
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const titles = (): Promise<string[]> =>
+    main.locator('.card.tasks .row:not(.subtask) .title').allTextContents();
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await main.locator('.nav', { hasText: 'Step nine' }).click();
+  await expect(main.locator('h1')).toContainText('Step nine');
+
+  // TASK-10: a pasted URL shows its smart title; the file keeps the URL.
+  await expect(main.locator('.row', { hasText: 'Review' }).locator('.title a')).toHaveText(
+    'flint!9',
+  );
+
+  // TASK-08: a temporary sort by priority from the list's menu; the file's order stays.
+  await main.locator('.nav', { hasText: 'Step nine' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Sort tasks by' }).hover();
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Priority' }).click();
+  await expect(main.locator('.sort-indicator')).toContainText('Sorted by priority');
+  await expect.poll(titles).toEqual(['High one', 'Medium one', 'Low one', 'Review flint!9']);
+  await main.locator('.sort-indicator button').click();
+  await expect.poll(titles).toEqual(['Low one', 'Review flint!9', 'High one', 'Medium one']);
+
+  // NAV-06: Ctrl+F finds in titles and notes; Enter goes to the match and selects it.
+  await main.keyboard.press('Control+f');
+  await expect(main.locator('.list-find .fl-find-input')).toBeFocused();
+  await main.keyboard.type('beta');
+  await expect(main.locator('.list-find .fl-find-count')).toHaveText('1 match');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.list-find .fl-find-count')).toHaveText('1 of 1');
+  await expect(main.locator('.row.sel .title')).toHaveText('High one');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.list-find')).toHaveCount(0);
+  await expect(main.locator('.row.sel .title')).toHaveText('High one');
+
+  // TASK-09: several lines pasted into the list are tasks below the selection; Keep as one.
+  await app.evaluate(async ({ clipboard }) => {
+    await clipboard.writeText(
+      ['- first pasted', '- second pasted !h'].join(String.fromCharCode(10)),
+    );
+  });
+  await main.keyboard.press('Control+v');
+  await expect(main.locator('.toast')).toContainText('Added 2 tasks');
+  await expect
+    .poll(titles)
+    .toEqual([
+      'Low one',
+      'Review flint!9',
+      'High one',
+      'first pasted',
+      'second pasted !h',
+      'Medium one',
+    ]);
+  await main.locator('.toast button', { hasText: 'Keep as one' }).click();
+  await expect
+    .poll(titles)
+    .toEqual(['Low one', 'Review flint!9', 'High one', 'first pasted', 'Medium one']);
+  await expect
+    .poll(() => readFile(join(flint, 'Step nine.md'), 'utf8'))
+    .toContain('- [ ] first pasted [id:: ');
+  expect(await readFile(join(flint, 'Step nine.md'), 'utf8')).toContain('    second pasted !h\n');
+
+  // TASK-06, Q-13: 50 completed tasks offer auto-archive; Turn on archives those over 14 days.
+  await expect(main.locator('.archive-offer')).toContainText('more than 14 days ago');
+  await main.locator('.archive-offer button', { hasText: 'Turn on' }).click();
+  await expect(main.locator('.toast')).toContainText('archived 50 tasks');
+  await expect(main.locator('.card.completed')).toHaveCount(0);
+  await expect
+    .poll(() => readFile(join(flint, '.flint', 'archive', 'st9.md'), 'utf8'))
+    .toContain('Old chore 50');
+
+  // NAV-04, D-79: a two-finger horizontal swipe goes back (here: to Inbox), and forward again.
+  const swipeBy = (deltaX: number): Promise<void> =>
+    main.evaluate((delta) => {
+      for (let step = 0; step < 8; step++)
+        document
+          .querySelector('.scroller')
+          ?.dispatchEvent(new WheelEvent('wheel', { deltaX: delta / 8, deltaY: 0, bubbles: true }));
+    }, deltaX);
+  await swipeBy(-320);
+  await expect(main.locator('h1')).toContainText('Inbox');
+  await main.waitForTimeout(300);
+  await swipeBy(320);
+  await expect(main.locator('h1')).toContainText('Step nine');
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

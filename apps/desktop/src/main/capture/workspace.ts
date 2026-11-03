@@ -1017,7 +1017,8 @@ export class Workspace {
       lists: this.listInfos(),
       ...(change.chooseNewList && { chooseNewList: true }),
     });
-    if (parsed.title.trim() === '') return null;
+    // D-45, D-88: an untitled task is fine when it has notes (pasted code, TASK-09).
+    if (parsed.title.trim() === '' && parsed.body.trim() === '') return null;
     let target = list;
     let created = false;
     if (parsed.target.kind === 'new') {
@@ -1137,6 +1138,61 @@ export class Workspace {
         if (!op) continue;
         await this.applyAndSave(list, op, now);
         count += ops.length;
+      }
+      if (count > 0) this.notify();
+      return count;
+    });
+  }
+
+  /**
+   * TASK-06 (Q-13, D-88): completed top-level tasks (with their subtasks) finished more than `days`
+   * days ago move to `.flint/archive/<list ID>.md`, a task list of its own, newest at the top; not
+   * an undo step (nothing the user did now). The archive is written first: a crash in between leaves
+   * a copy, never a loss. The number archived.
+   */
+  archiveDone(now: Date, days: number): Promise<number> {
+    return this.serial(async () => {
+      const cutoff = now.getTime() - days * 86_400_000;
+      let count = 0;
+      for (const list of this.lists) {
+        if (list.entry.mode === 'note' || list.file.readOnly) continue;
+        const keys = list.file.document.blocks.flatMap((block) => {
+          if (block.kind !== 'task' || block.line.status === ' ') return [];
+          const completion = block.line.fields.completion;
+          return completion && toDate(completion.value.value).getTime() < cutoff ? [block.key] : [];
+        });
+        if (keys.length === 0) continue;
+        const folder = join(this.folder, '.flint', 'archive');
+        await mkdir(folder, { recursive: true });
+        const path = join(folder, `${this.listId(list.entry)}.md`);
+        const exists = await readFile(path).then(
+          () => true,
+          () => false,
+        );
+        if (!exists)
+          await writeFileAtomic(path, NEW_LIST_HEADER(generateId(this.isTaken), 'tasks'), {
+            tempDirectory: tempDirectoryFor(path),
+          });
+        const archive = await ListFile.open(path);
+        if (archive.readOnly) continue;
+        const op = moveTasksToList(
+          new Map([
+            [list.file.path, list.file.document],
+            [path, archive.document],
+          ]),
+          list.file.path,
+          keys,
+          path,
+        );
+        if (op?.type !== 'batch') continue;
+        const onto = (target: string): Op | null =>
+          bulk(op.ops.filter((part) => 'list' in part && part.list === target));
+        const inserted = onto(path);
+        const removed = onto(list.file.path);
+        if (!inserted || !removed || !archive.apply(inserted)) continue;
+        await archive.save({ now: fromDate(now), isTaken: this.isTaken });
+        await this.applyAndSave(list, removed, now);
+        count += keys.length;
       }
       if (count > 0) this.notify();
       return count;
