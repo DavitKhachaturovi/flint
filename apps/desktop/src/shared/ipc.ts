@@ -60,6 +60,8 @@ export const Channels = {
   mainAttachmentExists: 'main:attachment-exists',
   /** Main window → main: an attachment in its default app, by the rules of D-84. */
   mainOpenAttachment: 'main:open-attachment',
+  /** TODAY-02 (M6): the rollover prompt's answer: keep the pins, or clear them. */
+  mainTodayAnswer: 'main:today-answer',
   /** TASK-06, D-88: auto-archive's days (null: off), and turning it on or off. */
   mainAutoArchive: 'main:auto-archive',
   mainSetAutoArchive: 'main:set-auto-archive',
@@ -209,6 +211,33 @@ export interface TaskRow {
   readonly createdAt?: string;
   /** TODAY-01, D-85: pinned (the Today view in M6). */
   readonly pinned?: boolean;
+  /** TODAY-01 (M6): in Today, the task's home list, shown subtly on its row. */
+  readonly home?: { readonly listId: string; readonly listName: string };
+}
+
+/**
+ * TODAY-01 (M6, D-89): the Today view's ID: a view over the pinned tasks of every list, never a
+ * file (`@` can't start a list's ID, docs/04).
+ */
+export const TODAY_ID = '@today';
+
+/** TODAY-03: a reminder later today, as a card in Today. */
+export interface TodayReminder {
+  readonly key: string;
+  readonly listId: string;
+  readonly listName: string;
+  readonly title: string;
+  /** `15:00`. */
+  readonly time: string;
+  /** The reminder as written (`YYYY-MM-DDTHH:MM`), for "in 2 h". */
+  readonly at: string;
+}
+
+/** TODAY-01, TODAY-02, TODAY-03: what Today shows besides its tasks. */
+export interface TodayExtras {
+  readonly reminders: readonly TodayReminder[];
+  /** TODAY-02, Q-04: unfinished tasks pinned before today, until the prompt is answered today. */
+  readonly rollover: readonly { readonly key: string; readonly title: string }[];
 }
 
 /**
@@ -250,6 +279,8 @@ export interface ListView {
   readonly edited?: string;
   /** NAV-07, D-85: a note's first sighting (`2 Nov`). */
   readonly created?: string;
+  /** TODAY-01 (M6): the Today view's reminders and rollover prompt. */
+  readonly today?: TodayExtras;
 }
 
 /**
@@ -360,6 +391,8 @@ export interface SidebarView {
   /** Groups folded away on this machine (ui-state.json). */
   readonly collapsed: readonly string[];
   readonly items: readonly SidebarItem[];
+  /** TODAY-01 (M6): the open pinned tasks, Today's count. */
+  readonly today?: number;
 }
 
 /** Changes to the sidebar's groups and order (LIST-05, LIST-06). */

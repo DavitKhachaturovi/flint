@@ -441,7 +441,7 @@ test('main window: a list from the sidebar, complete with Space, undo with Ctrl+
     main.evaluate(() => (window as unknown as { motion: string[] }).motion.splice(0));
 
   // The watcher picks the new list up.
-  await main.locator('.nav', { hasText: 'Errands' }).click();
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Errands' }).click();
   await expect(main.locator('h1')).toHaveText('Errands · 2 open');
   await expect
     .poll(motion)
@@ -1472,7 +1472,16 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
     .toContain('- [ ] two [id:: d2]\n    - [ ] two-b [id:: d2b]\n    - [ ] two-a [id:: d2a]\n');
 
   // A list dragged just below an open group's header joins the group. D-81: on the way the group's
-  // card gets its white ring.
+  // card gets its white ring. (A taller window: the sidebar has many lists by now, Today too.)
+  const resize = (height: number): Promise<void> =>
+    app.evaluate(({ BrowserWindow }, size) => {
+      const win = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().includes('main-window'),
+      );
+      const bounds = win?.getBounds();
+      if (win && bounds) win.setBounds({ ...bounds, height: size });
+    }, height);
+  await resize(1100);
   await main.locator('.add-list').click();
   await main.locator('.fl-menu').getByText('New group').click();
   await main.keyboard.type('Dragged');
@@ -1513,6 +1522,7 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   await drag(head, groupBox.y + groupBox.height / 2 + nextBox.height + 2);
   await expect.poll(order).not.toEqual(before);
   expect((await order()).indexOf('Dragged')).toBe(before.indexOf('Dragged') + 1);
+  await resize(780);
 });
 
 test('large files linked where they are: badge, loading, File not found (MEDIA-03, D-84)', async () => {
@@ -2142,6 +2152,79 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
     );
     win?.setBounds({ x: 0, y: 0, width: 1120, height: 780 });
   });
+});
+
+test('Today: pinned tasks of every list, its order, its composer, reminder cards (TODAY-01, TODAY-03, M6, D-90)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const now = new Date();
+  const soon = new Date(now.getTime() + 60 * 60_000);
+  const today = soon.getDate() === now.getDate();
+  const at = `${soon.getFullYear()}-${two(soon.getMonth() + 1)}-${two(soon.getDate())}T${two(soon.getHours())}:${two(soon.getMinutes())}`;
+  await writeFile(
+    join(flint, 'Focus work.md'),
+    `---\nflint: 1\nid: fcs1\nmode: tasks\n---\n- [ ] Write the design note [pinned:: true] [id:: fw1]\n- [ ] Review the pull request [reminder:: ${at}] [id:: fw2]\n- [ ] Not for today [id:: fw3]\n`,
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const focus = (): Promise<string[]> =>
+    main.locator('.card.tasks .row:not(.subtask) .title').allTextContents();
+  await main.locator('.nav', { hasText: 'Focus work' }).click();
+  await expect(main.locator('h1')).toContainText('Focus work');
+
+  // P pins a task; Today (first in the sidebar) has it, with its home list on the row.
+  await main.locator('.row', { hasText: 'Not for today' }).click({ position: { x: 400, y: 10 } });
+  await main.keyboard.press('p');
+  await expect(main.locator('.row', { hasText: 'Not for today' }).locator('.pin-ind')).toHaveCount(
+    1,
+  );
+  const todayNav = main.locator('.sidebar > .nav').first();
+  await expect(todayNav).toContainText('Today');
+  await todayNav.click();
+  await expect(main.locator('.today-greeting')).toContainText('in focus');
+  await expect
+    .poll(focus)
+    .toEqual(expect.arrayContaining(['Write the design note', 'Not for today']));
+  expect((await focus())[0]).toBe('Not for today');
+  await expect(
+    main.locator('.row', { hasText: 'Write the design note' }).locator('.home-list'),
+  ).toHaveText('Focus work');
+  if (today) {
+    await expect(
+      main.locator('.reminder-card', { hasText: 'Review the pull request' }),
+    ).toContainText(/in (1 h|5\d min)/);
+  }
+
+  // Alt+↓ reorders Today only (the list's file keeps its order), undoably.
+  const file = (): Promise<string> => readFile(join(flint, 'Focus work.md'), 'utf8');
+  const listBefore = await file();
+  await main.locator('.row', { hasText: 'Not for today' }).click({ position: { x: 400, y: 10 } });
+  const first = (await focus())[0];
+  await main.evaluate(() =>
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    ),
+  );
+  await expect.poll(async () => (await focus())[0]).not.toBe(first);
+  expect(await file()).toBe(listBefore);
+  await main.keyboard.press('Control+z');
+  await expect.poll(async () => (await focus())[0]).toBe(first);
+
+  // Its composer adds to Inbox, pinned, at the top of Today.
+  await main.locator('.composer-input').click();
+  await main.keyboard.type('Call the vendor');
+  await main.keyboard.press('Enter');
+  await expect.poll(async () => (await focus())[0]).toBe('Call the vendor');
+  await expect
+    .poll(() => readFile(join(flint, 'Inbox.md'), 'utf8'))
+    .toContain('- [ ] Call the vendor [pinned:: true] [id:: ');
+  await main.keyboard.press('Escape');
+
+  // Completing a task in Today completes it in its list.
+  await main.locator('.row', { hasText: 'Write the design note' }).locator('.check').click();
+  await expect.poll(file).toMatch(/- \[x\] Write the design note/);
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toMatch(/- \[ \] Write the design note/);
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

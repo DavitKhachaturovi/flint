@@ -579,6 +579,10 @@ async function start(): Promise<void> {
     void archive();
   };
   ipcMain.handle(Channels.mainAutoArchive, (event) => (owns(event.sender) ? archiveDays : null));
+  // TODAY-02 (M6): the rollover prompt's answer; Clear's label for the toast.
+  ipcMain.handle(Channels.mainTodayAnswer, (event, clear: unknown) =>
+    owns(event.sender) ? workspace.todayAnswer(clear === true, new Date()) : null,
+  );
   ipcMain.handle(Channels.mainSetAutoArchive, async (event, days: unknown) => {
     if (!owns(event.sender)) return 0;
     if (days !== null && (typeof days !== 'number' || !Number.isInteger(days) || days < 1))

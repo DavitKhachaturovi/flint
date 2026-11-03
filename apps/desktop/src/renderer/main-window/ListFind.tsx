@@ -97,7 +97,7 @@ export function ListFind(props: {
   const bar = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = bar.current;
-    const title = root?.querySelector<HTMLElement>('.list-header h1');
+    const title = root?.querySelector<HTMLElement>('.list-header h1, .today-greeting');
     if (!element || !root || !title) return;
     const place = (): void => {
       const area = root.getBoundingClientRect();

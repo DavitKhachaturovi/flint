@@ -42,7 +42,7 @@ import {
   type CaptureParse,
   type ListInfo,
 } from '@flint/core/shorthand';
-import { atDefaultTime, fromDate, toDate } from '@flint/core/time';
+import { atDefaultTime, formatLocalDateTime, fromDate, toDate } from '@flint/core/time';
 import type {
   ChangeOutcome,
   SidebarAction,
@@ -53,7 +53,11 @@ import type {
   ListChange,
   ListSummary,
   ListView,
+  TaskRow,
+  TodayReminder,
 } from '../../shared/ipc.js';
+import { TODAY_ID } from '../../shared/ipc.js';
+import { dayStamp, TodayFile } from '../today-file.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import { IMAGE_TYPES } from './drafts.js';
 import {
@@ -72,7 +76,7 @@ import {
 } from '../sidebar.js';
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
-import { listView } from '../views.js';
+import { listView, taskRow } from '../views.js';
 import { agoLabel, dayLabel, localStamp, TaskMetaFile } from '../task-meta.js';
 import { RECENT_CAPTURES, type PanelTask } from '../up-next.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
@@ -183,6 +187,8 @@ export class Workspace {
   private readonly trashed: Set<string>;
   /** docs/04 §3, NAV-07: when each task was first seen and last changed (`.flint/meta.json`). */
   readonly meta: TaskMetaFile;
+  /** TODAY-01, TODAY-02 (M6): Today's order and the rollover prompt's memory (`.flint/today.json`). */
+  readonly today: TodayFile;
 
   private constructor(
     folder: string,
@@ -197,6 +203,7 @@ export class Workspace {
     this.uiState = uiState;
     this.trashed = trashed;
     this.meta = new TaskMetaFile(folder);
+    this.today = new TodayFile(folder);
   }
 
   /** Every task ID of the lists, for the bookkeeping's first sight. */
@@ -225,6 +232,7 @@ export class Workspace {
       await readFile(workspace.sidebarPath, 'utf8').catch(() => null),
     );
     await workspace.meta.load();
+    await workspace.today.load();
     workspace.meta.seen(workspace.taskIds(), new Date());
     return workspace;
   }
@@ -293,6 +301,7 @@ export class Workspace {
       sort: this.sidebarSort,
       collapsed: this.collapsedGroups,
       items: arrange(this.sidebarFile, this.sidebarLists(), this.sidebarSort),
+      today: this.todayView(new Date()).open,
     };
   }
 
@@ -467,6 +476,7 @@ export class Workspace {
 
   /** One list as the main window shows it (M4). */
   view(id: string, now: Date): ListView | null {
+    if (id === TODAY_ID) return this.todayView(now);
     const loaded = this.find(id);
     if (!loaded) return null;
     const info = this.listInfos().find((list) => list.id === id);
@@ -593,6 +603,7 @@ export class Workspace {
     change: ListChange,
     now: Date,
   ): Promise<ChangeOutcome | null> {
+    if (id === TODAY_ID) return this.todayChange(change, now);
     const list = this.find(id);
     if (!list || list.entry.mode === 'note') return null;
     const document = list.file.document;
@@ -682,10 +693,13 @@ export class Workspace {
         const found = findTask(document, change.key);
         if (!found || (found.task.line.fields.pinned !== undefined) === change.pinned) return null;
         const label = change.pinned ? 'Pinned' : 'Unpinned';
-        return outcome(
+        const done = outcome(
           await this.record(list, setPinned(path, change.key, change.pinned), label, now),
           change.key,
         );
+        // M6: a task pinned now goes to the top of Today, pinned today.
+        if (change.pinned) this.today.pinnedNow(change.key, now);
+        return done;
       }
       case 'toNote':
         return this.taskToNote(list, change.key, now);
@@ -1011,6 +1025,8 @@ export class Workspace {
     list: Loaded,
     change: Extract<ListChange, { kind: 'add' }>,
     now: Date,
+    /** M6: added in Today: pinned, at the top of Today or after `after` there. */
+    today?: { readonly after?: string },
   ): Promise<ChangeOutcome | null> {
     const parsed = parseCapture(change.text, {
       now,
@@ -1049,11 +1065,13 @@ export class Workspace {
         ...(parsed.body.trim() === '' ? {} : { body: parsed.body.trim() }),
         priority: parsed.priority,
         reminder: parsed.reminder,
+        ...(today && { pinned: true }),
       },
       where,
     );
     const label = target === list ? 'Added' : `Added to ${target.entry.name}`;
     await this.record(target, op, label, now, created ? { createdList: target.entry.path } : {});
+    if (today) this.today.pinnedNow(id, now, today.after);
     if (target !== list) await this.markRecent(this.listId(target.entry));
     return {
       label,
@@ -1061,6 +1079,173 @@ export class Workspace {
       listId: this.listId(target.entry),
       listName: target.entry.id === INBOX_ID ? 'Inbox' : target.entry.name,
     };
+  }
+
+  /**
+   * TODAY-01, TODAY-02, TODAY-03 (M6, D-89): Today: the pinned tasks of every list (a pinned
+   * subtask on its own unless its parent is pinned too), in Today's order (pins made in Flint
+   * first, pins found in files last), with
+   * each task's home list; the done ones in its Completed section until the day changes (D-85);
+   * the reminders still to come today; and the rollover prompt's tasks (unfinished, pinned before
+   * today) until it is answered today (Q-04).
+   */
+  private todayView(now: Date): ListView {
+    const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
+    const today = dayStamp(now);
+    const open: { readonly row: TaskRow; readonly day: string }[] = [];
+    const completed: TaskRow[] = [];
+    const reminders: TodayReminder[] = [];
+    const two = (value: number): string => String(value).padStart(2, '0');
+    for (const { entry, file } of this.lists) {
+      if (entry.mode === 'note') continue;
+      const listId = this.listId(entry);
+      const home = { listId, listName: names.get(listId) ?? entry.name };
+      for (const { task, parent } of allTasks(file.document)) {
+        const done = task.line.status !== ' ';
+        const field = task.line.fields.reminder;
+        const at = field ? atDefaultTime(field.value) : null;
+        if (at && !done && !task.line.fields.muted) {
+          const when = toDate(at);
+          if (when.getTime() > now.getTime() && dayStamp(when) === today)
+            reminders.push({
+              key: task.key,
+              ...home,
+              title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
+              time: `${two(when.getHours())}:${two(when.getMinutes())}`,
+              at: formatLocalDateTime(at),
+            });
+        }
+        if (!task.line.fields.pinned || parent?.line.fields.pinned) continue;
+        const row: TaskRow = { ...taskRow(task, now, (key) => this.meta.get(key)), home };
+        if (done) completed.push(row);
+        else open.push({ row, day: this.today.pinnedDay(task.key, now) });
+      }
+    }
+    // Tasks Today hasn't placed yet (pinned in a file, or before M6) go last, in file order; a
+    // task pinned in Flint goes first (TodayFile.pinnedNow).
+    const order = this.today.order();
+    const rank = (key: string): number => {
+      const at = order.indexOf(key);
+      return at < 0 ? Number.MAX_SAFE_INTEGER : at;
+    };
+    open.sort((a, b) => rank(a.row.key) - rank(b.row.key));
+    const placed = open.map(({ row }) => row.key);
+    if (placed.join() !== order.join()) this.today.setOrder(placed);
+    reminders.sort((a, b) => a.at.localeCompare(b.at));
+    const rollover =
+      this.today.answered() === today
+        ? []
+        : open
+            .filter((task) => task.day < today)
+            .map(({ row }) => ({ key: row.key, title: titlePlain(row.title) || row.label }));
+    return {
+      id: TODAY_ID,
+      name: 'Today',
+      mode: 'tasks',
+      open: open.length,
+      items: open.map(({ row }) => ({ kind: 'task', task: row })),
+      completed,
+      readOnly: null,
+      noteText: null,
+      today: { reminders, rollover },
+    };
+  }
+
+  /**
+   * M6: a change made in Today goes to the task's home list; Today itself only keeps its order
+   * (Alt+↑/↓, drag), undoable. A task added in Today is pinned: at the top of Inbox (or of its
+   * `##list`), or after the task it was typed below, in its list. Indenting is the home list's
+   * business (null: the row nudges).
+   */
+  private async todayChange(change: ListChange, now: Date): Promise<ChangeOutcome | null> {
+    const here = (outcome: ChangeOutcome | null): ChangeOutcome | null =>
+      outcome && { ...outcome, listId: TODAY_ID, listName: 'Today' };
+    switch (change.kind) {
+      case 'add': {
+        const after = change.where === 'top' ? null : this.locate(change.where.after);
+        const list = this.find(after?.listId ?? INBOX_ID);
+        if (!list) return null;
+        return here(await this.add(list, change, now, after ? { after: after.key } : {}));
+      }
+      case 'many': {
+        const start = this.undoStack.length;
+        let last: ChangeOutcome | null = null;
+        for (const each of change.changes)
+          if (each.kind !== 'many') last = (await this.todayChange(each, now)) ?? last;
+        if (!this.mergeSince(start, change.label)) return null;
+        return last && { ...last, label: change.label };
+      }
+      case 'move':
+      case 'place': {
+        const keys = (this.todayView(now).items as readonly { task?: TaskRow }[]).flatMap((item) =>
+          item.task ? [item.task.key] : [],
+        );
+        const from = keys.indexOf(change.key);
+        if (from < 0) return null;
+        const next = keys.filter((key) => key !== change.key);
+        let to: number;
+        if (change.kind === 'move') to = from + (change.direction === 'up' ? -1 : 1);
+        else {
+          const at = next.indexOf(change.where.key);
+          if (at < 0) return null;
+          to = change.where.at === 'before' ? at : at + 1;
+        }
+        if (to < 0 || to > next.length || (change.kind === 'move' && to === from)) return null;
+        next.splice(to, 0, change.key);
+        if (next.every((key, index) => key === keys[index])) return null;
+        this.todayOrderStep(keys, next);
+        this.notify();
+        return { label: 'Moved', key: change.key, listId: TODAY_ID, listName: 'Today' };
+      }
+      case 'indent':
+      case 'outdent':
+        return null;
+      default: {
+        const home = this.locate(change.key);
+        return home ? this.changeNow(home.listId, change, now) : null;
+      }
+    }
+  }
+
+  /** M6: Today's order changes to `next`, one undo step back to `before` (and redo again). */
+  private todayOrderStep(before: readonly string[], next: readonly string[]): void {
+    this.today.setOrder(next);
+    const step = (from: readonly string[], to: readonly string[]): UndoEntry => ({
+      label: 'Moved',
+      run: () => {
+        this.today.setOrder(from);
+        this.notify();
+        return Promise.resolve(step(to, from));
+      },
+    });
+    this.remember(step(before, next));
+  }
+
+  /**
+   * TODAY-02 (Q-04, D-89): the rollover prompt's answer: Roll over (or its ×) keeps the tasks
+   * pinned for today; Clear unpins them (one undo step; they stay in their lists).
+   */
+  todayAnswer(clear: boolean, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const keys = (this.todayView(now).today?.rollover ?? []).map((task) => task.key);
+      this.today.answer(now);
+      if (!clear) {
+        this.today.keep(keys, now);
+        this.notify();
+        return null;
+      }
+      const label = keys.length === 1 ? 'Unpinned 1 task' : `Unpinned ${keys.length} tasks`;
+      const outcome = await this.todayChange(
+        {
+          kind: 'many',
+          label,
+          changes: keys.map((key) => ({ kind: 'pin', key, pinned: false }) as const),
+        },
+        now,
+      );
+      this.notify();
+      return outcome?.label ?? null;
+    });
   }
 
   /** Every task with a reminder, for the scheduler (REM-01). A note's fields are inert (D-29). */
@@ -1233,6 +1418,11 @@ export class Workspace {
   }
 
   private async toggleNow(id: string, key: string, now: Date): Promise<string | null> {
+    // M6: in Today, the task's home list.
+    if (id === TODAY_ID) {
+      const home = this.locate(key);
+      return home ? this.toggleNow(home.listId, key, now) : null;
+    }
     const list = this.find(id);
     const found = list ? findTask(list.file.document, key) : undefined;
     if (!list || !found) return null;

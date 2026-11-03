@@ -25,7 +25,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
   attachments/                  ← images/videos (MEDIA-02), referenced by relative paths
   .flint/
     meta.json                   ← per-task bookkeeping (created, last touched), keyed by task ID
-    today.json                  ← Today's manual order (task IDs)
+    today.json                  ← Today's manual order (task IDs), pin days, the rollover prompt's last answer (D-90)
     sidebar.json                ← sidebar groups and the manual order of lists, notes and groups (LIST-05, LIST-06, D-73)
     archive/                    ← auto-archived completed tasks, one task list per list: `<list ID>.md` (TASK-06, D-88)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
@@ -140,7 +140,7 @@ The app never shows fields as text; it renders them as the stripe, bell, pin, an
 ### Bookkeeping in `.flint/meta.json` and `.flint/today.json`
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
 - `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion), and **D-85** `captured` (when it came from the capture popup, for Recently captured); per note ID its `created` (first sighting). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
-- `today.json`: the manual order of Today. Today membership itself is the `pinned` field in the line (D-85), so losing this file only loses the order.
+- `today.json`: the manual order of Today. Today membership itself is the `pinned` field in the line (D-85), so losing this file only loses the order. **D-90 (Proposed format):** `{ "flint": 1, "order": [task IDs], "pinnedOn": { task ID: "YYYY-MM-DD" }, "answered": "YYYY-MM-DD" | null }`: the order, the day each task was pinned (for the rollover prompt; a pin first seen counts as pinned that day) and the day the prompt was last answered; unknown keys are kept.
 
 ### Sidebar groups in `.flint/sidebar.json` (LIST-05, LIST-06, D-73, Proposed format)
 - One file for the sidebar's groups and its manual order, kept in the Flint folder so it travels with the lists. Groups are not folders: the list files stay flat (D-23).

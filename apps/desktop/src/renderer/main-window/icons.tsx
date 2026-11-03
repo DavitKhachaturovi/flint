@@ -33,6 +33,16 @@ export const InboxIcon = ({ size = 14 }: IconProps): ReactElement =>
     />,
   ]);
 
+/** TODAY-01 (M6, mockup 03): Today's sun. */
+export const SunIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <circle key="a" cx="12" cy="12" r="4" />,
+    <path
+      key="b"
+      d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+    />,
+  ]);
+
 export const ListIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [
     <path key="a" d="M9 6h11M9 12h11M9 18h11" />,

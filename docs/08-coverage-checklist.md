@@ -544,3 +544,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 12 | Inbox's right-click menu | LIST-03 · Done (0.4.23) | 02, D-89 |
 | 13 | Find bar motion and position (title row, then level with the panel) | NAV-06 · Done (0.4.23) | 02, D-89 |
 | 14 | The task menu's grouping (proposed, not built) | UI-08 · v1 · awaiting Davit | D-89 |
+
+## Z. M6 step 1: Today (3 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Today first in the sidebar, the window opens on it; greeting and date | TODAY-01 · Done (0.4.24) | 02, D-90 |
+| 2 | Focus: pinned tasks of every list as rows, home-list chip, changes to the home list | TODAY-01 · Done (0.4.24) | 02, 03 §4, D-90 |
+| 3 | Today's own order in `.flint/today.json` (Alt+↑/↓, drag), undoable | TODAY-01 · Done (0.4.24) | 02, 04, D-90 |
+| 4 | Today's composer adds pinned tasks to Inbox (or `##list`) | TODAY-01 · Done (0.4.24) | 02, D-90 |
+| 5 | Rollover prompt on the first open of a new day: Clear, Roll over, × | TODAY-02 · Done (0.4.24; off in Settings M8) | 02, 06 Q-04, D-90 |
+| 6 | Today's reminder cards | TODAY-03 · Done (0.4.24, first part; overdue and the section with M6) | 02, D-90 |

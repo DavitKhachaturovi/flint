@@ -63,7 +63,7 @@ export type TaskStamps = (
   key: string,
 ) => { readonly created: string; readonly lastTouched: string } | undefined;
 
-function taskRow(task: TaskNode, now: Date, stamps?: TaskStamps): TaskRow {
+export function taskRow(task: TaskNode, now: Date, stamps?: TaskStamps): TaskRow {
   const { line } = task;
   const body = getBody(task);
   const title = line.title.trim();

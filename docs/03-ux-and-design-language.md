@@ -155,7 +155,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - No priority text is shown on rows.
 
 ### Row anatomy (task list)
-- Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today), pin (only if pinned, D-85).
+- Checkbox · task text · (tiny indicators, right-aligned and muted): body exists, attachment, bell (reminder), home-list label (only in Today, last, D-90), pin (only if pinned, D-85; not in Today, where every task is).
 - Task text renders its inline markdown; the raw syntax shows only while editing (LIST-02, D-52).
 - An overdue reminder: the bell with a small dot and the time in brighter text; no "Overdue" word, no red, no badge (REM-11, D-68).
 - The bell is a button: clicking it turns the reminder off (a strike line is drawn through the bell, the time turns faint, an overdue dot goes away) and on again; the bell never moves (REM-12, D-66, D-68). Clicking the **time** opens the date/time picker to change it (REM-01, D-68).

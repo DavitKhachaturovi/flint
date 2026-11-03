@@ -3526,3 +3526,230 @@ a.auto-link {
     transform: translateY(-4px);
   }
 }
+
+/* TODAY-01 (M6, D-89, mockup 03): Today's greeting, the key phrase in white (09 §4). */
+.today-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 4px 10px;
+}
+
+.today-greeting {
+  margin: 0;
+  max-width: 460px;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  color: var(--fl-text-heading-soft);
+}
+
+.today-key {
+  color: var(--fl-text-highlight);
+  white-space: nowrap;
+}
+
+.today-date {
+  font-size: 14px;
+  color: var(--fl-text-muted);
+}
+
+/* TODAY-02 (Q-04, D-89): the rollover card; it rises in and folds away once answered. */
+.rollover {
+  padding: 18px 18px 16px 20px;
+  overflow: hidden;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.rollover.leaving {
+  pointer-events: none;
+  animation: rollover-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes today-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes rollover-out {
+  from {
+    max-height: 400px;
+  }
+  to {
+    max-height: 0;
+    margin-bottom: -16px;
+    padding-block: 0;
+    opacity: 0;
+  }
+}
+
+.rollover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.rollover-title {
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+
+.rollover-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.rollover-close:hover,
+.rollover-clear:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.rollover-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  line-height: 1.55;
+  color: var(--fl-text-body);
+}
+
+.rollover-tasks li {
+  display: flex;
+  gap: 10px;
+}
+
+.rollover-tasks li::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+}
+
+.rollover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rollover-clear {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--fl-text-secondary);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.primary-button {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--fl-strong-bg);
+  box-shadow: var(--fl-shadow-primary-button);
+  color: var(--fl-strong-fg);
+  font-weight: 500;
+  transition: transform var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+.primary-button:active {
+  transform: scale(0.97);
+}
+
+/* TODAY-03 (D-89): today's reminders, two cards a row; they lift a little on hover. */
+.today-reminders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.reminder-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  text-align: left;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    box-shadow var(--fl-dur-fast) ease;
+}
+
+.reminder-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fl-shadow-card-hover);
+}
+
+.reminder-card-when {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reminder-card-when .tile {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.reminder-card-time {
+  font-family: var(--fl-font-mono);
+  font-size: 15px;
+  color: var(--fl-text-secondary);
+}
+
+.reminder-card:first-child .reminder-card-time {
+  color: var(--fl-text-highlight);
+}
+
+.reminder-card-until {
+  font-size: 12px;
+  color: var(--fl-text-faint);
+}
+
+.reminder-card-title {
+  font-weight: 500;
+  color: var(--fl-text-primary);
+}
+
+.reminder-card-list {
+  align-self: flex-start;
+  gap: 6px;
+}
+
+/* TODAY-01 (mockup 03): the Focus card's head, and a row's home list. */
+.focus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+}
+
+.focus-hint {
+  font-size: 12px;
+  color: var(--fl-text-faint);
+}
+
+.chip.home-list {
+  height: 22px;
+  color: var(--fl-text-secondary);
+}

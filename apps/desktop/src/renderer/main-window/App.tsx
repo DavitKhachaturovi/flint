@@ -64,7 +64,9 @@ import {
   PlusIcon,
   ReminderBellIcon,
   SortIcon,
+  SunIcon,
 } from './icons.js';
+import { ReminderCards, RolloverCard, TodayGreeting } from './Today.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
@@ -80,6 +82,7 @@ import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
+import { TODAY_ID } from '../../shared/ipc.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -510,7 +513,8 @@ export function App(): ReactElement {
    * null when the keyboard is in the task list.
    */
   const [sidebarFocus, setSidebarFocus] = useState<string | null>(null);
-  const [listId, setListId] = useState('inbox');
+  // TODAY-01 (M6, D-89): the main window opens on Today.
+  const [listId, setListId] = useState<string>(TODAY_ID);
   const [view, setView] = useState<ListView | null>(null);
   // D-77: nothing is selected when a list opens; the first ↓ selects its first row.
   const [selected, setSelected] = useState<string | null>(null);
@@ -669,7 +673,7 @@ export function App(): ReactElement {
    * buttons). Going somewhere new drops the forward part, as in a browser.
    */
   const history = useRef<{ places: Place[]; at: number }>({
-    places: [{ list: 'inbox', page: null }],
+    places: [{ list: TODAY_ID, page: null }],
     at: 0,
   });
   /** D-76: pages slide in from the right, and back from the left; lists just fade in. */
@@ -1888,6 +1892,19 @@ export function App(): ReactElement {
               },
             ]
           : [];
+      // M6 (Proposed): Today's menu: its temporary sorts.
+      if (list.id === TODAY_ID) {
+        openMenu(
+          [
+            ...sorting,
+            ...(listId === TODAY_ID && tempSort
+              ? [{ label: 'Back to manual order', action: () => sortTo(null) }]
+              : []),
+          ],
+          at,
+        );
+        return;
+      }
       // D-89 (Proposed): the Inbox's own menu: its sorts and Duplicate; it is never renamed,
       // converted, grouped or deleted.
       if (list.inbox) {
@@ -2451,7 +2468,10 @@ export function App(): ReactElement {
           : element.matches('.nav[data-key]')
             ? (element as HTMLElement).dataset['key']
             : undefined;
-        return key && key !== inbox?.id ? [{ key, elements: [element as HTMLElement] }] : [];
+        // Inbox and Today stay where they are (M6).
+        return key && key !== inbox?.id && key !== TODAY_ID
+          ? [{ key, elements: [element as HTMLElement] }]
+          : [];
       });
     const canStart = (): boolean => reorderable();
     const scroller = aside;
@@ -2472,7 +2492,7 @@ export function App(): ReactElement {
       return;
     }
     const id = nav?.dataset['key'];
-    if (!nav || !id || id === inbox?.id) return;
+    if (!nav || !id || id === inbox?.id || id === TODAY_ID) return;
     // Every visible list and group header, in order, each moving on its own.
     interface Spot {
       readonly unit: DragUnit;
@@ -2484,7 +2504,7 @@ export function App(): ReactElement {
     for (const element of aside.children) {
       if (element.matches('.nav[data-key]')) {
         const key = (element as HTMLElement).dataset['key'] ?? '';
-        if (key !== inbox?.id)
+        if (key !== inbox?.id && key !== TODAY_ID)
           spots.push({
             unit: { key, elements: [element as HTMLElement] },
             kind: 'list',
@@ -3090,7 +3110,7 @@ export function App(): ReactElement {
             ? {
                 kind: 'task',
                 task: selectedRow,
-                listName: view.name,
+                listName: selectedRow.home?.listName ?? view.name,
                 readOnly: view.readOnly !== null,
               }
             : { kind: 'upnext' };
@@ -3168,8 +3188,9 @@ export function App(): ReactElement {
     const element = scroller.current;
     if (!element || !panelShown) return;
     const measure = (): void => {
+      // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .composer, .content > .note-card',
+        '.content > .rollover, .content > .today-reminders, .content > .composer, .content > .note-card',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -3291,6 +3312,22 @@ export function App(): ReactElement {
           <img src={flintIcon} alt="" />
           <span>Flint</span>
         </div>
+        {/* TODAY-01 (M6, D-89): Today first, with its open pinned tasks. */}
+        <NavItem
+          list={{
+            id: TODAY_ID,
+            name: 'Today',
+            mode: 'tasks',
+            open: sidebarView?.today ?? 0,
+            inbox: false,
+          }}
+          active={listId === TODAY_ID}
+          icon={<SunIcon />}
+          onSelect={() => openList(TODAY_ID)}
+          onMenu={(at) =>
+            listMenu({ id: TODAY_ID, name: 'Today', mode: 'tasks', open: 0, inbox: false }, at)
+          }
+        />
         {inbox && (
           <NavItem
             list={inbox}
@@ -3498,7 +3535,32 @@ export function App(): ReactElement {
                 />
               )}
 
-              {view && !pageTask && view.mode === 'tasks' && (
+              {/* TODAY-01, TODAY-02, TODAY-03 (M6, D-89, mockup 03): the greeting, the rollover
+                  prompt and today's reminders, above the composer and Focus. */}
+              {view && !pageTask && view.id === TODAY_ID && (
+                <>
+                  <TodayGreeting open={view.open} reminders={view.today?.reminders.length ?? 0} />
+                  <RolloverCard
+                    tasks={view.today?.rollover ?? []}
+                    onAnswer={(clear) =>
+                      void window.flintMain.todayAnswer(clear).then((label) => {
+                        if (label) showToast(label, true);
+                      })
+                    }
+                  />
+                  <ReminderCards
+                    reminders={view.today?.reminders ?? []}
+                    onOpen={(reminder) =>
+                      view.items.some(
+                        (item) => item.kind === 'task' && item.task.key === reminder.key,
+                      )
+                        ? setSelected(reminder.key)
+                        : go({ list: reminder.listId, page: null }, reminder.key)
+                    }
+                  />
+                </>
+              )}
+              {view && !pageTask && view.mode === 'tasks' && view.id !== TODAY_ID && (
                 <header className="list-header">
                   <h1>
                     {view.name}
@@ -3577,10 +3639,17 @@ export function App(): ReactElement {
                       version={glideVersion}
                       editing={editing !== null}
                     />
+                    {view.id === TODAY_ID && (
+                      <div className="focus-head">
+                        <span className="panel-label">Focus</span>
+                        {view.open > 1 && <span className="focus-hint">drag to reorder</span>}
+                      </div>
+                    )}
                     {view.items.length === 0 && (
                       <p className="empty">
-                        Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your
-                        hotkey.
+                        {view.id === TODAY_ID
+                          ? 'Nothing pinned yet. Press P on a task in any list to bring it here, or add one above.'
+                          : 'Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your hotkey.'}
                       </p>
                     )}
                     {cardRows}
@@ -4883,7 +4952,7 @@ function Row(
         <Title task={task} />
       )}
       <span className="ind">
-        {task.pinned && (
+        {task.pinned && !task.home && (
           // D-86: the pin unpins.
           <button
             type="button"
@@ -4957,6 +5026,8 @@ function Row(
             <BodyIcon />
           </button>
         )}
+        {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
+        {task.home && <span className="chip home-list">{task.home.listName}</span>}
       </span>
     </div>
   );

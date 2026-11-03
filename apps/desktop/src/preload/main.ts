@@ -81,6 +81,10 @@ const main = {
   imageAction(source: string, action: 'copy' | 'show' | 'open'): Promise<boolean> {
     return ipcRenderer.invoke(Channels.mainImageAction, source, action) as Promise<boolean>;
   },
+  /** TODAY-02 (M6): Roll over (false) or Clear (true) the unfinished pins; Clear's undo label. */
+  todayAnswer(clear: boolean): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainTodayAnswer, clear) as Promise<string | null>;
+  },
   /** TASK-06, D-88: the days after which completed tasks are archived; null when it is off. */
   autoArchive(): Promise<number | null> {
     return ipcRenderer.invoke(Channels.mainAutoArchive) as Promise<number | null>;

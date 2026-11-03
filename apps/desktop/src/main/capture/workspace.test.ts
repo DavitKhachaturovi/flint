@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prepareFlintFolder } from '../storage/flint-folder.js';
 import { DraftFile } from './drafts.js';
 import { Workspace } from './workspace.js';
+import { TODAY_ID } from '../../shared/ipc.js';
 
 let base: string;
 let folder: string;
@@ -800,5 +801,76 @@ describe('auto-archive (TASK-06, Q-13, D-88)', () => {
     );
     // Nothing left to archive the second time.
     expect(await workspace.archiveDone(now, 14)).toBe(0);
+  });
+});
+
+describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89)', () => {
+  const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
+  const keys = (workspace: Workspace, at = now): string[] =>
+    (workspace.view(TODAY_ID, at)?.items ?? []).flatMap((item) =>
+      item.kind === 'task' ? [item.task.key] : [],
+    );
+  beforeEach(async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Plan [pinned:: true] [id:: aaaa]\n- [ ] Ship [reminder:: 2026-10-29T16:00] [id:: bbbb]\n    - [ ] Test [pinned:: true] [id:: cccc]\n- [x] Done [pinned:: true] [completion:: 2026-10-29T09:00] [id:: dddd]\n',
+    );
+  });
+
+  it("shows the pinned tasks of every list with their home list; Flint's new pins first", async () => {
+    const workspace = await open();
+    const view = workspace.view(TODAY_ID, now);
+    expect(view).toMatchObject({ name: 'Today', mode: 'tasks', open: 2 });
+    expect(keys(workspace)).toEqual(['aaaa', 'cccc']);
+    expect(view?.completed.map((task) => task.key)).toEqual(['dddd']);
+    expect(view?.items[0]).toMatchObject({ task: { home: { listId: 'wrk1', listName: 'Work' } } });
+    expect(view?.today?.reminders).toEqual([
+      expect.objectContaining({ key: 'bbbb', time: '16:00', listName: 'Work' }),
+    ]);
+    await workspace.change('wrk1', { kind: 'pin', key: 'bbbb', pinned: true }, now);
+    expect(keys(workspace)).toEqual(['bbbb', 'aaaa']);
+    expect(workspace.sidebar().today).toBe(2);
+  });
+
+  it('routes changes to the home list; adds pinned to Inbox; orders itself, undoably', async () => {
+    const workspace = await open();
+    await workspace.change(TODAY_ID, { kind: 'priority', key: 'aaaa', priority: 'high' }, now);
+    expect(await work()).toContain('- [ ] Plan [pinned:: true] [priority:: high] [id:: aaaa]');
+    const added = await workspace.change(
+      TODAY_ID,
+      { kind: 'add', text: 'Call the vendor', where: 'top' },
+      now,
+    );
+    expect(added).toMatchObject({ listId: TODAY_ID });
+    expect(await inbox()).toContain('- [ ] Call the vendor [pinned:: true] [id:: ');
+    expect(keys(workspace)[0]).toBe(added?.key);
+    await workspace.change(TODAY_ID, { kind: 'move', key: 'cccc', direction: 'up' }, now);
+    expect(keys(workspace)).toEqual([added?.key, 'cccc', 'aaaa']);
+    expect(await workspace.undoLast(now)).toBe('Moved');
+    expect(keys(workspace)).toEqual([added?.key, 'aaaa', 'cccc']);
+    expect(await workspace.change(TODAY_ID, { kind: 'indent', key: 'cccc' }, now)).toBeNull();
+    expect(await workspace.toggleDone(TODAY_ID, 'aaaa', now)).toBe('Completed');
+    expect(await work()).toMatch(/- \[x\] Plan/);
+  });
+
+  it('asks about unfinished pins from before today once a day: Roll over or Clear', async () => {
+    const workspace = await open();
+    expect(workspace.view(TODAY_ID, now)?.today?.rollover).toEqual([]);
+    const tomorrow = new Date(2026, 9, 30, 9, 0);
+    expect(workspace.view(TODAY_ID, tomorrow)?.today?.rollover.map((task) => task.key)).toEqual([
+      'aaaa',
+      'cccc',
+    ]);
+    expect(await workspace.todayAnswer(true, tomorrow)).toBe('Unpinned 2 tasks');
+    expect(keys(workspace, tomorrow)).toEqual([]);
+    expect(await work()).toContain('- [ ] Plan [id:: aaaa]');
+    expect(workspace.view(TODAY_ID, tomorrow)?.today?.rollover).toEqual([]);
+    expect(await workspace.undoLast(tomorrow)).toBe('Unpinned 2 tasks');
+    expect(keys(workspace, tomorrow)).toEqual(['aaaa', 'cccc']);
+    const later = new Date(2026, 9, 31, 9, 0);
+    expect(workspace.view(TODAY_ID, later)?.today?.rollover).toHaveLength(2);
+    expect(await workspace.todayAnswer(false, later)).toBeNull();
+    expect(workspace.view(TODAY_ID, later)?.today?.rollover).toEqual([]);
+    expect(keys(workspace, later)).toEqual(['aaaa', 'cccc']);
   });
 });
