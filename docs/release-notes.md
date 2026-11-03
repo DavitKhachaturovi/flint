@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.24 (3 Nov 2026)
+
+- **Today**, first in the sidebar, where Flint now opens: a greeting, today's reminders as cards, and **Focus**, every pinned task from every list, each showing its list. Pin a task with P (or its menu) to bring it here.
+- **Changes in Today go to the task's own list**: complete, edit, prioritise or add notes there as in any list.
+- **Put Today in your own order** with Alt+↑/↓ or by dragging; your lists keep theirs.
+- **Add tasks from Today**: they go to Inbox (or the `##list` you type), already pinned.
+- **Unfinished from yesterday**: on the first look at Today each day, Flint asks whether to keep yesterday's unfinished pinned tasks (Roll over) or unpin them (Clear). They always stay in their lists.
+
 ## 0.4.23 (3 Nov 2026)
 
 - **A click selects a task**, wherever you click, the title too. Click it again, or double-click, to edit, with the cursor where you clicked. A link in a title opens with a click once the task is selected, or with Ctrl+click.
