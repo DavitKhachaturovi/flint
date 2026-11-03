@@ -157,6 +157,33 @@ describe('parseCapture: lists (CAP-05, D-25)', () => {
   });
 });
 
+describe('parseCapture: list names of several words (D-87)', () => {
+  const one: ListInfo = { id: 'n1l', name: 'new list 1', mode: 'tasks' };
+  const two: ListInfo = { id: 'n2l', name: 'new list 2', mode: 'tasks' };
+  const many = [inbox, one, two, meeting];
+
+  it('takes the longest existing name the words spell out', () => {
+    const result = capture('ship it ##new list 2 today', { lists: many });
+    expect(result.target).toEqual({ kind: 'existing', list: two });
+    expect(result.title).toBe('ship it today');
+    expect(capture('##New-List 1 notes', { lists: many }).target).toEqual({
+      kind: 'existing',
+      list: one,
+    });
+    // A note of several words is found too (and stays text, D-25).
+    expect(capture('agenda ##meeting notes', { lists: many }).target).toEqual({ kind: 'inbox' });
+    expect(capture('agenda ##meeting notes', { lists: many }).title).toBe('agenda ##meeting notes');
+  });
+
+  it('falls back to the one-word rules when no name of several words matches', () => {
+    expect(capture('##new list 3', { lists: many }).target).toMatchObject({
+      kind: 'close-match',
+      name: 'new',
+    });
+    expect(capture('##new2 list', { lists: many }).target).toEqual({ kind: 'new', name: 'new2' });
+  });
+});
+
 describe('parseCapture: lines', () => {
   it('reads shorthand on the first line only; the rest is the body, verbatim', () => {
     const result = capture('crash in importer !h\nat Foo(@30m) !l ##infra\n  at Bar');

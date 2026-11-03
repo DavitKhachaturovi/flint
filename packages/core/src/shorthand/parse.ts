@@ -2,7 +2,7 @@ import { codeSpanRanges, rangeContaining } from '../format/code-spans.js';
 import { readPriority, type Priority } from '../format/fields.js';
 import type { LocalDateTime } from '../time/local-datetime.js';
 import { describeTime, matchTime } from '../time/parse.js';
-import { resolveList, type ListInfo, type ListResolution } from './lists.js';
+import { normalizeListName, resolveList, type ListInfo, type ListResolution } from './lists.js';
 
 /**
  * Capture shorthand (CAP-03): `!h` priority, `##list` list (D-25), `@<time>` reminder (REM-02).
@@ -55,6 +55,30 @@ export interface CaptureParse {
 
 const PRIORITY_TOKEN = /^!(h|high|m|med|medium|l|low)(?=\s|$)/i;
 const LIST_NAME = /^[\p{L}\p{N}_.-]+/u;
+
+/** The most words a list name after `##` is looked for in (D-87). */
+const MAX_NAME_WORDS = 8;
+
+/**
+ * D-87: the longest run of two or more words after `##` that spells an existing list's (or note's)
+ * name exactly, ignoring case, spaces and hyphens (D-25), ending at a word boundary; its length in
+ * `text`, or 0. `##new list 2` finds "new list 2" even when "new list 1" exists too.
+ */
+function multiWordName(text: string, lists: readonly ListInfo[]): number {
+  const names = new Set(
+    lists.filter((list) => /\s/.test(list.name.trim())).map((list) => normalizeListName(list.name)),
+  );
+  if (names.size === 0) return 0;
+  // The first words, separated by spaces or tabs (not line breaks).
+  const words = /^\S+(?:[ \t]+\S+){0,7}/.exec(text)?.[0] ?? '';
+  const ends: number[] = [];
+  for (const match of words.matchAll(/\S+/g)) ends.push(match.index + match[0].length);
+  for (let count = Math.min(ends.length, MAX_NAME_WORDS); count >= 2; count--) {
+    const end = ends[count - 1] ?? 0;
+    if (names.has(normalizeListName(text.slice(0, end)))) return end;
+  }
+  return 0;
+}
 
 interface Found {
   readonly kind: TokenKind;
@@ -113,6 +137,15 @@ function scan(line: string, context: ShorthandContext): { found: Found[]; escape
         continue;
       }
     } else if (char === '#' && line.startsWith('##', index)) {
+      // D-87: an existing list's name of several words first, then the one-word rules (D-25).
+      const long = multiWordName(line.slice(index + 2), context.lists);
+      if (long > 0) {
+        const end = index + 2 + long;
+        const name = line.slice(index + 2, end);
+        found.push({ kind: 'list', start: index, end, list: resolveList(name, context.lists) });
+        index = end;
+        continue;
+      }
       const match = LIST_NAME.exec(line.slice(index + 2));
       const name = (match?.[0] ?? '').replace(/\.+$/, '');
       if (name !== '') {
