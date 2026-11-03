@@ -513,3 +513,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 11 | Composer ## menu and close-match card back; longest exact list name wins (popup too) | CAP-03, CAP-05 · Done (0.4.21) | 02, D-87 |
 | 12 | Picture menus: Copy image, Open in viewer / default app, Show in folder; in the viewer too | MEDIA-02 · Done (0.4.21) | 02, D-87 |
 | 13 | Move to top for lists and notes (Manual sort only) | LIST-06 · Done (0.4.21) | 02, D-87 |
+
+## X. M4 step 9 (3 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Smart link titles: user patterns, built-in recognizers, domain and path; no wrapping | TASK-10 · Done (0.4.22) | 02, D-88 |
+| 2 | Temporary sorts: priority, reminder time, date added; indicator; back to manual | TASK-08 · Done (0.4.22) | 02, D-88 |
+| 3 | Find in task lists: highlights, next/previous, opens Completed or a body | NAV-06 · Done (0.4.22) | 02, D-88 |
+| 4 | Multi-line paste: a task per line, one undo, Keep as one; code as one task | TASK-09 · Done (0.4.22) | 02, D-88 |
+| 5 | Two-finger swipe back and forward with the edge arrow | NAV-04 · Done (0.4.22) | 02, D-88 |
+| 6 | The auto-archive offer and archiving into `.flint/archive/` | TASK-06 · Done (0.4.22; Settings in M8) | 02, 04, D-88 |

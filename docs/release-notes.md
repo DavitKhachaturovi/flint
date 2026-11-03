@@ -2,6 +2,15 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.22 (3 Nov 2026)
+
+- **Pasted links get short titles**: an Azure DevOps pull request shows as "PR 42", a work item as "AB#1234", GitHub issues and pull requests as "repo#12" and "repo!9", Jira as "KEY-5"; other links as their site and a short path. The full link stays in the file (hover to see it).
+- **Sort a list for a moment** by priority, reminder time or date added: right-click the list (or an empty spot in it) → Sort tasks by. Your own order stays; "Back to manual order" returns to it.
+- **Ctrl+F in a task list** finds text in titles and notes, Completed included; Enter and Shift+Enter go through the matches.
+- **Paste several lines** into a list (with nothing being edited) to get a task per line, below the selected task. "Keep as one" in the message turns them into one task with notes. Pasted code becomes one task with a code block.
+- **Swipe with two fingers** on the touchpad to go back and forward, as in the browser.
+- **Lists with 50 or more completed tasks** offer to archive tasks completed more than two weeks ago, automatically. They move to an archive file in the Flint folder; nothing is deleted.
+
 ## 0.4.21 (3 Nov 2026)
 
 - **Notes are never lost**: in the panel, under a task in the list, and on a task's page, notes are saved as you type, also when you click somewhere else right away.

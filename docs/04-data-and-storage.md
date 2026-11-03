@@ -27,7 +27,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
     meta.json                   ← per-task bookkeeping (created, last touched), keyed by task ID
     today.json                  ← Today's manual order (task IDs)
     sidebar.json                ← sidebar groups and the manual order of lists, notes and groups (LIST-05, LIST-06, D-73)
-    archive/                    ← auto-archived completed tasks, one file per list (TASK-06)
+    archive/                    ← auto-archived completed tasks, one task list per list: `<list ID>.md` (TASK-06, D-88)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
 ```
 

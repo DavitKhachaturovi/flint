@@ -234,6 +234,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-69:** undoing a completion (Ctrl+Z or the toast's Undo) plays the same un-complete animation as un-checking (D-67).
 - **Auto-archive:** Flint offers to auto-archive completed tasks older than **N days** (N configurable) so the Completed section doesn't grow forever. Archived tasks remain on disk (04) and remain searchable via Ctrl+K (**Proposed**).
 
+- **The auto-archive offer built (0.4.22, D-88, Q-13):** off by default; a Completed section of 50+ offers it ("Turn on · Not now", Not now remembered per list on this machine); on, tasks completed more than 14 days ago move to `.flint/archive/<list ID>.md` at once, at start-up and at each day change (not undoable). Off and the days in Settings (M8).
 ### TASK-07 — Multi-select and bulk actions (v1)
 - **Shift+↑/↓** (and Shift+click / Ctrl+click with the mouse) selects multiple tasks.
 - Bulk actions: set priority, move to another list, complete, star to Today (and delete, undoable).
@@ -246,10 +247,12 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Manual (drag) order stays the source of truth: the temporary sort is a view; leaving it, or reordering manually, returns to manual order. **Proposed:** a clear "Sorted by priority · Back to manual order" indicator while active.
 - **D-72:** the temporary sort offers **Priority**, **Reminder time** and **Date added**. **Proposed:** tasks without a reminder sort last; Date added uses `created` from `.flint/meta.json` (04), file order where it is missing; the indicator names the sort ("Sorted by reminder time · Back to manual order"). Milestone M4 step 10.
 
+- **Built (0.4.22, D-88, Proposed details):** in a list's right-click menu and the page's blank-area menu; headings and text left out while sorted, subtasks under their parents; missing reminders and dates last, date added newest first; Alt+↑/↓ while sorted returns to the manual order; nothing drags while sorted; another list ends the sort.
 ### TASK-09 — Multi-line paste creates multiple tasks (v1)
 - Pasting N lines of plain text into a task list creates N tasks, with a toast offering **"Keep as one?"** (which merges them back into a single task with the text as its body). Great for dumping meeting action items.
 - **Proposed:** if the pasted text is detected as a stack trace, code, or JSON (CAP-06 rules), it is treated as one task with a code-block body instead of being split.
 
+- **Built (0.4.22, D-88, Proposed details):** below the selected task or at the top; list markers and checkboxes dropped, shorthand kept as text; one undo step; the toast has **Keep as one** (first line the title, the rest the notes) and Undo; code is one untitled task with a code block (D-45).
 ### TASK-10 — Smart link titles (v1)
 - Pasted URLs are displayed with short, meaningful titles; the full URL is kept in the file.
 - Example: `https://dev.azure.com/.../pullrequest/42` displays as **"PR 42"**.
@@ -258,6 +261,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Long URLs never wrap rows**; they truncate with an ellipsis.
 - Applies in task titles, task bodies, and notes.
 
+- **Built (0.4.22, D-88, Proposed details):** the user's pattern, else the presets as built-in recognizers (`PR 42`, `AB#1234`, `repo#12`, `repo!9`, `KEY-5`), else domain and shortened path (about 40 characters); the URL is the link's tooltip; long links end in an ellipsis in rows.
 ### TASK-11 — Move tasks between lists (v1)
 - Any task (or a multi-selection) can be moved to another list via a fuzzy list picker, the context menu, the command palette, or the multi-select action bar. **D-64:** not by dragging onto a sidebar list (the drag is locked to the list, D-54).
 - This is the core action for sorting Inbox later. A dedicated single-key binding is **not decided** (see Q-06).
@@ -477,6 +481,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - No visible back/forward buttons, except the back arrow on a task page (TASK-05).
 - Milestone M4, with the page view.
 
+- **Swipe built (0.4.22, D-88, Proposed details):** about 240 px of horizontal touchpad scroll steps; the arrow grows at that edge; not over sideways-scrolling content, not with Ctrl, only when there is somewhere to go.
 ### NAV-05 — Tabs bar (Later, D-62)
 - Obsidian-style tabs for several open lists and pages. Later: it needs careful design to fit the visual language. v1 has one view at a time with back/forward (NAV-04).
 
@@ -526,6 +531,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Task lists:** matches are highlighted and **Enter / Shift+Enter** jump to the next / previous one; nothing is filtered. **Proposed:** titles and bodies are searched, the Completed section included; a match in a collapsed body or a collapsed Completed section opens it when jumped to; Esc closes the bar and keeps the selection on the last match. Milestone M4 step 10 (M5 if it doesn't fit).
 - **Notes:** CodeMirror's search, restyled to the same bar. Milestone M5.
 
+- **Built for task lists (0.4.22, D-88):** as proposed above; the matches are highlighted with the CSS Custom Highlight API; a jump opens Completed or a body under its row.
 ### MINI-01 — Mini mode (v1)
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
 - **Proposed:** supports adding a task, completing, and seeing reminders; everything else opens the main window.
