@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.25 (4 Nov 2026)
+
+- **Open on a reminder takes you to the task**: its list opens, the task is scrolled into view, selected and flashed.
+- **Lists, notes and pages remember where you were**: coming back (back, or the sidebar) puts you at the same place, at once.
+- **Code copied from Windows apps pastes again**: in a note it pasted nothing. Code on a single line is now recognised as code too.
+- **The task menu is tidier**: Complete, Edit and Open as page first; Priority, Reminder and Pin; Add (subtask, notes); Move to and Duplicate; More (indent, outdent, format as code, convert to note); Delete.
+- Fixed: "Open in viewer" on a picture in a note, selected text in the panel missing its first characters, and the note's find bar sitting too low and drifting while scrolling.
+
 ## 0.4.24 (3 Nov 2026)
 
 - **Today**, first in the sidebar, where Flint now opens: a greeting, today's reminders as cards, and **Focus**, every pinned task from every list, each showing its list. Pin a task with P (or its menu) to bring it here.
