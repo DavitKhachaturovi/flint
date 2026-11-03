@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.26 (4 Nov 2026)
+
+- **Today, redesigned**: a progress line under the date ("2 of 7 done") fills as you finish today's pinned tasks and reminders.
+- **Focus shows high-priority tasks too**, below your pinned ones, quieter; press P to pin one. Done pinned tasks stay, faded, with the time you finished them, until tomorrow.
+- **The next reminder stands out**, with a live countdown; cards go as their time comes, without leaving Today.
+- **A Today column on wide screens**: a timeline of today's reminders with a line for now, what you finished today, and today's captures with a "Sort Inbox" button. On smaller windows these sit under Focus and fold. Shift+Enter or a task's notes icon shows its details there; the back arrow or Esc returns.
+- **"Unfinished from yesterday" stays** until you choose Roll over, Clear or ×.
+
 ## 0.4.25 (4 Nov 2026)
 
 - **Open on a reminder takes you to the task**: its list opens, the task is scrolled into view, selected and flashed.
