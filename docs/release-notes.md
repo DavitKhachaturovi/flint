@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.27 (4 Nov 2026)
+
+- **Open on a reminder is instant**: the task is scrolled to, selected and flashed straight away, also when it was already selected.
+- **Click a task in Today to see its details** in the column on the right; Esc, the back arrow or a click on empty space brings the timeline back.
+- **Drag a reminder on the timeline** to change its time, in quarter hours (hold Alt for 5 minutes). Ctrl+Z undoes it.
+- **Done today and Captured today are always there**, saying so when empty. "Sort Inbox" stands out, and the list name on a task in Today opens that list.
+- Fixed: a scrollbar flashing as Today's column appeared, the task details shifting as they opened and scrolling a little past the top, and reminder cards' hover shadows spilling over their neighbours.
+
 ## 0.4.26 (4 Nov 2026)
 
 - **Today, redesigned**: a progress line under the date ("2 of 7 done") fills as you finish today's pinned tasks and reminders.
