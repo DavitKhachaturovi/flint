@@ -83,8 +83,10 @@ export function openMenu(
 ): void {
   closeMenu();
   if (entries.every((entry) => entry === 'divider')) return;
-  // D-78: what the menu was opened on, to move with it.
-  const anchor = document.elementFromPoint(at.x, at.y);
+  // D-78: what the menu was opened on, to move with it: its row when it is one (D-86: the row's
+  // contents may be drawn again as it is selected for the menu; the row stays).
+  const point = document.elementFromPoint(at.x, at.y);
+  const anchor = point?.closest('[data-key]') ?? point;
   let shift = { x: 0, y: 0 };
   const levels: Level[] = [];
 

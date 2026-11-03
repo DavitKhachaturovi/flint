@@ -33,6 +33,16 @@ export interface Outline {
   readonly headings: readonly OutlineHeading[];
   /** Checklist items (`- [ ]`, `- [x]`). */
   readonly checklist: { readonly done: number; readonly total: number };
+  /**
+   * D-86: where the clickable facts' items start, in order: open checklist items, code blocks,
+   * images and links (not inside code).
+   */
+  readonly facts: {
+    readonly open: readonly number[];
+    readonly code: readonly number[];
+    readonly images: readonly number[];
+    readonly links: readonly number[];
+  };
   /** Whether there is anything to outline (no headings and no blocks: the panel shows Up next). */
   readonly empty: boolean;
 }
@@ -138,6 +148,12 @@ export function outline(text: string): Outline {
   const before: OutlineBlock[] = [];
   let done = 0;
   let total = 0;
+  const facts = {
+    open: [] as number[],
+    code: [] as number[],
+    images: [] as number[],
+    links: [] as number[],
+  };
   const add = (block: OutlineBlock): void => {
     const current = headings.at(-1);
     if (current) current.blocks.push(block);
@@ -170,6 +186,7 @@ export function outline(text: string): Outline {
           body ? text.slice(body.from, body.to) : '',
         );
         add({ kind: 'code', title, tag, from: node.from });
+        facts.code.push(node.from);
         return false;
       }
       if (node.name === 'CodeBlock') {
@@ -180,6 +197,7 @@ export function outline(text: string): Outline {
           .join('\n');
         const { title, tag } = codeBlockTitle('', code);
         add({ kind: 'code', title, tag, from: node.from });
+        facts.code.push(node.from);
         return false;
       }
       if (node.name === 'Image') {
@@ -194,11 +212,23 @@ export function outline(text: string): Outline {
           tag: video ? 'video' : 'image',
           from: node.from,
         });
+        if (!video) facts.images.push(node.from);
         return false;
       }
+      if (node.name === 'Link') {
+        const url = node.node.getChild('URL');
+        if (url && /^https?:\/\//i.test(text.slice(url.from, url.to))) facts.links.push(node.from);
+        return false;
+      }
+      if (node.name === 'URL') {
+        if (/^https?:\/\//i.test(text.slice(node.from, node.to))) facts.links.push(node.from);
+        return false;
+      }
+      if (node.name === 'InlineCode') return false;
       if (node.name === 'TaskMarker') {
         total++;
         if (/x/i.test(text.slice(node.from, node.to))) done++;
+        else facts.open.push(node.from);
       }
       return undefined;
     },
@@ -207,6 +237,7 @@ export function outline(text: string): Outline {
     blocks: before,
     headings,
     checklist: { done, total },
+    facts,
     empty:
       headings.length === 0 && before.length === 0 && !headings.some((h) => h.blocks.length > 0),
   };

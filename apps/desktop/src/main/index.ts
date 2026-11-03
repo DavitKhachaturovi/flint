@@ -355,8 +355,11 @@ async function start(): Promise<void> {
     else if (command === 'selectAll') contents.selectAll();
   });
   ipcMain.on(Channels.mainOpenLink, (event, href: unknown) => {
-    if (owns(event.sender) && typeof href === 'string' && isOpenableLink(href))
-      void shell.openExternal(href);
+    if (!owns(event.sender) || typeof href !== 'string' || !isOpenableLink(href)) return;
+    // Tests never open a browser on the machine running them.
+    const hooks = e2eHooks();
+    if (hooks) hooks.opened.push(href);
+    else void shell.openExternal(href);
   });
   ipcMain.handle(Channels.mainListAction, (event, action: unknown) => {
     if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
@@ -435,6 +438,12 @@ async function start(): Promise<void> {
           'Flint opens pictures, videos and documents by itself. This is another kind of file.',
       });
       if (answer.response !== 0) return 'cancelled';
+    }
+    // Tests never open a file's app on the machine running them.
+    const hooks = e2eHooks();
+    if (hooks) {
+      hooks.opened.push(path);
+      return 'opened';
     }
     const problem = await shell.openPath(path);
     return problem === '' ? 'opened' : 'refused';

@@ -19,8 +19,14 @@ export function NoteEditor(props: {
   readonly onImage: ShowImage;
   /** NOTE-06, D-84: shown in monospace (this machine's choice). */
   readonly mono: boolean;
+  /** D-86: just made by Convert to note: the cursor goes to the end of the text, ready to type. */
+  readonly focus?: boolean;
+  readonly onFocused?: () => void;
 }): ReactElement {
-  const { id, text, readOnly, onId, onImage, mono } = props;
+  const { id, text, readOnly, onId, onImage, mono, focus, onFocused } = props;
+  useEffect(() => {
+    if (focus) onFocused?.();
+  }, [focus, onFocused]);
   const latest = useRef({ id, value: text, dirty: false });
   const timer = useRef<number | undefined>(undefined);
 
@@ -53,6 +59,7 @@ export function NoteEditor(props: {
       monospace={{ on: mono, toggle: () => void window.flintMain.noteMono(id, !mono) }}
       ariaLabel="Note"
       readOnly={readOnly}
+      {...(focus && !readOnly ? { autoFocus: true, caretAtEnd: true } : {})}
       {...(readOnly ? {} : { placeholder: 'Write here' })}
       handlers={{
         openLink: (href) => window.flintMain.openLink(href),

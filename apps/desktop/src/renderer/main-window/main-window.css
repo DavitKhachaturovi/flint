@@ -2578,18 +2578,41 @@ a.auto-link {
   flex-basis: 780px;
 }
 
-/* D-85: the panel's top lines up with the composer (or the note card) and stays there while the
-   page scrolls; --panel-top is measured. */
+/* D-85, D-86: the panel starts level with the composer (or the note card; --panel-top is measured),
+   scrolls up with the page and sticks 16 px below the title bar. Its scrollbar shows only when its
+   content overflows (never while it animates). */
 .context-panel {
   position: sticky;
-  top: var(--panel-top, 4px);
+  /* Never below where it starts (a note card starts higher than the 16 px margin). */
+  top: min(16px, var(--panel-top, 4px));
   flex: 0 0 440px;
-  max-height: calc(100vh - 40px - var(--panel-top, 4px) - 24px);
+  max-height: calc(100vh - 40px - 32px);
   margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  animation: panel-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+/* D-86: shown with Ctrl+\ or the panel button, it slides and fades in; hidden, a copy of it slides
+   and fades out (the column glides meanwhile). A window resize shows or hides it at once. */
+.context-panel.entering {
+  animation: panel-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.context-panel.panel-leaving {
+  z-index: 5;
+  overflow: hidden;
+  animation: panel-out var(--fl-dur-page) cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+.context-panel.panel-leaving * {
+  animation: none !important;
+}
+
+@keyframes panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
 }
 
 .pair.compact > .context-panel {
@@ -2599,7 +2622,7 @@ a.auto-link {
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translateX(24px);
   }
 }
 
@@ -2951,11 +2974,22 @@ a.auto-link {
   border-top: 1px solid var(--fl-edge-divider);
 }
 
+/* D-86: a fact is a button: it jumps through its items. */
 .panel-fact {
   display: flex;
   justify-content: space-between;
+  width: calc(100% + 16px);
+  margin-left: -8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  text-align: left;
   font-size: 13.5px;
   color: var(--fl-text-heading-soft);
+  transition: background-color var(--fl-dur-fast);
+}
+
+.panel-fact:hover {
+  background: var(--fl-ground-hover);
 }
 
 .panel-fact-value {
@@ -3085,4 +3119,95 @@ a.auto-link {
   display: flex;
   align-items: center;
   color: var(--fl-text-faint);
+}
+
+/* D-86: Up next rows: the title first, at one left edge; on the right, as on task rows, the icon
+   beside the time, then the list. */
+.panel-item .panel-item-when {
+  order: 2;
+  min-width: 0;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.panel-item .panel-item-list {
+  order: 3;
+}
+
+.panel-item.today .panel-item-when,
+.panel-item.tomorrow .panel-item-when {
+  color: var(--fl-text-secondary);
+}
+
+.panel-pin {
+  display: flex;
+  border-radius: 4px;
+  color: var(--fl-text-faint);
+  cursor: default;
+}
+
+.panel-pin:hover {
+  color: var(--fl-text-primary);
+}
+
+/* D-86: an extra section's rows line up with every other section's. */
+.panel-extra-inner {
+  margin-left: -8px;
+  padding-left: 0;
+}
+
+.panel-extra-inner > .panel-item {
+  margin-left: 0;
+}
+
+.panel-chip.pin.on {
+  color: var(--fl-text-primary);
+}
+
+/* D-86: the notes, edited in place in the M5 editor. */
+.panel-notes {
+  margin-left: -4px;
+}
+
+.panel-notes .panel-editor {
+  min-height: 44px;
+}
+
+.panel-subtask-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--fl-text-primary);
+}
+
+.panel-subtask-input::placeholder {
+  color: var(--fl-text-faint);
+}
+
+/* D-86: the place a fact jumped to lights up a moment. */
+.fl-flash {
+  animation: fl-flash 900ms ease-out;
+}
+
+@keyframes fl-flash {
+  from {
+    background-color: var(--fl-ground-float);
+  }
+}
+
+/* D-86: a task's page: its title and notes on the note's card. */
+.page-card {
+  gap: 10px;
+}
+
+.page-card > .page-head {
+  padding-bottom: 0;
+}
+
+.pin-ind {
+  border-radius: 4px;
+}
+
+.pin-ind:hover {
+  color: var(--fl-text-primary);
 }

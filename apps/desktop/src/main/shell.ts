@@ -53,6 +53,8 @@ export interface E2EHooks {
   readonly captured: string[];
   /** Reminder toasts, recorded instead of shown in tests (`label | title`). */
   readonly toasts: string[];
+  /** Links and files a click would open in the browser or their app, recorded instead. */
+  readonly opened: string[];
   showPopup?: () => void;
   /** A toast button's activation URL, as Windows would hand it over (REM-05). */
   activate?: (url: string) => void;
@@ -62,7 +64,7 @@ export interface E2EHooks {
 export function e2eHooks(): E2EHooks | undefined {
   if (app.isPackaged || process.env.FLINT_E2E !== '1') return undefined;
   const global = globalThis as { __flintE2E?: E2EHooks };
-  global.__flintE2E ??= { blockedRequests: [], captured: [], toasts: [] };
+  global.__flintE2E ??= { blockedRequests: [], captured: [], toasts: [], opened: [] };
   return global.__flintE2E;
 }
 

@@ -77,4 +77,23 @@ describe('the context panel outline (NAV-07, D-83)', () => {
     expect(outline('Just a few words.\n- [ ] and a checkbox').empty).toBe(true);
     expect(outline('![shot](attachments/a.png)').blocks).toMatchObject([{ title: 'shot' }]);
   });
+
+  it('finds where the clickable facts are: open checklist items, code, images, links (D-86)', () => {
+    const text = [
+      '- [ ] one',
+      '- [x] two',
+      '- [ ] three',
+      '```',
+      'https://in.code/ignored',
+      '```',
+      '![shot](attachments/a.png) and ![clip](attachments/b.mp4)',
+      'See [docs](https://example.com/docs), https://example.com/bare and `https://x.y/z`.',
+    ].join('\n');
+    const { facts } = outline(text);
+    const at = (needle: string): number => text.indexOf(needle);
+    expect(facts.open).toEqual([at('[ ] one'), at('[ ] three')]);
+    expect(facts.code).toEqual([at('```')]);
+    expect(facts.images).toEqual([at('![shot]')]);
+    expect(facts.links).toEqual([at('[docs]'), at('https://example.com/bare')]);
+  });
 });

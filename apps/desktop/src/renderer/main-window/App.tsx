@@ -64,7 +64,12 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
-import { ContextPanel, type PanelHandlers, type PanelState } from './ContextPanel.js';
+import {
+  ContextPanel,
+  type FactKind,
+  type PanelHandlers,
+  type PanelState,
+} from './ContextPanel.js';
 import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
@@ -295,6 +300,49 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 const BLANK_EXCEPT =
   '.row, .context-panel, .composer, .body-card, .inline-body, .completed-head, button, a, input, textarea, [contenteditable], .menu, .picker';
 
+/** D-86: what "In this task" jumps through on a task's page, in order. */
+function pageFactTargets(root: HTMLElement, kind: FactKind): HTMLElement[] {
+  const selector = {
+    open: '.page-subtasks .row:not(.done)',
+    code: '.task-page .body-view .code-card',
+    images: '.task-page .body-view :is(img, .fl-media)',
+    links: '.task-page .body-view a[href^="http"]',
+  }[kind];
+  return [...root.querySelectorAll<HTMLElement>(selector)];
+}
+
+/** D-86: the place a jump landed on lights up a moment. */
+function flash(element: Element): void {
+  element.classList.remove('fl-flash');
+  void (element as HTMLElement).offsetWidth;
+  element.classList.add('fl-flash');
+  window.setTimeout(() => element.classList.remove('fl-flash'), 900);
+}
+
+/** D-86: a copy of the hidden panel slides and fades out where it was. */
+function leavingPanel(panel: HTMLElement): void {
+  const box = panel.getBoundingClientRect();
+  const copy = panel.cloneNode(true) as HTMLElement;
+  copy.classList.add('panel-leaving');
+  copy.setAttribute('aria-hidden', 'true');
+  Object.assign(copy.style, {
+    position: 'fixed',
+    top: `${box.top}px`,
+    left: `${box.left}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
+    margin: '0',
+    pointerEvents: 'none',
+  });
+  document.body.append(copy);
+  const done = (): void => copy.remove();
+  // Its own fade's end, not one of its contents' (they bubble).
+  copy.addEventListener('animationend', (event) => {
+    if (event.target === copy) done();
+  });
+  window.setTimeout(done, 1000);
+}
+
 /** The note's editor, when a note is open (the outline measures and scrolls through it). */
 function noteEditorView(root: HTMLElement): CodeEditorView | null {
   const editor = root.querySelector<HTMLElement>('.note-editor .cm-editor');
@@ -429,6 +477,8 @@ export function App(): ReactElement {
   /** D-80: sidebar rows move to their new places (sort, groups, new and deleted items). */
   const motion = useMemo(() => sidebarMotion(() => sidebar.current), []);
 
+  /** D-86: a note just made by Convert to note: its editor takes the cursor when it opens. */
+  const [focusNote, setFocusNote] = useState<string | null>(null);
   const listsRef = useRef(lists);
   listsRef.current = lists;
   const sidebarRef = useRef(sidebarView);
@@ -596,12 +646,41 @@ export function App(): ReactElement {
   useEffect(() => {
     if (panelShown) setExpanded(new Set());
   }, [panelShown]);
+  /**
+   * D-86: showing and hiding animate: the panel slides and fades in, or a copy of it slides and
+   * fades out, and the column glides to its new place. A window resize switches at once.
+   */
+  const columnFrom = useRef<number | null>(null);
+  const [panelEntering, setPanelEntering] = useState(false);
   const togglePanel = useCallback((): void => {
+    if (!reducedMotion()) {
+      columnFrom.current = content.current?.getBoundingClientRect().left ?? null;
+      const shown = document.querySelector<HTMLElement>('.context-panel');
+      if (shown) leavingPanel(shown);
+      else setPanelEntering(true);
+    }
     setPanelHidden((hidden) => {
       window.flintMain.setPanel(!hidden);
       return !hidden;
     });
   }, []);
+  useLayoutEffect(() => {
+    const from = columnFrom.current;
+    columnFrom.current = null;
+    const column = content.current;
+    if (from === null || !column) return;
+    const delta = from - column.getBoundingClientRect().left;
+    if (Math.abs(delta) < 1) return;
+    column.animate([{ transform: `translateX(${delta}px)` }, { transform: 'none' }], {
+      duration: durationMs('--fl-dur-page', 320),
+      easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
+    });
+  }, [panelShown]);
+  useEffect(() => {
+    if (!panelEntering) return;
+    const timer = window.setTimeout(() => setPanelEntering(false), 600);
+    return () => window.clearTimeout(timer);
+  }, [panelEntering]);
   /** Inline bodies closing: shown a moment longer, playing their closing animation (D-76). */
   const [closingBodies, setClosingBodies] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -1038,9 +1117,17 @@ export function App(): ReactElement {
   const bulkMenu = useCallback(
     (at: Point): void => {
       const open = markedRows.some((row) => !row.done);
+      const count = tasksCount(markedRows.length);
       openMenu(
         [
-          { label: open ? 'Complete' : 'Reopen', hint: 'Space', action: bulkComplete },
+          // D-86: the menu says what it acts on.
+          { label: `${markedRows.length} selected`, disabled: true },
+          'divider',
+          {
+            label: `${open ? 'Complete' : 'Reopen'} ${count}`,
+            hint: 'Space',
+            action: bulkComplete,
+          },
           ...(open
             ? [
                 {
@@ -1054,11 +1141,11 @@ export function App(): ReactElement {
                 },
               ]
             : []),
-          { label: 'Move to…', action: () => bulkMove(new DOMRect(at.x, at.y, 0, 0)) },
+          { label: `Move ${count} to…`, action: () => bulkMove(new DOMRect(at.x, at.y, 0, 0)) },
           // TODAY-01, D-85: pins all, or unpins all when all are pinned.
           markedRows.every((row) => row.pinned)
-            ? { label: 'Unpin', hint: 'P', action: () => void pin(markedRows, false) }
-            : { label: 'Pin', hint: 'P', action: () => void pin(markedRows, true) },
+            ? { label: `Unpin ${count}`, hint: 'P', action: () => void pin(markedRows, false) }
+            : { label: `Pin ${count}`, hint: 'P', action: () => void pin(markedRows, true) },
           'divider',
           { label: `Delete ${tasksCount(markedRows.length)}`, hint: 'Del', action: bulkDelete },
         ],
@@ -1097,11 +1184,14 @@ export function App(): ReactElement {
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
     (row: TaskRow, at: Point): void => {
-      // TASK-07: a marked row's menu acts on all the marked tasks.
+      // TASK-07, D-86: inside the marks, the menu acts on all of them; outside, the right-clicked
+      // task alone is selected first (Windows Explorer).
       if (marked.size > 1 && marked.has(row.key)) {
         bulkMenu(at);
         return;
       }
+      setMarked(NOTHING);
+      setSelected(row.key);
       const open = !row.done;
       const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
         label,
@@ -1225,7 +1315,11 @@ export function App(): ReactElement {
             label: 'Convert to note',
             action: () =>
               void change({ kind: 'toNote', key: row.key }).then((outcome) => {
-                if (outcome) showToast(outcome.label, true);
+                if (!outcome) return;
+                showToast(outcome.label, true);
+                // D-86: the new note opens, ready to type.
+                setFocusNote(outcome.listId);
+                go({ list: outcome.listId, page: null });
               }),
           },
           'divider',
@@ -1234,7 +1328,27 @@ export function App(): ReactElement {
         at,
       );
     },
-    [change, edit, mute, remove, toggle, lists, listId, moveTask, changeReminder, pin],
+    // D-86: the marks are read here (inside or outside them), so they are a dependency.
+    [
+      marked,
+      bulkMenu,
+      view,
+      change,
+      edit,
+      mute,
+      remove,
+      toggle,
+      lists,
+      listId,
+      moveTask,
+      changeReminder,
+      pin,
+      openPage,
+      openNotes,
+      addSubtask,
+      showToast,
+      go,
+    ],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -1404,11 +1518,14 @@ export function App(): ReactElement {
         if (!outcome.ok) return showToast(outcome.problem, false);
         if (outcome.label) showToast(outcome.label, true);
       };
-      // D-59: a marked list's menu deletes all the marked lists and notes.
+      // D-59, D-86: inside the marks, the menu acts on all the marked lists and notes; outside,
+      // on the right-clicked one alone, and the marks go (Windows Explorer).
       if (markedLists.size > 1 && markedLists.has(list.id)) {
         const ids = [...markedLists];
         openMenu(
           [
+            { label: `${ids.length} selected`, disabled: true },
+            'divider',
             {
               label: `Delete ${ids.length} lists and notes`,
               action: () =>
@@ -1423,6 +1540,7 @@ export function App(): ReactElement {
         );
         return;
       }
+      setMarkedLists(NOTHING);
       const other = list.mode === 'note' ? 'tasks' : 'note';
       // LIST-05: into a group, or out of one.
       const groups = (sidebarView?.items ?? []).filter(
@@ -1484,7 +1602,14 @@ export function App(): ReactElement {
             action: () =>
               void window.flintMain
                 .listAction({ kind: 'convert', id: list.id, mode: other })
-                .then(done),
+                .then((outcome) => {
+                  done(outcome);
+                  // D-86: a list that became a note opens, ready to type.
+                  if (outcome?.ok && other === 'note') {
+                    setFocusNote(outcome.listId);
+                    go({ list: outcome.listId, page: null });
+                  }
+                }),
           },
           'divider',
           ...grouping,
@@ -1503,7 +1628,17 @@ export function App(): ReactElement {
         at,
       );
     },
-    [listId, openList, showToast, markedLists, sidebarView, sidebarChange, reorderable, setNaming],
+    [
+      listId,
+      openList,
+      showToast,
+      markedLists,
+      sidebarView,
+      sidebarChange,
+      reorderable,
+      setNaming,
+      go,
+    ],
   );
 
   /** The sidebar's lists in the order shown (Inbox first), for Shift+click ranges. */
@@ -2121,6 +2256,7 @@ export function App(): ReactElement {
     onTab: tab,
     onMenu: (task, at) => taskMenu(task, at),
     onMute: (key, muted) => void mute(key, muted),
+    onPin: (task, pinned) => void pin([task], pinned),
     onReminder: (task, anchor) => changeReminder(task, anchor),
     expanded,
     onBody: (task) => showBody(task),
@@ -2271,6 +2407,76 @@ export function App(): ReactElement {
     });
   }
 
+  // D-86: the open list or note went away (an undone Convert to note, a file deleted outside
+  // Flint): back to the last place whose list is still there, else Inbox.
+  const knownLists = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const ids = new Set(lists.map((list) => list.id));
+    const before = knownLists.current;
+    knownLists.current = ids;
+    // Only a list that was there and is gone; a new one may not be in the lists yet.
+    if (!before.has(listId) || ids.has(listId)) return;
+    const trail = history.current;
+    for (let at = trail.at - 1; at >= 0; at--) {
+      const place = trail.places[at];
+      if (place && ids.has(place.list)) {
+        trail.at = at;
+        show(place, place.select ?? null, true);
+        return;
+      }
+    }
+    openList('inbox');
+  }, [lists, listId, show, openList]);
+
+  /** D-86: a subtask added in the panel: below the last subtask, or as the first one. */
+  const addSubtaskIn = async (task: TaskRow, text: string): Promise<void> => {
+    if (text.trim() === '') return;
+    const id = (await window.flintMain.reserveId()) ?? undefined;
+    const last = task.subtasks.at(-1);
+    await change({
+      kind: 'many',
+      label: 'Added subtask',
+      changes: [
+        { kind: 'add', text, where: { after: last?.key ?? task.key }, ...(id ? { id } : {}) },
+        ...(last || !id ? [] : [{ kind: 'indent' as const, key: id }]),
+      ],
+    });
+  };
+  /**
+   * D-86: "In this note" / "In this task": a fact's click jumps to its first item, the next click to
+   * the next one (wrapping). A note scrolls its editor; a task's page its rendered body.
+   */
+  const factAt = useRef<{ kind: string; index: number } | null>(null);
+  const jumpToFact = (kind: FactKind, positions: readonly number[]): void => {
+    const root = scroller.current;
+    if (!root) return;
+    const cm = noteEditorView(root);
+    const targets = cm ? [] : pageFactTargets(root, kind);
+    const count = cm ? positions.length : targets.length;
+    if (count === 0) return;
+    const index = factAt.current?.kind === kind ? (factAt.current.index + 1) % count : 0;
+    factAt.current = { kind, index };
+    const behavior = reducedMotion() ? 'auto' : 'smooth';
+    if (cm) {
+      const from = positions[index] ?? 0;
+      const y = cm.documentTop + cm.lineBlockAt(from).top - root.getBoundingClientRect().top;
+      root.scrollTo({ top: root.scrollTop + y - root.clientHeight / 3, behavior });
+      window.setTimeout(() => {
+        const at = cm.domAtPos(from).node;
+        const line = (at instanceof Element ? at : at.parentElement)?.closest('.cm-line');
+        if (line) flash(line);
+      }, 320);
+      return;
+    }
+    const target = targets[index];
+    if (!target) return;
+    target.scrollIntoView({ block: 'center', behavior });
+    flash(target);
+  };
+  useEffect(() => {
+    factAt.current = null;
+  }, [view?.id, page]);
+
   /** NAV-07, D-85: "Show panel" / "Hide panel", where a right-click menu has room for it. */
   const panelItem = (): MenuEntry[] =>
     wide && view
@@ -2403,6 +2609,15 @@ export function App(): ReactElement {
     onMenu: (at) => panelMenu(at),
     onOpenPage: openPage,
     onToggle: (key) => void toggle(key),
+    onPin: (task, pinned) => void pin([task], pinned),
+    onUnpin: (item) =>
+      void window.flintMain
+        .change(item.listId, { kind: 'pin', key: item.key, pinned: false })
+        .then((outcome) => {
+          if (outcome) showToast(outcome.label, true);
+        }),
+    onNewSubtask: (task, text) => void addSubtaskIn(task, text),
+    onFact: (kind, positions) => jumpToFact(kind, positions),
     onTitle: (key, text) => void change({ kind: 'edit', key, text }),
     onPriority: (task, anchor) =>
       openPriorityPicker(
@@ -2676,6 +2891,8 @@ export function App(): ReactElement {
                     onId={setListId}
                     onImage={showImage}
                     mono={view.mono === true}
+                    focus={focusNote === view.id}
+                    onFocused={() => setFocusNote(null)}
                   />
                 </div>
               )}
@@ -2767,6 +2984,7 @@ export function App(): ReactElement {
                 upNext={upNextItems}
                 current={outlineCurrent}
                 back={panelBack}
+                entering={panelEntering}
                 handlers={panelHandlers}
               />
             )}
@@ -3477,6 +3695,8 @@ interface RowHandlers {
 
   /** REM-12: the bell turns the reminder off or on. */
   readonly onMute: (key: string, muted: boolean) => void;
+  /** TODAY-01, D-86: the row's pin unpins. */
+  readonly onPin: (task: TaskRow, pinned: boolean) => void;
   /** REM-01, D-68: the time opens the date/time picker for the task. */
   readonly onReminder: (task: TaskRow, anchor: DOMRect) => void;
   /** TASK-05, D-53: bodies shown inline, and the body indicator (inline or the task's page). */
@@ -3553,59 +3773,62 @@ function TaskPage(props: {
   const editable = !readOnly && !task.done;
   return (
     <>
-      <header className="page-head">
-        <button type="button" className="page-back" title="Back (Alt+←)" onClick={onBack}>
-          <BackIcon />
-        </button>
-        {editingTitle ? (
-          <TitleField
-            initial={task.title}
-            onLeave={(text, empty) => {
-              setEditingTitle(false);
-              if (!empty || hasBody(task)) onTitle(text);
+      {/* D-86: the title and the notes on the note's card (NOTE-01, D-85). */}
+      <div className="card note-card page-card">
+        <header className="page-head">
+          <button type="button" className="page-back" title="Back (Alt+←)" onClick={onBack}>
+            <BackIcon />
+          </button>
+          {editingTitle ? (
+            <TitleField
+              initial={task.title}
+              onLeave={(text, empty) => {
+                setEditingTitle(false);
+                if (!empty || hasBody(task)) onTitle(text);
+              }}
+            />
+          ) : (
+            <h1
+              className="page-title"
+              onClick={(event) => {
+                if ((event.target as HTMLElement).closest('a')) {
+                  event.preventDefault();
+                  const link = (event.target as HTMLElement).closest('a');
+                  if (link) window.flintMain.openLink(link.href);
+                } else if (editable) setEditingTitle(true);
+              }}
+            >
+              {task.title === '' ? (
+                task.label
+              ) : (
+                <span dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }} />
+              )}
+            </h1>
+          )}
+        </header>
+        {editingBody || hasBody(task) ? (
+          <BodyBlock
+            body={task.body}
+            inline={false}
+            editing={editingBody}
+            editable={editable}
+            placeholder="Notes, code, links…"
+            onImage={onImage}
+            onRemovePart={onRemovePart}
+            onEdit={() => setEditingBody(true)}
+            onDone={(body) => {
+              setEditingBody(false);
+              onBody(body);
             }}
           />
         ) : (
-          <h1
-            className="page-title"
-            onClick={(event) => {
-              if ((event.target as HTMLElement).closest('a')) {
-                event.preventDefault();
-                const link = (event.target as HTMLElement).closest('a');
-                if (link) window.flintMain.openLink(link.href);
-              } else if (editable) setEditingTitle(true);
-            }}
-          >
-            {task.title === '' ? (
-              task.label
-            ) : (
-              <span dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }} />
-            )}
-          </h1>
+          editable && (
+            <button type="button" className="page-add-body" onClick={() => setEditingBody(true)}>
+              Add notes, code or links
+            </button>
+          )
         )}
-      </header>
-      {editingBody || hasBody(task) ? (
-        <BodyBlock
-          body={task.body}
-          inline={false}
-          editing={editingBody}
-          editable={editable}
-          placeholder="Notes, code, links…"
-          onImage={onImage}
-          onRemovePart={onRemovePart}
-          onEdit={() => setEditingBody(true)}
-          onDone={(body) => {
-            setEditingBody(false);
-            onBody(body);
-          }}
-        />
-      ) : (
-        editable && (
-          <button type="button" className="page-add-body" onClick={() => setEditingBody(true)}>
-            Add notes, code or links
-          </button>
-        )
-      )}
+      </div>
       {children}
       {editable && (
         <button type="button" className="page-add-body" onClick={onAddSubtask}>
@@ -3715,6 +3938,9 @@ function Row(
       aria-hidden={ghost ? true : undefined}
       className={classes.join(' ')}
       onMouseDown={(event) => {
+        // D-86: a right-click doesn't select by itself: its menu keeps a multi-selection it lands
+        // in, or selects just this row (Windows Explorer).
+        if (event.button !== 0) return;
         // Shift+click marks a range of rows (TASK-07), never a text selection across them; an
         // edit in progress ends (leaving the field saves it).
         if (event.shiftKey) {
@@ -3733,7 +3959,7 @@ function Row(
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        onSelect(task.key);
+        // D-86: the menu selects this row unless it is inside a multi-selection (taskMenu).
         props.onMenu(task, { x: event.clientX, y: event.clientY });
       }}
       // D-71: double-click anywhere edits; inside the field it is the field's own (word selection).
@@ -3772,9 +3998,18 @@ function Row(
       )}
       <span className="ind">
         {task.pinned && (
-          <span className="pin-ind" title="Pinned (P)">
+          // D-86: the pin unpins.
+          <button
+            type="button"
+            className="pin-ind"
+            title="Unpin (P)"
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onPin(task, false);
+            }}
+          >
             <PinIcon />
-          </span>
+          </button>
         )}
         {task.reminder && !task.done && (
           // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the

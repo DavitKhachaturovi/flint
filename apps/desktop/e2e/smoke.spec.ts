@@ -1276,9 +1276,14 @@ test('multi-select, bulk actions, duplicate and convert (TASK-07, TASK-16, LIST-
   await main.locator('.nav', { hasText: 'Bulk copy' }).click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Convert to note').click();
   await expect.poll(() => readFile(join(flint, 'Bulk copy.md'), 'utf8')).toMatch(/mode: note\n/);
+  // D-86: the list that became a note opens.
+  await expect(main.locator('.note-card h1')).toHaveText('Bulk copy');
 
   // Ctrl+click marks lists in the sidebar; their menu deletes them together, one Undo restores.
-  await main.locator('.nav', { hasText: 'Bulk copy' }).click({ modifiers: ['Control'] });
+  await main
+    .locator('.nav', { hasText: 'Bulk' })
+    .filter({ hasNotText: 'copy' })
+    .click({ modifiers: ['Control'] });
   await expect(main.locator('.nav.marked')).toHaveCount(2);
   await main.locator('.nav', { hasText: 'Bulk copy' }).click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Delete 2 lists and notes').click();
@@ -1631,13 +1636,21 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
   await expect(panel).toHaveCount(0);
   await expect(main.locator('.panel-toggle')).toHaveCount(0);
 
-  // D-85: it slides in when the window gets wide enough (motion regression, D-79).
-  await resetMotion();
   await sizeTo(1920, 1040);
+  await expect(panel).toHaveCount(1);
+  // D-86: Ctrl+\ hides it with a slide and fade out, and shows it with one in (motion regression).
+  await resetMotion();
+  await main.keyboard.press('Control+Backslash');
+  await expect(main.locator('.context-panel:not(.panel-leaving)')).toHaveCount(0);
+  await expect
+    .poll(motion)
+    .toEqual(expect.arrayContaining(['animationend context-panel panel-out']));
+  await resetMotion();
+  await main.keyboard.press('Control+Backslash');
   await expect
     .poll(motion)
     .toEqual(expect.arrayContaining(['animationend context-panel panel-in']));
-  // Its top lines up with the composer's.
+  // Its top lines up with the composer's (D-85).
   await expect
     .poll(async () => Math.round((await top('.context-panel')) - (await top('.composer'))))
     .toBe(0);
@@ -1662,6 +1675,21 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
     );
   await expect(panel.locator('.panel-title')).toHaveText('Check the gateway logs');
   await expect(panel).toContainText('1 of 2');
+  // D-86: the notes are edited right in the panel, and a subtask is added there.
+  // (At the text's start: a click on a link opens it.)
+  await panel.locator('.panel-notes .cm-content').click({ position: { x: 3, y: 4 } });
+  await main.keyboard.press('Control+End');
+  await main.keyboard.type(' Then the DNS.');
+  await label.click();
+  await expect
+    .poll(() => readFile(join(flint, 'Panel tasks.md'), 'utf8'))
+    .toContain('incidents/42 Then the DNS.');
+  await panel.locator('.panel-add', { hasText: 'Add subtask' }).click();
+  await main.keyboard.type('Write the summary');
+  await main.keyboard.press('Enter');
+  await expect(panel).toContainText('1 of 3');
+  await expect(main.locator('.row.subtask', { hasText: 'Write the summary' })).toHaveCount(1);
+  await main.keyboard.press('Escape');
   // References (collapsed, one line with its count), opened with a click.
   const references = panel.locator('.panel-extra', { hasText: 'References' });
   await expect(references.locator('.panel-extra-count')).toHaveText('1');
@@ -1678,7 +1706,8 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
   await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
   await expect(panel.locator('.panel-title')).toHaveText('Plain task');
   await expect(panel.locator('.panel-state:not(.panel-ghost) .panel-back')).toHaveCount(0);
-  // P pins it (TODAY-01, D-85): a pin on the row, and in Up next's Pinned section.
+  // P pins it (TODAY-01, D-85): a pin on the row, and in Up next's Pinned section, its title
+  // first and the pin on the right (D-86).
   await main.keyboard.press('p');
   await expect(main.locator('.row', { hasText: 'Plain task' }).locator('.pin-ind')).toHaveCount(1);
   await expect
@@ -1688,22 +1717,45 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
   if (!box) throw new Error('no scroller');
   await main.mouse.click(box.x + 300, box.y + box.height - 40);
   await expect(label).toHaveText('Up next');
-  await expect(panel.locator('.panel-section.pinned .panel-item')).toContainText(['Plain task']);
-  await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
-  await main.keyboard.press('p');
+  const pinned = panel.locator('.panel-section.pinned .panel-item', { hasText: 'Plain task' });
+  await expect(pinned.locator(':scope > *').first()).toHaveClass('panel-item-title');
+  // D-86: a click on the row's pin unpins.
+  await main.locator('.row', { hasText: 'Plain task' }).locator('.pin-ind').click();
   await expect(main.locator('.row', { hasText: 'Plain task' }).locator('.pin-ind')).toHaveCount(0);
+  await expect(pinned).toHaveCount(0);
+
+  // D-86: right-click in a multi-selection acts on all of it and says so; outside, on one task.
+  await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
+  await main
+    .locator('.row', { hasText: 'Write it up' })
+    .click({ position: { x: 600, y: 10 }, modifiers: ['Control'] });
+  await main.locator('.row', { hasText: 'Plain task' }).click({ button: 'right' });
+  await expect(main.locator('.fl-menu .fl-menu-item').first()).toHaveText('2 selected');
+  await expect(main.locator('.fl-menu .fl-menu-item', { hasText: 'Pin 2 tasks' })).toHaveCount(1);
+  await main.keyboard.press('Escape');
+  await main.locator('.row', { hasText: 'Check the gateway logs' }).click({ button: 'right' });
+  await expect(main.locator('.fl-menu .fl-menu-item', { hasText: 'selected' })).toHaveCount(0);
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.row.marked')).toHaveCount(0);
 
   // Convert to note (TASK-17): a note named after the task; one undo brings the task back.
   await main.locator('.row', { hasText: 'Write it up' }).click({ button: 'right' });
-  await main.locator('.fl-menu-item', { hasText: 'Convert to note' }).click();
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Convert to note' }).click();
   await expect(main.locator('.nav', { hasText: 'Write it up' })).toHaveCount(1);
   await expect(main.locator('.row', { hasText: 'Write it up' })).toHaveCount(0);
   await expect
     .poll(() => readFile(join(flint, 'Write it up.md'), 'utf8'))
     .toMatch(/mode: note\n---\nNotes for the write-up\.\n$/);
-  await main.keyboard.press('Control+z');
-  await expect(main.locator('.row', { hasText: 'Write it up' })).toHaveCount(1);
+  // D-86: the note opens, the cursor in it.
+  await expect(main.locator('.note-card h1')).toHaveText('Write it up');
+  await expect
+    .poll(() => main.evaluate(() => document.activeElement?.closest('.note-editor') !== null))
+    .toBe(true);
+  // Undo (the toast's) brings the task back; the window returns to its list.
+  await main.locator('.toast button', { hasText: 'Undo' }).click();
   await expect(main.locator('.nav', { hasText: 'Write it up' })).toHaveCount(0);
+  await expect(main.locator('h1')).toContainText('Panel tasks');
+  await expect(main.locator('.row', { hasText: 'Write it up' })).toHaveCount(1);
 
   // A note: on its card, its outline with the blocks under their heading, the checklist, and
   // "Created … · edited …". Scrolled to the end, the last heading is current (a scroll-spy).
@@ -1717,7 +1769,11 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
   await expect(panel.locator('.outline-block .outline-title')).toHaveText(
     'Check the gateway health',
   );
-  await expect(panel).toContainText('1 of 2');
+  // D-86: clickable facts: one open checklist item, one code block.
+  await expect(panel.locator('.panel-fact', { hasText: 'Open checklist items' })).toContainText(
+    '1',
+  );
+  await expect(panel.locator('.panel-fact', { hasText: 'Code blocks' })).toContainText('1');
   await expect(panel.locator('.panel-foot')).toContainText(/^Created .* · edited /);
   await expect(panel.locator('.outline-heading.current')).toHaveText('Goals');
   await main.locator('.scroller').evaluate((element) => {

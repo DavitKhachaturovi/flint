@@ -9,7 +9,9 @@ import {
 } from 'react';
 import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
+import { mediaUrl } from '../../shared/body-markdown.js';
 import { activeLinkPatterns } from '../../shared/link-patterns.js';
+import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { openAttachment } from '../media/media.js';
 import { panelExtras, type Attachment, type Reference } from '../panel/extras.js';
 import { outline as outlineOf, type Outline, type OutlineBlock } from '../panel/outline.js';
@@ -54,8 +56,18 @@ export type PanelState =
     }
   | { readonly kind: 'page'; readonly task: TaskRow };
 
+/** D-86: what "In this note" / "In this task" can jump through. */
+export type FactKind = 'open' | 'code' | 'images' | 'links';
+
 export interface PanelHandlers {
   readonly onHide: () => void;
+  /** TODAY-01, D-86: the Pin chip pins or unpins; a pin in Up next unpins its task. */
+  readonly onPin: (task: TaskRow, pinned: boolean) => void;
+  readonly onUnpin: (item: UpNextItem) => void;
+  /** D-86: a subtask typed in the panel. */
+  readonly onNewSubtask: (task: TaskRow, text: string) => void;
+  /** D-86: a fact's click: the next of its items (their offsets in a note's text). */
+  readonly onFact: (kind: FactKind, positions: readonly number[]) => void;
   /** D-85: back to what the panel showed before a link in it was followed; null when there's none. */
   readonly onBack: (() => void) | null;
   /** D-85: the panel's right-click menu (Hide panel). */
@@ -85,37 +97,53 @@ export function ContextPanel(props: {
   readonly current: number;
   /** D-85: the header's back arrow shows (a task reached from a link in the panel). */
   readonly back: boolean;
+  /** D-86: shown with Ctrl+\ or the panel button: it slides in (a resize shows it at once). */
+  readonly entering: boolean;
   readonly handlers: PanelHandlers;
 }): ReactElement {
   const { state, upNext, current, handlers } = props;
   const card = useRef<HTMLElement>(null);
   const inner = useRef<HTMLDivElement>(null);
-  // The card's height eases to its content's (D-83); a change of state crossfades.
-  const lastHeight = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    const content = inner.current;
-    const box = card.current;
-    if (!content || !box) return;
-    const observer = new ResizeObserver(() => {
-      const next = box.offsetHeight;
-      const before = lastHeight.current;
-      lastHeight.current = next;
-      if (before === null || Math.abs(before - next) < 1) return;
-      if (reducedMotion()) return;
-      box.animate([{ height: `${before}px` }, { height: `${next}px` }], {
-        duration: durationOf(box, 260),
-        easing: 'cubic-bezier(.2, .9, .3, 1)',
-      });
-    });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, []);
   const stateKey =
     state.kind === 'task'
       ? `task:${state.task.key}`
       : state.kind === 'page'
         ? `page:${state.task.key}`
         : state.kind;
+  // D-83, D-86: the card's height eases to its content's when the state changes, and only then
+  // (a section opening, a note being typed resize it as they go). No scrollbar while it moves.
+  const restingHeight = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const content = inner.current;
+    const box = card.current;
+    if (!content || !box) return;
+    const observer = new ResizeObserver(() => {
+      if (!box.getAnimations().some((animation) => animation.id === 'panel-height'))
+        restingHeight.current = box.offsetHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+  const lastKey = useRef(stateKey);
+  useLayoutEffect(() => {
+    const box = card.current;
+    if (!box || lastKey.current === stateKey) return;
+    lastKey.current = stateKey;
+    const running = box.getAnimations().filter((animation) => animation.id === 'panel-height');
+    const before = running.length > 0 ? box.getBoundingClientRect().height : restingHeight.current;
+    for (const animation of running) animation.cancel();
+    const next = box.offsetHeight;
+    restingHeight.current = next;
+    if (before === null || Math.abs(before - next) < 1 || reducedMotion()) return;
+    const animation = box.animate(
+      [
+        { height: `${before}px`, overflow: 'hidden' },
+        { height: `${next}px`, overflow: 'hidden' },
+      ],
+      { duration: durationOf(box, 260), easing: 'cubic-bezier(.2, .9, .3, 1)' },
+    );
+    animation.id = 'panel-height';
+  });
   const content = (
     <>
       {state.kind === 'task' && <TaskDetails state={state} back={props.back} handlers={handlers} />}
@@ -151,7 +179,7 @@ export function ContextPanel(props: {
   }, [ghost]);
   return (
     <aside
-      className="context-panel card"
+      className={props.entering ? 'context-panel card entering' : 'context-panel card'}
       ref={card}
       aria-label="Context"
       onContextMenu={(event) => {
@@ -246,11 +274,11 @@ function TaskDetails(props: {
   const { state, handlers } = props;
   const { task, listName, readOnly } = state;
   const [editingTitle, setEditingTitle] = useState(false);
-  const [editingBody, setEditingBody] = useState(false);
+  const [addingSubtask, setAddingSubtask] = useState(false);
   const editable = !readOnly && !task.done;
   useEffect(() => {
     setEditingTitle(false);
-    setEditingBody(false);
+    setAddingSubtask(false);
   }, [task.key]);
   const done = task.subtasks.filter((sub) => sub.done).length;
   return (
@@ -332,30 +360,35 @@ function TaskDetails(props: {
           <BellIcon />
           {task.reminder ?? 'Reminder'}
         </button>
+        {/* TODAY-01, D-86: pins or unpins. */}
+        <button
+          type="button"
+          className={task.pinned ? 'chip panel-chip pin on' : 'chip panel-chip pin'}
+          disabled={readOnly}
+          aria-pressed={task.pinned === true}
+          title={task.pinned ? 'Unpin (P)' : 'Pin (P)'}
+          onClick={() => handlers.onPin(task, !task.pinned)}
+        >
+          <PinIcon />
+          {task.pinned ? 'Pinned' : 'Pin'}
+        </button>
       </div>
       <section className="panel-section">
         <span className="panel-label">Notes</span>
-        {editingBody || task.body.trim() !== '' ? (
-          <BodyBlock
-            body={task.body}
-            inline={false}
-            editing={editingBody}
-            editable={editable}
-            placeholder="Notes, code, links…"
-            onImage={handlers.onImage}
-            onEdit={() => setEditingBody(true)}
-            onDone={(body) => {
-              setEditingBody(false);
-              if (body !== task.body) handlers.onBody(task.key, body);
-            }}
-            onRemovePart={(body, kind) => handlers.onRemovePart(task.key, body, kind)}
-            onRelink={(body) => handlers.onBody(task.key, body)}
-          />
+        {editable ? (
+          // D-86: the notes are always the M5 editor here, edited in place.
+          <PanelNotes task={task} handlers={handlers} />
         ) : (
-          editable && (
-            <button type="button" className="panel-add" onClick={() => setEditingBody(true)}>
-              Add notes, code or links
-            </button>
+          task.body.trim() !== '' && (
+            <BodyBlock
+              body={task.body}
+              inline={false}
+              editing={false}
+              editable={false}
+              onImage={handlers.onImage}
+              onEdit={() => undefined}
+              onDone={() => undefined}
+            />
           )
         )}
       </section>
@@ -376,15 +409,22 @@ function TaskDetails(props: {
             <span className="panel-subtask-title">{sub.title === '' ? sub.label : sub.title}</span>
           </div>
         ))}
-        {editable && (
-          <button type="button" className="panel-add" onClick={() => handlers.onAddSubtask(task)}>
-            <PlusIcon size={12} />
-            Add subtask
-          </button>
-        )}
+        {editable &&
+          (addingSubtask ? (
+            // D-86: typed here; Enter adds it and keeps the field for the next one.
+            <PanelSubtaskField
+              onAdd={(text) => handlers.onNewSubtask(task, text)}
+              onLeave={() => setAddingSubtask(false)}
+            />
+          ) : (
+            <button type="button" className="panel-add" onClick={() => setAddingSubtask(true)}>
+              <PlusIcon size={12} />
+              Add subtask
+            </button>
+          ))}
       </section>
       <Stamps created={task.created} edited={task.edited} />
-      <Extras text={taskText(task)} />
+      <Extras text={taskText(task)} onImage={handlers.onImage} />
     </>
   );
 }
@@ -466,7 +506,7 @@ function Extra(props: {
 }
 
 /** D-85: References and Attachments of a task or a note. */
-function Extras(props: { readonly text: string }): ReactElement {
+function Extras(props: { readonly text: string; readonly onImage: ShowImage }): ReactElement {
   const { references, attachments } = useMemo(
     () => panelExtras(props.text, activeLinkPatterns()),
     [props.text],
@@ -479,7 +519,7 @@ function Extras(props: { readonly text: string }): ReactElement {
         ))}
       </Extra>
       <Extra id="attachments" label="Attachments" count={attachments.length}>
-        <AttachmentRows attachments={attachments} />
+        <AttachmentRows attachments={attachments} onImage={props.onImage} />
       </Extra>
     </>
   );
@@ -499,8 +539,18 @@ function ReferenceRow(props: { readonly reference: Reference }): ReactElement {
   );
 }
 
-function AttachmentRows(props: { readonly attachments: readonly Attachment[] }): ReactElement {
-  const { attachments } = props;
+function AttachmentRows(props: {
+  readonly attachments: readonly Attachment[];
+  readonly onImage: ShowImage;
+}): ReactElement {
+  const { attachments, onImage } = props;
+  // D-86: a picture opens in the lightbox, with the other pictures; other files in their app.
+  const pictures = attachments.filter((each) => each.kind === 'image');
+  const open = (each: Attachment, holder: HTMLElement): void => {
+    const urls = pictures.map((picture) => mediaUrl(picture.link) ?? '');
+    if (each.kind === 'image' && !missing.has(each.link)) onImage(urls, pictures.indexOf(each));
+    else void openAttachment(holder, each.link);
+  };
   // MEDIA-03: a file that isn't where its link points is flagged.
   const [missing, setMissing] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
@@ -526,7 +576,7 @@ function AttachmentRows(props: { readonly attachments: readonly Attachment[] }):
             missing.has(each.link) ? 'panel-item attachment missing' : 'panel-item attachment'
           }
           title={each.link}
-          onClick={(event) => void openAttachment(event.currentTarget, each.link)}
+          onClick={(event) => open(each, event.currentTarget)}
         >
           <span className="outline-tile">
             {each.kind === 'file' ? <OpenPageIcon size={11} /> : <ImageIcon size={11} />}
@@ -540,6 +590,91 @@ function AttachmentRows(props: { readonly attachments: readonly Attachment[] }):
         </button>
       ))}
     </>
+  );
+}
+
+/**
+ * D-86: a task's notes in the panel, always in the M5 editor: typed in place, saved when the editor
+ * is left (Esc, a click elsewhere, another task). Changes from elsewhere show while it isn't being
+ * typed in.
+ */
+function PanelNotes(props: {
+  readonly task: TaskRow;
+  readonly handlers: PanelHandlers;
+}): ReactElement {
+  const { task, handlers } = props;
+  const [focused, setFocused] = useState(false);
+  // The text the editor was made with: it follows the task's body only while nobody types in it.
+  const [shown, setShown] = useState(task.body);
+  useEffect(() => {
+    if (!focused) setShown(task.body);
+  }, [task.body, focused]);
+  const save = (text: string): void => {
+    if (text.trim() !== task.body.trim()) handlers.onBody(task.key, text);
+  };
+  return (
+    <div
+      className="panel-notes"
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
+      <MarkdownEditor
+        key={`${task.key}:${shown}`}
+        text={shown}
+        className="body-editor panel-editor"
+        ariaLabel="Notes"
+        placeholder="Notes, code, links…"
+        handlers={{
+          openLink: (href) => window.flintMain.openLink(href),
+          openImage: (images, index) => handlers.onImage(images, index),
+        }}
+        onBlur={save}
+        onEscape={(text) => {
+          save(text);
+          (document.activeElement as HTMLElement | null)?.blur();
+        }}
+      />
+    </div>
+  );
+}
+
+/** D-86: a new subtask's title, typed in the panel. */
+function PanelSubtaskField(props: {
+  readonly onAdd: (text: string) => void;
+  readonly onLeave: () => void;
+}): ReactElement {
+  const { onAdd, onLeave } = props;
+  const [value, setValue] = useState('');
+  return (
+    <div className="panel-subtask adding">
+      <span className="check" aria-hidden="true" />
+      <input
+        className="panel-subtask-input"
+        aria-label="New subtask"
+        placeholder="Subtask"
+        autoFocus
+        value={value}
+        spellCheck={false}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => {
+          if (value.trim() !== '') onAdd(value);
+          onLeave();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            if (value.trim() !== '') onAdd(value);
+            setValue('');
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            setValue('');
+            onLeave();
+          }
+        }}
+      />
+    </div>
   );
 }
 
@@ -597,7 +732,23 @@ function UpNextRow(props: {
       className={`panel-item ${item.group}${item.done ? ' done' : ''}`}
       onClick={() => handlers.onGo(item)}
     >
+      <span className="panel-item-title">{item.title}</span>
       <span className="panel-item-when">
+        {item.group === 'pinned' && (
+          // D-86: the pin unpins.
+          <span
+            className="panel-pin"
+            role="button"
+            title="Unpin"
+            onClick={(event) => {
+              event.stopPropagation();
+              handlers.onUnpin(item);
+            }}
+          >
+            <PinIcon size={12} />
+          </span>
+        )}
+        {(item.group === 'today' || item.group === 'tomorrow') && <BellIcon />}
         {item.group === 'overdue' && (
           <span className="reminder overdue">
             <span className="reminder-bell">
@@ -606,10 +757,8 @@ function UpNextRow(props: {
             </span>
           </span>
         )}
-        {item.group === 'pinned' && <PinIcon size={11} />}
         {item.when}
       </span>
-      <span className="panel-item-title">{item.title}</span>
       <span className="panel-item-list">{item.listName}</span>
     </button>
   );
@@ -760,17 +909,47 @@ function NoteOutline(props: {
       )}
       <section className="panel-section panel-facts">
         <span className="panel-label">In this note</span>
-        {outline.checklist.total > 0 && (
-          <div className="panel-fact">
-            <span>Checklist</span>
-            <span className="panel-fact-value">
-              {outline.checklist.done} of {outline.checklist.total} done
-            </span>
-          </div>
-        )}
+        <Facts outline={outline} handlers={handlers} />
       </section>
       <Stamps created={created} edited={edited} />
-      <Extras text={text} />
+      <Extras text={text} onImage={handlers.onImage} />
+    </>
+  );
+}
+
+/**
+ * D-86: what is in a note or a task's page, each fact a button: open checklist items, code blocks,
+ * images and links with their counts; a click jumps to the first, the next click to the next.
+ */
+function Facts(props: {
+  readonly outline: Outline;
+  readonly handlers: PanelHandlers;
+  /** A task's page: its open subtasks are its checklist. */
+  readonly open?: number;
+}): ReactElement {
+  const { outline, handlers } = props;
+  const { facts } = outline;
+  const rows: [FactKind, string, number, readonly number[]][] = [
+    ['open', 'Open checklist items', props.open ?? facts.open.length, facts.open],
+    ['code', 'Code blocks', facts.code.length, facts.code],
+    ['images', 'Images', facts.images.length, facts.images],
+    ['links', 'Links', facts.links.length, facts.links],
+  ];
+  return (
+    <>
+      {rows
+        .filter(([, , count]) => count > 0)
+        .map(([kind, label, count, positions]) => (
+          <button
+            key={kind}
+            type="button"
+            className="panel-fact"
+            onClick={() => handlers.onFact(kind, positions)}
+          >
+            <span>{label}</span>
+            <span className="panel-fact-value">{count}</span>
+          </button>
+        ))}
     </>
   );
 }
@@ -792,6 +971,11 @@ function PageOutline(props: {
       <OutlineList outline={outline} current={current} handlers={handlers} />
       <section className="panel-section panel-facts">
         <span className="panel-label">In this task</span>
+        <Facts
+          outline={outline}
+          handlers={handlers}
+          open={task.subtasks.filter((sub) => !sub.done).length}
+        />
         {task.subtasks.length > 0 && (
           <div className="panel-fact">
             <span>Subtasks</span>
@@ -819,7 +1003,7 @@ function PageOutline(props: {
           </div>
         )}
       </section>
-      <Extras text={taskText(task)} />
+      <Extras text={taskText(task)} onImage={handlers.onImage} />
     </>
   );
 }
