@@ -84,6 +84,28 @@ function cannotPlay(holder: HTMLElement, link: string): void {
   holder.replaceChildren(...(badge ? [badge] : []), box);
 }
 
+/**
+ * MEDIA-02, D-87: a picture's menu items (thumbnails in bodies, notes and the composer, and the
+ * image viewer): Copy image, Open in viewer (when there is one to open), Open in default app,
+ * Show in folder. `source` is the picture's markdown link or its `app://` address.
+ */
+export function imageMenuItems(
+  source: string,
+  viewer?: () => void,
+): { label: string; action: () => void }[] {
+  const run = (action: 'copy' | 'show' | 'open', done?: string): void =>
+    void window.flintMain.imageAction(source, action).then((ok) => {
+      if (!ok) announce('That picture is no longer there');
+      else if (done) announce(done);
+    });
+  return [
+    { label: 'Copy image', action: () => run('copy', 'Copied image') },
+    ...(viewer ? [{ label: 'Open in viewer', action: viewer }] : []),
+    { label: 'Open in default app', action: () => run('open') },
+    { label: 'Show in folder', action: () => run('show') },
+  ];
+}
+
 /** Opens the file in its default app; a missing one turns into "File not found". */
 export async function openAttachment(holder: HTMLElement | null, link: string): Promise<void> {
   const outcome = await window.flintMain.openAttachment(link);
@@ -172,6 +194,11 @@ export interface LinkedNotice {
 
 export function announceLinked(notice: LinkedNotice): void {
   window.dispatchEvent(new CustomEvent<LinkedNotice>('flint:linked', { detail: notice }));
+}
+
+/** D-87: pictures shown in the main window's viewer. */
+export function showInViewer(images: string[], index: number): void {
+  window.dispatchEvent(new CustomEvent('flint:image', { detail: { images, index } }));
 }
 
 /** A short message (a refused program, a failed copy) for the window's toast. */

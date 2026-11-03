@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { imageMenuItems } from '../media/media.js';
+import { openMenu } from '../menu/menu.js';
 import { ChevronIcon, CloseIcon } from './icons.js';
 
 /** A duration token in ms (09 §9); 0 under reduce-motion, when nothing animates. */
@@ -67,6 +69,12 @@ export function Lightbox(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         if (!(event.target as Element).closest('img, button')) close();
+      }}
+      // MEDIA-02, D-87: the picture's menu (it is already in the viewer).
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (src !== '') openMenu(imageMenuItems(src), { x: event.clientX, y: event.clientY });
       }}
     >
       <img

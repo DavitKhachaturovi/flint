@@ -11,11 +11,10 @@ import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { mediaUrl } from '../../shared/body-markdown.js';
 import { activeLinkPatterns } from '../../shared/link-patterns.js';
-import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { openAttachment } from '../media/media.js';
 import { panelExtras, type Attachment, type Reference } from '../panel/extras.js';
 import { outline as outlineOf, type Outline, type OutlineBlock } from '../panel/outline.js';
-import { BodyBlock, type ShowImage } from './Body.js';
+import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import {
   BackIcon,
   BellIcon,
@@ -82,6 +81,8 @@ export interface PanelHandlers {
   readonly onRemovePart: (key: string, body: string, kind: 'code' | 'image') => void;
   readonly onAddSubtask: (task: TaskRow) => void;
   readonly onImage: ShowImage;
+  /** D-87: a subtask's right-click menu, as in the list (the panel keeps showing its task). */
+  readonly onTaskMenu: (task: TaskRow, at: { x: number; y: number }) => void;
   /** Up next: an item's task, in its list. */
   readonly onGo: (item: UpNextItem) => void;
   /** Outline: scrolls the note or the page to a heading or block (its offset in the text). */
@@ -97,8 +98,6 @@ export function ContextPanel(props: {
   readonly current: number;
   /** D-85: the header's back arrow shows (a task reached from a link in the panel). */
   readonly back: boolean;
-  /** D-86: shown with Ctrl+\ or the panel button: it slides in (a resize shows it at once). */
-  readonly entering: boolean;
   readonly handlers: PanelHandlers;
 }): ReactElement {
   const { state, upNext, current, handlers } = props;
@@ -179,7 +178,7 @@ export function ContextPanel(props: {
   }, [ghost]);
   return (
     <aside
-      className={props.entering ? 'context-panel card entering' : 'context-panel card'}
+      className="context-panel card"
       ref={card}
       aria-label="Context"
       onContextMenu={(event) => {
@@ -397,17 +396,7 @@ function TaskDetails(props: {
           Subtasks{task.subtasks.length > 0 ? ` · ${done} of ${task.subtasks.length}` : ''}
         </span>
         {task.subtasks.map((sub) => (
-          <div key={sub.key} className={sub.done ? 'panel-subtask done' : 'panel-subtask'}>
-            <button
-              type="button"
-              className={sub.done ? 'check on' : 'check'}
-              aria-label={sub.done ? 'Reopen subtask' : 'Complete subtask'}
-              onClick={() => handlers.onToggle(sub.key)}
-            >
-              {sub.done && <CheckIcon />}
-            </button>
-            <span className="panel-subtask-title">{sub.title === '' ? sub.label : sub.title}</span>
-          </div>
+          <PanelSubtask key={sub.key} sub={sub} handlers={handlers} />
         ))}
         {editable &&
           (addingSubtask ? (
@@ -593,49 +582,74 @@ function AttachmentRows(props: {
   );
 }
 
-/**
- * D-86: a task's notes in the panel, always in the M5 editor: typed in place, saved when the editor
- * is left (Esc, a click elsewhere, another task). Changes from elsewhere show while it isn't being
- * typed in.
- */
+/** D-86, D-87: a task's notes in the panel, always the M5 editor (Body.tsx's LiveNotes). */
 function PanelNotes(props: {
   readonly task: TaskRow;
   readonly handlers: PanelHandlers;
 }): ReactElement {
   const { task, handlers } = props;
-  const [focused, setFocused] = useState(false);
-  // The text the editor was made with: it follows the task's body only while nobody types in it.
-  const [shown, setShown] = useState(task.body);
-  useEffect(() => {
-    if (!focused) setShown(task.body);
-  }, [task.body, focused]);
-  const save = (text: string): void => {
-    if (text.trim() !== task.body.trim()) handlers.onBody(task.key, text);
-  };
+  return (
+    <div className="panel-notes">
+      <LiveNotes
+        id={task.key}
+        body={task.body}
+        className="body-editor panel-editor"
+        onSave={(text) => handlers.onBody(task.key, text)}
+        onImage={handlers.onImage}
+      />
+    </div>
+  );
+}
+
+/**
+ * D-87: a subtask in the panel, like its row in the list: the priority stripe, the pin and the
+ * reminder's bell and time, and the list's right-click menu.
+ */
+function PanelSubtask(props: {
+  readonly sub: TaskRow;
+  readonly handlers: PanelHandlers;
+}): ReactElement {
+  const { sub, handlers } = props;
   return (
     <div
-      className="panel-notes"
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      className={sub.done ? 'panel-subtask done' : 'panel-subtask'}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onTaskMenu(sub, { x: event.clientX, y: event.clientY });
       }}
     >
-      <MarkdownEditor
-        key={`${task.key}:${shown}`}
-        text={shown}
-        className="body-editor panel-editor"
-        ariaLabel="Notes"
-        placeholder="Notes, code, links…"
-        handlers={{
-          openLink: (href) => window.flintMain.openLink(href),
-          openImage: (images, index) => handlers.onImage(images, index),
-        }}
-        onBlur={save}
-        onEscape={(text) => {
-          save(text);
-          (document.activeElement as HTMLElement | null)?.blur();
-        }}
-      />
+      {!sub.done && <div className={`stripe p-${sub.priority ?? 'none'}`} />}
+      <button
+        type="button"
+        className={sub.done ? 'check on' : 'check'}
+        aria-label={sub.done ? 'Reopen subtask' : 'Complete subtask'}
+        onClick={() => handlers.onToggle(sub.key)}
+      >
+        {sub.done && <CheckIcon />}
+      </button>
+      <span className="panel-subtask-title">{sub.title === '' ? sub.label : sub.title}</span>
+      <span className="ind">
+        {sub.pinned && (
+          <button
+            type="button"
+            className="pin-ind"
+            title="Unpin (P)"
+            onClick={() => handlers.onPin(sub, false)}
+          >
+            <PinIcon />
+          </button>
+        )}
+        {sub.reminder && !sub.done && (
+          <span className={`reminder ${sub.reminderState ?? 'on'}`}>
+            <span className="reminder-bell">
+              <ReminderBellIcon />
+              <span className="overdue-dot" aria-hidden="true" />
+            </span>
+            <span className="reminder-when">{sub.reminder}</span>
+          </span>
+        )}
+      </span>
     </div>
   );
 }
@@ -651,7 +665,7 @@ function PanelSubtaskField(props: {
     <div className="panel-subtask adding">
       <span className="check" aria-hidden="true" />
       <input
-        className="panel-subtask-input"
+        className="title-input panel-subtask-input"
         aria-label="New subtask"
         placeholder="Subtask"
         autoFocus

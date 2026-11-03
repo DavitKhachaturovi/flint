@@ -6,6 +6,8 @@ import { extname, join } from 'node:path';
 import {
   app,
   BrowserWindow,
+  clipboard,
+  ClipboardItem,
   dialog,
   ipcMain,
   nativeImage,
@@ -54,6 +56,7 @@ import {
 import {
   attachFile,
   copyIntoFlint,
+  fileKind,
   linkedPath,
   openRule,
   type AttachOutcome,
@@ -415,6 +418,40 @@ async function start(): Promise<void> {
   });
   // D-84: opens an attachment in its default app: media and documents only; programs and scripts
   // never; anything else after asking.
+  // MEDIA-02, D-87: a picture's menu. Only pictures: never a program (D-84).
+  ipcMain.handle(Channels.mainImageAction, async (event, source: unknown, action: unknown) => {
+    if (!owns(event.sender) || typeof source !== 'string') return false;
+    if (action !== 'copy' && action !== 'show' && action !== 'open') return false;
+    const path = /^app:\/\//i.test(source)
+      ? (resolveMediaFile(source, folder.folder) ?? resolveLinkedFile(source))
+      : linkedPath(source, folder.folder);
+    if (!path || fileKind(path) !== 'image') return false;
+    const exists = await stat(path).then(
+      (info) => info.isFile(),
+      () => false,
+    );
+    if (!exists) return false;
+    if (action === 'copy') {
+      const image = nativeImage.createFromPath(path);
+      if (image.isEmpty()) return false;
+      // Electron 45's clipboard: W3C-style items (as a PNG, which every app pastes).
+      await clipboard.write([
+        new ClipboardItem({
+          'image/png': new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' }),
+        }),
+      ]);
+      return true;
+    }
+    // Tests never open Explorer or an app on the machine running them.
+    const hooks = e2eHooks();
+    if (hooks) {
+      hooks.opened.push(`${action}:${path}`);
+      return true;
+    }
+    if (action === 'show') shell.showItemInFolder(path);
+    else return (await shell.openPath(path)) === '';
+    return true;
+  });
   ipcMain.handle(Channels.mainOpenAttachment, async (event, link: unknown) => {
     if (!owns(event.sender) || typeof link !== 'string') return 'refused';
     const path = linkedPath(link, folder.folder);

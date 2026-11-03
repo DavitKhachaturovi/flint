@@ -1012,7 +1012,11 @@ export class Workspace {
     change: Extract<ListChange, { kind: 'add' }>,
     now: Date,
   ): Promise<ChangeOutcome | null> {
-    const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
+    const parsed = parseCapture(change.text, {
+      now,
+      lists: this.listInfos(),
+      ...(change.chooseNewList && { chooseNewList: true }),
+    });
     if (parsed.title.trim() === '') return null;
     let target = list;
     let created = false;

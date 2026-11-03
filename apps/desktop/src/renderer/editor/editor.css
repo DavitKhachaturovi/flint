@@ -133,6 +133,27 @@
   line-height: 0;
 }
 
+/* D-87: a closed fence without a language is only the card's top edge; the copy button stays in
+   its corner. */
+.cm-fl-code-start {
+  font-size: 0;
+  line-height: 0;
+}
+
+.cm-fl-code-start + .cm-line {
+  padding-right: 40px !important;
+}
+
+.cm-fl-code-start .cm-fl-code-copy {
+  font-size: var(--fl-size-meta);
+  line-height: normal;
+}
+
+/* D-87: a paragraph right after a code card keeps the normal paragraph spacing. */
+.cm-fl-after-code {
+  padding-top: 10px !important;
+}
+
 .cm-fl-code-label {
   font-size: 11px;
   color: var(--fl-text-faint);

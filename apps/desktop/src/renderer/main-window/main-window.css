@@ -1387,6 +1387,9 @@ textarea:not([readonly], [disabled]) {
   font-size: 13px;
   max-height: calc(1.6em * 8);
   overflow: hidden;
+  /* D-87: room for a code card's 1 px ring, so a body that starts with code isn't cut off. */
+  margin: -2px;
+  padding: 2px;
 }
 
 /* A long body opens its page from its preview (D-77): a soft hover shows it can be clicked. */
@@ -1707,6 +1710,12 @@ textarea:not([readonly], [disabled]) {
 
 .row-group.subtask {
   margin-left: 32px;
+}
+
+/* D-87: two raised cards in a row (a task and its subtask, both open) keep apart: their shadows
+   never overlap. */
+.row-group + .row-group {
+  margin-top: 6px;
 }
 
 .row-group > .row,
@@ -2592,38 +2601,19 @@ a.auto-link {
   overflow-y: auto;
 }
 
-/* D-86: shown with Ctrl+\ or the panel button, it slides and fades in; hidden, a copy of it slides
-   and fades out (the column glides meanwhile). A window resize shows or hides it at once. */
-.context-panel.entering {
-  animation: panel-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
+/* D-86, D-87: hidden, a copy of the panel slides out with the column (App.tsx animates both);
+   nothing inside it animates on its own. */
 .context-panel.panel-leaving {
   z-index: 5;
   overflow: hidden;
-  animation: panel-out var(--fl-dur-page) cubic-bezier(0.4, 0, 0.6, 1) forwards;
 }
 
 .context-panel.panel-leaving * {
   animation: none !important;
 }
 
-@keyframes panel-out {
-  to {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-}
-
 .pair.compact > .context-panel {
   flex-basis: 380px;
-}
-
-@keyframes panel-in {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
 }
 
 .panel-inner {
@@ -2797,12 +2787,49 @@ a.auto-link {
 }
 
 .panel-subtask {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 5px 0;
   font-size: 14px;
   color: var(--fl-text-heading-soft);
+}
+
+/* D-87: a panel subtask's stripe and indicators, as on its row in the list. */
+.panel-subtask .stripe {
+  left: -10px;
+  top: 8px;
+  bottom: 8px;
+}
+
+.panel-subtask-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-subtask .ind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--fl-font-mono);
+  font-size: 12px;
+  color: var(--fl-text-muted);
+}
+
+.panel-subtask .reminder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* D-87: the new subtask's field looks like the list's editing field. */
+.panel-subtask.adding {
+  margin-left: -8px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
 }
 
 .panel-subtask.done {
@@ -3164,10 +3191,7 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
-/* D-86: the notes, edited in place in the M5 editor. */
-.panel-notes {
-  margin-left: -4px;
-}
+/* D-86, D-87: the notes, edited in place in the M5 editor, at the panel's content inset. */
 
 .panel-notes .panel-editor {
   min-height: 44px;
@@ -3210,4 +3234,73 @@ a.auto-link {
 
 .pin-ind:hover {
   color: var(--fl-text-primary);
+}
+
+/* CAP-05, D-51, D-87: the composer's `##` menu and close-match card, as in the capture popup. */
+.composer-suggestions {
+  list-style: none;
+  margin: 0 4px 6px;
+  padding: 4px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.composer-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--fl-radius-tile);
+  font-size: var(--fl-size-body);
+  color: var(--fl-text-body);
+  cursor: default;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.composer-suggestion:hover,
+.composer-suggestion[aria-selected='true'] {
+  background: var(--fl-ground-hover);
+}
+
+.composer-suggestion-tile {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-heading-soft);
+}
+
+.composer-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 12px 8px;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+.composer-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.composer-option.selected {
+  color: var(--fl-text-highlight);
+}
+
+.composer-key {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-label);
+  color: var(--fl-text-secondary);
 }

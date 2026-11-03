@@ -1118,7 +1118,8 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect(main.locator('.body-block.long')).toBeVisible();
   await main.getByRole('button', { name: 'Open as page' }).click();
   await expect(main.locator('.page-title')).toHaveText('Long body');
-  await expect(main.locator('.body-view')).toContainText('line 30');
+  // D-87: a page's notes are the editor, as a note's body.
+  await expect(main.locator('.task-page .cm-content')).toContainText('line 1line 2');
   await main.keyboard.press('Escape');
   await expect(main.locator('h1')).toHaveText(/^Bodies/);
   await expect(main.locator('.row.sel .title')).toHaveText('Long body');
@@ -1135,14 +1136,14 @@ test('bodies: inline when small, a page when large, back and forward (TASK-05, N
   await expect
     .poll(() =>
       main
-        .locator('.body-view img')
+        .locator('.task-page .fl-media img')
         .first()
         .evaluate((image: HTMLImageElement) => image.naturalWidth),
     )
     .toBe(1);
   // D-79: a click on an image opens the lightbox on the task's images; ←/→ go through them, Esc
   // closes it and nothing else (the page stays).
-  await main.locator('.body-view img').first().click();
+  await main.locator('.task-page .fl-media img').first().click();
   const lightbox = main.locator('.lightbox');
   await expect(lightbox.locator('.lightbox-count')).toHaveText('1 / 2');
   await main.keyboard.press('ArrowRight');
@@ -1533,7 +1534,7 @@ test('large files linked where they are: badge, loading, File not found (MEDIA-0
     .locator('.row', { hasText: 'With linked files' })
     .click({ position: { x: 600, y: 10 } });
   await main.keyboard.press('Shift+Enter');
-  const media = main.locator('.body-view .fl-media');
+  const media = main.locator('.task-page .fl-media');
   await expect(media).toHaveCount(2);
   await expect(media.first().locator('.fl-media-badge')).toHaveText('Linked');
   await expect
@@ -1632,24 +1633,56 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
   const panel = main.locator('.context-panel');
   const label = panel.locator('.panel-state:not(.panel-ghost) .panel-head .panel-label');
   await main.locator('.nav', { hasText: 'Panel tasks' }).click();
+  // D-87 (D-51 parity): the composer's ## menu, as in the capture popup; Enter takes the list.
+  await main.locator('.composer-input').click();
+  await main.keyboard.type('Ship it ##Pan');
+  await expect(main.locator('.composer-suggestion').first()).toContainText('Panel');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.composer-input')).toHaveValue(/^Ship it ##Panel-/);
+  await expect(main.locator('.composer-suggestions')).toHaveCount(0);
+  await main.locator('.composer-input').fill('');
+  await main.locator('.composer-input').blur();
   // Narrow: no panel and no panel button.
   await expect(panel).toHaveCount(0);
   await expect(main.locator('.panel-toggle')).toHaveCount(0);
 
   await sizeTo(1920, 1040);
   await expect(panel).toHaveCount(1);
-  // D-86: Ctrl+\ hides it with a slide and fade out, and shows it with one in (motion regression).
-  await resetMotion();
-  await main.keyboard.press('Control+Backslash');
-  await expect(main.locator('.context-panel:not(.panel-leaving)')).toHaveCount(0);
-  await expect
-    .poll(motion)
-    .toEqual(expect.arrayContaining(['animationend context-panel panel-out']));
-  await resetMotion();
-  await main.keyboard.press('Control+Backslash');
-  await expect
-    .poll(motion)
-    .toEqual(expect.arrayContaining(['animationend context-panel panel-in']));
+  // D-87: show and hide are one choreography: the column and the panel (or its copy, hiding) move
+  // together, so the gap between them never closes (motion regression, D-79).
+  const choreography = (): Promise<{ gap: number; moving: boolean }> =>
+    main.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let gap = Infinity;
+          let moving = false;
+          const start = performance.now();
+          const tick = (): void => {
+            const column = document.querySelector('.content');
+            const side =
+              document.querySelector('.context-panel.panel-leaving') ??
+              document.querySelector('.context-panel');
+            if (column && side) {
+              gap = Math.min(
+                gap,
+                side.getBoundingClientRect().left - column.getBoundingClientRect().right,
+              );
+              moving ||= column.getAnimations().length > 0 && side.getAnimations().length > 0;
+            }
+            if (performance.now() - start < 450) requestAnimationFrame(tick);
+            else resolve({ gap: Math.round(gap), moving });
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+  for (const shown of [false, true]) {
+    const sampled = choreography();
+    await main.keyboard.press('Control+Backslash');
+    const result = await sampled;
+    expect(result.moving).toBe(true);
+    expect(result.gap).toBeGreaterThanOrEqual(20);
+    await expect(main.locator('.context-panel:not(.panel-leaving)')).toHaveCount(shown ? 1 : 0);
+  }
   // Its top lines up with the composer's (D-85).
   await expect
     .poll(async () => Math.round((await top('.context-panel')) - (await top('.composer'))))
@@ -1673,25 +1706,40 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
         'animationend panel-state panel-crossfade',
       ]),
     );
-  await expect(panel.locator('.panel-title')).toHaveText('Check the gateway logs');
+  await expect(panel.locator('.panel-state:not(.panel-ghost) .panel-title')).toHaveText(
+    'Check the gateway logs',
+  );
   await expect(panel).toContainText('1 of 2');
   // D-86: the notes are edited right in the panel, and a subtask is added there.
   // (At the text's start: a click on a link opens it.)
-  await panel.locator('.panel-notes .cm-content').click({ position: { x: 3, y: 4 } });
+  await panel
+    .locator('.panel-state:not(.panel-ghost) .panel-notes .cm-content')
+    .click({ position: { x: 3, y: 4 } });
   await main.keyboard.press('Control+End');
   await main.keyboard.type(' Then the DNS.');
-  await label.click();
+  // D-87: never lost: a click on another task right away (the panel moves on) still saves it.
+  await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
   await expect
     .poll(() => readFile(join(flint, 'Panel tasks.md'), 'utf8'))
     .toContain('incidents/42 Then the DNS.');
-  await panel.locator('.panel-add', { hasText: 'Add subtask' }).click();
+  await main
+    .locator('.row', { hasText: 'Check the gateway logs' })
+    .click({ position: { x: 600, y: 10 } });
+  await expect(panel.locator('.panel-state:not(.panel-ghost) .panel-title')).toHaveText(
+    'Check the gateway logs',
+  );
+  await panel
+    .locator('.panel-state:not(.panel-ghost) .panel-add', { hasText: 'Add subtask' })
+    .click();
   await main.keyboard.type('Write the summary');
   await main.keyboard.press('Enter');
   await expect(panel).toContainText('1 of 3');
   await expect(main.locator('.row.subtask', { hasText: 'Write the summary' })).toHaveCount(1);
   await main.keyboard.press('Escape');
   // References (collapsed, one line with its count), opened with a click.
-  const references = panel.locator('.panel-extra', { hasText: 'References' });
+  const references = panel.locator('.panel-state:not(.panel-ghost) .panel-extra', {
+    hasText: 'References',
+  });
   await expect(references.locator('.panel-extra-count')).toHaveText('1');
   await expect(references).not.toHaveClass(/open/);
   await references.locator('.panel-extra-head').click();
@@ -1704,7 +1752,9 @@ test('the context panel: Up next, pins, the selected task, back, a note outline,
 
   // The selection drives the panel; a click on blank space clears it (D-85).
   await main.locator('.row', { hasText: 'Plain task' }).click({ position: { x: 600, y: 10 } });
-  await expect(panel.locator('.panel-title')).toHaveText('Plain task');
+  await expect(panel.locator('.panel-state:not(.panel-ghost) .panel-title')).toHaveText(
+    'Plain task',
+  );
   await expect(panel.locator('.panel-state:not(.panel-ghost) .panel-back')).toHaveCount(0);
   // P pins it (TODAY-01, D-85): a pin on the row, and in Up next's Pinned section, its title
   // first and the pin on the right (D-86).

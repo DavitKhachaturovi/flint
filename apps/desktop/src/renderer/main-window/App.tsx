@@ -14,7 +14,10 @@ import {
   blockFor,
   classifyPaste,
   fencedBlock,
+  listToken,
+  listTokenAt,
   parseCapture,
+  suggestLists,
   type ListInfo,
   type TokenKind,
 } from '@flint/core/shorthand';
@@ -73,13 +76,13 @@ import {
 import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
-import { BodyBlock, type ShowImage } from './Body.js';
+import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
 import { codeLanguage } from '../../shared/code-language.js';
 import { setLinkPatterns } from '../../shared/link-patterns.js';
-import { relink, type LinkedNotice } from '../media/media.js';
+import { imageMenuItems, relink, showInViewer, type LinkedNotice } from '../media/media.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
@@ -311,6 +314,29 @@ function pageFactTargets(root: HTMLElement, kind: FactKind): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(selector)];
 }
 
+/** D-87: a move that can't happen (the first task's indent, say): the row nudges that way. */
+function nudge(key: string, direction: 'left' | 'right' | 'up' | 'down'): void {
+  if (reducedMotion()) return;
+  const row = document.querySelector<HTMLElement>(`.row[data-key="${CSS.escape(key)}"]`);
+  if (!row) return;
+  const moves: Record<typeof direction, readonly [number, number]> = {
+    left: [-6, 0],
+    right: [6, 0],
+    up: [0, -4],
+    down: [0, 4],
+  };
+  const [x, y] = moves[direction];
+  row.animate(
+    [
+      { translate: '0 0' },
+      { translate: `${x}px ${y}px` },
+      { translate: `${-x / 3}px ${-y / 3}px` },
+      { translate: '0 0' },
+    ],
+    { duration: 260, easing: 'ease-out' },
+  );
+}
+
 /** D-86: the place a jump landed on lights up a moment. */
 function flash(element: Element): void {
   element.classList.remove('fl-flash');
@@ -319,8 +345,8 @@ function flash(element: Element): void {
   window.setTimeout(() => element.classList.remove('fl-flash'), 900);
 }
 
-/** D-86: a copy of the hidden panel slides and fades out where it was. */
-function leavingPanel(panel: HTMLElement): void {
+/** D-86, D-87: a copy of the hidden panel, which slides and fades out from where it was. */
+function leavingPanel(panel: HTMLElement): HTMLElement {
   const box = panel.getBoundingClientRect();
   const copy = panel.cloneNode(true) as HTMLElement;
   copy.classList.add('panel-leaving');
@@ -335,12 +361,9 @@ function leavingPanel(panel: HTMLElement): void {
     pointerEvents: 'none',
   });
   document.body.append(copy);
-  const done = (): void => copy.remove();
-  // Its own fade's end, not one of its contents' (they bubble).
-  copy.addEventListener('animationend', (event) => {
-    if (event.target === copy) done();
-  });
-  window.setTimeout(done, 1000);
+  // Gone after its slide (D-87), or at the latest a second later.
+  window.setTimeout(() => copy.remove(), 1000);
+  return copy;
 }
 
 /** The note's editor, when a note is open (the outline measures and scrolls through it). */
@@ -602,6 +625,8 @@ export function App(): ReactElement {
    * its own, also in the same list, so back (the panel's arrow, Alt+←) returns to what was before.
    */
   const selectedRef = useRef<string | null>(null);
+  /** D-87: the next selection came from the keyboard or a panel link: scroll it into view. */
+  const followSelection = useRef(false);
   const followFromPanel = useCallback(
     (list: string, key: string): void => {
       const trail = history.current;
@@ -612,6 +637,7 @@ export function App(): ReactElement {
         { list, page: null, select: key, fromPanel: true },
       ];
       trail.at = trail.places.length - 1;
+      followSelection.current = true;
       show({ list, page: null }, key);
     },
     [show],
@@ -651,36 +677,61 @@ export function App(): ReactElement {
    * fades out, and the column glides to its new place. A window resize switches at once.
    */
   const columnFrom = useRef<number | null>(null);
-  const [panelEntering, setPanelEntering] = useState(false);
+  const leavingCopy = useRef<HTMLElement | null>(null);
   const togglePanel = useCallback((): void => {
     if (!reducedMotion()) {
       columnFrom.current = content.current?.getBoundingClientRect().left ?? null;
-      const shown = document.querySelector<HTMLElement>('.context-panel');
-      if (shown) leavingPanel(shown);
-      else setPanelEntering(true);
+      const shown = document.querySelector<HTMLElement>('.context-panel:not(.panel-leaving)');
+      leavingCopy.current = shown ? leavingPanel(shown) : null;
     }
     setPanelHidden((hidden) => {
       window.flintMain.setPanel(!hidden);
       return !hidden;
     });
   }, []);
+  // D-87: one choreography: the column and the panel (or, hiding, the panel's copy) move the same
+  // distance with the same curve, so the gap between them holds and they never overlap.
   useLayoutEffect(() => {
     const from = columnFrom.current;
+    const copy = leavingCopy.current;
     columnFrom.current = null;
+    leavingCopy.current = null;
     const column = content.current;
-    if (from === null || !column) return;
+    if (from === null || !column) {
+      copy?.remove();
+      return;
+    }
     const delta = from - column.getBoundingClientRect().left;
-    if (Math.abs(delta) < 1) return;
-    column.animate([{ transform: `translateX(${delta}px)` }, { transform: 'none' }], {
+    const timing = {
       duration: durationMs('--fl-dur-page', 320),
       easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
-    });
+    };
+    const shift = `translateX(${delta}px)`;
+    column.animate([{ transform: shift }, { transform: 'none' }], timing);
+    const panel = document.querySelector<HTMLElement>('.context-panel:not(.panel-leaving)');
+    if (panelShown && panel)
+      panel.animate(
+        [
+          { transform: shift, opacity: 0 },
+          { transform: 'none', opacity: 1 },
+        ],
+        timing,
+      );
+    if (copy) {
+      const out = copy.animate(
+        [
+          { transform: 'none', opacity: 1 },
+          { transform: `translateX(${-delta}px)`, opacity: 0 },
+        ],
+        { ...timing, fill: 'forwards' },
+      );
+      out.id = 'panel-out';
+      void out.finished.then(
+        () => copy.remove(),
+        () => copy.remove(),
+      );
+    }
   }, [panelShown]);
-  useEffect(() => {
-    if (!panelEntering) return;
-    const timer = window.setTimeout(() => setPanelEntering(false), 600);
-    return () => window.clearTimeout(timer);
-  }, [panelEntering]);
   /** Inline bodies closing: shown a moment longer, playing their closing animation (D-76). */
   const [closingBodies, setClosingBodies] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -753,6 +804,15 @@ export function App(): ReactElement {
     [hideToast],
   );
 
+  // D-87: pictures shown in the viewer from places without a handler of their own (a chip's menu).
+  useEffect(() => {
+    const onShow = (event: Event): void => {
+      const { images, index } = (event as CustomEvent<{ images: string[]; index: number }>).detail;
+      if (images.length > 0) setLightbox({ images, start: index });
+    };
+    window.addEventListener('flint:image', onShow);
+    return () => window.removeEventListener('flint:image', onShow);
+  }, []);
   // D-84: short messages from the editor and the media code (a refused program, a failed copy).
   useEffect(() => {
     const onNotice = (event: Event): void =>
@@ -877,7 +937,10 @@ export function App(): ReactElement {
   const tab = useCallback(
     (how: 'indent' | 'outdent'): void => {
       const current = editingRef.current;
-      if (current?.kind === 'task') void change({ kind: how, key: current.key });
+      if (current?.kind === 'task')
+        void change({ kind: how, key: current.key }).then((outcome) => {
+          if (!outcome) nudge(current.key, how === 'indent' ? 'right' : 'left');
+        });
       if (current?.kind === 'new') {
         const level = how === 'indent' ? 'in' : 'out';
         setEditing({ ...current, level: current.level === 'same' ? level : 'same' });
@@ -935,8 +998,13 @@ export function App(): ReactElement {
   );
 
   const addFromComposer = useCallback(
-    async (text: string): Promise<void> => {
-      const outcome = await change({ kind: 'add', text, where: 'top' });
+    async (text: string, chooseNewList: boolean): Promise<void> => {
+      const outcome = await change({
+        kind: 'add',
+        text,
+        where: 'top',
+        ...(chooseNewList && { chooseNewList }),
+      });
       if (!outcome?.key) return;
       if (outcome.listId !== listId) showToast(outcome.label, true);
       else setSelected(outcome.key);
@@ -1183,15 +1251,18 @@ export function App(): ReactElement {
 
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
   const taskMenu = useCallback(
-    (row: TaskRow, at: Point): void => {
+    (row: TaskRow, at: Point, keepSelection = false): void => {
       // TASK-07, D-86: inside the marks, the menu acts on all of them; outside, the right-clicked
       // task alone is selected first (Windows Explorer).
-      if (marked.size > 1 && marked.has(row.key)) {
+      if (!keepSelection && marked.size > 1 && marked.has(row.key)) {
         bulkMenu(at);
         return;
       }
-      setMarked(NOTHING);
-      setSelected(row.key);
+      // D-87: a subtask's menu in the panel leaves the selection (the panel's task) as it is.
+      if (!keepSelection) {
+        setMarked(NOTHING);
+        setSelected(row.key);
+      }
       const open = !row.done;
       const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
         label,
@@ -1550,7 +1621,15 @@ export function App(): ReactElement {
       const intoGroup = (to: { group: string | null; index: number }): void => {
         if (reorderable()) void sidebarChange({ kind: 'move', id: list.id, to });
       };
+      // LIST-06, D-87: to the top of where it is (its group, or the lists outside groups); only
+      // in the manual order, which is what it changes.
+      const manual = (sidebarView?.sort ?? 'manual') === 'manual';
       const grouping: MenuEntry[] = [
+        {
+          label: 'Move to top',
+          ...(manual ? {} : { hint: 'Switch to Manual', disabled: true }),
+          action: () => intoGroup({ group: inGroup?.id ?? null, index: 0 }),
+        },
         {
           label: 'Move to group',
           submenu: [
@@ -1802,6 +1881,7 @@ export function App(): ReactElement {
           anchor.current = next.key;
           setMarked(NOTHING);
         }
+        followSelection.current = true;
         setSelected(next.key);
         return;
       }
@@ -1813,6 +1893,9 @@ export function App(): ReactElement {
             kind: 'move',
             key: open.key,
             direction: event.key === 'ArrowDown' ? 'down' : 'up',
+          }).then((outcome) => {
+            // D-87: Alt+↑ on the first task, Alt+↓ on the last: a nudge.
+            if (!outcome) nudge(open.key, event.key === 'ArrowDown' ? 'down' : 'up');
           });
         return;
       }
@@ -1860,7 +1943,13 @@ export function App(): ReactElement {
         composer.current?.focus();
       } else if (event.key === 'Tab') {
         event.preventDefault();
-        if (open) void change({ kind: event.shiftKey ? 'outdent' : 'indent', key: open.key });
+        // D-87: an impossible indent or outdent nudges the row.
+        if (open)
+          void change({ kind: event.shiftKey ? 'outdent' : 'indent', key: open.key }).then(
+            (outcome) => {
+              if (!outcome) nudge(open.key, event.shiftKey ? 'left' : 'right');
+            },
+          );
       } else if (event.key === 'Delete' && row) {
         event.preventDefault();
         void remove(row.key);
@@ -2290,6 +2379,8 @@ export function App(): ReactElement {
           editable={!view?.readOnly}
           onEdit={() => setEditingBody(task.key)}
           onDone={(body) => saveBody(task.key, body)}
+          // D-87: saved as it is typed, and if the editor goes without being left.
+          onSave={(body) => void change({ kind: 'body', key: task.key, body })}
           onOpenPage={() => openPage(task.key)}
           onImage={showImage}
           onRemovePart={(body, kind) => removePart(task.key, body, kind)}
@@ -2427,6 +2518,68 @@ export function App(): ReactElement {
     }
     openList('inbox');
   }, [lists, listId, show, openList]);
+
+  /**
+   * D-87 (CAP-06 on a task's page): pasted code, JSON or a stack trace becomes a code block, and a
+   * pasted picture an attachment, in the selected subtask's notes, or with none selected in the
+   * task's own; one undo step. Other text waits for TASK-09's multi-line paste.
+   */
+  useEffect(() => {
+    if (!pageTask || view?.readOnly) return;
+    const onPaste = (event: ClipboardEvent): void => {
+      if (isTextField(event.target) || !event.clipboardData) return;
+      const target = pageTask.subtasks.find((sub) => sub.key === selected) ?? pageTask;
+      const append = (part: string): void =>
+        void change({
+          kind: 'body',
+          key: target.key,
+          body: [target.body.trim(), part].filter((piece) => piece !== '').join('\n\n'),
+        }).then((outcome) => {
+          if (outcome)
+            showToast(
+              target === pageTask ? 'Added to the notes' : `Added to ${target.label}`,
+              true,
+            );
+        });
+      const image = [...event.clipboardData.items]
+        .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        ?.getAsFile();
+      if (image) {
+        event.preventDefault();
+        void image
+          .arrayBuffer()
+          .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
+          .then((link) => {
+            if (link) append(`![](${link})`);
+          });
+        return;
+      }
+      const clipboard = event.clipboardData.getData('text/plain');
+      const kind = classifyPaste(clipboard);
+      if (kind === 'text') return;
+      event.preventDefault();
+      append(fencedBlock(blockFor(clipboard).text, kind === 'json' ? 'json' : ''));
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [pageTask, selected, view?.readOnly, change, showToast]);
+
+  // D-87: a row selected with ↑/↓ (or from a link in the panel) is scrolled into view, smoothly;
+  // a click or a right-click never moves the list.
+  useEffect(() => {
+    const follow = followSelection.current;
+    followSelection.current = false;
+    if (!selected || !follow) return;
+    const row = scroller.current?.querySelector<HTMLElement>(
+      `.row[data-key="${CSS.escape(selected)}"]`,
+    );
+    if (!row) return;
+    const area = scroller.current?.getBoundingClientRect();
+    const box = row.getBoundingClientRect();
+    // Only a row that is out of view (a click or a menu never moves the list).
+    if (area && box.top >= area.top && box.bottom <= area.bottom) return;
+    row.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [selected]);
 
   /** D-86: a subtask added in the panel: below the last subtask, or as the first one. */
   const addSubtaskIn = async (task: TaskRow, text: string): Promise<void> => {
@@ -2618,6 +2771,7 @@ export function App(): ReactElement {
         }),
     onNewSubtask: (task, text) => void addSubtaskIn(task, text),
     onFact: (kind, positions) => jumpToFact(kind, positions),
+    onTaskMenu: (task, at) => taskMenu(task, at, true),
     onTitle: (key, text) => void change({ kind: 'edit', key, text }),
     onPriority: (task, anchor) =>
       openPriorityPicker(
@@ -2984,7 +3138,6 @@ export function App(): ReactElement {
                 upNext={upNextItems}
                 current={outlineCurrent}
                 back={panelBack}
-                entering={panelEntering}
                 handlers={panelHandlers}
               />
             )}
@@ -3268,7 +3421,8 @@ function Composer(props: {
   readonly listId: string;
   readonly lists: readonly ListSummary[];
   readonly inputRef: RefObject<HTMLInputElement | null>;
-  readonly onAdd: (text: string) => Promise<void>;
+  /** `chooseNewList`: the close-match card was flipped to a new list (Tab, D-25). */
+  readonly onAdd: (text: string, chooseNewList: boolean) => Promise<void>;
 }): ReactElement {
   const { listId, lists, inputRef, onAdd } = props;
   const text = useInertText('', false);
@@ -3324,20 +3478,80 @@ function Composer(props: {
       ...pasted.flatMap((item) => (item.kind === 'image' ? [`![](${item.link})`] : [])),
     ];
     const body = parts.length > 0 ? `\n${parts.join('\n\n')}` : '';
+    const newList = parsed?.target.kind === 'new' && chooseNewFor !== null;
     text.reset('', false);
     setNotes(null);
     setPasted([]);
+    setChooseNewFor(null);
+    setCardAcceptedFor(null);
+    setMenuAcceptedFor(null);
     inputRef.current?.focus();
-    void onAdd(typed + body);
+    void onAdd(typed + body, newList);
   };
   // UI-09: auto-closing brackets and quotes in the composer.
   useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
   const infos = useMemo(() => listInfos(lists), [lists]);
   const { escaped, value } = text;
-  const parsed = useMemo(
-    () => (value.trim() === '' ? null : parseCapture(escaped(), { now: new Date(), lists: infos })),
-    [value, escaped, infos],
+  /**
+   * CAP-05, D-25, D-51, D-87: the popup's `##` menu (search and recent lists) and close-match card,
+   * here too. Tab on the card flips between the close match and a new list.
+   */
+  const [caret, setCaret] = useState(0);
+  const [highlight, setHighlight] = useState(-1);
+  const [menuAcceptedFor, setMenuAcceptedFor] = useState<string | null>(null);
+  const [chooseNewFor, setChooseNewFor] = useState<string | null>(null);
+  const [cardAcceptedFor, setCardAcceptedFor] = useState<string | null>(null);
+  const { parsed, flippedFrom } = useMemo(() => {
+    if (value.trim() === '') return { parsed: null, flippedFrom: null };
+    const now = new Date();
+    const first = parseCapture(escaped(), { now, lists: infos });
+    if (chooseNewFor && first.target.kind === 'close-match' && first.target.name === chooseNewFor)
+      return {
+        parsed: parseCapture(escaped(), { now, lists: infos, chooseNewList: true }),
+        flippedFrom: first.target.list,
+      };
+    return { parsed: first, flippedFrom: null };
+  }, [value, escaped, infos, chooseNewFor]);
+  const token = useMemo(() => {
+    const at = listTokenAt(value, caret);
+    // A pasted `##` is text (D-45): no menu for it.
+    if (!at || escaped().includes(`\\${value.slice(at.start, at.end)}`)) return null;
+    return { ...at, text: value.slice(at.start, at.end) };
+  }, [value, caret, escaped]);
+  const suggestions = useMemo(
+    () =>
+      token && token.text !== menuAcceptedFor ? suggestLists(token.typed, infos).slice(0, 5) : [],
+    [token, menuAcceptedFor, infos],
   );
+  useEffect(() => setHighlight(-1), [suggestions.map((list) => list.id).join()]);
+  const cardTarget =
+    parsed &&
+    (parsed.target.kind === 'close-match' || parsed.target.kind === 'new') &&
+    parsed.target.name !== cardAcceptedFor
+      ? parsed.target
+      : null;
+  /** Replaces a stretch of the title with the list's own spelling, the caret after it. */
+  const spell = (start: number, end: number, list: ListInfo): string => {
+    const spelled = `##${listToken(list.name)}`;
+    const next = value.slice(0, start) + spelled + value.slice(end);
+    text.change(next);
+    const at = start + spelled.length;
+    setCaret(at);
+    window.requestAnimationFrame(() => inputRef.current?.setSelectionRange(at, at));
+    return spelled;
+  };
+  const acceptSuggestion = (list: ListInfo | undefined): void => {
+    if (!list || !token) return;
+    setMenuAcceptedFor(spell(token.start, token.end, list));
+  };
+  const acceptCard = (): void => {
+    if (!parsed || !cardTarget) return;
+    const winner = parsed.tokens.find((item) => item.kind === 'list' && item.role === 'winner');
+    if (cardTarget.kind === 'close-match' && winner) {
+      const { toOriginal } = text.mapped();
+      setMenuAcceptedFor(spell(toOriginal(winner.start), toOriginal(winner.end), cardTarget.list));
+    } else setCardAcceptedFor(cardTarget.name);
+  };
   const chips: string[] = [];
   if (parsed?.priority) chips.push(PRIORITY_NAMES[parsed.priority]);
   const target = parsed?.target;
@@ -3390,7 +3604,14 @@ function Composer(props: {
         placeholder="Add a task…"
         value={value}
         spellCheck={false}
-        onChange={(event) => text.change(event.target.value)}
+        aria-controls="composer-suggestions"
+        onChange={(event) => {
+          text.change(event.target.value);
+          setCaret(event.target.selectionStart ?? event.target.value.length);
+        }}
+        onSelect={(event) =>
+          setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+        }
         onPaste={(event) => {
           if (!pasteRules(event)) text.paste();
         }}
@@ -3403,13 +3624,88 @@ function Composer(props: {
             else notesRef.current?.focus();
           } else if (event.key === 'Enter') {
             event.preventDefault();
-            submit();
+            // D-40: with the menu or the card showing, Enter first accepts it; the next saves.
+            if (suggestions.length > 0) acceptSuggestion(suggestions[Math.max(0, highlight)]);
+            else if (cardTarget) acceptCard();
+            else submit();
+          } else if (
+            (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+            suggestions.length > 0
+          ) {
+            event.preventDefault();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            setHighlight((at) => (at + step + suggestions.length) % suggestions.length);
+          } else if (event.key === 'Tab' && !event.shiftKey && parsed) {
+            // D-25: Tab flips the card between the close match and a new list.
+            if (parsed.target.kind === 'close-match') {
+              event.preventDefault();
+              setChooseNewFor(parsed.target.name);
+              setCardAcceptedFor(null);
+            } else if (parsed.target.kind === 'new' && chooseNewFor) {
+              event.preventDefault();
+              setChooseNewFor(null);
+              setCardAcceptedFor(null);
+            }
           } else if (event.key === 'Escape') {
             event.preventDefault();
             event.currentTarget.blur();
           }
         }}
       />
+      {suggestions.length > 0 && (
+        <ul
+          id="composer-suggestions"
+          className="composer-suggestions"
+          role="listbox"
+          aria-label="Lists"
+        >
+          {suggestions.map((list, index) => (
+            <li
+              key={list.id}
+              className="composer-suggestion"
+              role="option"
+              aria-selected={index === highlight}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                acceptSuggestion(list);
+                inputRef.current?.focus();
+              }}
+            >
+              <span className="composer-suggestion-tile">
+                <HashIcon size={13} />
+              </span>
+              <span>{list.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {suggestions.length === 0 && cardTarget && (
+        <div className="composer-choice" aria-live="polite">
+          {cardTarget.kind === 'new' && flippedFrom ? (
+            <>
+              <span className="composer-option selected">
+                New list &quot;{cardTarget.name}&quot; <span className="composer-key">Enter</span>
+              </span>
+              <span className="composer-option">
+                {flippedFrom.name} <span className="composer-key">Tab</span>
+              </span>
+            </>
+          ) : cardTarget.kind === 'close-match' ? (
+            <>
+              <span className="composer-option selected">
+                {cardTarget.list.name} <span className="composer-key">Enter</span>
+              </span>
+              <span className="composer-option">
+                New list &quot;{cardTarget.name}&quot; <span className="composer-key">Tab</span>
+              </span>
+            </>
+          ) : (
+            <span className="composer-option selected">
+              New list &quot;{cardTarget.name}&quot; <span className="composer-key">Enter</span>
+            </span>
+          )}
+        </div>
+      )}
       {notes !== null && (
         <textarea
           ref={notesRef}
@@ -3564,7 +3860,20 @@ function ComposerPastes(props: {
       {images.length > 0 && (
         <div className="composer-images">
           {images.map((item) => (
-            <span key={item.id} className="chip image-chip">
+            <span
+              key={item.id}
+              className="chip image-chip"
+              // MEDIA-02, D-87: the picture's menu.
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const url = mediaUrl(item.link) ?? '';
+                openMenu(
+                  imageMenuItems(item.link, () => showInViewer([url], 0)),
+                  { x: event.clientX, y: event.clientY },
+                );
+              }}
+            >
               <img className="thumb" src={mediaUrl(item.link) ?? ''} alt="" />
               <span>{item.link.split('/').pop()}</span>
               <button
@@ -3769,7 +4078,6 @@ function TaskPage(props: {
   const { task, readOnly, onBack, onTitle, onBody, onAddSubtask, onImage, onRemovePart, children } =
     props;
   const [editingTitle, setEditingTitle] = useState(false);
-  const [editingBody, setEditingBody] = useState(false);
   const editable = !readOnly && !task.done;
   return (
     <>
@@ -3806,26 +4114,27 @@ function TaskPage(props: {
             </h1>
           )}
         </header>
-        {editingBody || hasBody(task) ? (
-          <BodyBlock
+        {editable ? (
+          // D-87: the notes look and work exactly like a note's body: always the editor.
+          <LiveNotes
+            id={task.key}
             body={task.body}
-            inline={false}
-            editing={editingBody}
-            editable={editable}
-            placeholder="Notes, code, links…"
+            className="body-editor page-editor"
+            onSave={onBody}
             onImage={onImage}
-            onRemovePart={onRemovePart}
-            onEdit={() => setEditingBody(true)}
-            onDone={(body) => {
-              setEditingBody(false);
-              onBody(body);
-            }}
           />
         ) : (
-          editable && (
-            <button type="button" className="page-add-body" onClick={() => setEditingBody(true)}>
-              Add notes, code or links
-            </button>
+          hasBody(task) && (
+            <BodyBlock
+              body={task.body}
+              inline={false}
+              editing={false}
+              editable={false}
+              onImage={onImage}
+              onRemovePart={onRemovePart}
+              onEdit={() => undefined}
+              onDone={() => undefined}
+            />
           )
         )}
       </div>

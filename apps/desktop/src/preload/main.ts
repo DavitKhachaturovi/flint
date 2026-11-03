@@ -74,6 +74,13 @@ const main = {
   openAttachment(link: string): Promise<OpenAttachmentOutcome> {
     return ipcRenderer.invoke(Channels.mainOpenAttachment, link) as Promise<OpenAttachmentOutcome>;
   },
+  /**
+   * MEDIA-02, D-87: a picture (its markdown link, or the `app://` address the viewer shows) copied
+   * to the clipboard, shown in its folder, or opened in its default app. False when it isn't there.
+   */
+  imageAction(source: string, action: 'copy' | 'show' | 'open'): Promise<boolean> {
+    return ipcRenderer.invoke(Channels.mainImageAction, source, action) as Promise<boolean>;
+  },
   /** NAV-07, D-83: the context panel's "Up next" (reminders). */
   upNext(): Promise<readonly UpNextItem[]> {
     return ipcRenderer.invoke(Channels.mainUpNext) as Promise<readonly UpNextItem[]>;

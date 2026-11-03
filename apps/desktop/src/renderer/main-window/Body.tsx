@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { blockFor, type BlockKind } from '@flint/core/shorthand';
 import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { bodyHtml, removeBodyPart } from '../../shared/body-markdown.js';
@@ -7,7 +7,14 @@ import { codeLanguage } from '../../shared/code-language.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { highlightLanguage } from '../highlight/languages.js';
 import { openMenu } from '../menu/menu.js';
-import { announce, isLinkedFile, mediaElement, openAttachment, relink } from '../media/media.js';
+import {
+  announce,
+  imageMenuItems,
+  isLinkedFile,
+  mediaElement,
+  openAttachment,
+  relink,
+} from '../media/media.js';
 
 const COPY_ICON =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
@@ -210,9 +217,23 @@ function BodyView(props: {
         event.preventDefault();
         event.stopPropagation();
         const trash = media.querySelector<HTMLButtonElement>('.part-trash');
+        // MEDIA-02, D-87: a picture's menu: copy it, see it large, open it, find it.
+        const picture = media.querySelector('img');
+        const pictures = box.current
+          ? [...box.current.querySelectorAll('img')].filter(
+              (item) => !item.closest('.fl-media.missing'),
+            )
+          : [];
         openMenu(
           [
-            { label: 'Open in default app', action: () => void openAttachment(media, link) },
+            ...(picture
+              ? imageMenuItems(link, () =>
+                  onImage?.(
+                    pictures.map((item) => item.getAttribute('src') ?? ''),
+                    pictures.indexOf(picture),
+                  ),
+                )
+              : [{ label: 'Open in default app', action: () => void openAttachment(media, link) }]),
             ...(isLinkedFile(link) && onRelink
               ? [
                   {
@@ -270,13 +291,17 @@ function BodyEditor(props: {
   readonly initial: string;
   readonly placeholder?: string;
   readonly onDone: (body: string) => void;
+  /** D-87: saves what is typed as it is typed (debounced), and if the editor goes unexpectedly. */
+  readonly onSave?: ((body: string) => void) | undefined;
   readonly onImage?: ShowImage | undefined;
 }): ReactElement {
   const { initial, placeholder, onDone, onImage } = props;
   const done = useRef(false);
+  const autosave = useAutosave(initial, props.onSave);
   const leave = (value: string): void => {
     if (done.current) return;
     done.current = true;
+    autosave.settle(value);
     onDone(value);
   };
   return (
@@ -292,11 +317,50 @@ function BodyEditor(props: {
           openLink: (href) => window.flintMain.openLink(href),
           openImage: (images, index) => onImage?.(images, index),
         }}
+        onChange={autosave.change}
         onBlur={leave}
         onEscape={leave}
       />
     </div>
   );
+}
+
+const SAVE_AFTER_MS = 600;
+
+/**
+ * D-87: a notes editor never loses what was typed: each change is saved a moment later (as notes
+ * are), and what is still unsaved is saved when the editor goes, whether or not it was left first.
+ * `settle` marks a value as saved by the caller (leaving the editor saves it itself).
+ */
+export function useAutosave(
+  initial: string,
+  save: ((text: string) => void) | undefined,
+): { readonly change: (text: string) => void; readonly settle: (text: string) => void } {
+  const state = useRef({ value: initial, saved: initial, timer: 0 });
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const flush = (): void => {
+    const current = state.current;
+    window.clearTimeout(current.timer);
+    if (current.value === current.saved) return;
+    current.saved = current.value;
+    saveRef.current?.(current.value);
+  };
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => () => flushRef.current(), []);
+  return {
+    change: (text) => {
+      state.current.value = text;
+      window.clearTimeout(state.current.timer);
+      state.current.timer = window.setTimeout(() => flushRef.current(), SAVE_AFTER_MS);
+    },
+    settle: (text) => {
+      window.clearTimeout(state.current.timer);
+      state.current.value = text;
+      state.current.saved = text;
+    },
+  };
 }
 
 /**
@@ -318,6 +382,8 @@ export function BodyBlock(props: {
   readonly onRemovePart?: (body: string, kind: 'code' | 'image') => void;
   /** D-84: Copy into Flint on a linked file: the body to save. */
   readonly onRelink?: (body: string) => void;
+  /** D-87: saves while typing (debounced) and when the editor goes; never loses text. */
+  readonly onSave?: (body: string) => void;
   readonly placeholder?: string;
 }): ReactElement {
   const { body, inline, editing, editable, onEdit, onDone, onOpenPage, onImage, placeholder } =
@@ -348,6 +414,7 @@ export function BodyBlock(props: {
         <BodyEditor
           initial={body}
           onDone={onDone}
+          onSave={props.onSave}
           onImage={onImage}
           {...(placeholder ? { placeholder } : {})}
         />
@@ -370,6 +437,60 @@ export function BodyBlock(props: {
           Open as page
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * D-86, D-87: a task's notes that are always the M5 editor (the context panel, a task's page), like
+ * a note's body: typed in place, saved as typed (debounced), when left, and when the editor goes, so
+ * nothing typed is lost. Changes from elsewhere show while nobody types in it.
+ */
+export function LiveNotes(props: {
+  /** The task: a new one starts a new editor. */
+  readonly id: string;
+  readonly body: string;
+  readonly className: string;
+  readonly onSave: (body: string) => void;
+  readonly onImage: ShowImage;
+}): ReactElement {
+  const { id, body, className, onSave, onImage } = props;
+  const [focused, setFocused] = useState(false);
+  // The text the editor was made with: it follows the body only while nobody types in it.
+  const [shown, setShown] = useState(body);
+  useEffect(() => {
+    if (!focused) setShown(body);
+  }, [body, focused]);
+  const autosave = useAutosave(shown, onSave);
+  const save = (text: string): void => {
+    autosave.settle(text);
+    if (text.trim() !== body.trim()) onSave(text);
+  };
+  return (
+    <div
+      className="live-notes"
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
+      <MarkdownEditor
+        key={`${id}:${shown}`}
+        text={shown}
+        className={className}
+        ariaLabel="Notes"
+        placeholder="Notes, code, links…"
+        handlers={{
+          openLink: (href) => window.flintMain.openLink(href),
+          openImage: (images, index) => onImage(images, index),
+        }}
+        onChange={autosave.change}
+        onBlur={save}
+        onEscape={(text) => {
+          save(text);
+          (document.activeElement as HTMLElement | null)?.blur();
+        }}
+      />
     </div>
   );
 }

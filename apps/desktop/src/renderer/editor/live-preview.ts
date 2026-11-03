@@ -24,7 +24,13 @@ import {
 import { tags } from '@lezer/highlight';
 import type { SyntaxNode } from '@lezer/common';
 import type { MarkdownConfig } from '@lezer/markdown';
-import { announce, isLinkedFile, mediaElement, openAttachment } from '../media/media.js';
+import {
+  announce,
+  imageMenuItems,
+  isLinkedFile,
+  mediaElement,
+  openAttachment,
+} from '../media/media.js';
 import { activeLinkPatterns, findShortForms, shortFormOf } from '../../shared/link-patterns.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
@@ -384,6 +390,13 @@ function decorate(view: EditorView): DecorationSet {
               ranges.push(line('cm-fl-code-end').range(end.from));
             for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
               codeLines.add(at);
+            // D-87: closed and without a language, the opening fence is only the card's top edge
+            // (no empty first line); a paragraph right after the card keeps its spacing.
+            const start = doc.lineAt(node.from);
+            if (!open && !node.node.getChild('CodeInfo') && start.number < end.number)
+              ranges.push(line('cm-fl-code-start').range(start.from));
+            if (end.number < doc.lines && doc.line(end.number + 1).text.trim() !== '')
+              ranges.push(line('cm-fl-after-code').range(doc.line(end.number + 1).from));
             const text = node.node.getChild('CodeText');
             ranges.push(
               Decoration.widget({
@@ -742,10 +755,19 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       // D-84: on an attachment, its own items first: open it, copy a linked one in.
       const media = (event.target as HTMLElement).closest<HTMLElement>('.fl-media[data-link]');
       const link = media?.dataset['link'] ?? '';
+      const picture = media?.querySelector('img');
       const attachment: MenuEntry[] =
         media && link !== ''
           ? [
-              { label: 'Open in default app', action: () => void openAttachment(media, link) },
+              // MEDIA-02, D-87: a picture's menu; Open in viewer is the picture's own click.
+              ...(picture
+                ? imageMenuItems(link, () => picture.click())
+                : [
+                    {
+                      label: 'Open in default app',
+                      action: () => void openAttachment(media, link),
+                    },
+                  ]),
               ...(isLinkedFile(link)
                 ? [
                     {

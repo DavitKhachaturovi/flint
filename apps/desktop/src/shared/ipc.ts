@@ -60,6 +60,8 @@ export const Channels = {
   mainAttachmentExists: 'main:attachment-exists',
   /** Main window → main: an attachment in its default app, by the rules of D-84. */
   mainOpenAttachment: 'main:open-attachment',
+  /** MEDIA-02, D-87: a picture's menu: copy it, show it in its folder, open it in its app. */
+  mainImageAction: 'main:image-action',
   /** Main window → main: the context panel's "Up next" (NAV-07, D-83). */
   mainUpNext: 'main:up-next',
   /** Main → main window: the context panel hidden or shown on this display (NAV-07, D-83). */
@@ -257,6 +259,8 @@ export type ListChange =
       readonly where: 'top' | { readonly after: string };
       /** From `reserveId`: a new row's task ID, known before the save finishes. */
       readonly id?: string;
+      /** D-25, D-87: Tab on the close-match card: create the typed list instead. */
+      readonly chooseNewList?: boolean;
     }
   | { readonly kind: 'edit'; readonly key: string; readonly text: string }
   /** TASK-05, D-49: a task's body, as typed in its plain field. */
