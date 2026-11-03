@@ -495,3 +495,21 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 11 | After Convert to note (task or list) the note opens, cursor ready | TASK-17, LIST-04 · Done (0.4.20) | 02, D-86 |
 | 12 | A task's page on a card | TASK-05 · Done (0.4.20) | 02, 09 §8, D-86 |
 | 13 | Clipboard section: Windows clipboard history, docked, insert / Capture as task, settings note | NAV-08 · v1 · late (with M8) | 02, D-86 |
+
+## W. After 0.4.20 (3 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Notes in every body editor saved as typed (debounced) and when left, never discarded | NAV-07, TASK-05, DATA-01 · v1 · 0.4.21 | 02, D-87 |
+| 2 | Show / hide: column and panel move together, never overlapping | NAV-07, UI-10 · v1 · 0.4.21 | 02, D-87 |
+| 3 | The panel's Add subtask field in the editing-field style | NAV-07 · v1 · 0.4.21 | 02, D-87 |
+| 4 | Panel subtasks: the list's right-click menu and indicators | NAV-07, UI-08 · v1 · 0.4.21 | 02, D-87 |
+| 5 | Panel notes spacing and inset; no empty first line in code blocks | NAV-07, NOTE-04 · v1 · 0.4.21 | 02, D-87 |
+| 6 | Task page paste: code into the selected subtask's notes, else the task's | TASK-05, CAP-06 · v1 · 0.4.21 | 02, D-87 |
+| 7 | Task page notes without an inner card | TASK-05 · v1 · 0.4.21 | 02, D-87 |
+| 8 | Inline code cards not cut off; parent and subtask cards don't overlap | TASK-05 · v1 · 0.4.21 | 02, D-87 |
+| 9 | ↑/↓ scroll the selected row into view | TASK-02, UI-04 · v1 · 0.4.21 | 02, D-87 |
+| 10 | Impossible moves nudge the row | TASK-02, UI-10 · v1 · 0.4.21 | 02, D-87 |
+| 11 | Composer ## menu and close-match card back; longest exact list name wins (popup too) | CAP-03, CAP-05 · v1 · 0.4.21 | 02, D-87 |
+| 12 | Picture menus: Copy image, Open in viewer / default app, Show in folder; in the viewer too | MEDIA-02 · v1 · 0.4.21 | 02, D-87 |
+| 13 | Move to top for lists and notes (Manual sort only) | LIST-06 · v1 · 0.4.21 | 02, D-87 |

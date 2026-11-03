@@ -679,3 +679,25 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
   - **Clickable facts (4):** open checklist items (on a task's page its open subtasks), code blocks, images and links; the target is scrolled to a third of the way down and flashes.
   - **Convert to note (11):** the note opens with the cursor at the end; Undo (the toast's) returns to the list the task came from (an open list or note that goes away returns to the last place still there).
   - **Tests never open anything outside Flint:** in test mode, links and attachments a click would open are recorded instead of handed to the browser or an app (a test had clicked a link in the panel).
+
+### D-87 — After 0.4.20: notes never lost, the panel's choreography, subtasks in the panel, pages and rows, the composer's ## menu, image menus
+- **Date:** 3 Nov 2026 · **Status:** Decided (Davit); details marked Proposed in the docs
+- **Confirmed (0.4.20):** the sticky panel, Up next rows, clickable facts, no scrollbar flash, the extra sections, attachments in the image viewer, unpinning with the pin, the unpin-all fix, Explorer-style right-click, the note opening after Convert to note, the task page card.
+- **High priority, data loss (NAV-07, TASK-05, DATA-01):** notes edited in the panel were lost when the click outside went to the page (the panel changed before the editor was left). Every notes editor (the panel, inline bodies, a task's page) **saves as it is typed** (debounced, as notes do) and when it is left or closed, and never discards what was typed.
+- **Panel (NAV-07):**
+  1. **Show and hide are one choreography:** the column slides left while the panel comes in, and slides back while the panel goes out, moving together the same distance with the same curve, so they never overlap.
+  2. The panel's **Add subtask** field uses Flint's editing-field style (not a default input).
+  3. **Subtasks in the panel** have the list's right-click menu (delete, priority, reminder, pin, move…) and its indicators: the priority stripe, the reminder bell and time, the pin.
+  4. **Notes in the panel:** a paragraph after a code block gets the normal paragraph spacing; text lines up with the panel's content inset; a code block shows no empty first line (everywhere the editor is used).
+- **Task page and rows (TASK-05, TASK-02, UI-04, UI-10):**
+  5. On a task's page, pasting code, JSON or a stack trace follows CAP-06: into the **selected subtask's notes** as a code block, or **with none selected, into the task's own notes** (grill answer); one undo step.
+  6. A task's page shows its notes exactly as a note's body (no inner dark card).
+  7. Code cards in bodies in the list are never cut off at the top, and when a subtask and its parent are both highlighted, their cards don't overlap.
+  8. **↑/↓ keep the selected row in view**, scrolling smoothly (instantly under reduce-motion).
+  9. **Impossible moves nudge (grill answer):** indenting the first task (or a subtask's first sibling), outdenting a top-level task, Alt+↑ on the first task and Alt+↓ on the last stay impossible, and the row gives a short nudge in that direction (off with reduce-motion).
+- **Composer regression (CAP-03, CAP-05, D-51, D-25):** the main window's composer has the capture popup's `##` list menu (search and recent lists) and close-match card again. **Matching in both places:** after `##`, the longest existing list name that the following words spell out, spaces included (an exact name, ignoring case, spaces and hyphens as D-25 does), wins; only then do the single-word token rules apply. So with "new list 1" and "new list 2", `##new list 2` goes to "new list 2".
+- **Images and sidebar (MEDIA-02, LIST-06):**
+  10. Right-clicking a picture (a thumbnail in a body, a note or the composer, and in the image viewer, which gets a menu too): **Copy image**, **Open in viewer**, **Open in default app**, **Show in folder**.
+  11. A list's or note's right-click menu has **Move to top**, only under the Manual sort; under another sort it is disabled with the usual "Switch to Manual" hint.
+- **Builds (grill answer):** 0.4.21 with these fixes, then M4 step 9 as 0.4.22.
+- The Trash screen (restoring deleted tasks, lists and notes, 30-day expiry) stays as planned for M7.
