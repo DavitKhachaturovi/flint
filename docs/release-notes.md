@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.28 (4 Nov 2026)
+
+- **Overdue reminders in Today**: a quiet "Overdue" card under "Unfinished from yesterday" lists every task whose reminder has passed, including ones missed while Flint was closed. Mark them Done, Snooze them (in an hour, tomorrow at 10:00, or a time you pick), or click to open. It folds, and remembers.
+- **"N reminders you missed" opens that card.**
+- **Press R** on a selected task to set or change its reminder, in any list and in Today.
+- **Flint can play its own soft chime** when a reminder fires. It is off by default, since Windows already plays a sound; Settings will have the switch.
+
 ## 0.4.27 (4 Nov 2026)
 
 - **Open on a reminder is instant**: the task is scrolled to, selected and flashed straight away, also when it was already selected.
