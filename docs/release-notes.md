@@ -2,6 +2,18 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.23 (3 Nov 2026)
+
+- **A click selects a task**, wherever you click, the title too. Click it again, or double-click, to edit, with the cursor where you clicked. A link in a title opens with a click once the task is selected, or with Ctrl+click.
+- **Subtasks in the panel are clickable**: their details open in the panel, and the back arrow returns to the parent. On a task's page, a selected subtask shows its notes in the panel.
+- **Shift+Enter while typing a title goes to the panel's notes** on wide screens; Esc closes a body opened in the list.
+- **Holding ↑ or ↓** keeps up with the key instead of lagging behind.
+- **Sorting moves the rows** to their new places, and the "Sorted by" line comes and goes smoothly. The find bar (Ctrl+F) opens and closes smoothly too, sits next to the list's title, and lines up with the panel as you scroll.
+- **The `##` list menu shows every matching list**, scrolling past five.
+- **Right-click menus** in the image viewer, on Attachments and on References in the panel; Inbox has one too (sorting, Duplicate).
+- **Copy buttons show a checkmark** after copying.
+- Fixed: an open task's card overlapping the selected task above it, the editing field's top edge cut off in a body, the indent nudge missing from the right-click menu, and Ctrl+A on a note selecting the whole window.
+
 ## 0.4.22 (3 Nov 2026)
 
 - **Pasted links get short titles**: an Azure DevOps pull request shows as "PR 42", a work item as "AB#1234", GitHub issues and pull requests as "repo#12" and "repo!9", Jira as "KEY-5"; other links as their site and a short path. The full link stays in the file (hover to see it).
