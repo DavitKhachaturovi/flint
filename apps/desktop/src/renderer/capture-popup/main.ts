@@ -170,12 +170,12 @@ function update(): void {
 
   const token = tokenAtCaret();
   if (token && token.text !== menuAcceptedFor) menuAcceptedFor = null;
-  const next5 =
-    token && menuAcceptedFor === null ? suggestLists(token.typed, lists).slice(0, 5) : [];
-  if (next5.map((list) => list.id).join() !== suggestions.map((list) => list.id).join()) {
+  // D-89: every matching list; the menu scrolls past five.
+  const found = token && menuAcceptedFor === null ? suggestLists(token.typed, lists) : [];
+  if (found.map((list) => list.id).join() !== suggestions.map((list) => list.id).join()) {
     selected = -1;
   }
-  suggestions = next5;
+  suggestions = found;
   renderSuggestions(suggestionsBox, suggestions, selected, (list) => {
     acceptSuggestion(list);
     input.focus();

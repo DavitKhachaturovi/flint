@@ -29,6 +29,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - It is the default target for every capture (CAP-02).
 - **Proposed (D-23):** Inbox is identified by the reserved frontmatter `id: inbox`, always displays as "Inbox", is pinned at the top, and cannot be renamed in Flint. If no list has that id at startup, Flint adopts `Inbox.md` if it exists, otherwise creates it.
 
+- **D-89 (Proposed):** Inbox's right-click menu: Sort tasks by ▸, Back to manual order while sorted, Duplicate (never rename, convert, group or delete).
 ### LIST-04 — Convert between modes (v1)
 - A note can be converted into a task list and back.
 - Note → task list (**D-22**, resolves Q-16): checklist items (`- [ ]` / `- [x]`) become tasks (with completion state preserved), and plain bullet lines become tasks too. Everything else (headings, paragraphs) stays in place as non-task content, which task lists show read-only (TASK-15). Nothing is dropped and no confirmation is needed. Example use: meeting notes → action items.
@@ -120,6 +121,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Ranking (D-29):** a task list with the same normalized name is an exact match (an identical spelling wins, then sidebar order); a task list wins over a note of the same name. Among close matches, prefix matches come before typo matches; prefix matches are ordered most recently used first, typo matches by smallest edit distance first, and sidebar order breaks remaining ties.
 
 - **D-87 (both the popup and the main window's composer, D-51 parity):** after `##`, the longest existing list name spelled out by the following words, spaces included (exact, ignoring case, spaces and hyphens as D-25), wins before the single-word rules; `##new list 2` goes to "new list 2" when "new list 1" exists too. The composer shows the popup's `##` menu (search, recent lists) and close-match card.
+- **D-89:** the `##` menu lists every matching list, scrolling past five (wheel, ↑/↓), in the composer and the popup.
 ### CAP-06 — Paste-to-capture (v1)
 - **D-80:** in the main window's composer, pasted images and code look as in the popup: a thumbnail chip and a code card preview, never raw link or fence text (TASK-05).
 - **D-79:** pasted content that already contains markdown (a fenced code block, an image link) stays markdown; only raw, unfenced code, JSON and stack traces are fenced. The same rules apply in the main window's composer and in body fields.
@@ -129,6 +131,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Proposed (details, M3):** detected as code: valid JSON objects and arrays, stack traces (two or more frame lines in .NET, Java, JavaScript or Python style, or a Python traceback), and multi-line text where at least half the lines look like code (indented, or ending in `;` `{` `}` `)`). Other text pastes as text; pasted text in the task line is plain text, never shorthand (D-45). The title from a paste: the exception message (the last line of a Python traceback), for JSON its first text field (`error: token expired`), cut to 80 characters, with shorthand-looking text in it kept as text (`##`, `!`, `@`). The code fence is longer than any backtick run in the paste. A capture that is only an image keeps an empty task line (D-45). Pasted images (PNG, JPEG, GIF, WebP) wait with the draft in app data until the capture is saved, then go to `attachments/<date-time>-<task id>.png` with a relative link in the body. The + button under the title points to Ctrl+V for now.
 - This is how bugs actually show up, so it is high-value for developers.
 
+- **D-89 (Proposed):** in a task list, code pasted on a selected task whose notes are open inline goes into those notes.
 ### CAP-07 — Capture-selection hotkey (v1)
 - A **second global hotkey** (**Ctrl+Shift+X**, D-37) captures the currently selected text in any app (an error in a terminal, a line in a Teams chat) and opens the capture popup **prefilled** with it.
 - **D-39:** on a closed popup it starts fresh with the new selection; an earlier draft is set aside and shown as "Previous draft · Restore", so it is never lost (Restore swaps the two). On a popup that is open (also one left open without focus, D-41) the selection is appended to the selection area, to collect from several places.
@@ -189,6 +192,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-71 (mouse):** clicking a task's title text edits it directly, with the caret where you clicked; clicking empty row space only selects; double-click anywhere on the row edits; Esc goes back to the selected row (03 §2). **D-74:** clicking another task's text goes straight into editing on that row, without the selection gliding there first; the row being edited looks like a dark input field (09 §8), clearly different from a selected row. **D-76:** a second single click on an already-selected row (not on its text) also edits, like renaming in Explorer; the field eases in when editing starts and glides when editing moves to another row. **D-78:** while a task is being edited, a click on another task's blank space saves the edit and selects that task.
 
 - **D-87:** ↑/↓ keep the selected row in view (smooth, instant under reduce-motion). Impossible moves (indenting the first task or a first subtask, outdenting a top-level task, Alt+↑ on the first, Alt+↓ on the last) nudge the row briefly in that direction (off with reduce-motion).
+- **D-89 (supersedes D-71's click-to-edit):** a single click always selects, the title's text included; a double-click or a second click on the selected row edits, the caret where it landed. A link in a title opens with a click on a selected row or with Ctrl+click. Held ↑/↓ keep the selection in view without smooth scrolling; the menu's impossible Indent/Outdent nudges the row.
 ### TASK-03 — Priority: low / medium / high, shown by color, not text (v1)
 - Each task can have priority **low, medium, high**, or **none**.
 - **"No priority" is the default** and is visually neutral. If every task were colored, nothing would stand out.
@@ -248,6 +252,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-72:** the temporary sort offers **Priority**, **Reminder time** and **Date added**. **Proposed:** tasks without a reminder sort last; Date added uses `created` from `.flint/meta.json` (04), file order where it is missing; the indicator names the sort ("Sorted by reminder time · Back to manual order"). Milestone M4 step 10.
 
 - **Built (0.4.22, D-88, Proposed details):** in a list's right-click menu and the page's blank-area menu; headings and text left out while sorted, subtasks under their parents; missing reminders and dates last, date added newest first; Alt+↑/↓ while sorted returns to the manual order; nothing drags while sorted; another list ends the sort.
+- **D-89:** rows glide to their new places when a sort starts or ends; the sort's line eases in and out.
 ### TASK-09 — Multi-line paste creates multiple tasks (v1)
 - Pasting N lines of plain text into a task list creates N tasks, with a toast offering **"Keep as one?"** (which merges them back into a single task with the text as its body). Great for dumping meeting action items.
 - **Proposed:** if the pasted text is detected as a stack trace, code, or JSON (CAP-06 rules), it is treated as one task with a code-block body instead of being split.
@@ -422,6 +427,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-82 (built):** in the editor too: the code card's copy button sits in its top-right corner, as in the rendered body; a press doesn't move the cursor.
 - Every code block has a copy button (visible on hover/focus).
 
+- **D-89:** after copying, the button's icon morphs into a checkmark for a moment.
 ### NOTE-06 — Monospace toggle (v1)
 - A setting (and per-note toggle, **Proposed**) to render text in a monospace font.
 - **D-84:** the per-note toggle is a checked **Monospace** item in the note's right-click menu (and **Ctrl+Shift+M**), remembered per note on this machine (UI state), the file unchanged. The global default comes with Settings (M8, APP-11).
@@ -447,6 +453,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Media is stored in an `attachments/` folder inside the Flint folder and referenced by **relative paths**, so moving the Flint folder never breaks images.
 
 - **D-87:** a picture's right-click menu (body and note thumbnails, the composer's chips, and the image viewer, which gets one): **Copy image**, **Open in viewer**, **Open in default app**, **Show in folder**.
+- **D-89:** the image viewer's right-click menu works (Copy image, Open in default app, Show in folder); other files' menus have Open in default app and Show in folder.
 ### MEDIA-03 — Large files are linked, not copied (v1, D-84)
 - ~~Warn when adding a file above a size threshold.~~ **D-84 (replaces the warning):** no hard size limit. Up to **25 MB** a file is copied into `attachments/`; above it, it is added **as a link to its original location** at once (nothing copied).
 - A notice says **"Large file, linked to its original location"** with **Copy into Flint instead**. It stays until acted on or dismissed (it never fades) and never blocks input. Hovering the button, or the small info icon beside it, explains: large files are linked by default because copying them makes the Flint folder, snapshots, exports and future sync slow and big; copying keeps the file safe if the original is moved or deleted.
@@ -517,6 +524,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
   - **Proposed details (0.4.19):** the crossfade keeps the previous content a moment, fading out over the new; the current-section marker is one bar that slides; the panel toggle shows the panel's state (a filled background while shown); the multi-select bar has Pin / Unpin; the blank-area menu and the panel's own menu have Show / Hide panel.
 
 - **D-87, after 0.4.20:** show and hide move the column and the panel together (same distance, same curve, never overlapping); the Add subtask field uses the editing-field style; subtasks in the panel have the list's right-click menu and indicators (priority stripe, reminder bell and time, pin); notes in the panel keep paragraph spacing after a code block and the panel's content inset; a code block has no empty first line. **Notes are saved as they are typed** (debounced) and when left, never discarded.
+- **D-89:** subtasks in the panel highlight on hover and are clickable (selected in the list, the panel shows them, back returns); on a task's page a selected subtask shows its own details; Shift+Enter and "Add notes" go to the panel's notes; an inline body closes with Esc or its notes icon; the lower sections ease in with the rest; the panel's text isn't part of a window-wide selection; References and Attachments have right-click menus.
 ### NAV-08 — The clipboard section of the context panel (v1, late: alongside M8, D-86)
 - A **Clipboard** section docked at the bottom of the context panel (NAV-07), apart from its scrolling content, so it stays reachable under long outlines.
 - It shows **Windows' own clipboard history** (`Clipboard.GetHistoryItemsAsync`, Windows 10 1809+), read while Flint is in the foreground: Flint never records the clipboard itself, and items that password managers exclude stay excluded.
@@ -532,6 +540,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Notes:** CodeMirror's search, restyled to the same bar. Milestone M5.
 
 - **Built for task lists (0.4.22, D-88):** as proposed above; the matches are highlighted with the CSS Custom Highlight API; a jump opens Completed or a body under its row.
+- **D-89:** in task lists the bar opens and closes with motion, its count crossfades, the match's row lights up; at the list's top it is level with the title row, scrolled it sits level with the context panel's top.
 ### MINI-01 — Mini mode (v1)
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
 - **Proposed:** supports adding a task, completing, and seeing reminders; everything else opens the main window.
@@ -741,6 +750,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (D-75: motion never delays input; fuller default durations). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
 - Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.
 
+- **D-89, standing rule:** every UI change or action added comes with its motion; a feature isn't done without it (03 §5, CLAUDE.md).
 ### UI-12 — Wide screens and interface size (v1, D-81)
 - **D-82 (supersedes D-81's growing column):** task lists, notes and task pages share one centred column of at most 820 px with 40 px sides, as before 0.4.16. A right-side panel for wide screens is being designed by Davit (not specified yet; nothing is built for it).
 - **App zoom:** Ctrl+= (Ctrl++), Ctrl+− and Ctrl+0 zoom the main window in Chrome's steps (67, 75, 80, 90, 100, 110, 125, 150, 175, 200 %), remembered **per display** (a laptop panel and a monitor each keep their own); the level shows briefly in a small pill when it changes. The capture popup stays at 100 % (**Proposed**: it has its own fixed size and latency budget).

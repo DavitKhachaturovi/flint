@@ -26,11 +26,12 @@ import type { SyntaxNode } from '@lezer/common';
 import type { MarkdownConfig } from '@lezer/markdown';
 import {
   announce,
+  fileMenuItems,
   imageMenuItems,
   isLinkedFile,
   mediaElement,
-  openAttachment,
 } from '../media/media.js';
+import { COPY_ICON, copyWithFeedback } from '../media/copy.js';
 import { activeLinkPatterns, findShortForms, linkTitle } from '../../shared/link-patterns.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
@@ -217,9 +218,6 @@ function fieldText(key: string, value: string): string {
   }
 }
 
-const COPY_ICON =
-  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
-
 /** NOTE-05, D-82: the code card's copy button, in its top-right corner, inside the editor too. */
 class CopyWidget extends WidgetType {
   readonly code: string;
@@ -242,14 +240,7 @@ class CopyWidget extends WidgetType {
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      void navigator.clipboard.writeText(this.code).then(() => {
-        button.classList.add('copied');
-        button.title = 'Copied';
-        window.setTimeout(() => {
-          button.classList.remove('copied');
-          button.title = 'Copy';
-        }, 1200);
-      });
+      copyWithFeedback(button, this.code);
     });
     return button;
   }
@@ -764,12 +755,7 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
               // MEDIA-02, D-87: a picture's menu; Open in viewer is the picture's own click.
               ...(picture
                 ? imageMenuItems(link, () => picture.click())
-                : [
-                    {
-                      label: 'Open in default app',
-                      action: () => void openAttachment(media, link),
-                    },
-                  ]),
+                : fileMenuItems(link, media)),
               ...(isLinkedFile(link)
                 ? [
                     {

@@ -15,9 +15,7 @@ import {
   openAttachment,
   relink,
 } from '../media/media.js';
-
-const COPY_ICON =
-  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
+import { COPY_ICON, copyWithFeedback } from '../media/copy.js';
 
 const TRASH_ICON =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path></svg>';
@@ -80,14 +78,7 @@ function highlightCode(
     copy.innerHTML = COPY_ICON;
     copy.addEventListener('click', (event) => {
       event.stopPropagation();
-      void navigator.clipboard.writeText(text).then(() => {
-        copy.classList.add('copied');
-        copy.title = 'Copied';
-        window.setTimeout(() => {
-          copy.classList.remove('copied');
-          copy.title = 'Copy';
-        }, 1200);
-      });
+      copyWithFeedback(copy, text);
     });
     head.append(label, copy);
     const part = Number(pre.dataset['part']);

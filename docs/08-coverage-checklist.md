@@ -524,3 +524,23 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Multi-line paste: a task per line, one undo, Keep as one; code as one task | TASK-09 · Done (0.4.22) | 02, D-88 |
 | 5 | Two-finger swipe back and forward with the edge arrow | NAV-04 · Done (0.4.22) | 02, D-88 |
 | 6 | The auto-archive offer and archiving into `.flint/archive/` | TASK-06 · Done (0.4.22; Settings in M8) | 02, 04, D-88 |
+
+## Y. After 0.4.21 and 0.4.22 (3 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| — | Standing rule: motion is part of done, in the motion tests where practical | UI-10 · v1 · every milestone | CLAUDE.md, 03 §5, D-89 |
+| 1 | A single click selects (title included); double-click or a second click edits; links: click on a selected row or Ctrl+click | TASK-02 · Done (0.4.23) | 02, 03 §2, D-89 |
+| 2 | Panel subtasks: hover, click opens their details, back to the parent | NAV-07 · Done (0.4.23) | 02, D-89 |
+| 3 | Subtask notes on a task's page with the panel; code pasted on a task with open notes goes into them | NAV-07, CAP-06 · Done (0.4.23) | 02, D-89 |
+| 4 | Open cards keep 6 px from a selected row; the inline editing field's edge not clipped | TASK-05 · Done (0.4.23) | D-89 |
+| 5 | Held ↑/↓ scroll at once; the menu's impossible Indent/Outdent nudges | TASK-02 · Done (0.4.23) | 02, D-89 |
+| 6 | `##` menu: every match, scrolling past five | CAP-05 · Done (0.4.23) | 02, D-89 |
+| 7 | Menus: the image viewer, Attachments, References | MEDIA-02, UI-08 · Done (0.4.23) | 02, D-89 |
+| 8 | Ctrl+A on a note or page selects its text, never the panel | NAV-07 · Done (0.4.23) | 02, D-89 |
+| 9 | The panel's lower sections ease in with it; Shift+Enter and Add notes into the panel; Esc closes an inline body | NAV-07 · Done (0.4.23) | 02, D-89 |
+| 10 | Copy buttons morph into a checkmark | NOTE-05 · Done (0.4.23) | 02, D-89 |
+| 11 | Temporary sorts glide; the sort line eases in and out | TASK-08 · Done (0.4.23) | 02, D-89 |
+| 12 | Inbox's right-click menu | LIST-03 · Done (0.4.23) | 02, D-89 |
+| 13 | Find bar motion and position (title row, then level with the panel) | NAV-06 · Done (0.4.23) | 02, D-89 |
+| 14 | The task menu's grouping (proposed, not built) | UI-08 · v1 · awaiting Davit | D-89 |

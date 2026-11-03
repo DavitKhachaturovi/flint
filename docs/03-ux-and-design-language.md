@@ -25,7 +25,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | **Edit** | A text cursor is *inside* a task's text | Typing (Space is a space, 3 is a 3) |
 
 - **Enter** → Edit state. **Esc** → back to Navigate (with the same row selected).
-- **Mouse (D-71, replaces click-to-select-then-click-to-edit):** clicking a task's **title text** enters Edit directly, with the caret where you clicked, and the row stays highlighted; clicking **empty row space** only selects; **double-click** anywhere on the row edits; Esc returns to the selected row. **Proposed:** the caret lands at the matching place in the raw text (markup characters such as `**` counted); clicking a link in a title still opens it; Ctrl/Shift+click selects (TASK-07); a press that becomes a drag never edits.
+- **Mouse (D-89, supersedes D-71's click-to-edit):** a single click on a task **always selects it**, wherever it lands, the title's text included. Editing starts only with a **double-click**, or a **second single click on an already-selected row** (D-76, as in Explorer); the caret lands where the click was on the title (at the end beside it). A link in a title opens with a click on an already-selected row, or with **Ctrl+click** from any state (which marks nothing). Ctrl/Shift+click still mark rows (TASK-07).
+- *Superseded by D-89:* **Mouse (D-71, replaces click-to-select-then-click-to-edit):** clicking a task's **title text** enters Edit directly, with the caret where you clicked, and the row stays highlighted; clicking **empty row space** only selects; **double-click** anywhere on the row edits; Esc returns to the selected row. **Proposed:** the caret lands at the matching place in the raw text (markup characters such as `**` counted); clicking a link in a title still opens it; Ctrl/Shift+click selects (TASK-07); a press that becomes a drag never edits.
 - **D-74:** a click on another task's text goes **straight into editing** on that row: no selection glide first. The **editing row looks like a dark input field**, like the composer (`--fl-ground-well` with a subtle edge), so Edit is clearly different from a selected row (09 §8).
 - **D-76:** a **second single click** on an already-selected row (outside its text) enters Edit too, like renaming in Explorer; a double-click edits from any state. The field eases in when Edit starts and glides when Edit moves to another row (Enter on a new row, a click on another task's text).
 - **D-77: nothing is selected when a list opens**; the first ↓ (or ↑) selects the first row, so a single click never unexpectedly starts editing.
@@ -131,7 +132,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 ### Mouse
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
-- Click a task's title text to edit it there, empty row space to select it, double-click to edit (D-71, §2); click the check to complete.
+- Click a task to select it (its title too), click it again or double-click to edit (D-89, §2); click the check to complete.
 - Right-click empty sidebar space for the **+** menu: New task list, New note, New group (D-69, D-73). Only the title-bar strip at the top drags the window.
 - Right-click anything for its menu (UI-08, D-55). **D-86:** inside a multi-selection the menu acts on all of it (a "3 selected" header, counted labels); outside it, the right-clicked item alone is selected first (Windows Explorer). A task: edit, open as page, priority, move, delete; pin / unpin (D-85) and Convert to note (TASK-17, D-85); reminder joins in M6 (**Proposed** items).
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
@@ -210,6 +211,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - **Completion (D-67):** the check fills with a small pop, then the row fades, slides and collapses into Completed. **Un-completing** brings the row back smoothly into the open tasks.
 - **Animation speed (D-67, D-75):** a setting scales all motion (APP-11, M8), next to the reduce-motion behaviour. If the defaults feel slow in daily use, they are dialled back.
 - **The context panel (NAV-07, D-83):** it slides and fades in when it appears, its height eases when its content changes, and its content crossfades when the selection or state changes; nothing waits for it.
+- **Standing rule (D-89): motion is part of done.** Every UI change or action that is added comes with smooth, minimal motion for appearing, disappearing and changing state, following the rules above (never delays input, interruptible, off with reduce-motion). A feature isn't done without it, and its motion goes into the motion regression test (e2e, the animation recorder of D-79) where practical.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - No decorative motion (no idle animations, no bouncing icons).
 

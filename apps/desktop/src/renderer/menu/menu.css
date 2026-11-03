@@ -9,7 +9,8 @@
 .fl-menu,
 .fl-menu-ghost {
   position: fixed;
-  z-index: 100;
+  /* D-89: above everything, the image viewer (120) too. */
+  z-index: 200;
   min-width: 220px;
   padding: 5px;
   border-radius: var(--fl-radius-row);

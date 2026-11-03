@@ -447,3 +447,34 @@
   font-family: var(--fl-font-mono);
   font-size: 13.5px;
 }
+
+/* D-89: a copy button's feedback: the copy icon morphs into a checkmark for a moment. */
+.fl-copy-icon,
+.fl-copy-done {
+  grid-area: 1 / 1;
+  display: flex;
+  transition:
+    opacity var(--fl-dur-state) ease-out,
+    transform var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.fl-copy-done {
+  opacity: 0;
+  transform: scale(0.5) rotate(-20deg);
+}
+
+.copied > .fl-copy-icon {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.copied > .fl-copy-done {
+  opacity: 1;
+  transform: none;
+}
+
+.cm-fl-code-copy:has(> .fl-copy-icon),
+.code-copy:has(> .fl-copy-icon) {
+  display: grid;
+  place-items: center;
+}

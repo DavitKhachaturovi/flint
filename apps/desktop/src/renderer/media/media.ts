@@ -106,6 +106,26 @@ export function imageMenuItems(
   ];
 }
 
+/**
+ * D-89: another attachment's menu items (a document, a video): Open in default app, Show in folder.
+ * `holder` turns into "File not found" when the file is gone.
+ */
+export function fileMenuItems(
+  link: string,
+  holder: HTMLElement | null,
+): { label: string; action: () => void }[] {
+  return [
+    { label: 'Open in default app', action: () => void openAttachment(holder, link) },
+    {
+      label: 'Show in folder',
+      action: () =>
+        void window.flintMain.imageAction(link, 'show').then((ok) => {
+          if (!ok) announce('That file is no longer there');
+        }),
+    },
+  ];
+}
+
 /** Opens the file in its default app; a missing one turns into "File not found". */
 export async function openAttachment(holder: HTMLElement | null, link: string): Promise<void> {
   const outcome = await window.flintMain.openAttachment(link);

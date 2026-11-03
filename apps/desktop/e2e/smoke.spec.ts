@@ -571,8 +571,9 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
   ]);
   await expect(main.locator('.row.sel .title')).toHaveText('Fix the gate');
 
-  // D-71: a click on the title text edits with the caret there; beside the text only selects;
-  // a double-click anywhere edits; Esc goes back to the selected row.
+  // D-89 (supersedes D-71's click-to-edit): a click anywhere, the title's text too, only selects;
+  // a second click on the selected row edits with the caret where it landed; a double-click edits
+  // too; Esc goes back to the selected row.
   const field = main.locator('.title-input');
   const caret = (): Promise<number | null> =>
     field.evaluate((input: HTMLInputElement) => input.selectionStart);
@@ -584,6 +585,9 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
     return { left: rect.left, right: rect.right, y: rect.top + rect.height / 2 };
   });
   await main.mouse.click(lawnText.left + 1, lawnText.y);
+  await expect(main.locator('.row.sel .title')).toHaveText('Mow the lawn');
+  await expect(field).toHaveCount(0);
+  await main.mouse.click(lawnText.left + 1, lawnText.y);
   await expect(field).toBeFocused();
   await expect(field).toHaveValue('Mow the lawn');
   expect(await caret()).toBe(0);
@@ -591,6 +595,7 @@ test('main window: composer, priority keys, Edit-state Enter, Tab, undo and redo
   await main.keyboard.press('Escape');
   await expect(field).toHaveCount(0);
   await main.mouse.click(lawnText.right - 1, lawnText.y);
+  await expect(field).toBeFocused();
   expect(await caret()).toBe('Mow the lawn'.length);
   await main.keyboard.press('Escape');
   await main.locator('.row', { hasText: 'Fix the gate' }).click();
@@ -1954,6 +1959,189 @@ test('M4 step 9: smart link titles, temporary sorts, find in lists, multi-line p
   await main.waitForTimeout(300);
   await swipeBy(320);
   await expect(main.locator('h1')).toContainText('Step nine');
+});
+
+test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts and the find bar, menus (TASK-02, NAV-07, TASK-08, NAV-06, UI-08, LIST-03, CAP-05, D-89)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const lists = Array.from({ length: 7 }, (_, index) => `Ops ${index + 1}`);
+  for (const [index, name] of lists.entries())
+    await writeFile(
+      join(flint, `${name}.md`),
+      `---\nflint: 1\nid: ops${index}\nmode: tasks\n---\n- [ ] Task in ${name} [id:: oq${index}]\n`,
+    );
+  await writeFile(
+    join(flint, 'Clicks.md'),
+    '---\nflint: 1\nid: clk1\nmode: tasks\n---\n- [ ] First [priority:: low] [id:: k1]\n- [ ] Read [the runbook](https://runbook.example.com/a) [id:: k2]\n- [ ] Parent [priority:: high] [id:: k3]\n    Parent notes.\n\n    ```js\n    const a = 1;\n    ```\n    - [ ] Child one [id:: k4]\n        Child notes.\n- [ ] Last [priority:: medium] [id:: k5]\n',
+  );
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const motion = (): Promise<string[]> =>
+    main.evaluate(() => [...(window as unknown as { motion: string[] }).motion]);
+  const resetMotion = (): Promise<unknown> =>
+    main.evaluate(() => (window as unknown as { motion: string[] }).motion.splice(0));
+  const opened = (): Promise<string[]> =>
+    app.evaluate(() => [
+      ...((globalThis as { __flintE2E?: { opened: string[] } }).__flintE2E?.opened ?? []),
+    ]);
+  const field = main.locator('.title-input');
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await main.locator('.nav', { hasText: 'Clicks' }).click();
+  await expect(main.locator('h1')).toContainText('Clicks');
+
+  // D-89: a click on the title text only selects; a second click there edits.
+  const first = main.locator('.row', { hasText: 'First' }).locator('.title');
+  await first.click();
+  await expect(main.locator('.row.sel .title')).toHaveText('First');
+  await expect(field).toHaveCount(0);
+  await first.click();
+  await expect(field).toBeFocused();
+  await main.keyboard.press('Escape');
+
+  // A link in a title: a click on an unselected row selects it, a second click opens the link;
+  // Ctrl+click opens it from any state and marks nothing.
+  const link = main.locator('.row', { hasText: 'Read' }).locator('.title a');
+  const before = (await opened()).length;
+  await link.click();
+  await expect(main.locator('.row.sel .title')).toContainText('Read');
+  expect((await opened()).length).toBe(before);
+  await link.click();
+  await expect
+    .poll(async () => (await opened()).slice(before))
+    .toEqual(['https://runbook.example.com/a']);
+  await first.click();
+  await link.click({ modifiers: ['Control'] });
+  await expect.poll(async () => (await opened()).length).toBe(before + 2);
+  await expect(main.locator('.row.marked')).toHaveCount(0);
+
+  // The menu's impossible Indent nudges the row, as Tab does.
+  await resetMotion();
+  await main.locator('.row', { hasText: 'First' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Indent' }).click();
+  expect(
+    await main.locator('.row', { hasText: 'First' }).evaluate((row) => row.getAnimations().length),
+  ).toBeGreaterThan(0);
+
+  // TASK-08, D-89: sorting moves the rows with a glide, and the line eases in and out.
+  await resetMotion();
+  await main.locator('.nav', { hasText: 'Clicks' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Sort tasks by' }).hover();
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Priority' }).click();
+  const glides = await main.evaluate(
+    () =>
+      document
+        .getAnimations()
+        .filter((animation) =>
+          (animation.effect as KeyframeEffect | null)
+            ?.getKeyframes()
+            .some((frame) => 'translate' in frame),
+        ).length,
+  );
+  expect(glides).toBeGreaterThan(0);
+  await expect
+    .poll(motion)
+    .toEqual(expect.arrayContaining(['animationend sort-indicator sort-in']));
+  await expect
+    .poll(() => main.locator('.card.tasks .row:not(.subtask) .title').allTextContents())
+    .toEqual(['Parent', 'Last', 'First', 'Read the runbook']);
+  await main.locator('.sort-indicator button').click();
+  await expect
+    .poll(motion)
+    .toEqual(expect.arrayContaining(['animationend sort-indicator sort-out']));
+  await expect(main.locator('.sort-indicator')).toHaveCount(0);
+
+  // NAV-06, D-89: the find bar opens and closes with its motion.
+  await resetMotion();
+  await main.keyboard.press('Control+f');
+  await expect(main.locator('.list-find .fl-find-input')).toBeFocused();
+  await expect.poll(motion).toEqual(expect.arrayContaining(['animationend fl-find list-find-in']));
+  await main.keyboard.press('Escape');
+  await expect.poll(motion).toEqual(expect.arrayContaining(['animationend fl-find list-find-out']));
+  await expect(main.locator('.list-find')).toHaveCount(0);
+
+  // CAP-05, D-89: the composer's ## menu shows every matching list and scrolls past five.
+  await main.locator('.composer-input').click();
+  await main.keyboard.type('Ship ##ops');
+  await expect(main.locator('.composer-suggestion')).toHaveCount(7);
+  expect(
+    await main
+      .locator('.composer-suggestions')
+      .evaluate((box) => box.scrollHeight > box.clientHeight + 1),
+  ).toBe(true);
+  for (let step = 0; step < 7; step++) await main.keyboard.press('ArrowDown');
+  await expect(main.locator('.composer-suggestion[aria-selected="true"]')).toHaveText('Ops 7');
+  expect(
+    await main.locator('.composer-suggestion[aria-selected="true"]').evaluate((row) => {
+      const box = row.parentElement?.getBoundingClientRect();
+      const own = row.getBoundingClientRect();
+      return !!box && own.bottom <= box.bottom + 1 && own.top >= box.top - 1;
+    }),
+  ).toBe(true);
+  await main.keyboard.press('Escape');
+  await main.locator('.composer-input').fill('');
+  await main.keyboard.press('Escape');
+
+  // LIST-03, D-89: Inbox has a short menu of its own.
+  await main.locator('.nav', { hasText: 'Inbox' }).click({ button: 'right' });
+  await expect(main.locator('.fl-menu .fl-menu-item', { hasText: 'Sort tasks by' })).toHaveCount(1);
+  await expect(main.locator('.fl-menu .fl-menu-item', { hasText: 'Rename' })).toHaveCount(0);
+  await main.keyboard.press('Escape');
+
+  // A copy button turns into a checkmark for a moment (D-89).
+  await main.locator('.row', { hasText: 'Parent' }).locator('.body-toggle').click();
+  const copy = main.locator('.row-body .code-copy, .row-body .cm-fl-code-copy').first();
+  await copy.click();
+  await expect(copy).toHaveClass(/copied/);
+  await expect(copy.locator('.fl-copy-done')).toHaveCount(1);
+  await main.locator('.row', { hasText: 'Parent' }).locator('.body-toggle').click();
+
+  // NAV-07, D-89: in the panel, a subtask is clickable: its details, then back to its parent.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: 0, y: 0, width: 1600, height: 900 });
+  });
+  const panel = main.locator('.context-panel .panel-state:not(.panel-ghost)');
+  await expect(main.locator('.context-panel')).toHaveCount(1);
+  await main
+    .locator('.row', { hasText: 'Parent' })
+    .first()
+    .click({ position: { x: 400, y: 10 } });
+  await expect(panel.locator('.panel-title')).toHaveText('Parent');
+  await panel.locator('.panel-subtask', { hasText: 'Child one' }).click();
+  await expect(panel.locator('.panel-title')).toHaveText('Child one');
+  await expect(main.locator('.row.sel .title')).toHaveText('Child one');
+  await panel.locator('.panel-back').click();
+  await expect(panel.locator('.panel-title')).toHaveText('Parent');
+
+  // D-89: Shift+Enter while editing a title, with the panel: the panel's notes take the caret.
+  await main.locator('.row', { hasText: 'Last' }).click({ position: { x: 400, y: 10 } });
+  await main.keyboard.press('Enter');
+  await expect(field).toBeFocused();
+  await main.keyboard.press('Shift+Enter');
+  await expect(panel.locator('.panel-notes .cm-content')).toBeFocused();
+  await expect(main.locator('.row-body')).toHaveCount(0);
+  await main.keyboard.press('Escape');
+
+  // D-89: on a note, Ctrl+A selects the note's text, never the panel's.
+  await main.locator('.nav', { hasText: 'Panel note' }).click();
+  await main.locator('.note-card h1, .note-card .note-title').first().click();
+  await main.keyboard.press('Escape');
+  await main.locator('.context-panel').click({ position: { x: 30, y: 10 } });
+  await main.keyboard.press('Control+a');
+  expect(
+    await main.evaluate(() => {
+      const selection = window.getSelection();
+      const panelNode = document.querySelector('.context-panel');
+      return !!selection && !!panelNode && selection.containsNode(panelNode, true);
+    }),
+  ).toBe(false);
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: 0, y: 0, width: 1120, height: 780 });
+  });
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

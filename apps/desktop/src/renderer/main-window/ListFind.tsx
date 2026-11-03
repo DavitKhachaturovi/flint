@@ -69,8 +69,21 @@ export function ListFind(props: {
   readonly onJump: (match: FindMatch) => void;
   readonly onClose: () => void;
 }): ReactElement {
-  const { rows, root, version, onJump, onClose } = props;
+  const { rows, root, version, onJump } = props;
   const [text, setText] = useState('');
+  // D-89: closing plays the bar's way out first (nothing waits for it: the list takes keys at once).
+  const [leaving, setLeaving] = useState(false);
+  const onClose = (): void => {
+    if (leaving) return;
+    paint(null, '', null);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) props.onClose();
+    else setLeaving(true);
+  };
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = window.setTimeout(props.onClose, 400);
+    return () => window.clearTimeout(timer);
+  }, [leaving, props.onClose]);
   const [at, setAt] = useState(-1);
   const input = useRef<HTMLInputElement>(null);
   const matches = useMemo(() => findMatches(rows, text), [rows, text]);
@@ -79,8 +92,28 @@ export function ListFind(props: {
     input.current?.focus();
     return () => paint(null, '', null);
   }, []);
+  // D-89: with the list at its top, the bar sits level with the title row; as the list scrolls it
+  // settles 16 px below the window's top (its sticky place, where the context panel sticks).
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = bar.current;
+    const title = root?.querySelector<HTMLElement>('.list-header h1');
+    if (!element || !root || !title) return;
+    const place = (): void => {
+      const area = root.getBoundingClientRect();
+      const box = title.getBoundingClientRect();
+      const rest =
+        box.top + root.scrollTop + (box.height - element.offsetHeight) / 2 - (area.top + 16);
+      element.style.translate = `0 ${Math.min(0, rest + root.scrollTop)}px`;
+    };
+    place();
+    root.addEventListener('scroll', place, { passive: true });
+    return () => root.removeEventListener('scroll', place);
+  }, [root]);
   // After every draw of the list, so new rows (and opened bodies) are highlighted too.
-  useLayoutEffect(() => paint(root, text, current), [root, text, current, version, rows]);
+  useLayoutEffect(() => {
+    if (!leaving) paint(root, text, current);
+  }, [root, text, current, version, rows, leaving]);
   const go = (step: 1 | -1): void => {
     if (matches.length === 0) return;
     const next =
@@ -98,7 +131,15 @@ export function ListFind(props: {
           ? `${at + 1} of ${matches.length}`
           : `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`;
   return (
-    <div className="fl-find list-find" role="search">
+    <div
+      ref={bar}
+      className={leaving ? 'fl-find list-find leaving' : 'fl-find list-find'}
+      role="search"
+      inert={leaving}
+      onAnimationEnd={(event) => {
+        if (leaving && event.target === event.currentTarget) props.onClose();
+      }}
+    >
       <input
         ref={input}
         className="fl-find-input"
@@ -121,7 +162,10 @@ export function ListFind(props: {
           }
         }}
       />
-      <span className="fl-find-count">{count}</span>
+      {/* D-89: the count changes with a short crossfade as the matches go by. */}
+      <span className="fl-find-count" key={count} data-changed={at >= 0 || undefined}>
+        {count}
+      </span>
       <button
         type="button"
         className="fl-find-button up"

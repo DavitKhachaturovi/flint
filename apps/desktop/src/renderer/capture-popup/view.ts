@@ -176,6 +176,8 @@ export function renderSuggestions(
   });
   box.replaceChildren(...rows);
   box.hidden = rows.length === 0;
+  // D-89: the highlighted list stays in view past the five visible rows.
+  rows[selected]?.scrollIntoView({ block: 'nearest' });
 }
 
 const KIND_LABEL = { json: 'JSON', 'stack-trace': 'Stack trace', code: 'Code' } as const;

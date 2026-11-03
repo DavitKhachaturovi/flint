@@ -1312,7 +1312,9 @@ textarea:not([readonly], [disabled]) {
    rendered text's place, padding and type. */
 .row-body {
   padding: 0 12px 10px 48px;
-  overflow: hidden;
+  /* D-89: clipped for its opening and closing, but the editing field's edge (6 px out) shows. */
+  overflow: clip;
+  overflow-clip-margin: 6px;
   animation: body-in var(--fl-dur-base) ease-out;
 }
 
@@ -1712,10 +1714,22 @@ textarea:not([readonly], [disabled]) {
   margin-left: 32px;
 }
 
-/* D-87: two raised cards in a row (a task and its subtask, both open) keep apart: their shadows
-   never overlap. */
+/* D-87, D-89: a raised card keeps 6 px from what is next to it (with the list's 2 px gap): another
+   open card, or a selected row's raised highlight; their shadows never overlap. */
+.row-group {
+  margin-block: 4px;
+}
+
+.row-group:first-child {
+  margin-top: 0;
+}
+
+.row-group:last-child {
+  margin-bottom: 0;
+}
+
 .row-group + .row-group {
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .row-group > .row,
@@ -2612,6 +2626,15 @@ a.auto-link {
   animation: none !important;
 }
 
+/* D-89: the panel's text isn't part of a window-wide selection (its notes and fields are). */
+.context-panel {
+  user-select: none;
+}
+
+.context-panel :is(input, textarea, .cm-content) {
+  user-select: text;
+}
+
 .pair.compact > .context-panel {
   flex-basis: 380px;
 }
@@ -2791,14 +2814,22 @@ a.auto-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 5px 0;
+  padding: 5px 8px;
+  margin: 0 -8px;
+  border-radius: 10px;
   font-size: 14px;
   color: var(--fl-text-heading-soft);
+  transition: background-color var(--fl-dur-fast);
+}
+
+/* D-89: a subtask in the panel is clickable: it opens its own details. */
+.panel-subtask:not(.adding):hover {
+  background: var(--fl-ground-hover);
 }
 
 /* D-87: a panel subtask's stripe and indicators, as on its row in the list. */
 .panel-subtask .stripe {
-  left: -10px;
+  left: -2px;
   top: 8px;
   bottom: 8px;
 }
@@ -3089,6 +3120,19 @@ a.auto-link {
   color: var(--fl-text-faint);
 }
 
+/* D-89: an extra section that arrives (its content loaded a moment later) eases in with the rest
+   of the panel. */
+.panel-extra {
+  animation: extra-in var(--fl-dur-state) ease-out;
+}
+
+@keyframes extra-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 /* D-85: an extra section is one quiet line until opened (it folds like Completed). */
 .panel-extra-head {
   display: flex;
@@ -3241,6 +3285,10 @@ a.auto-link {
   list-style: none;
   margin: 0 4px 6px;
   padding: 4px;
+  /* D-89: five rows show; more scroll. It eases in (03 §5). */
+  max-height: calc(5 * 34px + 8px);
+  overflow-y: auto;
+  animation: suggestions-in var(--fl-dur-base) ease-out;
   border-radius: var(--fl-radius-row);
   background: var(--fl-ground-well);
   box-shadow: inset 0 0 0 1px var(--fl-edge-card);
@@ -3315,6 +3363,34 @@ a.auto-link {
   color: var(--fl-text-muted);
 }
 
+/* D-89: it eases in and out, taking and giving back its room (no jump in the list below). */
+.sort-indicator {
+  height: 18px;
+  overflow: hidden;
+  animation: sort-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sort-indicator.leaving {
+  pointer-events: none;
+  animation: sort-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes sort-in {
+  from {
+    height: 0;
+    margin-block: -16px 0;
+    opacity: 0;
+  }
+}
+
+@keyframes sort-out {
+  to {
+    height: 0;
+    margin-block: -16px 0;
+    opacity: 0;
+  }
+}
+
 .sort-indicator button {
   color: var(--fl-text-secondary);
   text-decoration: underline;
@@ -3335,12 +3411,40 @@ a.auto-link {
   vertical-align: bottom;
 }
 
-/* NAV-06, D-88: the task list's find bar, floating at the top right of the list as it scrolls. */
+/* NAV-06, D-88, D-89: the task list's find bar, floating at the top right of the list: level with
+   the title row, then, as the list scrolls, 16 px below the window's top, as the context panel. It
+   takes no room (its height and the column's gap given back). */
 .list-find {
   position: sticky;
-  top: 8px;
+  top: 16px;
   z-index: 6;
-  margin: 0 0 -46px auto;
+  height: 40px;
+  margin: 0 0 -56px auto;
+  animation: list-find-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+@keyframes list-find-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+.list-find.leaving {
+  pointer-events: none;
+  animation: list-find-out var(--fl-dur-base) ease-in forwards;
+}
+
+@keyframes list-find-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+/* D-89: the count crossfades as it changes. */
+.list-find .fl-find-count {
+  animation: fade-in var(--fl-dur-state) ease-out;
 }
 
 .list-find .fl-find-button.up svg {
@@ -3413,4 +3517,12 @@ a.auto-link {
 .swipe-arrow.forward {
   right: 12px;
   transform: translate(calc((1 - var(--swipe)) * 32px), -50%) scale(calc(0.6 + var(--swipe) * 0.4));
+}
+
+/* D-89: the composer's `##` menu eases in. */
+@keyframes suggestions-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }

@@ -11,7 +11,8 @@ import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { mediaUrl } from '../../shared/body-markdown.js';
 import { activeLinkPatterns } from '../../shared/link-patterns.js';
-import { openAttachment } from '../media/media.js';
+import { announce, fileMenuItems, imageMenuItems, openAttachment } from '../media/media.js';
+import { openMenu } from '../menu/menu.js';
 import { panelExtras, type Attachment, type Reference } from '../panel/extras.js';
 import { outline as outlineOf, type Outline, type OutlineBlock } from '../panel/outline.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
@@ -83,6 +84,8 @@ export interface PanelHandlers {
   readonly onImage: ShowImage;
   /** D-87: a subtask's right-click menu, as in the list (the panel keeps showing its task). */
   readonly onTaskMenu: (task: TaskRow, at: { x: number; y: number }) => void;
+  /** D-89: a subtask's click: it is selected, so the panel shows it (with the back arrow). */
+  readonly onSubtask: (task: TaskRow) => void;
   /** Up next: an item's task, in its list. */
   readonly onGo: (item: UpNextItem) => void;
   /** Outline: scrolls the note or the page to a heading or block (its offset in the text). */
@@ -112,13 +115,32 @@ export function ContextPanel(props: {
   // D-83, D-86: the card's height eases to its content's when the state changes, and only then
   // (a section opening, a note being typed resize it as they go). No scrollbar while it moves.
   const restingHeight = useRef<number | null>(null);
+  /** D-89: when the state last changed: content arriving just after (Up next) eases in too. */
+  const changedAt = useRef(0);
   useLayoutEffect(() => {
     const content = inner.current;
     const box = card.current;
     if (!content || !box) return;
     const observer = new ResizeObserver(() => {
-      if (!box.getAnimations().some((animation) => animation.id === 'panel-height'))
-        restingHeight.current = box.offsetHeight;
+      if (box.getAnimations().some((animation) => animation.id === 'panel-height')) return;
+      const before = restingHeight.current;
+      const next = box.offsetHeight;
+      restingHeight.current = next;
+      if (
+        before === null ||
+        Math.abs(before - next) < 1 ||
+        performance.now() - changedAt.current > 600 ||
+        reducedMotion()
+      )
+        return;
+      const animation = box.animate(
+        [
+          { height: `${before}px`, overflow: 'hidden' },
+          { height: `${next}px`, overflow: 'hidden' },
+        ],
+        { duration: durationOf(box, 260), easing: 'cubic-bezier(.2, .9, .3, 1)' },
+      );
+      animation.id = 'panel-height';
     });
     observer.observe(content);
     return () => observer.disconnect();
@@ -128,6 +150,7 @@ export function ContextPanel(props: {
     const box = card.current;
     if (!box || lastKey.current === stateKey) return;
     lastKey.current = stateKey;
+    changedAt.current = performance.now();
     const running = box.getAnimations().filter((animation) => animation.id === 'panel-height');
     const before = running.length > 0 ? box.getBoundingClientRect().height : restingHeight.current;
     for (const animation of running) animation.cancel();
@@ -522,6 +545,24 @@ function ReferenceRow(props: { readonly reference: Reference }): ReactElement {
       className="panel-item reference"
       title={reference.href}
       onClick={() => window.flintMain.openLink(reference.href)}
+      // D-89: open it, or copy its address.
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openMenu(
+          [
+            { label: 'Open link', action: () => window.flintMain.openLink(reference.href) },
+            {
+              label: 'Copy link',
+              action: () =>
+                void navigator.clipboard
+                  .writeText(reference.href)
+                  .then(() => announce('Copied link')),
+            },
+          ],
+          { x: event.clientX, y: event.clientY },
+        );
+      }}
     >
       <span className="panel-item-title">{reference.text}</span>
     </button>
@@ -566,6 +607,18 @@ function AttachmentRows(props: {
           }
           title={each.link}
           onClick={(event) => open(each, event.currentTarget)}
+          // D-89: the picture's or file's menu, as in the notes.
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const holder = event.currentTarget;
+            openMenu(
+              each.kind === 'image' && !missing.has(each.link)
+                ? imageMenuItems(each.link, () => open(each, holder))
+                : fileMenuItems(each.link, holder),
+              { x: event.clientX, y: event.clientY },
+            );
+          }}
         >
           <span className="outline-tile">
             {each.kind === 'file' ? <OpenPageIcon size={11} /> : <ImageIcon size={11} />}
@@ -613,6 +666,11 @@ function PanelSubtask(props: {
   return (
     <div
       className={sub.done ? 'panel-subtask done' : 'panel-subtask'}
+      // D-89: a click opens the subtask's details (it is selected in the list); back returns.
+      onClick={(event) => {
+        if ((event.target as Element).closest('button')) return;
+        handlers.onSubtask(sub);
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();

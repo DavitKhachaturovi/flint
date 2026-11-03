@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { imageMenuItems } from '../media/media.js';
-import { openMenu } from '../menu/menu.js';
+import { isMenuOpen, openMenu } from '../menu/menu.js';
 import { ChevronIcon, CloseIcon } from './icons.js';
 
 /** A duration token in ms (09 §9); 0 under reduce-motion, when nothing animates. */
@@ -42,6 +42,8 @@ export function Lightbox(props: {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
+      // D-89: the picture's menu takes its own keys (Esc closes the menu, not the viewer).
+      if (isMenuOpen()) return;
       event.stopPropagation();
       if (event.key === 'Escape') {
         event.preventDefault();

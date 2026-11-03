@@ -248,6 +248,9 @@ button:focus-visible {
   list-style: none;
   margin: 0 0 6px;
   padding: 4px;
+  /* D-89: five rows show; more scroll. */
+  max-height: calc(5 * 34px + 8px);
+  overflow-y: auto;
   border-radius: var(--fl-radius-row);
   background: var(--fl-ground-card);
   box-shadow: inset 0 0 0 1px var(--fl-edge-card);

@@ -425,7 +425,8 @@ async function start(): Promise<void> {
     const path = /^app:\/\//i.test(source)
       ? (resolveMediaFile(source, folder.folder) ?? resolveLinkedFile(source))
       : linkedPath(source, folder.folder);
-    if (!path || fileKind(path) !== 'image') return false;
+    // D-89: Show in folder works for any attachment; copying and opening here, for pictures.
+    if (!path || (action !== 'show' && fileKind(path) !== 'image')) return false;
     const exists = await stat(path).then(
       (info) => info.isFile(),
       () => false,

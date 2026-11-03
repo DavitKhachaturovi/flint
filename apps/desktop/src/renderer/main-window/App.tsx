@@ -417,6 +417,58 @@ const SORT_NAMES: Readonly<Record<TempSort, string>> = {
  * reminder time: soonest first, without one last; date added: newest first, file order where it is
  * unknown. Ties keep the file's order (a stable sort).
  */
+/** D-89: what a row or an open task's card in the task list is, by its task's key. */
+function rowKey(element: Element): string | null {
+  if (element.matches('.row[data-key]')) return element.getAttribute('data-key');
+  if (element.matches('.row-group'))
+    return element.querySelector('.row[data-key]')?.getAttribute('data-key') ?? null;
+  return null;
+}
+
+/** D-89: where the task list's rows (and the selection's highlight) are, before a sort. */
+function rowTops(): Map<string, number> {
+  const places = new Map<string, number>();
+  const card = document.querySelector('section.card.tasks');
+  for (const element of card?.children ?? []) {
+    const key = element.matches('.sel-glide') ? 'glide' : rowKey(element);
+    if (key) places.set(key, element.getBoundingClientRect().top);
+  }
+  return places;
+}
+
+/**
+ * D-89 (TASK-08): a temporary sort starting or ending: each row glides from where it was to its new
+ * place, the selection's highlight with its row; rows that come back (headings, text) fade in.
+ */
+function glideRows(before: ReadonlyMap<string, number>, selected: string | null): void {
+  if (reducedMotion()) return;
+  const card = document.querySelector('section.card.tasks');
+  const timing = {
+    duration: durationMs('--fl-dur-page', 320),
+    easing: 'cubic-bezier(.2, .9, .3, 1)',
+  };
+  for (const element of card?.children ?? []) {
+    const glide = element.matches('.sel-glide');
+    const key = glide ? 'glide' : rowKey(element);
+    const was = key ? before.get(key) : undefined;
+    const at = glide
+      ? card?.querySelector(`[data-key="${CSS.escape(selected ?? '')}"]`)?.getBoundingClientRect()
+          .top
+      : element.getBoundingClientRect().top;
+    if (was === undefined || at === undefined) {
+      if (!glide)
+        element.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: durationMs('--fl-dur-state', 260),
+          easing: 'ease-out',
+        });
+      continue;
+    }
+    const by = was - at;
+    if (Math.abs(by) >= 1)
+      element.animate([{ translate: `0 ${by}px` }, { translate: '0 0' }], timing);
+  }
+}
+
 function sortedItems(items: readonly ListItem[], sort: TempSort): ListItem[] {
   const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const time = (stamp: string | null | undefined): number =>
@@ -679,8 +731,11 @@ export function App(): ReactElement {
    * its own, also in the same list, so back (the panel's arrow, Alt+←) returns to what was before.
    */
   const selectedRef = useRef<string | null>(null);
-  /** D-87: the next selection came from the keyboard or a panel link: scroll it into view. */
-  const followSelection = useRef(false);
+  /**
+   * D-87: the next selection came from the keyboard or a panel link: scroll it into view. D-89:
+   * 'instant' while ↑/↓ is held, so the list keeps up with the key repeat.
+   */
+  const followSelection = useRef<false | 'smooth' | 'instant'>(false);
   const followFromPanel = useCallback(
     (list: string, key: string): void => {
       const trail = history.current;
@@ -691,7 +746,7 @@ export function App(): ReactElement {
         { list, page: null, select: key, fromPanel: true },
       ];
       trail.at = trail.places.length - 1;
-      followSelection.current = true;
+      followSelection.current = 'smooth';
       show({ list, page: null }, key);
     },
     [show],
@@ -794,13 +849,14 @@ export function App(): ReactElement {
    */
   const showBody = useCallback(
     (task: TaskRow): void => {
+      const without = (keys: ReadonlySet<string>): Set<string> =>
+        new Set([...keys].filter((key) => key !== task.key));
       // NAV-07, D-83: with the context panel, the body is read and edited there: select the task.
-      if (panelShownRef.current) {
+      // D-89: one open inline anyway closes.
+      if (panelShownRef.current && !expanded.has(task.key)) {
         setSelected(task.key);
         return;
       }
-      const without = (keys: ReadonlySet<string>): Set<string> =>
-        new Set([...keys].filter((key) => key !== task.key));
       if (!expanded.has(task.key)) {
         setExpanded((current) => new Set([...current, task.key]));
         setClosingBodies(without);
@@ -815,8 +871,17 @@ export function App(): ReactElement {
     [expanded],
   );
 
+  /** D-89: a task whose notes the context panel's editor takes as soon as it shows them. */
+  const panelNotesFor = useRef<string | null>(null);
   /** D-78: a task's body opened inline and in its field, for Shift+Enter and "Add notes". */
   const openNotes = useCallback((key: string): void => {
+    // D-89: with the context panel, in the panel's notes editor instead.
+    if (panelShownRef.current) {
+      panelNotesFor.current = key;
+      setEditing(null);
+      setSelected(key);
+      return;
+    }
     setExpanded((current) => new Set([...current, key]));
     setClosingBodies((current) => new Set([...current].filter((other) => other !== key)));
     setEditingBody(key);
@@ -970,6 +1035,35 @@ export function App(): ReactElement {
   useEffect(() => setFinding(0), [listId]);
   /** TASK-08, D-88: a temporary sort of the open list (a view; the file's order stays). */
   const [tempSort, setTempSort] = useState<TempSort | null>(null);
+  /** D-89: a sort's change, with the rows gliding to their new places. */
+  const sortFrom = useRef<Map<string, number> | null>(null);
+  const sortTo = useCallback((next: TempSort | null): void => {
+    sortFrom.current = rowTops();
+    setTempSort(next);
+  }, []);
+  useLayoutEffect(() => {
+    const before = sortFrom.current;
+    sortFrom.current = null;
+    if (before) glideRows(before, selectedRef.current);
+  }, [tempSort]);
+  /** D-89: the sort's line, kept while it eases out. */
+  const [sortLine, setSortLine] = useState<{
+    readonly sort: TempSort;
+    readonly list: string;
+    readonly leaving: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (tempSort) {
+      setSortLine({ sort: tempSort, list: listId, leaving: false });
+      return;
+    }
+    setSortLine((current) => current && { ...current, leaving: true });
+    const timer = window.setTimeout(
+      () => setSortLine((current) => (current?.leaving ? null : current)),
+      durationMs('--fl-dur-state', 260),
+    );
+    return () => window.clearTimeout(timer);
+  }, [tempSort, listId]);
   /** A sort chosen from another list's menu, applied once that list is open. */
   const pendingSort = useRef<TempSort | null>(null);
   useEffect(() => {
@@ -1457,12 +1551,19 @@ export function App(): ReactElement {
                   ? {
                       label: 'Indent',
                       hint: 'Tab',
-                      action: () => void change({ kind: 'indent', key: row.key }),
+                      // D-89: an impossible one nudges the row, as from the keyboard.
+                      action: () =>
+                        void change({ kind: 'indent', key: row.key }).then((outcome) => {
+                          if (!outcome) nudge(row.key, 'right');
+                        }),
                     }
                   : {
                       label: 'Outdent',
                       hint: 'Shift+Tab',
-                      action: () => void change({ kind: 'outdent', key: row.key }),
+                      action: () =>
+                        void change({ kind: 'outdent', key: row.key }).then((outcome) => {
+                          if (!outcome) nudge(row.key, 'left');
+                        }),
                     },
               ]
             : []),
@@ -1735,7 +1836,7 @@ export function App(): ReactElement {
     [naming, openList, showToast, sidebarChange, refresh, setNaming],
   );
 
-  /** D-55: a list's right-click menu; Inbox has none (LIST-03). */
+  /** D-55: a list's right-click menu; D-89: Inbox has a short one of its own (LIST-03). */
   const listMenu = useCallback(
     (list: ListSummary, at: Point): void => {
       const done = (outcome: ListActionOutcome | null): void => {
@@ -1777,7 +1878,7 @@ export function App(): ReactElement {
                   label: SORT_NAMES[sort][0]?.toUpperCase() + SORT_NAMES[sort].slice(1),
                   checked: list.id === listId && tempSort === sort,
                   action: () => {
-                    if (list.id === listId) setTempSort(sort);
+                    if (list.id === listId) sortTo(sort);
                     else {
                       pendingSort.current = sort;
                       openList(list.id);
@@ -1787,6 +1888,26 @@ export function App(): ReactElement {
               },
             ]
           : [];
+      // D-89 (Proposed): the Inbox's own menu: its sorts and Duplicate; it is never renamed,
+      // converted, grouped or deleted.
+      if (list.inbox) {
+        openMenu(
+          [
+            ...sorting,
+            ...(list.id === listId && tempSort
+              ? [{ label: 'Back to manual order', action: () => sortTo(null) }]
+              : []),
+            'divider',
+            {
+              label: 'Duplicate',
+              action: () =>
+                void window.flintMain.listAction({ kind: 'duplicate', id: list.id }).then(done),
+            },
+          ],
+          at,
+        );
+        return;
+      }
       // LIST-05: into a group, or out of one.
       const groups = (sidebarView?.items ?? []).filter(
         (item): item is SidebarGroup => item.kind === 'group',
@@ -1893,6 +2014,7 @@ export function App(): ReactElement {
       setNaming,
       go,
       tempSort,
+      sortTo,
     ],
   );
 
@@ -2016,9 +2138,20 @@ export function App(): ReactElement {
       }
       // TASK-07: Ctrl+A marks every task in the list.
       if (event.ctrlKey && !event.altKey && !event.shiftKey && key === 'a') {
-        if (view?.mode !== 'tasks' || page) return;
         event.preventDefault();
-        selectAll();
+        if (view?.mode === 'tasks' && !page) {
+          selectAll();
+          return;
+        }
+        // D-89: on a note or a task's page, the text of its notes (never the whole window's, the
+        // context panel's included).
+        const editor = document.querySelector<HTMLElement>(
+          '.content.note-page .note-editor .cm-editor, .content.task-page .page-editor .cm-editor',
+        );
+        const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+        if (!cm) return;
+        cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
+        cm.focus();
         return;
       }
       // D-79: Alt+↑/↓ with the keyboard in the sidebar moves the list or group picked there; with
@@ -2070,7 +2203,7 @@ export function App(): ReactElement {
           anchor.current = next.key;
           setMarked(NOTHING);
         }
-        followSelection.current = true;
+        followSelection.current = event.repeat ? 'instant' : 'smooth';
         setSelected(next.key);
         return;
       }
@@ -2079,7 +2212,7 @@ export function App(): ReactElement {
         // Alt+↑/↓ reorders (TASK-02); single keys never reach Windows. TASK-08, D-88: while
         // sorted, reordering returns to the manual order first.
         if (tempSort) {
-          setTempSort(null);
+          sortTo(null);
           return;
         }
         if (open)
@@ -2154,8 +2287,10 @@ export function App(): ReactElement {
           ?.getBoundingClientRect();
         taskMenu(row, box ? { x: box.left + 48, y: box.bottom } : { x: 300, y: 200 });
       } else if (event.key === 'Escape') {
-        // Esc clears the marks first, then the selection (TASK-07).
+        // Esc clears the marks first, then the selection (TASK-07). D-89: with the context panel,
+        // a body open inline anyway closes first.
         if (marked.size > 0) setMarked(NOTHING);
+        else if (row && panelShownRef.current && expanded.has(row.key)) showBody(row);
         else setSelected(null);
       }
     };
@@ -2775,7 +2910,10 @@ export function App(): ReactElement {
     const box = row.getBoundingClientRect();
     // Only a row that is out of view (a click or a menu never moves the list).
     if (area && box.top >= area.top && box.bottom <= area.bottom) return;
-    row.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    row.scrollIntoView({
+      block: 'nearest',
+      behavior: follow === 'instant' || reducedMotion() ? 'instant' : 'smooth',
+    });
   }, [selected]);
 
   /**
@@ -2794,6 +2932,19 @@ export function App(): ReactElement {
       event.preventDefault();
       const after = rows.find((row) => row.key === selected && !row.done)?.key;
       const kind = classifyPaste(text);
+      // D-89 (CAP-06): code on a selected task whose notes are open inline goes into those notes.
+      const open = selected && expanded.has(selected) ? findRow(view, selected) : null;
+      if (kind !== 'text' && open && !open.done) {
+        const block = fencedBlock(blockFor(text).text, kind === 'json' ? 'json' : '');
+        void change({
+          kind: 'body',
+          key: open.key,
+          body: [open.body.trim(), block].filter((piece) => piece !== '').join('\n\n'),
+        }).then((outcome) => {
+          if (outcome) showToast(`Added to ${open.label}`, true);
+        });
+        return;
+      }
       if (kind !== 'text') {
         void change({
           kind: 'add',
@@ -2846,7 +2997,7 @@ export function App(): ReactElement {
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [view?.mode, view?.readOnly, page, rows, selected, change, showToast, undo]);
+  }, [view, page, rows, selected, expanded, change, showToast, undo]);
 
   /** D-86: a subtask added in the panel: below the last subtask, or as the first one. */
   const addSubtaskIn = async (task: TaskRow, text: string): Promise<void> => {
@@ -2918,10 +3069,10 @@ export function App(): ReactElement {
             submenu: (['priority', 'reminder', 'added'] as const).map((sort) => ({
               label: SORT_NAMES[sort][0]?.toUpperCase() + SORT_NAMES[sort].slice(1),
               checked: tempSort === sort,
-              action: () => setTempSort(sort),
+              action: () => sortTo(sort),
             })),
           },
-          ...(tempSort ? [{ label: 'Back to manual order', action: () => setTempSort(null) }] : []),
+          ...(tempSort ? [{ label: 'Back to manual order', action: () => sortTo(null) }] : []),
         ]
       : [];
 
@@ -2932,7 +3083,8 @@ export function App(): ReactElement {
       ? null
       : view.mode === 'note'
         ? { kind: 'note', text: view.noteText ?? '', edited: view.edited, created: view.created }
-        : pageTask
+        : // D-89: on a task's page, a selected subtask shows its own details (its notes too).
+          pageTask && (!selectedRow || selectedRow.key === pageTask.key)
           ? { kind: 'page', task: pageTask }
           : selectedRow
             ? {
@@ -3038,6 +3190,19 @@ export function App(): ReactElement {
     if (content.current) observer.observe(content.current);
     return () => observer.disconnect();
   }, [panelShown, view?.id, view?.mode, pageTask?.key]);
+  // D-89: Shift+Enter or "Add notes" with the context panel: its notes editor takes the caret.
+  useEffect(() => {
+    const key = panelNotesFor.current;
+    if (!key || panelState?.kind !== 'task' || panelState.task.key !== key) return;
+    panelNotesFor.current = null;
+    const editor = document.querySelector<HTMLElement>(
+      '.context-panel .panel-state:not(.panel-ghost) .panel-notes .cm-editor',
+    );
+    const cm = editor ? CodeEditorView.findFromDOM(editor) : null;
+    if (!cm) return;
+    cm.dispatch({ selection: { anchor: cm.state.doc.length } });
+    cm.focus();
+  });
   const panelHandlers: PanelHandlers = {
     onHide: togglePanel,
     onBack: panelBack ? () => travel(-1) : null,
@@ -3054,6 +3219,7 @@ export function App(): ReactElement {
     onNewSubtask: (task, text) => void addSubtaskIn(task, text),
     onFact: (kind, positions) => jumpToFact(kind, positions),
     onTaskMenu: (task, at) => taskMenu(task, at, true),
+    onSubtask: (task) => followFromPanel(listId, task.key),
     onTitle: (key, text) => void change({ kind: 'edit', key, text }),
     onPriority: (task, anchor) =>
       openPriorityPicker(
@@ -3131,7 +3297,7 @@ export function App(): ReactElement {
             active={listId === inbox.id}
             icon={<InboxIcon />}
             onSelect={() => openList(inbox.id)}
-            onMenu={() => undefined}
+            onMenu={(at) => listMenu(inbox, at)}
           />
         )}
         <div className="section-label lists-label">
@@ -3297,6 +3463,41 @@ export function App(): ReactElement {
                 </TaskPage>
               )}
 
+              {/* NAV-06, D-88, D-89: the find bar, level with the title row, then 16 px below the
+              window's top as the list scrolls (where the context panel sticks). */}
+              {view?.mode === 'tasks' && !pageTask && finding > 0 && (
+                <ListFind
+                  key={finding}
+                  rows={visibleRows(shownView, true)}
+                  root={scroller.current}
+                  version={[view, expanded, completedOpen, tempSort]}
+                  onJump={(match) => {
+                    // A match in a folded place opens it (Completed, a body under its row).
+                    if (
+                      view.completed.some(
+                        (task) =>
+                          task.key === match.row.key ||
+                          task.subtasks.some((sub) => sub.key === match.row.key),
+                      )
+                    )
+                      setCompletedOpen(true);
+                    if (match.where === 'body' && !panelShownRef.current)
+                      setExpanded((current) => new Set([...current, match.row.key]));
+                    followSelection.current = 'smooth';
+                    setMarked(NOTHING);
+                    setSelected(match.row.key);
+                    // D-89: the match's row lights up a moment as the jump lands.
+                    window.requestAnimationFrame(() => {
+                      const row = scroller.current?.querySelector(
+                        `.row[data-key="${CSS.escape(match.row.key)}"]`,
+                      );
+                      if (row) flash(row);
+                    });
+                  }}
+                  onClose={() => setFinding(0)}
+                />
+              )}
+
               {view && !pageTask && view.mode === 'tasks' && (
                 <header className="list-header">
                   <h1>
@@ -3341,31 +3542,6 @@ export function App(): ReactElement {
 
               {view?.mode === 'tasks' && !pageTask && (
                 <>
-                  {finding > 0 && (
-                    <ListFind
-                      key={finding}
-                      rows={visibleRows(shownView, true)}
-                      root={scroller.current}
-                      version={[view, expanded, completedOpen, tempSort]}
-                      onJump={(match) => {
-                        // A match in a folded place opens it (Completed, a body under its row).
-                        if (
-                          view.completed.some(
-                            (task) =>
-                              task.key === match.row.key ||
-                              task.subtasks.some((sub) => sub.key === match.row.key),
-                          )
-                        )
-                          setCompletedOpen(true);
-                        if (match.where === 'body' && !panelShownRef.current)
-                          setExpanded((current) => new Set([...current, match.row.key]));
-                        followSelection.current = true;
-                        setMarked(NOTHING);
-                        setSelected(match.row.key);
-                      }}
-                      onClose={() => setFinding(0)}
-                    />
-                  )}
                   {!view.readOnly && (
                     <Composer
                       key={view.id}
@@ -3377,11 +3553,14 @@ export function App(): ReactElement {
                   )}
 
                   {/* TASK-08, D-88: while sorted, what the order is and the way back. */}
-                  {tempSort && (
-                    <div className="sort-indicator" role="status">
-                      <span>Sorted by {SORT_NAMES[tempSort]}</span>
+                  {sortLine && sortLine.list === view.id && (
+                    <div
+                      className={sortLine.leaving ? 'sort-indicator leaving' : 'sort-indicator'}
+                      role="status"
+                    >
+                      <span>Sorted by {SORT_NAMES[sortLine.sort]}</span>
                       <span aria-hidden="true">·</span>
-                      <button type="button" onClick={() => setTempSort(null)}>
+                      <button type="button" onClick={() => sortTo(null)}>
                         Back to manual order
                       </button>
                     </div>
@@ -3893,10 +4072,18 @@ function Composer(props: {
   }, [value, caret, escaped]);
   const suggestions = useMemo(
     () =>
-      token && token.text !== menuAcceptedFor ? suggestLists(token.typed, infos).slice(0, 5) : [],
+      // D-89: every matching list; the menu scrolls past five.
+      token && token.text !== menuAcceptedFor ? suggestLists(token.typed, infos) : [],
     [token, menuAcceptedFor, infos],
   );
   useEffect(() => setHighlight(-1), [suggestions.map((list) => list.id).join()]);
+  // D-89: the highlighted list stays in view as ↑/↓ go past the menu's five visible rows.
+  const suggestionsBox = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    suggestionsBox.current
+      ?.querySelector('[aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [highlight]);
   const cardTarget =
     parsed &&
     (parsed.target.kind === 'close-match' || parsed.target.kind === 'new') &&
@@ -4027,6 +4214,7 @@ function Composer(props: {
       />
       {suggestions.length > 0 && (
         <ul
+          ref={suggestionsBox}
           id="composer-suggestions"
           className="composer-suggestions"
           role="listbox"
@@ -4623,6 +4811,11 @@ function Row(
         // D-86: a right-click doesn't select by itself: its menu keeps a multi-selection it lands
         // in, or selects just this row (Windows Explorer).
         if (event.button !== 0) return;
+        // D-89: Ctrl+click on a title's link opens it (on click) and marks nothing.
+        if (event.ctrlKey && titleLink(event.target)) {
+          event.preventDefault();
+          return;
+        }
         // Shift+click marks a range of rows (TASK-07), never a text selection across them; an
         // edit in progress ends (leaving the field saves it).
         if (event.shiftKey) {
@@ -4634,9 +4827,19 @@ function Row(
         onSelect(task.key, { ctrl: event.ctrlKey, shift: event.shiftKey });
       }}
       onClick={(event) => {
+        // D-89: a single click only selects, the title's text and links too. A link opens with
+        // Ctrl+click, or with a click on an already-selected row.
+        const link = titleLink(event.target);
+        if (link) {
+          event.preventDefault();
+          if (event.ctrlKey || (wasSelected.current && event.detail === 1))
+            window.flintMain.openLink(link.href);
+          return;
+        }
         if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;
         if ((event.target as Element).closest('button, a, input, textarea')) return;
-        onEdit(task.key);
+        // D-76, D-89: a second single click on a selected row edits, the caret where it landed.
+        onEdit(task.key, titleCaret(task, event));
       }}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -4644,8 +4847,12 @@ function Row(
         // D-86: the menu selects this row unless it is inside a multi-selection (taskMenu).
         props.onMenu(task, { x: event.clientX, y: event.clientY });
       }}
-      // D-71: double-click anywhere edits; inside the field it is the field's own (word selection).
-      onDoubleClick={() => !task.done && !isEditing && onEdit(task.key)}
+      // D-71, D-89: double-click anywhere edits (the caret where it landed on the title); inside
+      // the field it is the field's own (word selection); never on a link.
+      onDoubleClick={(event) => {
+        if (task.done || isEditing || titleLink(event.target)) return;
+        onEdit(task.key, titleCaret(task, event));
+      }}
     >
       {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}
       <button
@@ -4673,10 +4880,7 @@ function Row(
           {task.code.peek && <span className="code-peek">{task.code.peek}</span>}
         </span>
       ) : (
-        <Title
-          task={task}
-          {...(!task.done && { onEditAt: (caret: number) => onEdit(task.key, caret) })}
-        />
+        <Title task={task} />
       )}
       <span className="ind">
         {task.pinned && (
@@ -4927,58 +5131,30 @@ function MorphText(props: { readonly text: string }): ReactElement {
 
 /**
  * A task's title with its inline markdown rendered (LIST-02, D-52); the raw text shows while it is
- * edited. markdown-it escapes everything that isn't markdown, so the HTML is safe. A click on a
- * link opens it in the browser and does nothing else; a click on the text edits the task with the
- * caret there (D-71); a click beside the text only selects the row.
+ * edited. markdown-it escapes everything that isn't markdown, so the HTML is safe. Clicks are the
+ * row's (D-89): a single click selects, wherever it lands; links open with Ctrl+click or a click on
+ * an already-selected row.
  */
-function Title(props: {
-  readonly task: TaskRow;
-  /** D-71: editing starts with the caret at this offset in the raw title. */
-  readonly onEditAt?: (caret: number) => void;
-}): ReactElement {
-  const { task, onEditAt } = props;
+function Title(props: { readonly task: TaskRow }): ReactElement {
+  const { task } = props;
   if (task.title === '') return <span className="title">{task.label}</span>;
-  const onLink = (event: React.MouseEvent): HTMLAnchorElement | null =>
-    (event.target as HTMLElement).closest('a');
-  return (
-    <span
-      className="title md"
-      dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }}
-      onMouseDown={(event) => {
-        if (onLink(event)) event.stopPropagation();
-        // D-74: a press on the text doesn't select first, so the click goes straight into
-        // editing that row, without the selection gliding there on the way.
-        else if (
-          onEditAt &&
-          event.button === 0 &&
-          !event.ctrlKey &&
-          !event.shiftKey &&
-          textOffsetAt(event.currentTarget, event.clientX, event.clientY) !== null
-        )
-          event.stopPropagation();
-      }}
-      onDoubleClick={(event) => {
-        if (onLink(event)) event.stopPropagation();
-      }}
-      onClick={(event) => {
-        const link = onLink(event);
-        if (link) {
-          event.preventDefault();
-          event.stopPropagation();
-          window.flintMain.openLink(link.href);
-          return;
-        }
-        // Ctrl/Shift+click select (TASK-07); the second click of a double-click is the field's.
-        if (!onEditAt || event.ctrlKey || event.shiftKey || event.detail > 1) return;
-        const span = event.currentTarget;
-        const at = textOffsetAt(span, event.clientX, event.clientY);
-        if (at === null) return;
-        // Not also the row's second click (D-76).
-        event.stopPropagation();
-        onEditAt(rawOffset(task.title, span.textContent ?? '', at));
-      }}
-    />
-  );
+  return <span className="title md" dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }} />;
+}
+
+/** D-89: the link in a row's rendered title under a click, if any. */
+function titleLink(target: EventTarget | null): HTMLAnchorElement | null {
+  return target instanceof Element ? target.closest<HTMLAnchorElement>('.title.md a') : null;
+}
+
+/**
+ * D-71, D-89: where the caret goes when a click starts editing: the matching place in the raw
+ * title when the click is on its text, else the end (undefined).
+ */
+function titleCaret(task: TaskRow, event: React.MouseEvent): number | undefined {
+  const span = (event.target as Element).closest<HTMLElement>('.title.md');
+  if (!span) return undefined;
+  const at = textOffsetAt(span, event.clientX, event.clientY);
+  return at === null ? undefined : rawOffset(task.title, span.textContent ?? '', at);
 }
 
 /** D-71: the offset in `element`'s text under a point, or null when the point is beside the text. */

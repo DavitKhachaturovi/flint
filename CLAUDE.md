@@ -28,7 +28,8 @@ Flint is a minimalist, keyboard-first quick-capture notes and task app for devel
 - **Performance budgets** (`docs/05` §4): hotkey → focused popup < 50 ms (hard limit 100 ms); keypress → screen one frame; Enter → saved and hidden < 100 ms. Pre-warmed, tiny capture popup; windows are hidden, never destroyed.
 - **Data** (`docs/04`): plain markdown, task metadata as `[key:: value]` fields with a stable `id`, tolerant reader and canonical writer, atomic writes, never destroy content the parser doesn't understand. Round-trip and fuzz tests for the format are mandatory.
 - **Privacy:** no telemetry and **no network requests at all in v1** (no auto-update yet). Fonts (Onest, FiraGO for Georgian only, Geist Mono; D-60) are bundled locally, never loaded from Google Fonts.
-- **Visual design** (`docs/09`): use `docs/design/tokens.css` variables only, no raw hex values in components. Match `docs/design/screenshots/` and `docs/design/mockups/`. Dark mode only in v1. No emoji in the UI. Motion ≤ 150 ms and off under reduce-motion.
+- **Visual design** (`docs/09`): use `docs/design/tokens.css` variables only, no raw hex values in components. Match `docs/design/screenshots/` and `docs/design/mockups/`. Dark mode only in v1. No emoji in the UI. Motion follows `docs/03` §5 (D-75: never delays input, interruptible, off under reduce-motion).
+- **Motion is part of done (D-89):** every UI change or action added comes with smooth, minimal motion for appearing, disappearing and changing state, following those rules. A feature isn't done without it; add it to the motion regression tests (`e2e/smoke.spec.ts`, the animation recorder) where practical.
 
 ## Working conventions
 
