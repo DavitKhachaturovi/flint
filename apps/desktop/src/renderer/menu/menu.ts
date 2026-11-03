@@ -253,6 +253,14 @@ export function openMenu(
         else if (options.room && !grown) {
           grown = true;
           options.room.grow(y + height + 3 * GAP - window.innerHeight);
+        } else {
+          // D-87: room neither below nor above the click: as low as it fits, never past the
+          // window's edge (and scrolling when it is taller than the window).
+          y = window.innerHeight - GAP - height;
+          if (height > window.innerHeight - 2 * GAP) {
+            menu.style.maxHeight = `${window.innerHeight - 2 * GAP}px`;
+            menu.style.overflowY = 'auto';
+          }
         }
       }
     }
