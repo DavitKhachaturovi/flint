@@ -2,6 +2,12 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.30 (4 Nov 2026)
+
+- **Trash**, at the bottom of the sidebar: everything you deleted in the last 30 days, by day. Restore puts it back where it was (Ctrl+Z undoes that); Delete now and Empty Trash remove things for good, after asking.
+- **Archived**, the second tab: completed tasks that auto-archive moved away, by list. Restore one to bring it back to its list.
+- Flint now removes pictures and files nothing uses any more, when it starts.
+
 ## 0.4.29 (4 Nov 2026)
 
 - **Flint's window comes back as you left it**: maximized if it was, from a reminder, the tray, the Start menu or opening Flint again.
