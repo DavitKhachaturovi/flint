@@ -44,8 +44,6 @@ export interface Settings {
   readonly keepDailyDays: number;
   /** D-67, D-100: all motion slower, as it is, or quicker. */
   readonly animationSpeed: AnimationSpeed;
-  /** D-102: the sidebar's foot, two designs to choose between (Davit picks one). */
-  readonly sidebarFooter: 'card' | 'row';
 }
 
 export type AnimationSpeed = 'relaxed' | 'normal' | 'quick';
@@ -72,7 +70,6 @@ export function defaultSettings(development = false): Settings {
     keepHourlyHours: 48,
     keepDailyDays: 30,
     animationSpeed: 'normal',
-    sidebarFooter: 'card',
   };
 }
 
@@ -134,12 +131,6 @@ export function readSettings(stored: Stored, development = false): Settings {
       (value): value is AnimationSpeed =>
         value === 'relaxed' || value === 'normal' || value === 'quick',
       defaults.animationSpeed,
-    ),
-    sidebarFooter: pick(
-      stored,
-      'sidebarFooter',
-      (value): value is 'card' | 'row' => value === 'card' || value === 'row',
-      defaults.sidebarFooter,
     ),
   };
 }

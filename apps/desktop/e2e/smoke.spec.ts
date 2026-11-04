@@ -3181,11 +3181,34 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(size.locator('[aria-checked=true]')).toHaveText('125%');
   await choose('Interface size', '100%');
   await expect.poll(zoomFactor).toBeCloseTo(1);
-  // D-102: the sidebar's foot, two designs.
-  await choose('Sidebar footer', 'Buttons');
-  await expect(main.locator('.sidebar-foot.row')).toHaveCount(1);
-  await choose('Sidebar footer', 'Card');
-  await expect(main.locator('.sidebar-foot.card')).toHaveCount(1);
+  // D-103: the foot's buttons show their names whole (the count only where it fits), and their
+  // hover is their own shape (the foot around them keeps the sidebar's ground).
+  const foot = await main.evaluate(() =>
+    [...document.querySelectorAll('.sidebar-foot .nav')].map((button) => {
+      const name = button.querySelector('.nav-name');
+      const count = button.querySelector('.nav-count');
+      const label = button.querySelector('.foot-label')?.getBoundingClientRect();
+      const shown = (element: Element | null): boolean =>
+        !!element && !!label && element.getBoundingClientRect().top < label.bottom;
+      return {
+        whole: !!name && name.scrollWidth <= name.clientWidth + 0.5,
+        named: shown(name),
+        counted: count === null || shown(count),
+      };
+    }),
+  );
+  expect(foot).toEqual([
+    { whole: true, named: true, counted: true },
+    { whole: true, named: true, counted: true },
+  ]);
+  await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).hover();
+  expect(
+    await main.evaluate(
+      () =>
+        getComputedStyle(document.querySelector('.sidebar-foot') as Element).backgroundColor ===
+        getComputedStyle(document.querySelector('.sidebar') as Element).backgroundColor,
+    ),
+  ).toBe(true);
   // Snapshots: how often, kept how long, the space they use.
   await main
     .locator('[role=radiogroup][aria-label="Take a snapshot"] [role=radio]', { hasText: '2 h' })

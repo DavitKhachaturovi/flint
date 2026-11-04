@@ -755,12 +755,8 @@ export function App(): ReactElement {
     void window.flintMain.settings().then((settings) => {
       if (!settings) return;
       applySpeed(settings.animationSpeed);
-      setFooter(settings.sidebarFooter);
     });
-    window.flintMain.onAppearance((appearance) => {
-      applySpeed(appearance.animationSpeed);
-      setFooter(appearance.sidebarFooter);
-    });
+    window.flintMain.onAppearance((appearance) => applySpeed(appearance.animationSpeed));
     // DATA-04, D-97: the tray's Restore from a snapshot…: the Snapshots view.
     window.flintMain.onShowSnapshots(() => goRef.current({ list: SNAPSHOTS_ID, page: null }));
     // REM-07, D-94: "N reminders you missed": Today, its Overdue card open and in view.
@@ -801,6 +797,10 @@ export function App(): ReactElement {
       scrollMemory.current.set(placeKey(listIdRef.current, pageRef.current), root.scrollTop);
     const pages = place.page !== null || pageRef.current !== null;
     setHeading(!pages ? null : back || !place.page ? 'back' : 'forward');
+    // D-103: Trash, Settings and Snapshots have no list of their own: the list open before them
+    // goes at once, not when the next read arrives (its header showed under theirs for a moment).
+    if (place.list === TRASH_ID || place.list === SETTINGS_ID || place.list === SNAPSHOTS_ID)
+      setView(null);
     setListId(place.list);
     setPage(place.page);
     setMarked(NOTHING);
@@ -881,8 +881,6 @@ export function App(): ReactElement {
     readonly when: string;
     readonly diff: SnapshotDiff;
   } | null>(null);
-  /** D-102: the sidebar foot's design (two to choose from, Settings → Appearance). */
-  const [footer, setFooter] = useState<'card' | 'row'>('card');
   /** D-100: Ctrl+F in Settings: its filter takes the caret. */
   const [settingsFind, setSettingsFind] = useState(0);
   /** D-98: scrolled down far enough for the "back to top" button. */
@@ -3760,6 +3758,24 @@ export function App(): ReactElement {
    * and sticks there while the page scrolls (never higher).
    */
   const [panelTop, setPanelTop] = useState(4);
+  // D-103: how far the page is scrolled, for the context panel's height (it rests lower than it
+  // sticks, and its bottom must stay in the window): only while that changes anything.
+  const panelTopNow = useRef(0);
+  panelTopNow.current = panelTop;
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    let last = -1;
+    const update = (): void => {
+      const at = Math.min(Math.round(element.scrollTop), Math.max(0, panelTopNow.current));
+      if (at === last) return;
+      last = at;
+      element.style.setProperty('--page-scroll', `${at}px`);
+    };
+    update();
+    element.addEventListener('scroll', update, { passive: true });
+    return () => element.removeEventListener('scroll', update);
+  }, []);
   useLayoutEffect(() => {
     const element = scroller.current;
     if (!element || !(panelShown || trashPanel || settingsPanel)) return;
@@ -4055,27 +4071,24 @@ export function App(): ReactElement {
           />
         )}
         {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
-        <div className={`sidebar-foot ${footer}`}>
-          {/* APP-11, D-100: Settings, above Trash. */}
-          <NavItem
-            list={{ id: SETTINGS_ID, name: 'Settings', mode: 'note', open: 0, inbox: true }}
+        {/* D-103: room for the fade above the foot, so the last list isn't dimmed at the end. */}
+        <div className="sidebar-foot-space" aria-hidden="true" />
+        <div className="sidebar-foot">
+          {/* APP-11, D-100, D-103: Settings and Trash, side by side. */}
+          <FootButton
+            id={SETTINGS_ID}
+            name="Settings"
             active={listId === SETTINGS_ID}
             icon={<SettingsIcon />}
             onSelect={() => openList(SETTINGS_ID)}
-            onMenu={() => undefined}
           />
-          <NavItem
-            list={{
-              id: TRASH_ID,
-              name: 'Trash',
-              mode: 'tasks',
-              open: trash?.deleted.length ?? 0,
-              inbox: true,
-            }}
+          <FootButton
+            id={TRASH_ID}
+            name="Trash"
+            count={trash?.deleted.length ?? 0}
             active={listId === TRASH_ID}
             icon={<TrashIcon />}
             onSelect={() => openList(TRASH_ID)}
-            onMenu={() => undefined}
           />
         </div>
         {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
@@ -4896,6 +4909,42 @@ function NavItem(props: {
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
       <span className="nav-name">{list.name}</span>
       {list.mode === 'tasks' && <span className="nav-count">{list.open}</span>}
+    </button>
+  );
+}
+
+/**
+ * D-98, D-100, D-103: Settings or Trash at the sidebar's foot, one of two buttons side by side,
+ * sized to its content. Its name is never cut: where its count can't fit too, the count wraps onto
+ * a second line the button doesn't show.
+ */
+function FootButton(props: {
+  readonly id: string;
+  readonly name: string;
+  readonly count?: number;
+  readonly active: boolean;
+  readonly icon: ReactElement;
+  readonly onSelect: () => void;
+}): ReactElement {
+  const { id, name, count, active, icon, onSelect } = props;
+  return (
+    <button
+      type="button"
+      data-key={id}
+      className={active ? 'nav on' : 'nav'}
+      // As a list in the sidebar: a click opens it without taking the keyboard.
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onSelect}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+    >
+      <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
+      <span className="foot-label">
+        <span className="nav-name">{name}</span>
+        {count !== undefined && <span className="nav-count">{count}</span>}
+      </span>
     </button>
   );
 }

@@ -624,22 +624,6 @@ export function SettingsScreen(props: {
             onChange={(value) => set({ key: 'animationSpeed', value })}
           />
         </Row>
-        <Row
-          name="Sidebar footer"
-          note="Two designs for Settings and Trash at the bottom of the sidebar, to choose one."
-          filter={filter}
-          words="sidebar footer trash settings design"
-        >
-          <Choice
-            label="Sidebar footer"
-            value={view.sidebarFooter}
-            options={[
-              { value: 'card', label: 'Card' },
-              { value: 'row', label: 'Buttons' },
-            ]}
-            onChange={(value) => set({ key: 'sidebarFooter', value })}
-          />
-        </Row>
       </Section>
 
       <Section

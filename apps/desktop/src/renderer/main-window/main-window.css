@@ -2609,7 +2609,12 @@ a.auto-link {
   /* Never below where it starts (a note card starts higher than the 16 px margin). */
   top: min(16px, var(--panel-top, 4px));
   flex: 0 0 440px;
-  max-height: calc(100vh - 40px - 32px);
+  /* D-103: from where it is (resting at --panel-top until the page scrolls it up to where it
+     sticks) to 16 px above the window's bottom: its bottom never sits below the window. */
+  max-height: calc(
+    100vh - 56px -
+      max(min(16px, var(--panel-top, 4px)), var(--panel-top, 4px) - var(--page-scroll, 0px))
+  );
   margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -4102,7 +4107,11 @@ a.auto-link {
   flex: 0 0 calc(440px + var(--fl-scroll-size));
   margin-right: calc(-1 * var(--fl-scroll-size));
   scrollbar-gutter: stable;
-  max-height: calc(100vh - 40px - 32px);
+  /* D-103: as the context panel. */
+  max-height: calc(
+    100vh - 56px -
+      max(min(16px, var(--panel-top, 4px)), var(--panel-top, 4px) - var(--page-scroll, 0px))
+  );
   margin-top: var(--panel-top, 4px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -4446,26 +4455,84 @@ a.auto-link {
   background: var(--fl-ground-sidebar);
 }
 
+/* D-103: the lists blend out above it over 32 px (eased, not a hard edge); the space before it
+   keeps the last list clear of the fade once the sidebar is scrolled to its end. */
 .sidebar-foot::before {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  top: -18px;
-  height: 18px;
-  background: linear-gradient(to bottom, transparent, var(--fl-ground-sidebar));
+  top: -32px;
+  height: 32px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--fl-ground-sidebar) 35%, transparent) 35%,
+    color-mix(in srgb, var(--fl-ground-sidebar) 75%, transparent) 65%,
+    var(--fl-ground-sidebar)
+  );
   pointer-events: none;
 }
 
+.sidebar-foot-space {
+  flex: 0 0 26px;
+}
+
+/* D-103 (D-102's "Buttons", chosen): Settings and Trash as two rounded buttons side by side, each
+   sized to its content and sharing what is left; the hover and the selection are the button's
+   own shape. */
+.sidebar-foot {
+  display: flex;
+  gap: 6px;
+}
+
 .sidebar-foot .nav {
+  flex: 1 1 auto;
+  width: auto;
+  height: 36px;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: var(--fl-ground-card);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
   transition:
     background-color var(--fl-dur-fast) ease,
     box-shadow var(--fl-dur-fast) ease;
 }
 
+.sidebar-foot .nav:hover {
+  background: var(--fl-ground-hover);
+  box-shadow: 0 0 0 1px var(--fl-edge-float);
+}
+
 .sidebar-foot .nav.on {
   background: var(--fl-ground-float);
-  box-shadow: var(--fl-shadow-selected);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-selected);
+}
+
+.sidebar-foot .nav .tile {
+  width: 22px;
+  height: 22px;
+}
+
+/* The name and its count on one line; a count that doesn't fit wraps out of sight. */
+.foot-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  height: 18px;
+  line-height: 18px;
+  overflow: hidden;
+}
+
+.foot-label .nav-name {
+  flex: none;
+  overflow: visible;
+  font-size: 13px;
 }
 
 .trash-bar {
@@ -4636,13 +4703,6 @@ a.auto-link {
 
 .trash-panel {
   animation: panel-crossfade var(--fl-dur-state) ease;
-}
-
-/* D-102: what sits in the panel's place (a comparison, a trash item, Settings' index) fits the
-   window where it rests (the title bar, the column's 4 px, its offset, 16 px below), so its
-   bottom and the actions there are in view on a page too short to scroll. */
-.context-panel.trash-panel {
-  max-height: calc(100vh - 60px - var(--panel-top, 4px));
 }
 
 .trash-preview {
@@ -5365,74 +5425,6 @@ a.auto-link {
   font-size: 11.5px;
   white-space: nowrap;
   color: var(--fl-text-primary);
-}
-
-/* D-102: two designs for the sidebar's foot, to choose one (Settings → Appearance).
-   (a) Card: Settings and Trash on a rounded card, inset from the sidebar's edges; the strip
-   around it stays solid, so no list shows through, and the lists fade out above it. */
-.sidebar-foot.card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 14px 8px 18px 16px;
-}
-
-.sidebar-foot.card::after {
-  content: '';
-  position: absolute;
-  inset: 8px 2px 10px 10px;
-  z-index: -1;
-  border-radius: 14px;
-  background: var(--fl-ground-card);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-card),
-    var(--fl-shadow-card-close);
-}
-
-/* (b) Buttons: Settings and Trash as two smaller rounded buttons side by side. */
-.sidebar-foot.row {
-  display: flex;
-  flex-direction: row;
-  gap: 6px;
-  padding: 12px 2px 14px 12px;
-}
-
-.sidebar-foot.row .nav {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 36px;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-radius: 12px;
-  background: var(--fl-ground-card);
-  box-shadow: 0 0 0 1px var(--fl-edge-card);
-}
-
-.sidebar-foot.row .nav:hover {
-  background: var(--fl-ground-hover);
-  box-shadow: 0 0 0 1px var(--fl-edge-float);
-}
-
-.sidebar-foot.row .nav.on {
-  background: var(--fl-ground-float);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-float),
-    var(--fl-shadow-selected);
-}
-
-.sidebar-foot.row .nav .tile {
-  width: 22px;
-  height: 22px;
-}
-
-.sidebar-foot.row .nav-name {
-  flex: 0 1 auto;
-  font-size: 13px;
-}
-
-.sidebar-foot.row .nav-count {
-  margin-left: 0;
 }
 
 /* APP-08, D-102: a hotkey recorded in Settings: click the keycap, press the keys. While it

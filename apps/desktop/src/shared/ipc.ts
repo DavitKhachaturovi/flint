@@ -392,7 +392,6 @@ export interface SettingsView {
   readonly keepHourlyHours: number;
   readonly keepDailyDays: number;
   readonly animationSpeed: 'relaxed' | 'normal' | 'quick';
-  readonly sidebarFooter: 'card' | 'row';
   readonly flintFolder: string;
   readonly captureHotkey: string;
   readonly captureSelectionHotkey: string;
@@ -411,13 +410,11 @@ export type SettingChange =
       readonly key: 'snapshotEveryMinutes' | 'keepHourlyHours' | 'keepDailyDays';
       readonly value: number;
     }
-  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' }
-  | { readonly key: 'sidebarFooter'; readonly value: 'card' | 'row' };
+  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' };
 
-/** D-67, D-100, D-102: how the main window looks (sent when it changes). */
+/** D-67, D-100: how the main window looks (sent when it changes). */
 export interface Appearance {
   readonly animationSpeed: 'relaxed' | 'normal' | 'quick';
-  readonly sidebarFooter: 'card' | 'row';
 }
 
 /** The Settings view's place (D-100): the row above Trash, never a list. */

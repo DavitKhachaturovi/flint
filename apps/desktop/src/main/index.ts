@@ -693,7 +693,6 @@ async function start(): Promise<void> {
       keepHourlyHours: current.keepHourlyHours,
       keepDailyDays: current.keepDailyDays,
       animationSpeed: current.animationSpeed,
-      sidebarFooter: current.sidebarFooter,
       flintFolder: folder.folder,
       captureHotkey: current.captureHotkey,
       captureSelectionHotkey: current.captureSelectionHotkey,
@@ -725,10 +724,9 @@ async function start(): Promise<void> {
     }
     if (key === 'snapshotEveryMinutes') reschedule();
     if (key === 'keepHourlyHours' || key === 'keepDailyDays') snapshot();
-    if ((key === 'animationSpeed' || key === 'sidebarFooter') && !mainWindow.isDestroyed())
+    if (key === 'animationSpeed' && !mainWindow.isDestroyed())
       mainWindow.webContents.send(Channels.mainAppearance, {
         animationSpeed: after.animationSpeed,
-        sidebarFooter: after.sidebarFooter,
       });
     log(`setting ${key} is now ${JSON.stringify(after[key])}`);
     return settingsView();
