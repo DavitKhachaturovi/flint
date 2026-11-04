@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.29 (4 Nov 2026)
+
+- **Flint's window comes back as you left it**: maximized if it was, from a reminder, the tray, the Start menu or opening Flint again.
+- **The list name on a task in Today** now takes you to the task in its list, scrolled into view.
+- **Flint's chime is "Nudge"**, two soft taps (still off by default).
+- Fixed: the side panel's scrollbar running over the card's rounded corner, a second shadow flicker under reminder cards after hovering, and "Sort Inbox" not reacting to the pointer.
+
 ## 0.4.28 (4 Nov 2026)
 
 - **Overdue reminders in Today**: a quiet "Overdue" card under "Unfinished from yesterday" lists every task whose reminder has passed, including ones missed while Flint was closed. Mark them Done, Snooze them (in an hour, tomorrow at 10:00, or a time you pick), or click to open. It folds, and remembers.
