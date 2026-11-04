@@ -2,6 +2,10 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.5 (5 Nov 2026)
+
+- Fixed: a new quick note (Ctrl+Shift+J) sometimes opened without the cursor in it.
+
 ## 0.8.4 (5 Nov 2026)
 
 - **Ctrl+K**: one box to find anything (lists, notes, tasks in every list, lines of notes) and to run commands: go somewhere, make a list or note, move or pin the selected task, change the interface size, export, quit. Also from "Search or run a command" at the top of a list. Deleted and archived things are one row away: "Search Trash and Archive".
