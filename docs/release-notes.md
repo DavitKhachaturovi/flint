@@ -2,6 +2,11 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.2 (4 Nov 2026)
+
+- **Move your Flint folder** from Settings → General → Change…: Flint copies everything to the new place, checks every file, and keeps the old folder as a backup. You can also start fresh somewhere else, or open a folder that already has Flint lists.
+- **Link patterns** in Settings → Links: paste a link (an Azure DevOps work item, a GitHub issue, a Jira ticket…), choose its short form, and from then on typing `AB#1234` makes a link and pasted links show as `AB#1234`.
+
 ## 0.8.1 (4 Nov 2026)
 
 - **Settings and Trash** sit side by side at the bottom of the sidebar, both names in full, and your lists fade out softly above them.
