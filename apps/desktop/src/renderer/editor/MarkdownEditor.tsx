@@ -132,6 +132,22 @@ export function MarkdownEditor(props: {
     // The editor is made once; its handlers are read through `latest`.
   }, []);
 
+  // D-106: asked for the caret (a quick note, a new note): it takes it even when the editor was
+  // there already, and again over the next frames if something took it back as the view settled.
+  useEffect(() => {
+    const editor = view.current;
+    if (!autoFocus || !editor) return;
+    if (!editor.hasFocus) editor.focus();
+    // Not cancelled when the request is cleared (that happens at once); gone with the editor.
+    let frames = 0;
+    const check = (): void => {
+      if (view.current !== editor) return;
+      if (!editor.hasFocus) editor.focus();
+      if (++frames < 2) requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  }, [autoFocus]);
+
   // A change from outside shows when nothing typed is waiting to be saved.
   useEffect(() => {
     const editor = view.current;

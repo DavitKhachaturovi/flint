@@ -678,7 +678,8 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   const lowBox = await main.locator('.fl-submenu').getByText('Low').boundingBox();
   if (!priorityBox || !lowBox) throw new Error('no menu boxes');
   await main.mouse.move(priorityBox.x + 20, priorityBox.y + priorityBox.height / 2);
-  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 6 });
+  // (Few steps: on a slow machine six took longer than the aim's grace.)
+  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 3 });
   await expect(main.locator('.fl-submenu .fl-menu-item.active')).toHaveText(/Low/);
   await menu.getByText('Move to…').click();
   await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
@@ -3553,7 +3554,7 @@ test('M8 step 2: the Ctrl+K palette and the ? cheat sheet (NAV-01, NAV-02, D-106
 
   // In the note editor, Ctrl+K with text selected makes it a link.
   await main.keyboard.press('Control+Shift+J');
-  await main.locator('.note-editor .cm-content').click();
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
   await main.keyboard.type('see the runbook');
   await main.keyboard.press('Shift+Control+ArrowLeft');
   await main.keyboard.press('Control+k');
