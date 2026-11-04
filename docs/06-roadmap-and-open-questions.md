@@ -105,7 +105,7 @@ Each has a proposed default that is used until decided. Record decisions in [07]
 | Q-02 | ~~Default time when a reminder gives only a day (`tomorrow`, `fri`).~~ **Resolved (D-69):** a fixed **10:00**, matching the "Tomorrow 10:00" preset, shown in the chip/preview before confirming (09:00 until 0.4.5). Workday-aware defaults were not selected. | — |
 | Q-03 | ~~Default global hotkeys for capture and capture-selection.~~ **Resolved (D-37):** capture **Ctrl+Shift+Space**, capture-selection **Ctrl+Shift+X**; no Alt (push-to-talk); both rebindable with conflict detection (APP-08). | — |
 | Q-04 | When/how the Today rollover prompt appears. | On the first open of a new day: "Roll over unfinished pinned tasks?" (D-85) (no fixed end-of-day time needed). **Built as proposed (D-90):** the first open of Today on a new day; × is Roll over. |
-| Q-05 | Snapshot frequency and retention. | Only when changed; hourly for 48 h, then daily for 30 days. |
+| Q-05 | Snapshot frequency and retention. | Only when changed; hourly for 48 h, then daily for 30 days. **Decided as proposed (D-97).** |
 | Q-06 | Single-key binding for "move to list" (the `M` key idea was not selected). | No dedicated key in v1; move via Ctrl+K, the context menu, the list picker and the action bar (no drag to sidebar, D-64). |
 | Q-07 | CLI command name: `flint` (from "Notes") vs `flint`. | Decide before the CLI ships; `flint` matches the product name. |
 | Q-08 | Enter semantics in Navigate state and the "new task" key. "Enter adds a task" is decided for Edit state. | Navigate: Enter = edit selected task; N / Ctrl+N = new task. Edit: Enter = save + new task below. |

@@ -619,3 +619,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | The list chip scrolls to the task at once, then flashes | TODAY-01 · Done (0.4.29) | D-96 |
 | 5 | "Sort Inbox · N" (and every primary button) has a hover state, the arrow cursor kept | UI-01 · Done (0.4.29) | 09, D-96 |
 | 6 | The chime file is the source of truth: the generator a one-off tool, a hash check | REM-06 · Done (0.4.29) | 02, D-95, D-96 |
+
+## AF. M7, data safety (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Trash in the sidebar: deleted tasks, lists and notes by day; Restore, Delete now, Empty Trash; 30-day expiry | DATA-02 · v1 · M7 | 02, D-97 |
+| 2 | Archived tab: auto-archived tasks by list, restorable | DATA-02, TASK-06 · v1 · M7 | 02, D-97 |
+| 3 | Snapshots, hourly 48 h then daily 30 days; restore one list or note, or everything | DATA-04 · v1 · M7 | 02, 04, D-97 |
+| 4 | Export as zip and Restore from a snapshot in the tray (Settings and Ctrl+K in M8) | DATA-05, DATA-04 · v1 · M7 | 02, D-97 |
+| 5 | Orphaned attachments cleaned up at start-up | MEDIA-04 · v1 · M7 | 04, D-97 |

@@ -585,15 +585,18 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### DATA-02 — Trash, kept 30 days (v1)
 - Deleted tasks and deleted lists go to Trash and can be restored for 30 days, after which they are permanently removed (and MEDIA-04 runs).
+- **D-97:** a **Trash** row at the bottom of the sidebar (with its count) opens a view: deleted tasks, lists and notes by day, newest first, with their list and "deleted 3 days ago"; Restore, Delete now, Empty Trash (inline confirms). A second tab, **Archived**, shows auto-archived completed tasks by list, each restorable to its list.
 
 ### DATA-03 — Global Ctrl+Z (v1)
 - Undo (and redo, **Proposed:** Ctrl+Shift+Z / Ctrl+Y) works for deletes, moves, reorders, priority changes, completion, conversions, and bulk actions, not just text edits.
 
 ### DATA-04 — Local snapshots (v1)
 - Flint keeps automatic local snapshots of the Flint folder so a bad change can be restored. Retention policy: see Q-05.
+- **D-97:** restore one list or note at a time (what differs from now shown; a fresh snapshot first; one undo step), or **Restore everything** behind a confirm. From the tray's **Restore from a snapshot…** and the Trash view until Settings (M8).
 
 ### DATA-05 — One-click zip export (v1)
 - Export the whole Flint folder (lists + attachments) as a zip.
+- **D-97:** the tray's **Export Flint folder…** (a save dialog, a dated file name) until Settings and Ctrl+K (M8).
 
 ### DATA-06 — File watcher (v1)
 - Flint watches the Flint folder and reloads lists changed on disk by anything else (the CLI, Claude via the CLI, a text editor) **live**, without losing the cursor position or selection.
