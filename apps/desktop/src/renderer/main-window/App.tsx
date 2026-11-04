@@ -4226,6 +4226,10 @@ export function App(): ReactElement {
                   find={settingsFind}
                   onToast={(text) => showToast(text, false)}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
+                  onLinkPatterns={(patterns) => {
+                    setLinkPatterns(patterns);
+                    setPatternsLoaded((count) => count + 1);
+                  }}
                   zoom={zoomFactor}
                   onZoom={(level) => void window.flintMain.zoom(level)}
                 />

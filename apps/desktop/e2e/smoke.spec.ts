@@ -3101,8 +3101,8 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   // The Settings row above Trash opens the page; its index sits in the panel's place.
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
   await expect(main.locator('.settings-header h1')).toHaveText('Settings');
-  await expect(main.locator('.settings-section')).toHaveCount(8);
-  await expect(main.locator('.settings-index-item')).toHaveCount(8);
+  await expect(main.locator('.settings-section')).toHaveCount(9);
+  await expect(main.locator('.settings-index-item')).toHaveCount(9);
   await main.locator('.settings-index-item', { hasText: 'Keyboard shortcuts' }).click();
   await expect(main.locator('#settings-shortcuts')).toBeInViewport();
   await expect(main.locator('#settings-shortcuts')).toContainText('Ctrl+Shift+J');
@@ -3228,13 +3228,100 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(main.locator('.settings-section')).toHaveCount(1);
   await expect(main.locator('.settings-section')).toHaveAttribute('aria-label', 'Reminders');
   await main.keyboard.press('Escape');
-  await expect(main.locator('.settings-section')).toHaveCount(8);
+  await expect(main.locator('.settings-section')).toHaveCount(9);
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('main-window'),
     );
     win?.setBounds({ x: -6000, y: 0, width: 1120, height: 780 });
   });
+});
+
+test('M8 step 1b: link patterns made from an example; the Flint folder moved, checked (NOTE-07, DATA-07, D-104)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const settingsFile = (): Promise<Record<string, unknown>> =>
+    readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8')
+      .then((text) => JSON.parse(text) as Record<string, unknown>)
+      .catch(() => ({}));
+  const bounds = (width: number, height: number): Promise<void> =>
+    app.evaluate(
+      ({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: -6000, y: 0, ...size });
+      },
+      { width, height },
+    );
+  await bounds(1800, 900);
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  // D-104: opening on General, never on About while the page is still loading.
+  await expect(main.locator('.settings-index-item.on')).toHaveText('General');
+
+  // NOTE-07, D-104: a pasted Azure DevOps link is recognised; the preview shows both ways.
+  await main.locator('#settings-links .trash-action', { hasText: 'Add a link pattern' }).click();
+  const editor = main.locator('.link-editor');
+  await expect(editor.locator('input[aria-label="Example link"]')).toBeFocused();
+  await main.keyboard.type('https://dev.azure.com/acme/web/_workitems/edit/4567');
+  await expect(editor.locator('input[aria-label="Short form"]')).toHaveValue('AB#4567');
+  await expect(editor).toContainText('Recognised: Azure DevOps work item.');
+  await expect(editor.locator('.link-preview')).toContainText(
+    'Typing AB#4568 links to https://dev.azure.com/acme/web/_workitems/edit/4568',
+  );
+  await editor.locator('.primary-button', { hasText: 'Save pattern' }).click();
+  await expect(main.locator('.link-editor')).toHaveCount(0);
+  await expect(main.locator('.link-pattern')).toHaveCount(1);
+  await expect(main.locator('.link-pattern')).toContainText('AB#1234');
+  await expect
+    .poll(async () => JSON.stringify((await settingsFile())['linkPatterns']))
+    .toContain('"short":"AB#{id}"');
+  // The same short form twice is refused.
+  await main.locator('#settings-links .trash-action', { hasText: 'Add a link pattern' }).click();
+  await main.keyboard.type('https://dev.azure.com/acme/web/_workitems/edit/77');
+  await expect(main.locator('.link-editor .settings-warning')).toHaveText(
+    'You already have a pattern for AB#1234.',
+  );
+  await expect(main.locator('.link-editor .primary-button')).toBeDisabled();
+  await main.locator('.link-editor .trash-action', { hasText: 'Cancel' }).click();
+  // Delete, asked inline.
+  await main.locator('.link-pattern .trash-action', { hasText: 'Delete' }).click();
+  await main.locator('.link-pattern .trash-action.danger', { hasText: 'Delete' }).click();
+  await expect(main.locator('.link-pattern')).toHaveCount(0);
+  await expect.poll(async () => (await settingsFile())['linkPatterns']).toEqual([]);
+
+  // DATA-07, D-104: the Flint folder itself is refused; an empty folder gets everything, checked.
+  const flint = join(dataDirectory, 'Flint');
+  const pick = (path: string): Promise<void> =>
+    app.evaluate((_electron, folder) => {
+      (globalThis as { __flintE2E?: { pickFolder?: string } }).__flintE2E!.pickFolder = folder;
+    }, path);
+  await pick(flint);
+  await main.locator('#settings-general .trash-action', { hasText: 'Change…' }).click();
+  const panel = main.locator('.settings-panel[aria-label="Change the Flint folder"]');
+  await expect(panel).toContainText('That is already your Flint folder.');
+  await expect(panel.locator('.primary-button')).toHaveCount(0);
+  const target = join(dataDirectory, 'Moved Flint');
+  await mkdir(target);
+  await pick(target);
+  await panel.locator('.trash-action', { hasText: 'Choose another…' }).click();
+  await expect(panel.locator('[role=radio][aria-checked=true]')).toHaveText('Move my lists here');
+  await expect(panel).toContainText('stays as it is, as a backup');
+  await panel.locator('.primary-button', { hasText: 'Move and restart' }).click();
+  await expect(panel).toContainText('Done. Flint restarts…');
+  expect(
+    await app.evaluate(
+      () => (globalThis as { __flintE2E?: { relaunched?: string } }).__flintE2E?.relaunched,
+    ),
+  ).toBe(target);
+  expect(await readFile(join(target, 'Inbox.md'), 'utf8')).toBe(
+    await readFile(join(flint, 'Inbox.md'), 'utf8'),
+  );
+  expect((await readdir(target)).length).toBeGreaterThan(3);
+  expect((await settingsFile())['flintFolder']).toBe(target);
+  await pick('');
+  await bounds(1120, 780);
+  await main.locator('.sidebar > .nav').first().click();
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

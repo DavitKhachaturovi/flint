@@ -5474,3 +5474,99 @@ a.auto-link {
 .settings-warning {
   color: var(--fl-text-highlight);
 }
+
+/* DATA-07, NOTE-07, D-104: what is asked inside a settings card (changing the Flint folder, a new
+   link pattern): a well under its row, rising in; its parts fade in as they change. */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.settings-panel p {
+  margin: 0;
+}
+
+.settings-panel .settings-choice {
+  align-self: flex-start;
+}
+
+.settings-panel-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settings-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-field .settings-name {
+  flex: 0 0 110px;
+  font-size: 13px;
+}
+
+.settings-field .settings-find {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.link-patterns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.link-pattern {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.link-pattern:hover {
+  background: var(--fl-ground-hover);
+}
+
+.link-pattern-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-secondary);
+}
+
+.link-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}

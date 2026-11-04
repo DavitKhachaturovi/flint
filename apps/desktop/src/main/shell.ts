@@ -74,6 +74,9 @@ export interface E2EHooks {
   /** D-97: the tray's Restore from a snapshot…, and Export without its save dialog. */
   showSnapshots?: () => void;
   exportTo?: (path: string) => Promise<number>;
+  /** DATA-07, D-104: the folder the picker returns (no dialog), and where Flint would restart. */
+  pickFolder?: string;
+  relaunched?: string;
 }
 
 export function e2eHooks(): E2EHooks | undefined {

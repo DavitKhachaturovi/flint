@@ -15,9 +15,18 @@ import type {
   RebindOutcome,
   SettingChange,
   SettingsView,
+  FolderChange,
+  FolderChoice,
 } from '../../shared/ipc.js';
 import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
+import {
+  compileLinkPatterns,
+  inferLinkPattern,
+  patternFromPreset,
+  shortFormOf,
+  type LinkPattern,
+} from '../../shared/link-patterns.js';
 
 /**
  * Settings (APP-11, D-100): one scrolling page, its sections as cards, a slim index in the side
@@ -30,6 +39,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'capture', name: 'Capture & hotkeys' },
   { id: 'reminders', name: 'Reminders' },
   { id: 'today', name: 'Today & lists' },
+  { id: 'links', name: 'Links' },
   { id: 'data', name: 'Data' },
   { id: 'appearance', name: 'Appearance' },
   { id: 'shortcuts', name: 'Keyboard shortcuts' },
@@ -248,13 +258,19 @@ function HotkeyButton(props: {
 export function SettingsScreen(props: {
   readonly onToast: (text: string) => void;
   readonly onSnapshots: () => void;
+  /** NOTE-07, D-104: link patterns saved in Settings → Links, for the window to use at once. */
+  readonly onLinkPatterns: (patterns: readonly LinkPattern[]) => void;
   /** D-102: the interface size now, and setting an exact one. */
   readonly zoom: number;
   readonly onZoom: (level: number) => void;
   /** Bumped by Ctrl+F: the filter takes the caret. */
   readonly find: number;
 }): ReactElement {
-  const { onToast, onSnapshots, zoom, onZoom, find } = props;
+  const { onToast, onSnapshots, onLinkPatterns, zoom, onZoom, find } = props;
+  // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
+  const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
+  // NOTE-07, D-104: the link-pattern editor open.
+  const [addingLink, setAddingLink] = useState(false);
   // D-102: the levels offered (Ctrl+= and Ctrl+− reach the rest, 67–200 %).
   const sizes = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
   const size = sizes.find((level) => Math.abs(level - zoom) < 0.001);
@@ -330,7 +346,7 @@ export function SettingsScreen(props: {
           name="Flint folder"
           note={<span className="settings-path">{view.flintFolder}</span>}
           filter={filter}
-          words="folder location path files markdown"
+          words="folder location path files markdown move change"
         >
           <button
             type="button"
@@ -339,7 +355,30 @@ export function SettingsScreen(props: {
           >
             Open folder
           </button>
+          <button
+            type="button"
+            className="trash-action"
+            onClick={() =>
+              void window.flintMain.chooseFolder().then((choice) => {
+                if (choice) setFolderChoice({ ...choice, at: Date.now() });
+              })
+            }
+          >
+            Change…
+          </button>
         </Row>
+        {folderChoice && (
+          <FolderChangePanel
+            key={folderChoice.at}
+            choice={folderChoice}
+            onChooseAgain={() =>
+              void window.flintMain.chooseFolder().then((choice) => {
+                if (choice) setFolderChoice({ ...choice, at: Date.now() });
+              })
+            }
+            onCancel={() => setFolderChoice(null)}
+          />
+        )}
       </Section>
 
       <Section id="capture" filter={filter}>
@@ -483,6 +522,22 @@ export function SettingsScreen(props: {
             onChange={(value) => set({ key: 'autoArchiveDays', value })}
           />
         </Row>
+      </Section>
+
+      <Section id="links" filter={filter}>
+        <Row
+          name="Link patterns"
+          note="Short forms that become links: type AB#1234 for a work item, and a pasted link shows as AB#1234."
+          filter={filter}
+          words="link pattern azure devops github jira short form url auto-link"
+        >
+          {!addingLink && (
+            <button type="button" className="trash-action" onClick={() => setAddingLink(true)}>
+              Add a link pattern
+            </button>
+          )}
+        </Row>
+        <LinkPatternList adding={addingLink} onAdding={setAddingLink} onPatterns={onLinkPatterns} />
       </Section>
 
       <Section id="data" filter={filter}>
@@ -694,13 +749,24 @@ export function SettingsIndex(props: {
         const box = document.getElementById(`settings-${section.id}`)?.getBoundingClientRect();
         if (box && box.top <= top) found = section.id;
       }
-      // Scrolled to the end: the last section.
-      if (element.scrollTop + element.clientHeight >= element.scrollHeight - 2) found = 'about';
+      // Scrolled to the end: the last section (only on a page that scrolls: D-104, while Settings
+      // was still loading the empty page counted as scrolled to its end, marking About).
+      if (
+        element.scrollHeight > element.clientHeight + 2 &&
+        element.scrollTop + element.clientHeight >= element.scrollHeight - 2
+      )
+        found = 'about';
       setCurrent(found);
     };
     onScroll();
     element.addEventListener('scroll', onScroll, { passive: true });
-    return () => element.removeEventListener('scroll', onScroll);
+    // D-104: and again when the page's content changes size (its sections arriving, a panel).
+    const sizes = new ResizeObserver(onScroll);
+    if (element.firstElementChild) sizes.observe(element.firstElementChild);
+    return () => {
+      element.removeEventListener('scroll', onScroll);
+      sizes.disconnect();
+    };
   }, [scroller]);
   return (
     <nav className="settings-index" aria-label="Settings sections">
@@ -721,5 +787,429 @@ export function SettingsIndex(props: {
         </button>
       ))}
     </nav>
+  );
+}
+
+/**
+ * DATA-07, D-104: a chosen folder becoming the Flint folder, asked in the folder's row: what it
+ * holds decides the choices (the likeliest one preselected), and the confirmation says exactly what
+ * will happen. Flint restarts on the new folder once it is ready.
+ */
+function FolderChangePanel(props: {
+  readonly choice: FolderChoice;
+  readonly onChooseAgain: () => void;
+  readonly onCancel: () => void;
+}): ReactElement {
+  const { choice, onChooseAgain, onCancel } = props;
+  // A folder holding other things: a Flint subfolder inside it, or the folder itself.
+  const [where, setWhere] = useState<'sub' | 'here'>('sub');
+  const [what, setWhat] = useState<'move' | 'fresh'>('move');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const sub = choice.state === 'other' && where === 'sub';
+  const target = sub ? choice.subfolder.path : choice.path;
+  const state = sub
+    ? choice.subfolder.state === 'missing'
+      ? 'empty'
+      : choice.subfolder.state
+    : choice.state;
+  const refused = sub ? choice.subfolder.refused : choice.refused;
+  const how: FolderChange = state === 'flint' ? 'open' : what;
+  const path = <span className="settings-path">{target}</span>;
+  const current = <span className="settings-path">{choice.current}</span>;
+  const says =
+    how === 'open' ? (
+      <>
+        Flint opens the lists in {path} and restarts. Your current lists stay in {current}. Merging
+        the two isn't possible yet.
+      </>
+    ) : how === 'move' ? (
+      <>
+        Flint copies everything in {current} to {path}, checks every file, then restarts on it.{' '}
+        {current} stays as it is, as a backup.
+      </>
+    ) : (
+      <>
+        Flint starts a new Flint folder in {path} with an empty Inbox, and restarts. Your lists stay
+        in {current}.
+      </>
+    );
+  const go = (): void => {
+    setBusy(true);
+    setProblem(null);
+    void window.flintMain.changeFolder(target, how).then((outcome) => {
+      setBusy(false);
+      if (outcome?.ok) setDone(true);
+      else setProblem(outcome?.problem ?? 'Flint could not change its folder.');
+    });
+  };
+  const action = how === 'open' ? 'Open' : how === 'move' ? 'Move' : 'Start';
+  return (
+    <div className="settings-panel" role="group" aria-label="Change the Flint folder">
+      <div className="settings-panel-line">
+        <span className="settings-name">Chosen</span>
+        <span className="settings-path">{choice.path}</span>
+      </div>
+      {choice.insideOneDrive && (
+        <p className="settings-warning settings-said">
+          This folder is in OneDrive, which syncs it. Flint doesn't support synced folders yet:
+          edits on two computers can clash. You can still use it.
+        </p>
+      )}
+      {choice.state === 'other' && !choice.refused && (
+        <Choice
+          label="Where"
+          value={where}
+          options={[
+            { value: 'sub', label: 'Use a Flint subfolder inside it' },
+            { value: 'here', label: 'Use this folder directly' },
+          ]}
+          onChange={(value) => {
+            setWhere(value);
+            setProblem(null);
+          }}
+        />
+      )}
+      {refused ? (
+        <p key={refused} className="settings-warning settings-said">
+          {refused} Choose another folder.
+        </p>
+      ) : (
+        <>
+          {state === 'flint' ? (
+            <Choice
+              label="What"
+              value="open"
+              options={[{ value: 'open', label: 'Open these lists' }]}
+              onChange={() => undefined}
+            />
+          ) : (
+            <Choice
+              label="What"
+              value={what}
+              options={[
+                {
+                  value: 'move',
+                  label:
+                    sub || choice.state !== 'empty' ? 'Move my lists there' : 'Move my lists here',
+                },
+                {
+                  value: 'fresh',
+                  label: sub || choice.state !== 'empty' ? 'Start fresh there' : 'Start fresh here',
+                },
+              ]}
+              onChange={(value) => {
+                setWhat(value);
+                setProblem(null);
+              }}
+            />
+          )}
+          <p key={`${how}:${target}`} className="settings-note settings-said">
+            {says}
+          </p>
+        </>
+      )}
+      {problem && (
+        <p key={problem} className="settings-warning settings-said">
+          {problem}
+        </p>
+      )}
+      <div className="settings-panel-actions">
+        {done ? (
+          <span className="settings-note settings-said">Done. Flint restarts…</span>
+        ) : (
+          <>
+            <button type="button" className="trash-action" onClick={onChooseAgain} disabled={busy}>
+              Choose another…
+            </button>
+            <button type="button" className="trash-action" onClick={onCancel} disabled={busy}>
+              Cancel
+            </button>
+            {!refused && (
+              <button type="button" className="primary-button" onClick={go} disabled={busy}>
+                {busy
+                  ? how === 'move'
+                    ? 'Copying and checking…'
+                    : 'Working…'
+                  : `${action} and restart`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A template with its placeholders filled (`AB#{id}` + `{ id: '1234' }` → `AB#1234`). */
+function fillTemplate(template: string, values: Readonly<Record<string, string>>): string {
+  return template.replace(/\{([a-z][a-z0-9]*)\}/gi, (whole, name: string) => values[name] ?? whole);
+}
+
+/** How a saved pattern reads: its parts as an example (numbers as 1234, words by their name). */
+function sampleOf(pattern: LinkPattern): { short: string; url: string } {
+  const values: Record<string, string> = {};
+  for (const match of `${pattern.short} ${pattern.url}`.matchAll(/\{([a-z][a-z0-9]*)\}/gi)) {
+    const name = match[1] ?? '';
+    values[name] = pattern.kinds?.[name] === 'word' ? name : '1234';
+  }
+  return {
+    short: fillTemplate(pattern.short, values),
+    url: fillTemplate(pattern.url, values).replace(/^https?:\/\//i, ''),
+  };
+}
+
+/**
+ * NOTE-07, D-84, D-104: the user's link patterns, each as its short form and where it links, with
+ * Delete (asked inline); and the editor that makes one from an example.
+ */
+function LinkPatternList(props: {
+  readonly adding: boolean;
+  readonly onAdding: (adding: boolean) => void;
+  readonly onPatterns: (patterns: readonly LinkPattern[]) => void;
+}): ReactElement {
+  const { adding, onAdding, onPatterns } = props;
+  const [patterns, setPatterns] = useState<readonly LinkPattern[] | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  useEffect(() => {
+    void window.flintMain.linkPatterns().then(setPatterns);
+  }, []);
+  const save = (next: readonly LinkPattern[]): void => {
+    void window.flintMain.saveLinkPatterns(next).then((kept) => {
+      if (!kept) return;
+      setPatterns(kept);
+      onPatterns(kept);
+    });
+  };
+  return (
+    <>
+      {patterns && patterns.length > 0 && (
+        <ul className="link-patterns">
+          {patterns.map((pattern, index) => {
+            const sample = sampleOf(pattern);
+            return (
+              <li key={`${pattern.short} ${pattern.url}`} className="link-pattern">
+                <span className="keycap">{sample.short}</span>
+                <span className="link-pattern-url">→ {sample.url}</span>
+                {deleting === index ? (
+                  <span className="trash-confirm" role="group" aria-label="Delete this pattern?">
+                    <span className="trash-confirm-text">Delete it?</span>
+                    <button
+                      type="button"
+                      className="trash-action danger"
+                      onClick={() => {
+                        setDeleting(null);
+                        save(patterns.filter((_, at) => at !== index));
+                      }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="trash-action"
+                      onClick={() => setDeleting(null)}
+                    >
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button type="button" className="trash-action" onClick={() => setDeleting(index)}>
+                    Delete
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {adding && patterns && (
+        <LinkPatternEditor
+          existing={patterns}
+          onSave={(pattern) => {
+            save([...patterns, pattern]);
+            onAdding(false);
+          }}
+          onCancel={() => onAdding(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * NOTE-07, D-84: a pattern from an example. Paste a link: a known kind (the presets) is recognised
+ * and its short form filled in; else type the short form wanted. A live preview shows both ways
+ * with another number; a second example when it's ambiguous; Advanced shows the pattern made.
+ */
+function LinkPatternEditor(props: {
+  readonly existing: readonly LinkPattern[];
+  readonly onSave: (pattern: LinkPattern) => void;
+  readonly onCancel: () => void;
+}): ReactElement {
+  const { existing, onSave, onCancel } = props;
+  const [url, setUrl] = useState('');
+  const [short, setShort] = useState('');
+  const [typed, setTyped] = useState(false);
+  const [url2, setUrl2] = useState('');
+  const [short2, setShort2] = useState('');
+  const [advanced, setAdvanced] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  const preset = url.trim() === '' ? null : patternFromPreset(url);
+  const presetShort = preset
+    ? shortFormOf(url.trim(), compileLinkPatterns([preset.pattern]))
+    : null;
+  const examples = [
+    { url, short },
+    ...(url2.trim() && short2.trim() ? [{ url: url2, short: short2 }] : []),
+  ];
+  const inference =
+    url.trim() === ''
+      ? null
+      : preset && presetShort !== null && short.trim() === presetShort
+        ? { pattern: preset.pattern, ambiguous: false, problem: undefined }
+        : short.trim() === ''
+          ? null
+          : inferLinkPattern(examples);
+  const pattern = inference?.pattern ?? null;
+  const duplicate =
+    pattern !== null && existing.some((other) => other.short === pattern.short)
+      ? `You already have a pattern for ${sampleOf(pattern).short}.`
+      : null;
+  const problem = inference?.problem ?? duplicate;
+  const ready = pattern !== null && !inference?.ambiguous && !problem;
+  // The preview: the example with its number one higher, both ways.
+  let preview: { short: string; url: string } | null = null;
+  if (ready) {
+    const compiled = compileLinkPatterns([pattern]);
+    const groups = compiled[0]?.fullUrl.exec(url.trim())?.groups ?? {};
+    const values: Record<string, string> = {};
+    for (const [name, value] of Object.entries(groups))
+      values[name] = /^\d+$/.test(value) ? String(Number(value) + 1) : value;
+    const nextUrl = fillTemplate(pattern.url, values);
+    const nextShort = fillTemplate(pattern.short, values);
+    if (shortFormOf(nextUrl, compiled) === nextShort) preview = { short: nextShort, url: nextUrl };
+  }
+  return (
+    <div className="settings-panel link-editor" role="group" aria-label="Add a link pattern">
+      <label className="settings-field">
+        <span className="settings-name">Example link</span>
+        <input
+          ref={first}
+          className="settings-find"
+          value={url}
+          placeholder="https://dev.azure.com/acme/web/_workitems/edit/1234"
+          aria-label="Example link"
+          spellCheck={false}
+          onChange={(event) => {
+            const next = event.target.value;
+            setUrl(next);
+            // A known kind fills in its short form, until one is typed.
+            if (!typed) {
+              const found = next.trim() === '' ? null : patternFromPreset(next);
+              setShort(
+                found ? (shortFormOf(next.trim(), compileLinkPatterns([found.pattern])) ?? '') : '',
+              );
+            }
+          }}
+        />
+      </label>
+      <label className="settings-field">
+        <span className="settings-name">Short form</span>
+        <input
+          className="settings-find"
+          value={short}
+          placeholder="AB#1234"
+          aria-label="Short form"
+          spellCheck={false}
+          onChange={(event) => {
+            setShort(event.target.value);
+            setTyped(true);
+          }}
+        />
+      </label>
+      {preset && (
+        <p key={preset.preset.label} className="settings-note settings-said">
+          Recognised: {preset.preset.label}.
+        </p>
+      )}
+      {inference?.ambiguous && !inference.problem && (
+        <div className="settings-said">
+          <p className="settings-note">
+            Another example, so Flint knows which parts change from link to link:
+          </p>
+          <label className="settings-field">
+            <span className="settings-name">Second link</span>
+            <input
+              className="settings-find"
+              value={url2}
+              aria-label="Second link"
+              spellCheck={false}
+              onChange={(event) => setUrl2(event.target.value)}
+            />
+          </label>
+          <label className="settings-field">
+            <span className="settings-name">Its short form</span>
+            <input
+              className="settings-find"
+              value={short2}
+              aria-label="Second short form"
+              spellCheck={false}
+              onChange={(event) => setShort2(event.target.value)}
+            />
+          </label>
+        </div>
+      )}
+      {problem && url.trim() !== '' && (
+        <p key={problem} className="settings-warning settings-said">
+          {problem}
+        </p>
+      )}
+      {preview && (
+        <div key={preview.short} className="settings-info link-preview settings-said">
+          <div>
+            Typing <span className="keycap">{preview.short}</span> links to{' '}
+            <span className="settings-path">{preview.url}</span>
+          </div>
+          <div>
+            Pasting that link shows <span className="keycap">{preview.short}</span>
+          </div>
+        </div>
+      )}
+      {advanced && pattern && (
+        <div className="settings-info settings-said">
+          <div>
+            Short form: <span className="settings-path">{pattern.short}</span>
+          </div>
+          <div>
+            Link: <span className="settings-path">{pattern.url}</span>
+          </div>
+        </div>
+      )}
+      <div className="settings-panel-actions">
+        <button
+          type="button"
+          className="trash-action"
+          aria-pressed={advanced}
+          onClick={() => setAdvanced(!advanced)}
+        >
+          {advanced ? 'Hide pattern' : 'Advanced'}
+        </button>
+        <button type="button" className="trash-action" onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!ready}
+          onClick={() => {
+            if (pattern && ready) onSave(pattern);
+          }}
+        >
+          Save pattern
+        </button>
+      </div>
+    </div>
   );
 }

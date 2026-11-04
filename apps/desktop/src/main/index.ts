@@ -1,8 +1,8 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
-import { dirname, extname, join } from 'node:path';
+import { dirname, extname, isAbsolute, join } from 'node:path';
 import {
   app,
   BrowserWindow,
@@ -73,6 +73,8 @@ import {
   type AttachOutcome,
 } from './attachments.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
+import { checkFolder, clashes, copyFlintFolder } from './storage/folder-change.js';
+import { readLinkPatterns } from '../shared/link-patterns.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
@@ -521,6 +523,13 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.mainLinkPatterns, (event) =>
     owns(event.sender) ? settingsFile.current.linkPatterns : [],
   );
+  // NOTE-07, D-104: saved from Settings → Links (the tolerant reader keeps only usable ones).
+  ipcMain.handle(Channels.mainSaveLinkPatterns, async (event, patterns: unknown) => {
+    if (!owns(event.sender)) return null;
+    const kept = readLinkPatterns(patterns);
+    await settingsFile.update({ linkPatterns: kept });
+    return kept;
+  });
   // NOTE-02, D-82: Insert ▸ Image: a picture from the file picker, copied into attachments/.
   ipcMain.handle(Channels.mainPickImage, async (event) => {
     if (!owns(event.sender)) return null;
@@ -752,6 +761,77 @@ async function start(): Promise<void> {
     if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
     else send();
   };
+  // DATA-07, D-104: changing the Flint folder: a folder chosen, then moved to, started fresh in,
+  // or opened; Flint restarts on it (every watcher, reminder and timer starts clean).
+  ipcMain.handle(Channels.mainChooseFolder, async (event) => {
+    if (!owns(event.sender)) return null;
+    let path = testHooks?.pickFolder || null;
+    if (path === null) {
+      const picked = await dialog.showOpenDialog(mainWindow, {
+        title: 'Choose a folder for Flint',
+        defaultPath: dirname(folder.folder),
+        properties: ['openDirectory', 'createDirectory'],
+      });
+      path = picked.canceled ? null : (picked.filePaths[0] ?? null);
+    }
+    if (path === null) return null;
+    return { ...(await checkFolder(path, folder.folder)), current: folder.folder };
+  });
+  ipcMain.handle(Channels.mainChangeFolder, async (event, path: unknown, how: unknown) => {
+    if (
+      !owns(event.sender) ||
+      typeof path !== 'string' ||
+      !isAbsolute(path) ||
+      (how !== 'move' && how !== 'fresh' && how !== 'open')
+    )
+      return null;
+    const check = await checkFolder(path, folder.folder);
+    if (check.refused) return { ok: false, problem: check.refused };
+    if (how === 'open' && check.state !== 'flint')
+      return { ok: false, problem: 'That folder has no Flint lists.' };
+    if (how !== 'open' && check.state === 'flint')
+      return { ok: false, problem: 'That folder already has Flint lists: open them instead.' };
+    if (how === 'move') {
+      const clash = await clashes(folder.folder, path);
+      if (clash)
+        return {
+          ok: false,
+          problem: `“${clash}” is already there. Use a Flint subfolder instead.`,
+        };
+      const copied = await copyFlintFolder(folder.folder, path);
+      if (!copied.ok) {
+        log(`Flint folder not moved: ${copied.problem ?? ''}`);
+        return { ok: false, problem: copied.problem ?? 'Flint could not move its folder.' };
+      }
+      log(`Flint folder copied to ${path}: ${copied.files} files, checked`);
+    } else if (how === 'fresh') await mkdir(path, { recursive: true });
+    await settingsFile.update({ flintFolder: path });
+    log(`Flint folder is now ${path} (${how}); restarting`);
+    if (testHooks) {
+      testHooks.relaunched = path;
+      return { ok: true };
+    }
+    // A moment for Settings to say so, then a new Flint on the new folder, back on Settings.
+    setTimeout(() => {
+      app.relaunch({
+        args: [
+          ...process.argv
+            .slice(1)
+            .filter((argument) => argument !== '--hidden' && argument !== '--show-settings'),
+          '--show-settings',
+        ],
+      });
+      app.quit();
+    }, 900);
+    return { ok: true };
+  });
+  // D-104: back from that restart: on Settings.
+  if (process.argv.includes('--show-settings')) {
+    showMain();
+    const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings, 'general');
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  }
   if (testHooks) {
     testHooks.showSnapshots = () => showSnapshots();
     testHooks.exportTo = (path) => zipFolder(folder.folder, path);

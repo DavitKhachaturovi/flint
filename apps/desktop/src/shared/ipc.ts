@@ -75,6 +75,12 @@ export const Channels = {
   mainClearSnapshots: 'main:clear-snapshots',
   mainOpenFolder: 'main:open-folder',
   mainShowSettings: 'main:show-settings',
+  /** Main window → main: Windows' folder picker for a new Flint folder, and what it holds (D-104). */
+  mainChooseFolder: 'main:choose-folder',
+  /** Main window → main: move to, start fresh in, or open a folder as the Flint folder (D-104). */
+  mainChangeFolder: 'main:change-folder',
+  /** Main window → main: the user's link patterns, saved from Settings → Links (D-104). */
+  mainSaveLinkPatterns: 'main:save-link-patterns',
   /** D-67, D-100: the animation speed changed (every window scales its motion). */
   mainAppearance: 'main:appearance',
   /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
@@ -663,3 +669,27 @@ export type AttachFileOutcome =
 
 /** What opening an attachment did (D-84). */
 export type OpenAttachmentOutcome = 'opened' | 'missing' | 'refused' | 'cancelled';
+
+/** DATA-07, D-104: a folder chosen to be the Flint folder, and what it holds. */
+export interface FolderChoice {
+  readonly path: string;
+  readonly state: 'empty' | 'flint' | 'other';
+  readonly lists: number;
+  readonly insideOneDrive: boolean;
+  readonly refused: string | null;
+  readonly subfolder: {
+    readonly path: string;
+    readonly state: 'empty' | 'flint' | 'other' | 'missing';
+    readonly refused: string | null;
+  };
+  /** The Flint folder now. */
+  readonly current: string;
+}
+
+/** D-104: what is done with the chosen folder. */
+export type FolderChange = 'move' | 'fresh' | 'open';
+
+export interface FolderChangeOutcome {
+  readonly ok: boolean;
+  readonly problem?: string;
+}

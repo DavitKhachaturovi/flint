@@ -17,6 +17,9 @@ import {
   type SidebarView,
   type RestoredItem,
   type Appearance,
+  type FolderChange,
+  type FolderChangeOutcome,
+  type FolderChoice,
   type HotkeyName,
   type HotkeysView,
   type RebindOutcome,
@@ -121,6 +124,24 @@ const main = {
   },
   setSetting(change: SettingChange): Promise<SettingsView | null> {
     return ipcRenderer.invoke(Channels.mainSetSetting, change) as Promise<SettingsView | null>;
+  },
+  /** DATA-07, D-104: Windows' folder picker for a new Flint folder; null when cancelled. */
+  chooseFolder(): Promise<FolderChoice | null> {
+    return ipcRenderer.invoke(Channels.mainChooseFolder) as Promise<FolderChoice | null>;
+  },
+  /** D-104: move to, start fresh in, or open `path`; Flint restarts when it worked. */
+  changeFolder(path: string, how: FolderChange): Promise<FolderChangeOutcome | null> {
+    return ipcRenderer.invoke(
+      Channels.mainChangeFolder,
+      path,
+      how,
+    ) as Promise<FolderChangeOutcome | null>;
+  },
+  /** NOTE-07, D-104: the link patterns saved; what was kept. */
+  saveLinkPatterns(patterns: readonly LinkPattern[]): Promise<readonly LinkPattern[] | null> {
+    return ipcRenderer.invoke(Channels.mainSaveLinkPatterns, patterns) as Promise<
+      readonly LinkPattern[] | null
+    >;
   },
   snapshotSpace(): Promise<number> {
     return ipcRenderer.invoke(Channels.mainSnapshotSpace) as Promise<number>;
