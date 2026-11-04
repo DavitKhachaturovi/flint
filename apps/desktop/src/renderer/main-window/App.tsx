@@ -952,7 +952,7 @@ export function App(): ReactElement {
   useEffect(() => {
     if (listId !== SNAPSHOTS_ID) setSnapshotOpen(null);
   }, [listId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!snapshotOpen) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setSnapshotOpen(null);

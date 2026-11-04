@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactElement } from 'react';
 import type { ArchivedList, TrashItem, TrashPreview, TrashView } from '../../shared/ipc.js';
 import { BodyBlock } from './Body.js';
 import { BackIcon, CheckIcon, CloseIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
@@ -307,8 +307,8 @@ export function TrashScreen(props: {
 }): ReactElement {
   const { view, open, asPage, onOpen, onClose, onRestoreToEdit, onSnapshots, onExport } = props;
   const { onRestore, onDelete, onEmpty, onRestoreArchived } = props;
-  // D-98: Esc closes the opened item.
-  useEffect(() => {
+  // D-98: Esc closes the opened item (listening before it is painted, so no Esc is missed).
+  useLayoutEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose();
