@@ -2,6 +2,11 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.1 (4 Nov 2026)
+
+- **Settings and Trash** sit side by side at the bottom of the sidebar, both names in full, and your lists fade out softly above them.
+- The side panel always fits the window, so its bottom is never out of reach.
+
 ## 0.8.0 (4 Nov 2026)
 
 Versions now follow the milestone: 0.8 is M8 (polish), and 1.0 is the first release for coworkers.
