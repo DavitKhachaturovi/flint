@@ -2233,7 +2233,15 @@ test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Wi
   // Each place keeps its scroll position for the session, restored at once.
   await nav('Long list').click();
   await expect(main.locator('h1')).toContainText('Long list');
-  await scroller.evaluate((element) => element.scrollTo({ top: 600, behavior: 'instant' }));
+  // (Scrolled again until it is there: on a slow machine the list may still be growing.)
+  await expect
+    .poll(() =>
+      scroller.evaluate((element) => {
+        element.scrollTo({ top: 600, behavior: 'instant' });
+        return Math.round(element.scrollTop);
+      }),
+    )
+    .toBe(600);
   await nav('Paste note').click();
   await expect(main.locator('.note-card h1')).toHaveText('Paste note');
   await expect.poll(top).toBe(0);
