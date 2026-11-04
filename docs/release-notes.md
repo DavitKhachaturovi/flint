@@ -2,6 +2,12 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.4 (5 Nov 2026)
+
+- **Ctrl+K**: one box to find anything (lists, notes, tasks in every list, lines of notes) and to run commands: go somewhere, make a list or note, move or pin the selected task, change the interface size, export, quit. Also from "Search or run a command" at the top of a list. Deleted and archived things are one row away: "Search Trash and Archive".
+- **?** shows every keyboard shortcut; type to narrow it down.
+- In notes, Ctrl+K with text selected makes it a link.
+
 ## 0.8.3 (5 Nov 2026)
 
 - **Link patterns** can be edited, and Flint understands more of them: a part that changes can be a word with fixed text around it (`platform-repo`). A short form needs some fixed text (like `AB#` or `dx:`), so ordinary words never turn into links; Flint suggests one and shows how many places a pattern would link.
