@@ -15,6 +15,8 @@ import {
   type SidebarAction,
   type SidebarOutcome,
   type SidebarView,
+  type RestoredItem,
+  type TrashPreview,
   type TrashView,
 } from '../shared/ipc.js';
 
@@ -90,9 +92,13 @@ const main = {
   trash(): Promise<TrashView> {
     return ipcRenderer.invoke(Channels.mainTrash) as Promise<TrashView>;
   },
-  /** D-97: Restore from the trash; the toast's label, or null. */
-  restoreFromTrash(id: string): Promise<string | null> {
-    return ipcRenderer.invoke(Channels.mainTrashRestore, id) as Promise<string | null>;
+  /** D-97, D-98: Restore from the trash; where it went (the toast's label, its list), or null. */
+  restoreFromTrash(id: string): Promise<RestoredItem | null> {
+    return ipcRenderer.invoke(Channels.mainTrashRestore, id) as Promise<RestoredItem | null>;
+  },
+  /** D-98: a trash item opened read-only. */
+  trashPreview(id: string): Promise<TrashPreview | null> {
+    return ipcRenderer.invoke(Channels.mainTrashPreview, id) as Promise<TrashPreview | null>;
   },
   /** D-97: Delete now, for good. */
   deleteFromTrash(id: string): Promise<boolean> {

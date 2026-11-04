@@ -4439,10 +4439,38 @@ a.auto-link {
   transform: scale(0.97);
 }
 
-/* DATA-02, TASK-06, D-97: Trash, quiet, at the bottom of the sidebar; its view in the column. */
+/* DATA-02, TASK-06, D-97: Trash, quiet, at the bottom of the sidebar; its view in the column.
+   D-98: pinned there, the lists scrolling underneath it (fading out just above it); selected, it
+   has the selection's own look, the sliding highlight staying with the rows that scroll. */
 .sidebar-foot {
-  margin-top: auto;
-  padding-top: 12px;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: auto -2px -14px -12px;
+  padding: 12px 2px 14px 12px;
+  background: var(--fl-ground-sidebar);
+}
+
+.sidebar-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -18px;
+  height: 18px;
+  background: linear-gradient(to bottom, transparent, var(--fl-ground-sidebar));
+  pointer-events: none;
+}
+
+.sidebar-foot .nav {
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    box-shadow var(--fl-dur-fast) ease;
+}
+
+.sidebar-foot .nav.on {
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
 }
 
 .trash-bar {
@@ -4597,4 +4625,163 @@ a.auto-link {
 
 .trash-action:active {
   transform: scale(0.97);
+}
+
+/* D-98: a deleted item opens read-only (a click on its row): selected like a row, opened in the
+   side panel on wide screens, as a page on narrow ones. Trying to edit it asks to restore it. */
+.trash-row.opens {
+  cursor: default;
+}
+
+.trash-row.sel,
+.trash-row.sel:hover {
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+.trash-panel {
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.trash-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.trash-preview.page {
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.trash-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  user-select: text;
+}
+
+.trash-preview-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--fl-text-heading-soft);
+}
+
+.trash-preview.page .trash-preview-title {
+  font-size: 27px;
+}
+
+.trash-preview-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--fl-text-body);
+}
+
+.trash-preview-tasks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trash-preview-tasks li.sub {
+  padding-left: 26px;
+}
+
+.trash-preview-tasks li.done {
+  color: var(--fl-text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--fl-edge-chip);
+}
+
+.trash-preview-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
+  color: var(--fl-text-muted);
+}
+
+.trash-locked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 12px;
+  background: var(--fl-ground-float);
+  box-shadow: 0 0 0 1px var(--fl-edge-float);
+  font-size: 13.5px;
+  color: var(--fl-text-primary);
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* D-98: back to the top: at the bottom right of the main column, sticking to the window's bottom
+   while the column scrolls; it rises in and fades out. */
+.to-top-dock {
+  position: sticky;
+  bottom: 24px;
+  z-index: 4;
+  height: 0;
+  pointer-events: none;
+}
+
+.to-top {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-selected);
+  color: var(--fl-text-secondary);
+  opacity: 0;
+  transform: translateY(8px) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity var(--fl-dur-state) ease,
+    transform var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.to-top svg {
+  transform: rotate(-90deg);
+}
+
+.to-top.shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.to-top.shown:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.to-top.shown:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .to-top {
+    transition: none;
+  }
 }

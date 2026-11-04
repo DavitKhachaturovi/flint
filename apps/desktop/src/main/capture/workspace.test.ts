@@ -825,7 +825,18 @@ describe('Trash and Archived (DATA-02, TASK-06, MEDIA-04, D-97)', () => {
       }),
     ]);
     const name = view.deleted[0]?.id ?? '';
-    expect(await workspace.restoreFromTrash(name, now)).toBe('Restored to Work');
+    // D-98: opened read-only: the title, the notes.
+    expect(await workspace.trashPreview(name)).toMatchObject({
+      title: 'Delete me',
+      body: 'notes stay',
+      tasks: [],
+    });
+    expect(await workspace.restoreFromTrash(name, now)).toEqual({
+      label: 'Restored to Work',
+      listId: 'wrk1',
+      listName: 'Work',
+      key: 'bbbb',
+    });
     expect(await work()).toMatch(/- \[ \] Delete me \[id:: bbbb\]\n {4}notes stay/);
     expect(await trash()).toEqual([]);
     // Undo takes it out again and puts its trash file back.
@@ -841,7 +852,9 @@ describe('Trash and Archived (DATA-02, TASK-06, MEDIA-04, D-97)', () => {
     const name = (await workspace.trashView()).deleted[0];
     expect(name).toMatchObject({ kind: 'note', title: 'Notes', from: null });
     await writeFile(join(folder, 'Notes.md'), 'someone else');
-    expect(await workspace.restoreFromTrash(name?.id ?? '', now)).toBe('Restored Notes (restored)');
+    expect((await workspace.restoreFromTrash(name?.id ?? '', now))?.label).toBe(
+      'Restored Notes (restored)',
+    );
     expect(await readFile(join(folder, 'Notes (restored).md'), 'utf8')).toContain('A note');
     expect(workspace.listInfos().map((info) => info.name)).toContain('Notes (restored)');
     await workspace.undoLast(now);

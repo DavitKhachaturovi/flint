@@ -138,6 +138,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Shift+click / Ctrl+click for multi-select of tasks, and of lists and notes in the sidebar (D-59). With 2+ tasks selected, the floating action bar appears (TASK-07).
 - The mouse's back and forward buttons navigate (NAV-04).
 - Cursor: the arrow on every control, the hand only on links (UI-01).
+- **D-98:** a page scrolled down shows a "back to top" button at the bottom right of the main column (NAV-09); the sidebar's foot (Trash) stays pinned while the lists scroll.
 
 ---
 

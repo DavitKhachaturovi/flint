@@ -2816,6 +2816,104 @@ test('Trash and Archived: restore, undo, Delete now, Empty Trash, an archived ta
   ).toHaveCount(0);
 });
 
+test('fixes after 0.4.30: a new list in a group, the pinned Trash row, back to top, a trash item opened, Go to (LIST-05, DATA-02, D-98)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const size = (width: number, height: number) =>
+    app.evaluate(
+      ({ BrowserWindow }, bounds) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: -6000, y: 0, ...bounds });
+      },
+      { width, height },
+    );
+
+  // LIST-05: a group's right-click menu makes a new list right inside it; one undo step.
+  await main.evaluate(() => window.flintMain.sidebarAction({ kind: 'newGroup', name: 'Errands' }));
+  const group = main.locator('.nav-group', { hasText: 'Errands' });
+  await group.locator('.nav-group-head').click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'New task list' }).click();
+  await expect(group.locator('.name-field input')).toBeFocused();
+  await main.keyboard.type('Groceries');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('h1')).toContainText('Groceries');
+  await expect(group.locator('.nav', { hasText: 'Groceries' })).toHaveCount(1);
+  await main.keyboard.press('Control+z');
+  await expect(main.locator('.nav', { hasText: 'Groceries' })).toHaveCount(0);
+
+  // The Trash row stays at the bottom while the lists scroll.
+  await main.evaluate(() => document.querySelector('.sidebar')?.scrollTo({ top: 0 }));
+  await expect(main.locator('.sidebar-foot .nav', { hasText: 'Trash' })).toBeInViewport();
+
+  // Back to top: shown once scrolled down, back at the top on a click.
+  const tasks = Array.from({ length: 60 }, (_, i) => `- [ ] Scroll task ${i + 1} [id:: sc${i}]`);
+  const file = join(flint, 'Scroll me.md');
+  await writeFile(file, `---\nflint: 1\nid: scr1\nmode: tasks\n---\n${tasks.join('\n')}\n`);
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Scroll me' }).click();
+  await expect(main.locator('.to-top')).not.toHaveClass(/shown/);
+  await main.evaluate(() =>
+    document.querySelector('.scroller')?.scrollTo({ top: 1200, behavior: 'instant' }),
+  );
+  await expect(main.locator('.to-top')).toHaveClass(/shown/);
+  await main.locator('.to-top').click();
+  await expect
+    .poll(() => main.evaluate(() => document.querySelector('.scroller')?.scrollTop ?? -1))
+    .toBe(0);
+  await expect(main.locator('.to-top')).not.toHaveClass(/shown/);
+
+  // DATA-02: two tasks deleted; in Trash, Restore's toast offers Go to the list.
+  await main
+    .locator('.row', { hasText: 'Scroll task 1' })
+    .first()
+    .click({ position: { x: 300, y: 10 } });
+  await main.keyboard.press('Delete');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('Scroll task 1 [');
+  await main.keyboard.press('Delete');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('Scroll task 2 [');
+  await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).click();
+  const row = (title: string) =>
+    main.locator('.trash-row:not(.leaving)').filter({
+      has: main.locator('.trash-title').getByText(title, { exact: true }),
+    });
+  await row('Scroll task 2').locator('.trash-action', { hasText: 'Restore' }).click();
+  await expect(main.locator('h1')).toHaveText('Trash');
+  await main.locator('.toast button', { hasText: 'Go to Scroll me' }).click();
+  await expect(main.locator('h1')).toContainText('Scroll me');
+  await expect(main.locator('.row.sel')).toContainText('Scroll task 2');
+
+  // Narrow: a trash item opens as a page, read-only; Esc goes back.
+  await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).click();
+  await row('Scroll task 1').locator('.trash-title').click();
+  await expect(main.locator('.trash-preview.page .trash-preview-title')).toHaveText(
+    'Scroll task 1',
+  );
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.trash-preview')).toHaveCount(0);
+
+  // Wide: in the side panel; trying to edit asks to restore; Restore opens it to edit.
+  await size(1800, 900);
+  await row('Scroll task 1').locator('.trash-title').click();
+  const panel = main.locator('.trash-panel');
+  await expect(panel.locator('.trash-preview-title')).toHaveText('Scroll task 1');
+  await expect(row('Scroll task 1')).toHaveClass(/\bsel\b/);
+  await panel.locator('.trash-preview-title').click();
+  await expect(panel.locator('.trash-locked')).toContainText('Restore to edit');
+  await panel.locator('.trash-locked button', { hasText: 'Restore' }).click();
+  await expect(main.locator('h1')).toContainText('Scroll me');
+  await expect(main.locator('.row.editing')).toContainText('', { timeout: 5000 });
+  await expect(
+    main
+      .locator('.row.editing input, .row.editing textarea, .row.editing [contenteditable]')
+      .first(),
+  ).toBeFocused();
+  await main.keyboard.press('Escape');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('Scroll task 1 [id:: sc0]');
+  await size(1120, 780);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

@@ -43,6 +43,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **One level** of collapsible groups in the sidebar, each holding task lists and notes. No nesting.
 - Groups are **not folders**: the list files stay flat in the Flint folder (04 §2). Membership and order live in `.flint/sidebar.json` (user data, travels with the folder); which groups are collapsed is machine UI state (`ui-state.json`).
 - **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
+- **D-98:** a group's right-click menu also offers **New task list** and **New note**, made inside that group (its name field at the end of the group; one undo step). The sidebar's foot (Trash; Settings above it in M8) is pinned at the bottom while the lists scroll.
 - Lists and notes move into or out of a group by drag (M4 step 8, D-78) and the right-click menu ("Move to group ▸", "Remove from group").
 - **Proposed (drag, step 8):** a list dragged right below a group's header goes into the group (first); right below a group's last list it joins the group when it is nearer that list, and goes after the group when it is nearer what follows; it shows indented while it would land in a group and flush while it would land outside one. A group's header drags the whole group among the top-level items. Under a non-manual sort a drag doesn't start and the hint shows.
 - **D-81 (supersedes D-80's look):** the group look and drag visuals are 0.4.14's again (the all-caps label header with chevron, name and the count as a number; no folder tile; the previous drag feel, no lift scale, no drop line), plus: an **expanded group has a highlighted card background**; a list dragged over a group gives its card a **white outline ring** (a folded group shows the card and ring only then); D-80's animations and functional changes stay (new groups at the top, a drop on a folded group adds to its end with a pulse, the card grows with sliding lists).
@@ -379,6 +380,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
+- **D-98 (for M8):** "Reminder sound: Windows sound (default) / Flint chime"; the chime makes the toast silent, so one sound plays; an info card explains why one would choose it and what changes.
 - **D-94 (0.4.28):** Flint's own sound is a short soft chime made for Flint, **off by default** (the reminder toast already plays Windows' sound); until Settings (M8) it is `reminderSound: true` in `settings.json`. The in-app alert comes with mini mode (M8).
 - **D-95:** the chime is **"Nudge"**: two soft rounded taps on one pitch, about half a second (`apps/desktop/scripts/make-chime.mjs`). Drop and Mallet, the runners-up, are candidates for the choice of sounds in Settings.
 - **D-96:** the bundled `sounds/chime.wav` is Davit's file and the source of truth; `make-chime.mjs` is a one-off tool that never runs in the build or the tests and refuses to write over it, and a test checks the file's hash.
@@ -560,6 +562,9 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Screen sharing:** the design includes a caution, since clipboard items are visible to viewers (**open for the design**, e.g. contents hidden until hovered or a "hide contents" switch).
 - Needs a small native bridge to WinRT, chosen under D-30 when built.
 
+### NAV-09 — Back to top (v1, D-98)
+- In every page that scrolls (task lists, Today, notes, task pages, Trash), once scrolled down a little, a small round button appears at the bottom right of the main column (never over the side panel). A click scrolls smoothly to the top (at once under reduce-motion); it appears and disappears with motion. Built (0.4.31).
+
 ### NAV-06 — Find in page (v1, D-72)
 - **Ctrl+F** opens a find bar in Flint's style (09 §8).
 - **Task lists:** matches are highlighted and **Enter / Shift+Enter** jump to the next / previous one; nothing is filtered. **Proposed:** titles and bodies are searched, the Completed section included; a match in a collapsed body or a collapsed Completed section opens it when jumped to; Esc closes the bar and keeps the selection on the last match. Milestone M4 step 10 (M5 if it doesn't fit).
@@ -586,6 +591,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### DATA-02 — Trash, kept 30 days (v1)
 - Deleted tasks and deleted lists go to Trash and can be restored for 30 days, after which they are permanently removed (and MEDIA-04 runs).
 - **D-97:** a **Trash** row at the bottom of the sidebar (with its count) opens a view: deleted tasks, lists and notes by day, newest first, with their list and "deleted 3 days ago"; Restore, Delete now, Empty Trash (inline confirms). A second tab, **Archived**, shows auto-archived completed tasks by list, each restorable to its list. **Built (0.4.30).**
+- **D-98 (0.4.31):** a click on a deleted item opens it read-only (the side panel on wide screens, a page on narrow ones); trying to edit it says "Restore to edit" with Restore, which restores it and opens it there, ready to edit. Restore's toast offers Undo and "Go to <list>".
 
 ### DATA-03 — Global Ctrl+Z (v1)
 - Undo (and redo, **Proposed:** Ctrl+Shift+Z / Ctrl+Y) works for deletes, moves, reorders, priority changes, completion, conversions, and bulk actions, not just text edits.

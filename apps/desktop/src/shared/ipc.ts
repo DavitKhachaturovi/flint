@@ -53,6 +53,7 @@ export const Channels = {
   /** DATA-02, D-97: the Trash view, and what it does. */
   mainTrash: 'main:trash',
   mainTrashRestore: 'main:trash-restore',
+  mainTrashPreview: 'main:trash-preview',
   mainTrashDelete: 'main:trash-delete',
   mainTrashEmpty: 'main:trash-empty',
   mainArchiveRestore: 'main:archive-restore',
@@ -275,6 +276,26 @@ export interface TrashView {
   readonly archived: readonly ArchivedList[];
 }
 
+/** D-98: a trash item opened read-only: its title, text and tasks (a list's, or a task's subtasks). */
+export interface TrashPreview extends TrashItem {
+  /** A task's notes, or a note's text (without its header). */
+  readonly body: string;
+  readonly tasks: readonly {
+    readonly title: string;
+    readonly done: boolean;
+    readonly sub: boolean;
+  }[];
+}
+
+/** D-98: where a restored item now is: "Go to Work", and opening it to edit. */
+export interface RestoredItem {
+  readonly label: string;
+  readonly listId: string;
+  readonly listName: string;
+  /** The task, for a restored task; null for a list or a note. */
+  readonly key: string | null;
+}
+
 /** The Trash view's place in the sidebar (D-97): a view, never a list. */
 export const TRASH_ID = '@trash';
 
@@ -440,7 +461,13 @@ export type EditCommand = 'cut' | 'copy' | 'paste' | 'pasteAndMatchStyle' | 'sel
 
 /** LIST-01, D-52, D-55: what the sidebar asks of a list. */
 export type ListAction =
-  | { readonly kind: 'new'; readonly name: string; readonly mode: 'tasks' | 'note' }
+  | {
+      readonly kind: 'new';
+      readonly name: string;
+      readonly mode: 'tasks' | 'note';
+      /** D-98: made inside this sidebar group (its right-click menu). */
+      readonly group?: string;
+    }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
   | { readonly kind: 'delete'; readonly id: string }
   /** D-59: several lists and notes at once, undone together. */

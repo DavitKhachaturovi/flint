@@ -629,3 +629,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Snapshots, hourly 48 h then daily 30 days; restore one list or note, or everything | DATA-04 · v1 · M7 | 02, 04, D-97 |
 | 4 | Export as zip and Restore from a snapshot in the tray (Settings and Ctrl+K in M8) | DATA-05, DATA-04 · v1 · M7 | 02, D-97 |
 | 5 | Orphaned attachments cleaned up at start-up | MEDIA-04 · Done (0.4.30) | 04, D-97 |
+
+## AG. Fixes after 0.4.29 and 0.4.30 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Reminder card hover: no second shadow after un-hovering | TODAY-03 · Done (0.4.31) | 09, D-98 |
+| 2 | A group's right-click menu: New task list, New note, made inside the group | LIST-05 · Done (0.4.31) | 02, D-98 |
+| 3 | The sidebar's foot (Trash, Settings in M8) pinned while the lists scroll | LIST-05, DATA-02 · Done (0.4.31) | 02, 03, 09, D-98 |
+| 4 | Back to top in every scrolling page | NAV-09 · Done (0.4.31) | 02, 03, 09, D-98 |
+| 5 | A trash item opened read-only; "Restore to edit" with Restore | DATA-02 · Done (0.4.31) | 02, 09, D-98 |
+| 6 | Restore's toast: Undo and "Go to <list>" | DATA-02 · Done (0.4.31) | 02, D-98 |
+| 7 | Reminder sound: Windows sound or Flint chime (the toast silent then), with an info card | REM-06, APP-11 · v1 · M8 | 02, D-98 |

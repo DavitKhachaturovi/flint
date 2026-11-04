@@ -58,7 +58,9 @@ import type {
   TaskRow,
   TodayEntry,
   TodayReminder,
+  RestoredItem,
   TrashItem,
+  TrashPreview,
   TrashView,
 } from '../../shared/ipc.js';
 import { TODAY_ID } from '../../shared/ipc.js';
@@ -875,6 +877,35 @@ export class Workspace {
     });
   }
 
+  /**
+   * LIST-05, D-98: a new task list or note from a group's right-click menu, at the end of that
+   * group (also under a sort: the group is where it belongs, not an order); one undo step.
+   */
+  async newListInGroup(
+    name: string,
+    mode: ListMode,
+    group: string,
+    now: Date,
+  ): Promise<ListOutcome> {
+    const start = this.undoStack.length;
+    const outcome = await this.newList(name, mode, now);
+    if (!outcome.ok) return outcome;
+    await this.serial(async () => {
+      const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+      const target = items.find((item) => item.kind === 'group' && item.id === group);
+      if (target?.kind !== 'group') return;
+      const before = this.sidebarFile;
+      const after = fromItems(
+        moveInSidebar(items, outcome.listId, { group, index: target.lists.length }),
+        before.extra,
+      );
+      await this.saveSidebar(after);
+      this.remember(this.sidebarStep('Moved', before, after));
+      this.mergeSince(start, outcome.label);
+    });
+    return outcome;
+  }
+
   /** LIST-01, D-52: a new task list or note from the sidebar's + or Ctrl+Shift+N; undoable. */
   newList(name: string, mode: ListMode, now: Date): Promise<ListOutcome> {
     return this.serial(async () => {
@@ -1558,12 +1589,47 @@ export class Workspace {
     return { deleted, archived };
   }
 
+  /** D-98: a trash item, read-only: its title, its text, its tasks (or a task's subtasks). */
+  async trashPreview(name: string): Promise<TrashPreview | null> {
+    const item = (await this.trashView()).deleted.find((each) => each.id === name);
+    const path = trashPath(this.folder, name);
+    const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
+    if (!item || text === null) return null;
+    const document = parseDocument(text);
+    const label = (task: TaskNode): string => taskLabel(titlePlain(task.line.title.trim()), '');
+    if (item.kind === 'task') {
+      const task = document.blocks.find((block): block is TaskNode => block.kind === 'task');
+      return {
+        ...item,
+        body: task ? getBody(task) : '',
+        tasks: (task ? [...allTasks({ ...document, blocks: [task] })] : [])
+          .filter(({ parent }) => parent)
+          .map(({ task: sub }) => ({
+            title: label(sub),
+            done: sub.line.status !== ' ',
+            sub: true,
+          })),
+      };
+    }
+    const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+    if (item.kind === 'note') return { ...item, body, tasks: [] };
+    return {
+      ...item,
+      body: '',
+      tasks: [...allTasks(document)].map(({ task, parent }) => ({
+        title: label(task),
+        done: task.line.status !== ' ',
+        sub: parent !== null,
+      })),
+    };
+  }
+
   /**
    * DATA-02, D-97: restores something from the trash, one undo step: a task to the top of its list
    * (Inbox if that list is gone), a list or note to the Flint folder under its name ("(restored)"
    * added if that name is taken). Its label, or null when it can't be.
    */
-  restoreFromTrash(name: string, now: Date): Promise<string | null> {
+  restoreFromTrash(name: string, now: Date): Promise<RestoredItem | null> {
     return this.serial(async () => {
       const path = trashPath(this.folder, name);
       const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
@@ -1593,7 +1659,7 @@ export class Workspace {
           { restored: { path, text } },
         );
         await unlink(path).catch(() => undefined);
-        return label;
+        return { label, listId: this.listId(list.entry), listName: where, key: task.key };
       }
       const original = trashedListName(name);
       let target = join(this.folder, `${original}.md`);
@@ -1624,7 +1690,15 @@ export class Workspace {
       await rename(path, target);
       await this.refresh(target);
       this.remember(step(target, path));
-      return label;
+      const restored = this.lists.find(({ entry }) => entry.path === target);
+      return restored
+        ? {
+            label,
+            listId: this.listId(restored.entry),
+            listName: restored.entry.name,
+            key: null,
+          }
+        : null;
     });
   }
 

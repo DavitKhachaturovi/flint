@@ -1,6 +1,7 @@
-import { useState, type ReactElement } from 'react';
-import type { ArchivedList, TrashItem, TrashView } from '../../shared/ipc.js';
-import { CheckIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
+import { useEffect, useState, type ReactElement } from 'react';
+import type { ArchivedList, TrashItem, TrashPreview, TrashView } from '../../shared/ipc.js';
+import { BodyBlock } from './Body.js';
+import { BackIcon, CheckIcon, CloseIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
 import { usePresence } from './Today.js';
 
 /**
@@ -69,10 +70,12 @@ function Confirm(props: {
 function DeletedRows(props: {
   readonly items: readonly TrashItem[];
   readonly now: Date;
+  readonly open: string | null;
+  readonly onOpen: (id: string) => void;
   readonly onRestore: (id: string) => void;
   readonly onDelete: (id: string) => void;
 }): ReactElement {
-  const { items, now, onRestore, onDelete } = props;
+  const { items, now, open, onOpen, onRestore, onDelete } = props;
   const [asking, setAsking] = useState<string | null>(null);
   const { entries, gone } = usePresence(items, (item) => item.id);
   return (
@@ -80,10 +83,19 @@ function DeletedRows(props: {
       {entries.map(({ item, key, leaving }) => (
         <div
           key={key}
-          className={leaving ? 'trash-row leaving' : 'trash-row'}
+          className={[
+            'trash-row',
+            'opens',
+            leaving ? 'leaving' : '',
+            open === key ? 'sel' : '',
+          ].join(' ')}
           inert={leaving}
           onAnimationEnd={(event) => {
             if (leaving && event.target === event.currentTarget) gone(key);
+          }}
+          // D-98: a click opens it read-only (not on its buttons).
+          onClick={(event) => {
+            if (!(event.target as Element).closest('button')) onOpen(item.id);
           }}
         >
           <span className="tile">
@@ -169,14 +181,117 @@ function ArchivedRows(props: {
   );
 }
 
+/**
+ * D-98: a deleted task, list or note, read-only: its title, its tasks (or a task's subtasks) and its
+ * text. Trying to change it (a click on its title or text, a double-click) says "Restore to edit",
+ * with Restore, which restores it and opens it where it now is, ready to edit.
+ */
+export function TrashPreviewView(props: {
+  readonly preview: TrashPreview;
+  readonly onRestore: () => void;
+  readonly onClose: () => void;
+  /** As a page (narrow windows): a back arrow instead of the panel's ×. */
+  readonly page?: boolean;
+}): ReactElement {
+  const { preview, onRestore, onClose, page = false } = props;
+  const [asked, setAsked] = useState(false);
+  const ask = (): void => setAsked(true);
+  const now = new Date();
+  const kind = preview.kind === 'task' ? 'Task' : preview.kind === 'note' ? 'Note' : 'List';
+  return (
+    <div className={page ? 'trash-preview page' : 'trash-preview'}>
+      <div className="panel-head">
+        {page && (
+          <button
+            type="button"
+            className="panel-button"
+            aria-label="Back to Trash"
+            title="Back to Trash (Esc)"
+            onClick={onClose}
+          >
+            <BackIcon />
+          </button>
+        )}
+        <span className="panel-label">Deleted {kind.toLowerCase()}</span>
+        <span className="panel-meta">
+          {preview.from ? `from ${preview.from} · ` : ''}deleted {ago(preview.deleted, now)}
+        </span>
+        {!page && (
+          <span className="panel-actions">
+            <button
+              type="button"
+              className="panel-button"
+              aria-label="Close"
+              title="Close (Esc)"
+              onClick={onClose}
+            >
+              <CloseIcon />
+            </button>
+          </span>
+        )}
+      </div>
+      <div className="trash-preview-content" onMouseDown={ask} onDoubleClick={ask}>
+        <h2 className="trash-preview-title">{preview.title}</h2>
+        {preview.tasks.length > 0 && (
+          <ul className="trash-preview-tasks">
+            {preview.tasks.map((task, index) => (
+              <li
+                key={index}
+                className={[task.done ? 'done' : '', task.sub ? 'sub' : ''].join(' ')}
+              >
+                <span className="trash-preview-check">{task.done && <CheckIcon size={10} />}</span>
+                {task.title}
+              </li>
+            ))}
+          </ul>
+        )}
+        {preview.body.trim() !== '' && (
+          <BodyBlock
+            body={preview.body}
+            inline={false}
+            editing={false}
+            editable={false}
+            onEdit={ask}
+            onDone={() => undefined}
+          />
+        )}
+      </div>
+      {asked && (
+        <div className="trash-locked" role="status">
+          <span>Restore to edit</span>
+          <button type="button" className="primary-button" onClick={onRestore}>
+            Restore
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TrashScreen(props: {
   readonly view: TrashView | null;
+  /** D-98: the item opened read-only, and whether it shows here as a page (narrow windows). */
+  readonly open: TrashPreview | null;
+  readonly asPage: boolean;
+  readonly onOpen: (id: string) => void;
+  readonly onClose: () => void;
+  readonly onRestoreToEdit: (id: string) => void;
   readonly onRestore: (id: string) => void;
   readonly onDelete: (id: string) => void;
   readonly onEmpty: () => void;
   readonly onRestoreArchived: (listId: string, key: string) => void;
 }): ReactElement {
-  const { view, onRestore, onDelete, onEmpty, onRestoreArchived } = props;
+  const { view, open, asPage, onOpen, onClose, onRestoreToEdit } = props;
+  const { onRestore, onDelete, onEmpty, onRestoreArchived } = props;
+  // D-98: Esc closes the opened item.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
   const [tab, setTab] = useState<'deleted' | 'archived'>('deleted');
   const [emptying, setEmptying] = useState(false);
   const now = new Date();
@@ -190,6 +305,16 @@ export function TrashScreen(props: {
     if (last?.label === label) last.items.push(item);
     else days.push({ label, items: [item] });
   }
+  if (open && asPage)
+    return (
+      <TrashPreviewView
+        key={open.id}
+        preview={open}
+        page
+        onRestore={() => onRestoreToEdit(open.id)}
+        onClose={onClose}
+      />
+    );
   return (
     <>
       <header className="list-header trash-header">
@@ -248,6 +373,8 @@ export function TrashScreen(props: {
                 <DeletedRows
                   items={day.items}
                   now={now}
+                  open={open?.id ?? null}
+                  onOpen={onOpen}
                   onRestore={onRestore}
                   onDelete={onDelete}
                 />

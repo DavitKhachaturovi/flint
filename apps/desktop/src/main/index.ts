@@ -373,7 +373,9 @@ async function start(): Promise<void> {
     const now = new Date();
     const run =
       request.kind === 'new'
-        ? workspace.newList(request.name, request.mode, now)
+        ? request.group
+          ? workspace.newListInGroup(request.name, request.mode, request.group, now)
+          : workspace.newList(request.name, request.mode, now)
         : request.kind === 'rename'
           ? workspace.renameList(request.id, request.name, now)
           : request.kind === 'duplicate'
@@ -604,6 +606,9 @@ async function start(): Promise<void> {
           return null;
         })
       : null,
+  );
+  ipcMain.handle(Channels.mainTrashPreview, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string' ? workspace.trashPreview(id) : null,
   );
   ipcMain.handle(Channels.mainTrashDelete, (event, id: unknown) =>
     owns(event.sender) && typeof id === 'string' ? workspace.deleteFromTrash(id) : false,

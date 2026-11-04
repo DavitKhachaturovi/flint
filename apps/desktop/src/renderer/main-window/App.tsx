@@ -84,8 +84,14 @@ import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
-import { TODAY_ID, TRASH_ID, type TrashView } from '../../shared/ipc.js';
-import { TrashScreen } from './Trash.js';
+import {
+  TODAY_ID,
+  TRASH_ID,
+  type RestoredItem,
+  type TrashPreview,
+  type TrashView,
+} from '../../shared/ipc.js';
+import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -129,7 +135,8 @@ interface Point {
 
 /** A list's name being typed in the sidebar (LIST-01). */
 type Naming =
-  | { readonly kind: 'new'; readonly mode: 'tasks' | 'note' }
+  /** D-98: `group`: made inside that group (its right-click menu), the field among its lists. */
+  | { readonly kind: 'new'; readonly mode: 'tasks' | 'note'; readonly group?: string }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
   /** LIST-05: a new group, at the top of Lists (D-80), with a list to move into it (`Move to group ›`). */
   | { readonly kind: 'newGroup'; readonly list?: string }
@@ -323,6 +330,9 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 /** NAV-07, D-85: what isn't blank space in the main area (a click there keeps the selection). */
 /** REM-06, D-94: Flint's own reminder sound (`scripts/make-chime.mjs`), bundled, never fetched. */
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
+
+/** D-98: how far down a page is scrolled before "back to top" shows. */
+const TO_TOP_AFTER = 320;
 
 const BLANK_EXCEPT =
   '.row, .context-panel, .composer, .body-card, .inline-body, .completed-head, button, a, input, textarea, [contenteditable], .menu, .picker';
@@ -792,11 +802,17 @@ export function App(): ReactElement {
     readonly flash: boolean;
     /** D-96: the list it arrives in: the same task's row in Today (still on screen) isn't it. */
     readonly list?: string;
+    /** D-98: restored from the Trash to be edited: its title's field opens once it is there. */
+    readonly edit?: boolean;
   } | null>(null);
   /** D-93: a new arrival, also of the task that is already selected. */
   const [arrival, setArrival] = useState(0);
   /** DATA-02, D-97: the Trash view's contents (its count is in the sidebar). */
   const [trash, setTrash] = useState<TrashView | null>(null);
+  /** D-98: the trash item opened read-only (a page, or the side panel on wide screens). */
+  const [trashOpen, setTrashOpen] = useState<TrashPreview | null>(null);
+  /** D-98: scrolled down far enough for the "back to top" button. */
+  const [toTop, setToTop] = useState(false);
   /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
   const [overdueCalled, setOverdueCalled] = useState(false);
   /**
@@ -804,8 +820,8 @@ export function App(): ReactElement {
    * at once (never a long smooth scroll, which flashed the row before it was in view).
    */
   const reveal = useCallback(
-    (list: string, key: string): void => {
-      arriving.current = { key, mode: 'instant', flash: true, list };
+    (list: string, key: string, edit = false): void => {
+      arriving.current = { key, mode: 'instant', flash: true, list, edit };
       setArrival((count) => count + 1);
       go({ list, page: null }, key);
     },
@@ -876,6 +892,24 @@ export function App(): ReactElement {
     return () => observer.disconnect();
   }, []);
   const panelShown = wide && !panelHidden && view !== null;
+  /** D-98: the Trash view on a wide screen: an opened item shows in the panel's place. */
+  const trashWide = wide && !panelHidden && listId === TRASH_ID;
+  const trashPanel = trashWide && trashOpen !== null;
+  // D-98: "back to top" shows once the page is scrolled down a little (and goes near the top).
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const onScroll = (): void => setToTop(element.scrollTop > TO_TOP_AFTER);
+    onScroll();
+    element.addEventListener('scroll', onScroll, { passive: true });
+    return () => element.removeEventListener('scroll', onScroll);
+  }, []);
+  // D-98: the opened item goes when Trash is left, or when it is no longer in the trash.
+  useEffect(() => {
+    if (!trashOpen) return;
+    if (listId !== TRASH_ID || !trash?.deleted.some((item) => item.id === trashOpen.id))
+      setTrashOpen(null);
+  }, [listId, trash, trashOpen]);
   const panelShownRef = useRef(panelShown);
   panelShownRef.current = panelShown;
   useEffect(() => {
@@ -1645,6 +1679,30 @@ export function App(): ReactElement {
     [showToast],
   );
 
+  /** D-98: a restored item where it now is: a task selected and flashed in its list, a list opened. */
+  const goToRestored = useCallback(
+    (restored: RestoredItem, edit = false): void => {
+      if (restored.key) reveal(restored.listId, restored.key, edit);
+      else {
+        openList(restored.listId);
+        if (edit) setFocusNote(restored.listId);
+      }
+    },
+    [reveal, openList],
+  );
+  /** D-98: "Restore to edit": restored, then opened where it is now, ready to edit. */
+  const restoreToEdit = useCallback(
+    (id: string): void => {
+      void window.flintMain.restoreFromTrash(id).then((restored) => {
+        if (!restored) return;
+        setTrashOpen(null);
+        showToast(restored.label, true);
+        goToRestored(restored, true);
+      });
+    },
+    [goToRestored, showToast],
+  );
+
   /** REM-07, D-94: an overdue reminder's Done: its task completed in its own list, with Undo. */
   const completeOverdue = useCallback(
     (reminder: TodayReminder): void => {
@@ -1977,8 +2035,17 @@ export function App(): ReactElement {
   const groupMenu = useCallback(
     (group: SidebarGroup, at: Point): void => {
       setSidebarFocus(group.id);
+      // D-98: a new list or note made right inside the group (opened if it was folded).
+      const newIn = (mode: 'tasks' | 'note'): void => {
+        if (sidebarView?.collapsed.includes(group.id)) toggleGroup(group.id);
+        setNamingProblem(null);
+        setNaming({ kind: 'new', mode, group: group.id });
+      };
       openMenu(
         [
+          { label: 'New task list', action: () => newIn('tasks') },
+          { label: 'New note', action: () => newIn('note') },
+          'divider',
           {
             label: 'Rename group',
             action: () => {
@@ -2005,7 +2072,7 @@ export function App(): ReactElement {
         at,
       );
     },
-    [sidebarChange, showToast, setNaming],
+    [sidebarChange, showToast, setNaming, sidebarView, toggleGroup],
   );
 
   const submitName = useCallback(
@@ -2037,7 +2104,7 @@ export function App(): ReactElement {
       }
       const outcome = await window.flintMain.listAction(
         naming.kind === 'new'
-          ? { kind: 'new', name, mode: naming.mode }
+          ? { kind: 'new', name, mode: naming.mode, ...(naming.group && { group: naming.group }) }
           : { kind: 'rename', id: naming.id, name },
       );
       if (!outcome) return;
@@ -3198,6 +3265,7 @@ export function App(): ReactElement {
         block: target.flash ? 'center' : 'nearest',
         behavior: target.mode === 'instant' || reducedMotion() ? 'instant' : 'smooth',
       });
+    if (target.edit) edit(target.key);
     // D-93: the flash where the row landed; a window that isn't showing yet flashes when it shows.
     if (!target.flash) return;
     flash(row);
@@ -3484,11 +3552,11 @@ export function App(): ReactElement {
   const [panelTop, setPanelTop] = useState(4);
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (!element || !panelShown) return;
+    if (!element || !(panelShown || trashPanel)) return;
     const measure = (): void => {
       // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card',
+        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card, .content > .trash-bar',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -3508,7 +3576,7 @@ export function App(): ReactElement {
     const observer = new ResizeObserver(measure);
     if (content.current) observer.observe(content.current);
     return () => observer.disconnect();
-  }, [panelShown, view?.id, view?.mode, pageTask?.key]);
+  }, [panelShown, trashPanel, view?.id, view?.mode, pageTask?.key]);
   // D-89: Shift+Enter or "Add notes" with the context panel: its notes editor takes the caret.
   useEffect(() => {
     const key = panelNotesFor.current;
@@ -3606,7 +3674,7 @@ export function App(): ReactElement {
       >
         <Glide
           card={sidebar}
-          target={listId}
+          target={listId === TRASH_ID ? null : listId}
           version={[lists, naming, sidebarView]}
           className="nav-glide"
         />
@@ -3697,10 +3765,23 @@ export function App(): ReactElement {
                 const list = listById.get(id);
                 return list ? navList(list) : null;
               })}
+              {/* D-98: a new list or note named right where it will be, at the end of the group. */}
+              {naming?.kind === 'new' && naming.group === item.id && (
+                <NameField
+                  flip="naming:list"
+                  key={`new-${naming.mode}-${item.id}`}
+                  initial=""
+                  placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+                  icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+                  problem={namingProblem}
+                  onSubmit={(name) => void submitName(name)}
+                  onCancel={() => setNaming(null)}
+                />
+              )}
             </NavGroup>
           );
         })}
-        {naming?.kind === 'new' && (
+        {naming?.kind === 'new' && !naming.group && (
           <NameField
             flip="naming:list"
             key={`new-${naming.mode}`}
@@ -3773,7 +3854,9 @@ export function App(): ReactElement {
         >
           {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
           <div
-            className={panelState || todayColumn ? `pair ${pairSize ?? ''}` : 'pair single'}
+            className={
+              panelState || todayColumn || trashPanel ? `pair ${pairSize ?? ''}` : 'pair single'
+            }
             style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
           >
             {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
@@ -3857,9 +3940,21 @@ export function App(): ReactElement {
               {listId === TRASH_ID && !pageTask && (
                 <TrashScreen
                   view={trash}
+                  open={trashOpen}
+                  asPage={!trashWide}
+                  onOpen={(id) =>
+                    void window.flintMain.trashPreview(id).then((preview) => setTrashOpen(preview))
+                  }
+                  onClose={() => setTrashOpen(null)}
+                  onRestoreToEdit={restoreToEdit}
                   onRestore={(id) =>
-                    void window.flintMain.restoreFromTrash(id).then((label) => {
-                      if (label) showToast(label, true);
+                    void window.flintMain.restoreFromTrash(id).then((restored) => {
+                      // D-98: it stays in Trash; the toast offers the way to it.
+                      if (restored)
+                        showToast(restored.label, true, {
+                          label: `Go to ${restored.listName}`,
+                          run: () => goToRestored(restored),
+                        });
                     })
                   }
                   onDelete={(id) =>
@@ -4102,7 +4197,39 @@ export function App(): ReactElement {
                   )}
                 </>
               )}
+              {/* D-98: back to the top, at the bottom right of the column (never over the panel). */}
+              <div className="to-top-dock">
+                <button
+                  type="button"
+                  className={toTop ? 'to-top shown' : 'to-top'}
+                  tabIndex={toTop ? 0 : -1}
+                  aria-hidden={!toTop}
+                  aria-label="Back to top"
+                  title="Back to top"
+                  onClick={() =>
+                    scroller.current?.scrollTo({
+                      top: 0,
+                      behavior: reducedMotion() ? 'instant' : 'smooth',
+                    })
+                  }
+                >
+                  <ChevronIcon size={14} />
+                </button>
+              </div>
             </div>
+            {/* D-98: on wide screens a trash item opens read-only in the panel's place. */}
+            {trashPanel && trashOpen && (
+              <aside className="context-panel card trash-panel" aria-label="Deleted item">
+                <div className="panel-inner">
+                  <TrashPreviewView
+                    key={trashOpen.id}
+                    preview={trashOpen}
+                    onRestore={() => restoreToEdit(trashOpen.id)}
+                    onClose={() => setTrashOpen(null)}
+                  />
+                </div>
+              </aside>
+            )}
             {panelState && (
               <ContextPanel
                 state={panelState}
