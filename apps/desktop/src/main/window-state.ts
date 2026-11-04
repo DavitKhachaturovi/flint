@@ -64,14 +64,51 @@ export function restoreBounds(
   };
 }
 
-/** `window-state.json` (docs/04 §2): bounds per window per monitor setup. */
-export type WindowStates = Record<string, Record<string, Rect>>;
+/**
+ * A window as it was left (D-96): its normal (not maximized) bounds, and whether it was maximized.
+ * Files from before D-96 have the bounds only (not maximized).
+ */
+export interface SavedWindow extends Rect {
+  readonly maximized?: boolean;
+}
+
+/** `window-state.json` (docs/04 §2): each window's state per monitor setup. */
+export type WindowStates = Record<string, Record<string, SavedWindow>>;
 
 export function rememberBounds(
   states: WindowStates,
   window: string,
   setup: string,
-  bounds: Rect,
+  bounds: SavedWindow,
 ): WindowStates {
-  return { ...states, [window]: { ...(states[window] ?? {}), [setup]: bounds } };
+  const saved: SavedWindow = {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    ...(bounds.maximized && { maximized: true }),
+  };
+  return { ...states, [window]: { ...(states[window] ?? {}), [setup]: saved } };
+}
+
+/** The parts of a window that showing it as it was left needs (a BrowserWindow has them). */
+export interface ShowableWindow {
+  isMinimized(): boolean;
+  restore(): void;
+  show(): void;
+  maximize(): void;
+  focus(): void;
+}
+
+/**
+ * APP-05, D-96: shows a window in the state it was left in, from every entry point (a reminder,
+ * the tray, the Start menu, a second launch): maximized again if it was (maximizing a hidden
+ * window shows it, so it never appears at its normal size first), un-minimized, in front.
+ */
+export function showAsLeft(window: ShowableWindow, maximized: boolean, focus = true): void {
+  // A minimized window comes back as it was (maximized too).
+  if (window.isMinimized()) window.restore();
+  if (maximized) window.maximize();
+  else window.show();
+  if (focus) window.focus();
 }

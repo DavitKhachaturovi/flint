@@ -112,6 +112,7 @@ Three levels, all opaque:
 - **Hover next to selection (UI-03, D-52, Proposed):** rows sit 2 px apart inside the card, so two row backgrounds never touch; the selected row keeps its level-1.5 look under the pointer; hover on other rows is `--fl-ground-hover` without ring or shadow.
 - **Hover lift** on clickable cards: up 2 px with a stronger shadow. **D-93:** the shadow stays close to the card (`--fl-shadow-card-hover`: a ring, a 2 px and an 8 px / 16 px drop), never over the cards beside it.
 - **The Overdue card (D-94):** under the rollover card, one step quieter: `--fl-ground-sidebar` with a 1 px `--fl-edge-divider` ring and no drop shadow; its head the folding section label ("OVERDUE · 3", `--fl-text-secondary`); rows 13.5 px `--fl-text-secondary` titles with the bell and its white dot (`--fl-text-muted`, 09 §8's overdue mark), the list and time in mono 11 px faint, and Done and Snooze as quiet text buttons (`--fl-text-muted`, `--fl-ground-tile` on hover).
+- **D-96:** the context panel's scrollbar track is inset 16 px top and bottom, inside the card's rounded corners; a clickable card's hover lift eases without overshoot (`cubic-bezier(.2, .9, .3, 1)`, not the spring); a primary button brightens to `--fl-text-highlight` on hover (**Proposed**).
 - **Scrolling columns (D-93):** the context panel and Today's column keep their scrollbar's room (`scrollbar-gutter: stable`) and scroll only while their content is more than 2 px taller than they are, so a scrollbar never flashes or shifts the content.
 - Exact values: `--fl-shadow-*` in tokens.css.
 

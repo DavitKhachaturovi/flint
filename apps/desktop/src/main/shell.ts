@@ -1,5 +1,5 @@
 import dns from 'node:dns';
-import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import net from 'node:net';
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
@@ -8,6 +8,7 @@ import {
   monitorSetupKey,
   rememberBounds,
   restoreBounds,
+  showAsLeft,
   type DisplayInfo,
   type Rect,
   type WindowStates,
@@ -219,29 +220,39 @@ function displays(): DisplayInfo[] {
     .map(({ id, bounds, workArea, scaleFactor }) => ({ id, bounds, workArea, scaleFactor }));
 }
 
-/** APP-05: restores a window's position for the current monitor setup and remembers changes. */
-export async function rememberWindowState(
+/**
+ * APP-05: restores a window's position for the current monitor setup and remembers changes. D-96:
+ * also whether it was maximized (its normal bounds kept underneath); `show` then brings it back
+ * that way. Read synchronously (a small file, before the window is first shown), so the first show
+ * already knows.
+ */
+export function rememberWindowState(
   window: BrowserWindow,
   name: string,
   fallback: Rect,
-): Promise<void> {
+): { readonly show: (focus?: boolean) => void } {
   const file = join(app.getPath('userData'), 'window-state.json');
   let states: WindowStates = {};
   try {
-    states = JSON.parse(await readFile(file, 'utf8')) as WindowStates;
+    states = JSON.parse(readFileSync(file, 'utf8')) as WindowStates;
   } catch {
     states = {};
   }
   const setup = (): string => monitorSetupKey(displays());
   const active = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  window.setBounds(restoreBounds(states[name]?.[setup()], displays(), { ...active }, fallback));
+  const saved = states[name]?.[setup()];
+  const bounds = restoreBounds(saved, displays(), { ...active }, fallback);
+  window.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
+  let maximized = saved?.maximized === true;
 
   let timer: NodeJS.Timeout | undefined;
   const save = (): void => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      if (window.isDestroyed() || window.isMinimized() || window.isMaximized()) return;
-      states = rememberBounds(states, name, setup(), window.getBounds());
+      // Hidden or minimized, it keeps what it had (hiding a window never unmaximizes it).
+      if (window.isDestroyed() || window.isMinimized() || !window.isVisible()) return;
+      const normal = maximized ? window.getNormalBounds() : window.getBounds();
+      states = rememberBounds(states, name, setup(), { ...normal, maximized });
       void writeFileAtomic(file, `${JSON.stringify(states, null, 2)}\n`, {
         tempDirectory: join(app.getPath('userData'), 'tmp'),
       }).catch(() => undefined);
@@ -249,4 +260,13 @@ export async function rememberWindowState(
   };
   window.on('move', save);
   window.on('resize', save);
+  window.on('maximize', () => {
+    maximized = true;
+    save();
+  });
+  window.on('unmaximize', () => {
+    maximized = false;
+    save();
+  });
+  return { show: (focus = true) => showAsLeft(window, maximized, focus) };
 }

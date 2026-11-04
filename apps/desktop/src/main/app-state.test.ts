@@ -7,7 +7,9 @@ import {
   monitorSetupKey,
   rememberBounds,
   restoreBounds,
+  showAsLeft,
   type DisplayInfo,
+  type ShowableWindow,
 } from './window-state.js';
 
 let folder: string;
@@ -111,6 +113,39 @@ describe('window state (APP-05)', () => {
       width: 800,
       height: 600,
     });
+  });
+
+  it('D-96: remembers a maximized window with its normal bounds underneath', () => {
+    const states = rememberBounds({}, 'main', 'a', { ...fallback, maximized: true });
+    expect(states.main?.a).toEqual({ ...fallback, maximized: true });
+    // Not maximized: no flag, as in files from before D-96.
+    expect(rememberBounds({}, 'main', 'a', { ...fallback, maximized: false }).main?.a).toEqual(
+      fallback,
+    );
+  });
+
+  it('D-96: shows a window as it was left: maximized again, un-minimized, in front', () => {
+    const fake = (minimized: boolean): ShowableWindow & { calls: string[] } => {
+      const calls: string[] = [];
+      return {
+        calls,
+        isMinimized: () => minimized,
+        restore: () => calls.push('restore'),
+        show: () => calls.push('show'),
+        maximize: () => calls.push('maximize'),
+        focus: () => calls.push('focus'),
+      };
+    };
+    const hidden = fake(false);
+    showAsLeft(hidden, true);
+    // Maximizing a hidden window shows it maximized: never at its normal size first.
+    expect(hidden.calls).toEqual(['maximize', 'focus']);
+    const normal = fake(false);
+    showAsLeft(normal, false);
+    expect(normal.calls).toEqual(['show', 'focus']);
+    const minimized = fake(true);
+    showAsLeft(minimized, true, false);
+    expect(minimized.calls).toEqual(['restore', 'maximize']);
   });
 
   it('remembers bounds per window and per setup', () => {

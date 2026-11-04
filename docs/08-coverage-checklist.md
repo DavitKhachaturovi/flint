@@ -605,6 +605,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | Done, Snooze ▸ (In 1 hour, Tomorrow 10:00, Pick a time…), a click opens the task | REM-04, REM-07 · Done (0.4.28) | 02, D-94 |
 | 3 | "N reminders you missed" opens Today's Overdue card | REM-07, REM-05 · Done (0.4.28) | 02, D-94 |
 | 4 | R sets or changes the selected task's reminder anywhere | REM-01 · Done (0.4.28) | 02, 03 §3, D-94 |
-| 5 | Flint's own chime, off by default (`reminderSound`) | REM-06 · Done (0.4.28; the switch in Settings with M8) | 02, 04 §2, D-94 |
+| 5 | Flint's own chime, off by default (`reminderSound`); the "Nudge" sound | REM-06 · Done (0.4.28; Nudge after 0.4.28, D-95; the switch in Settings with M8) | 02, 04 §2, D-94, D-95 |
 | 6 | The in-app alert when a reminder fires | REM-06 · v1 · M8 (with mini mode) | 02, D-94 |
 | 7 | The Focus Assist note in Settings | REM-06 · v1 · M8 | 02, D-94 |
+
+## AE. Fixes after 0.4.27 and 0.4.28 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The main window comes back as it was left (maximized, or its bounds per monitor setup) from every entry point | APP-05 · Done (0.4.29) | 02, 04 §2, D-96 |
+| 2 | The panel's scrollbar inside the card's rounded area, the content never shifting | NAV-07 · Done (0.4.29) | 09, D-96 |
+| 3 | No second shadow animation after a reminder card's hover | TODAY-03 · Done (0.4.29) | 09, D-96 |
+| 4 | The list chip scrolls to the task at once, then flashes | TODAY-01 · Done (0.4.29) | D-96 |
+| 5 | "Sort Inbox · N" (and every primary button) has a hover state, the arrow cursor kept | UI-01 · Done (0.4.29) | 09, D-96 |
+| 6 | The chime file is the source of truth: the generator a one-off tool, a hash check | REM-06 · Done (0.4.29) | 02, D-95, D-96 |

@@ -380,6 +380,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
 - **D-94 (0.4.28):** Flint's own sound is a short soft chime made for Flint, **off by default** (the reminder toast already plays Windows' sound); until Settings (M8) it is `reminderSound: true` in `settings.json`. The in-app alert comes with mini mode (M8).
+- **D-95:** the chime is **"Nudge"**: two soft rounded taps on one pitch, about half a second (`apps/desktop/scripts/make-chime.mjs`). Drop and Mallet, the runners-up, are candidates for the choice of sounds in Settings.
+- **D-96:** the bundled `sounds/chime.wav` is Davit's file and the source of truth; `make-chime.mjs` is a one-off tool that never runs in the build or the tests and refuses to write over it, and a test checks the file's hash.
 - Windows **Focus Assist / Do Not Disturb silently suppresses ordinary toasts**, and people often enable it during exactly the calls where they capture tasks.
 - **Decided (D-35, verified 29 Oct 2026, docs/06 §1):** reminder toasts use Windows' reminder scenario (`scenario="reminder"`): they stay on screen until acted on, and with Windows' default priority settings ("reminders" allowed) they still appear during Do Not Disturb, where an ordinary toast is suppressed. Flint's own sound and in-app alert remain for users who turn that setting off. Flint must make this visible: an option to play Flint's own sound and/or show an in-app alert (e.g. in mini mode) when a reminder fires, and a note in settings explaining Focus Assist.
 
@@ -623,6 +625,7 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-05 — Remembered window positions (v1)
 - Each window (main, mini mode) remembers its size and position **per monitor setup**.
+- **D-96 (0.4.29):** also whether it was **maximized** (its normal size and position kept underneath), and it comes back that way from every entry point: a reminder, the tray, the Start menu, a second launch, a manual start.
 
 ### APP-06 — Auto-update, applied safely (Later, D-19)
 - v1 is distributed manually; users update by running the newer installer over the old one.

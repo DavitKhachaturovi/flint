@@ -309,12 +309,15 @@ async function start(): Promise<void> {
     quitting = true;
   });
   recoverFromCrashes(mainWindow, 'main window', log);
-  void rememberWindowState(mainWindow, 'main', { x: 0, y: 0, width: 900, height: 640 });
+  const mainState = rememberWindowState(mainWindow, 'main', {
+    x: 0,
+    y: 0,
+    width: 900,
+    height: 640,
+  });
   setUpZoom(mainWindow);
-  const showMain = (): void => {
-    mainWindow.show();
-    mainWindow.focus();
-  };
+  /** APP-05, D-96: from every entry point, as it was left (maximized, or its remembered bounds). */
+  const showMain = (): void => mainState.show();
 
   // Captures (CAP-01, CAP-02, CAP-05, D-27): every list loaded, drafts kept in app data.
   const workspace = await Workspace.open(
@@ -963,7 +966,7 @@ async function start(): Promise<void> {
   } else if (!STARTED_AT_LOGIN) {
     // APP-01, D-68: a manual start (Start menu, shortcut, the installer's finish) shows the main
     // window; only the start-with-Windows launch (`--hidden`) stays in the tray.
-    mainWindow.show();
+    showMain();
   }
 
   const testToast = devEnv('FLINT_TEST_TOAST') as ToastKind | undefined;

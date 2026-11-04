@@ -2618,6 +2618,11 @@ a.auto-link {
   scrollbar-gutter: stable;
 }
 
+/* D-96: the scrollbar runs inside the card's rounded area, clear of its corners (18 px radius). */
+.context-panel::-webkit-scrollbar-track {
+  margin-block: 16px;
+}
+
 /* D-93 (scrolls.ts): it scrolls only while its content is really taller than it. */
 .context-panel:not(.scrolls),
 .today-column:not(.stacked):not(.scrolls) {
@@ -3866,7 +3871,14 @@ a.auto-link {
   box-shadow: var(--fl-shadow-primary-button);
   color: var(--fl-strong-fg);
   font-weight: 500;
-  transition: transform var(--fl-dur-fast) var(--fl-ease-spring);
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    background-color var(--fl-dur-fast) ease;
+}
+
+/* D-96 (Proposed): brighter on hover; the arrow cursor stays (UI-01). */
+.primary-button:hover {
+  background: var(--fl-text-highlight);
 }
 
 .primary-button:active {
@@ -3904,8 +3916,10 @@ a.auto-link {
   padding: 16px 18px;
   text-align: left;
   animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+  /* D-96: the lift eases without the spring's overshoot, which, as the card settled back, dipped
+     it past its place and played its shadow a second time over the card below. */
   transition:
-    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    transform var(--fl-dur-fast) cubic-bezier(0.2, 0.9, 0.3, 1),
     box-shadow var(--fl-dur-fast) ease,
     background-color var(--fl-dur-state) ease;
 }

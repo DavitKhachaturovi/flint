@@ -786,6 +786,8 @@ export function App(): ReactElement {
     readonly key: string;
     readonly mode: 'smooth' | 'instant';
     readonly flash: boolean;
+    /** D-96: the list it arrives in: the same task's row in Today (still on screen) isn't it. */
+    readonly list?: string;
   } | null>(null);
   /** D-93: a new arrival, also of the task that is already selected. */
   const [arrival, setArrival] = useState(0);
@@ -797,7 +799,7 @@ export function App(): ReactElement {
    */
   const reveal = useCallback(
     (list: string, key: string): void => {
-      arriving.current = { key, mode: 'instant', flash: true };
+      arriving.current = { key, mode: 'instant', flash: true, list };
       setArrival((count) => count + 1);
       go({ list, page: null }, key);
     },
@@ -3175,6 +3177,8 @@ export function App(): ReactElement {
       arriving.current = null;
       return;
     }
+    // D-96: its list's rows aren't there yet (the view still shows the list it came from).
+    if (target.list !== undefined && view?.id !== target.list) return;
     const row = scroller.current?.querySelector<HTMLElement>(
       `.row[data-key="${CSS.escape(target.key)}"]`,
     );

@@ -2652,6 +2652,8 @@ test('fixes after 0.4.26: a reminder opens and flashes at once, the column follo
     .click();
   await expect(main.locator('h1')).toContainText('Flash');
   await expect(main.locator('.row.sel')).toContainText('Drag me on the timeline');
+  // D-96: scrolled into view at once (the same task's row in Today isn't the one).
+  await expect(main.locator('.row.sel')).toBeInViewport();
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('main-window'),
