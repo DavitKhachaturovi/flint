@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -801,6 +801,111 @@ describe('auto-archive (TASK-06, Q-13, D-88)', () => {
     );
     // Nothing left to archive the second time.
     expect(await workspace.archiveDone(now, 14)).toBe(0);
+  });
+});
+
+describe('Trash and Archived (DATA-02, TASK-06, MEDIA-04, D-97)', () => {
+  const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
+  const trash = (): Promise<string[]> => readdir(join(folder, '.flint', 'trash')).catch(() => []);
+
+  it('shows a deleted task with its list, restores it in one undo step', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Keep [id:: aaaa]\n- [ ] Delete me [id:: bbbb]\n    notes stay\n- [x] Old [completion:: 2026-10-01T09:00] [id:: cccc]\n',
+    );
+    const workspace = await open();
+    await workspace.change('wrk1', { kind: 'delete', key: 'bbbb' }, now);
+    const view = await workspace.trashView();
+    expect(view.deleted).toEqual([
+      expect.objectContaining({
+        kind: 'task',
+        title: 'Delete me',
+        from: 'Work',
+        deleted: '2026-10-29T14:30',
+      }),
+    ]);
+    const name = view.deleted[0]?.id ?? '';
+    expect(await workspace.restoreFromTrash(name, now)).toBe('Restored to Work');
+    expect(await work()).toMatch(/- \[ \] Delete me \[id:: bbbb\]\n {4}notes stay/);
+    expect(await trash()).toEqual([]);
+    // Undo takes it out again and puts its trash file back.
+    expect(await workspace.undoLast(now)).toBe('Restored to Work');
+    expect(await work()).not.toContain('Delete me');
+    expect(await trash()).toEqual([name]);
+  });
+
+  it('restores a deleted list under its name, or as "(restored)" when it is taken', async () => {
+    await writeFile(join(folder, 'Notes.md'), '---\nflint: 1\nid: nte1\nmode: note\n---\nA note\n');
+    const workspace = await open();
+    await workspace.deleteList('nte1', now);
+    const name = (await workspace.trashView()).deleted[0];
+    expect(name).toMatchObject({ kind: 'note', title: 'Notes', from: null });
+    await writeFile(join(folder, 'Notes.md'), 'someone else');
+    expect(await workspace.restoreFromTrash(name?.id ?? '', now)).toBe('Restored Notes (restored)');
+    expect(await readFile(join(folder, 'Notes (restored).md'), 'utf8')).toContain('A note');
+    expect(workspace.listInfos().map((info) => info.name)).toContain('Notes (restored)');
+    await workspace.undoLast(now);
+    expect(await trash()).toHaveLength(1);
+  });
+
+  it('Delete now, Empty Trash and the 30-day expiry remove for good', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Keep [id:: aaaa]\n- [ ] Delete me [id:: bbbb]\n    notes stay\n- [x] Old [completion:: 2026-10-01T09:00] [id:: cccc]\n',
+    );
+    const workspace = await open();
+    await workspace.change('wrk1', { kind: 'delete', key: 'bbbb' }, now);
+    await workspace.change('wrk1', { kind: 'delete', key: 'aaaa' }, new Date(2026, 9, 1, 9, 0));
+    expect(await trash()).toHaveLength(2);
+    expect((await workspace.expireTrash(now, false)).expired).toBe(0);
+    expect((await workspace.expireTrash(new Date(2026, 10, 1, 9, 0), false)).expired).toBe(1);
+    const left = await trash();
+    expect(left).toHaveLength(1);
+    expect(await workspace.deleteFromTrash(left[0] ?? '')).toBe(true);
+    expect(await workspace.deleteFromTrash('../Work.md')).toBe(false);
+    expect(await workspace.emptyTrash()).toBe(0);
+    expect(await work()).toContain('Old');
+  });
+
+  it('cleans up attachments nothing mentions, at start-up, never young ones', async () => {
+    await writeFile(
+      join(folder, 'Inbox.md'),
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---\n- [ ] With [id:: aaaa]\n    ![](attachments/used%20one.png)\n',
+    );
+    await mkdir(join(folder, 'attachments'), { recursive: true });
+    const old = new Date(2026, 9, 1);
+    for (const file of ['used one.png', 'orphan.png', 'young.png']) {
+      await writeFile(join(folder, 'attachments', file), 'x');
+      if (file !== 'young.png') await utimes(join(folder, 'attachments', file), old, old);
+    }
+    const workspace = await open();
+    expect((await workspace.expireTrash(new Date(), true)).orphans).toEqual(['orphan.png']);
+    expect((await readdir(join(folder, 'attachments'))).sort()).toEqual([
+      'used one.png',
+      'young.png',
+    ]);
+  });
+
+  it('lists archived tasks by list and restores one, still completed, undoable', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Keep [id:: aaaa]\n- [ ] Delete me [id:: bbbb]\n    notes stay\n- [x] Old [completion:: 2026-10-01T09:00] [id:: cccc]\n',
+    );
+    const workspace = await open();
+    await workspace.archiveDone(now, 14);
+    expect((await workspace.trashView()).archived).toEqual([
+      {
+        listId: 'wrk1',
+        listName: 'Work',
+        tasks: [{ key: 'cccc', title: 'Old', completed: '2026-10-01' }],
+      },
+    ]);
+    expect(await workspace.restoreArchived('wrk1', 'cccc', now)).toBe('Restored to Work');
+    expect(await work()).toContain('- [x] Old [completion:: 2026-10-01T09:00] [id:: cccc]');
+    expect((await workspace.trashView()).archived).toEqual([]);
+    await workspace.undoLast(now);
+    expect(await work()).not.toContain('Old');
+    expect((await workspace.trashView()).archived[0]?.tasks).toHaveLength(1);
   });
 });
 

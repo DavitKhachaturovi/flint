@@ -585,7 +585,7 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### DATA-02 — Trash, kept 30 days (v1)
 - Deleted tasks and deleted lists go to Trash and can be restored for 30 days, after which they are permanently removed (and MEDIA-04 runs).
-- **D-97:** a **Trash** row at the bottom of the sidebar (with its count) opens a view: deleted tasks, lists and notes by day, newest first, with their list and "deleted 3 days ago"; Restore, Delete now, Empty Trash (inline confirms). A second tab, **Archived**, shows auto-archived completed tasks by list, each restorable to its list.
+- **D-97:** a **Trash** row at the bottom of the sidebar (with its count) opens a view: deleted tasks, lists and notes by day, newest first, with their list and "deleted 3 days ago"; Restore, Delete now, Empty Trash (inline confirms). A second tab, **Archived**, shows auto-archived completed tasks by list, each restorable to its list. **Built (0.4.30).**
 
 ### DATA-03 — Global Ctrl+Z (v1)
 - Undo (and redo, **Proposed:** Ctrl+Shift+Z / Ctrl+Y) works for deletes, moves, reorders, priority changes, completion, conversions, and bulk actions, not just text edits.

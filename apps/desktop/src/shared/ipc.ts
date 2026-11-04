@@ -50,6 +50,12 @@ export const Channels = {
   mainOverdue: 'main:overdue',
   /** REM-06, D-94: a reminder fired and Flint's own sound is on: play it. */
   mainChime: 'main:chime',
+  /** DATA-02, D-97: the Trash view, and what it does. */
+  mainTrash: 'main:trash',
+  mainTrashRestore: 'main:trash-restore',
+  mainTrashDelete: 'main:trash-delete',
+  mainTrashEmpty: 'main:trash-empty',
+  mainArchiveRestore: 'main:archive-restore',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',
   /** Main window → main: new, rename or delete a list or note (LIST-01). */
@@ -238,6 +244,39 @@ export interface TodayReminder {
   /** D-92: the task is done (struck through on the timeline). */
   readonly done: boolean;
 }
+
+/** DATA-02, D-97: something in the Trash view's Deleted tab. */
+export interface TrashItem {
+  /** Its file name in `.flint/trash/`. */
+  readonly id: string;
+  readonly kind: 'task' | 'list' | 'note';
+  readonly title: string;
+  /** The list a task was deleted from. */
+  readonly from: string | null;
+  /** When it was deleted, `YYYY-MM-DDTHH:MM`. */
+  readonly deleted: string;
+}
+
+/** TASK-06, D-97: one list's auto-archived completed tasks, in the Trash view's Archived tab. */
+export interface ArchivedList {
+  readonly listId: string;
+  readonly listName: string;
+  readonly tasks: readonly {
+    readonly key: string;
+    readonly title: string;
+    /** When it was completed, `YYYY-MM-DD`. */
+    readonly completed: string;
+  }[];
+}
+
+/** DATA-02, D-97: the Trash view. */
+export interface TrashView {
+  readonly deleted: readonly TrashItem[];
+  readonly archived: readonly ArchivedList[];
+}
+
+/** The Trash view's place in the sidebar (D-97): a view, never a list. */
+export const TRASH_ID = '@trash';
 
 /** D-92: a task in Today's Done today or Captured today, with the time it was done or captured. */
 export interface TodayEntry {

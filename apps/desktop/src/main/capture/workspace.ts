@@ -1,5 +1,5 @@
 import { statSync } from 'node:fs';
-import { copyFile, mkdir, readFile, rename, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rename, stat, unlink } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
   addTask,
@@ -22,6 +22,7 @@ import {
   moveUp,
   placeTask,
   outdentTask,
+  parseDocument,
   serializeDocument,
   setBody,
   setPriority,
@@ -32,6 +33,7 @@ import {
   uncompleteTask,
   type Applied,
   type Op,
+  type TaskNode,
   type Where,
 } from '@flint/core';
 import {
@@ -56,6 +58,8 @@ import type {
   TaskRow,
   TodayEntry,
   TodayReminder,
+  TrashItem,
+  TrashView,
 } from '../../shared/ipc.js';
 import { TODAY_ID } from '../../shared/ipc.js';
 import { dayStamp, TodayFile } from '../today-file.js';
@@ -83,11 +87,17 @@ import { RECENT_CAPTURES, type PanelTask } from '../up-next.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
 import {
+  cleanOrphanAttachments,
   ensureTrashFolder,
+  expireTrash,
+  readTrash,
+  removeFromTrash,
   stamp,
   trashedIds,
+  trashedListName,
   trashedTaskText,
   trashFolder,
+  trashPath,
 } from '../storage/trash.js';
 
 /**
@@ -145,6 +155,8 @@ interface StepFiles {
   readonly createdList?: string;
   /** Undoing removes this trash file, redoing writes it again (TASK-12, D-50). */
   readonly trash?: { readonly path: string; readonly text: string };
+  /** D-97: a task restored from the trash: undoing writes its trash file again, redoing removes it. */
+  readonly restored?: { readonly path: string; readonly text: string };
 }
 
 export type ListMode = 'tasks' | 'note';
@@ -581,6 +593,10 @@ export class Workspace {
         if (files.trash) {
           if (undoing) await unlink(files.trash.path).catch(() => undefined);
           else await this.writeTrash(files.trash.path, files.trash.text);
+        }
+        if (files.restored) {
+          if (undoing) await this.writeTrash(files.restored.path, files.restored.text);
+          else await unlink(files.restored.path).catch(() => undefined);
         }
         const created = files.createdList;
         const list = created ? this.lists.find(({ entry }) => entry.path === created) : undefined;
@@ -1476,6 +1492,230 @@ export class Workspace {
       if (count > 0) this.notify();
       return count;
     });
+  }
+
+  /**
+   * DATA-02, TASK-06, D-97: the Trash view: what was deleted (newest first, each with the list a
+   * task came from) and the auto-archived tasks by list.
+   */
+  async trashView(): Promise<TrashView> {
+    const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
+    const deleted: TrashItem[] = [];
+    for (const entry of await readTrash(this.folder)) {
+      const when = formatLocalDateTime(fromDate(entry.at)).slice(0, 16);
+      if (entry.kind === 'task') {
+        const task = parseDocument(entry.text).blocks.find(
+          (block): block is TaskNode => block.kind === 'task',
+        );
+        if (!task) continue;
+        const listId = /^list:\s*(\S+)\s*$/m.exec(entry.text)?.[1];
+        let listName: string | null;
+        try {
+          listName = JSON.parse(/^listName:\s*(.+)$/m.exec(entry.text)?.[1] ?? 'null') as string;
+        } catch {
+          listName = null;
+        }
+        deleted.push({
+          id: entry.name,
+          kind: 'task',
+          title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
+          from: (listId && names.get(listId)) || listName,
+          deleted: when,
+        });
+      } else {
+        deleted.push({
+          id: entry.name,
+          kind: /^mode:\s*note\s*$/m.test(entry.text) ? 'note' : 'list',
+          title: trashedListName(entry.name),
+          from: null,
+          deleted: when,
+        });
+      }
+    }
+    const archived: TrashView['archived'][number][] = [];
+    const folder = join(this.folder, '.flint', 'archive');
+    for (const name of (await readdir(folder).catch(() => [])).sort()) {
+      if (!name.endsWith('.md')) continue;
+      const listId = name.slice(0, -3);
+      const text = await readFile(join(folder, name), 'utf8').catch(() => '');
+      const tasks = parseDocument(text).blocks.flatMap((block) =>
+        block.kind === 'task'
+          ? [
+              {
+                key: block.key,
+                title: taskLabel(titlePlain(block.line.title.trim()), getBody(block)),
+                completed: block.line.fields.completion?.value.value
+                  ? formatLocalDateTime(block.line.fields.completion.value.value).slice(0, 10)
+                  : '',
+              },
+            ]
+          : [],
+      );
+      if (tasks.length > 0)
+        archived.push({ listId, listName: names.get(listId) ?? 'A deleted list', tasks });
+    }
+    archived.sort((a, b) => a.listName.localeCompare(b.listName));
+    return { deleted, archived };
+  }
+
+  /**
+   * DATA-02, D-97: restores something from the trash, one undo step: a task to the top of its list
+   * (Inbox if that list is gone), a list or note to the Flint folder under its name ("(restored)"
+   * added if that name is taken). Its label, or null when it can't be.
+   */
+  restoreFromTrash(name: string, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const path = trashPath(this.folder, name);
+      const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
+      if (!path || text === null) return null;
+      if (/^trashed:/m.test(text)) {
+        const task = parseDocument(text).blocks.find(
+          (block): block is TaskNode => block.kind === 'task',
+        );
+        const listId = /^list:\s*(\S+)\s*$/m.exec(text)?.[1];
+        const home = listId ? this.find(listId) : undefined;
+        const list =
+          home && home.entry.mode !== 'note' && !home.file.readOnly ? home : this.find(INBOX_ID);
+        if (!task || !list || list.file.readOnly || findTask(list.file.document, task.key))
+          return null;
+        const where = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
+        const label = `Restored to ${where}`;
+        await this.record(
+          list,
+          {
+            type: 'insert',
+            list: list.file.path,
+            task: { ...task, eol: '\n' },
+            where: { at: 'top' },
+          },
+          label,
+          now,
+          { restored: { path, text } },
+        );
+        await unlink(path).catch(() => undefined);
+        return label;
+      }
+      const original = trashedListName(name);
+      let target = join(this.folder, `${original}.md`);
+      for (
+        let count = 1;
+        await stat(target).then(
+          () => true,
+          () => false,
+        );
+        count++
+      )
+        target = join(this.folder, `${original} (restored${count > 1 ? ` ${count}` : ''}).md`);
+      const label = `Restored ${basename(target, '.md')}`;
+      const step = (from: string, to: string): UndoEntry => ({
+        label,
+        run: async () => {
+          const there = await stat(from).then(
+            () => true,
+            () => false,
+          );
+          if (!there) return null;
+          await rename(from, to);
+          await this.refresh(to);
+          await this.refresh(from);
+          return step(to, from);
+        },
+      });
+      await rename(path, target);
+      await this.refresh(target);
+      this.remember(step(target, path));
+      return label;
+    });
+  }
+
+  /** D-97: Delete now (gone for good, not undoable); true when it was there. */
+  deleteFromTrash(name: string): Promise<boolean> {
+    return this.serial(() => removeFromTrash(this.folder, name));
+  }
+
+  /** D-97: Empty Trash; how many went. */
+  emptyTrash(): Promise<number> {
+    return this.serial(async () => {
+      let count = 0;
+      for (const entry of await readTrash(this.folder))
+        if (await removeFromTrash(this.folder, entry.name)) count++;
+      return count;
+    });
+  }
+
+  /**
+   * DATA-02, MEDIA-04, D-97: what has been in the trash over 30 days goes for good (at start-up
+   * and each day change); at start-up (`orphans`), attachments nothing mentions go too.
+   */
+  expireTrash(now: Date, orphans: boolean): Promise<{ expired: number; orphans: string[] }> {
+    return this.serial(async () => {
+      const expired = await expireTrash(this.folder, now);
+      return { expired, orphans: orphans ? await cleanOrphanAttachments(this.folder, now) : [] };
+    });
+  }
+
+  /**
+   * TASK-06, D-97: an archived task back in its list (Inbox if that list is gone), still completed;
+   * one undo step, which puts it back in the archive.
+   */
+  restoreArchived(listId: string, key: string, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const path = join(this.folder, '.flint', 'archive', `${listId}.md`);
+      if (basename(listId) !== listId) return null;
+      const home = this.find(listId);
+      const list =
+        home && home.entry.mode !== 'note' && !home.file.readOnly ? home : this.find(INBOX_ID);
+      if (!list) return null;
+      const where = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
+      const label = `Restored to ${where}`;
+      const step = (toList: boolean): UndoEntry => ({
+        label,
+        run: async (at) =>
+          (await this.shuttle(list, path, key, toList, at)) ? step(!toList) : null,
+      });
+      if (!(await this.shuttle(list, path, key, true, now))) return null;
+      this.remember(step(false));
+      return label;
+    });
+  }
+
+  /** D-97: a task moved between a list and an archive file; the copy is written before the removal. */
+  private async shuttle(
+    list: Loaded,
+    archivePath: string,
+    key: string,
+    toList: boolean,
+    now: Date,
+  ): Promise<boolean> {
+    if (!this.lists.includes(list) || list.file.readOnly) return false;
+    const archive = await ListFile.open(archivePath).catch(() => null);
+    if (!archive || archive.readOnly) return false;
+    const [from, to] = toList ? [archivePath, list.file.path] : [list.file.path, archivePath];
+    const op = moveTasksToList(
+      new Map([
+        [list.file.path, list.file.document],
+        [archivePath, archive.document],
+      ]),
+      from,
+      [key],
+      to,
+    );
+    if (op?.type !== 'batch') return false;
+    const onto = (target: string): Op | null =>
+      bulk(op.ops.filter((part) => 'list' in part && part.list === target));
+    const inserted = onto(to);
+    const removed = onto(from);
+    if (!inserted || !removed) return false;
+    if (toList) {
+      await this.applyAndSave(list, inserted, now);
+      if (!archive.apply(removed)) return false;
+      await archive.save({ now: fromDate(now), isTaken: this.isTaken });
+    } else {
+      if (!archive.apply(inserted)) return false;
+      await archive.save({ now: fromDate(now), isTaken: this.isTaken });
+      await this.applyAndSave(list, removed, now);
+    }
+    return true;
   }
 
   /** The list holding a task; task IDs are unique in the Flint folder (D-21, D-29). */

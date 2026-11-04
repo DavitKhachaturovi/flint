@@ -575,13 +575,50 @@ async function start(): Promise<void> {
           log(`archive failed: ${String(error)}`);
           return 0;
         });
+  // DATA-02, MEDIA-04, D-97: the trash's 30 days, and (at start-up only) orphaned attachments.
+  let started = false;
   const unpin = (): void => {
     workspace
       .unpinDone(new Date())
       .catch((error: unknown) => log(`unpin failed: ${String(error)}`));
     void archive();
+    const orphans = !started;
+    started = true;
+    workspace
+      .expireTrash(new Date(), orphans)
+      .then(({ expired, orphans: removed }) => {
+        if (expired > 0) log(`removed ${expired} item(s) older than 30 days from the trash`);
+        if (removed.length > 0) log(`removed unused attachments: ${removed.join(', ')}`);
+      })
+      .catch((error: unknown) => log(`trash expiry failed: ${String(error)}`));
   };
   ipcMain.handle(Channels.mainAutoArchive, (event) => (owns(event.sender) ? archiveDays : null));
+  // DATA-02, TASK-06, D-97: the Trash view and what it does.
+  ipcMain.handle(Channels.mainTrash, (event) =>
+    owns(event.sender) ? workspace.trashView() : { deleted: [], archived: [] },
+  );
+  ipcMain.handle(Channels.mainTrashRestore, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string'
+      ? workspace.restoreFromTrash(id, new Date()).catch((error: unknown) => {
+          log(`restore from the trash failed: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  ipcMain.handle(Channels.mainTrashDelete, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string' ? workspace.deleteFromTrash(id) : false,
+  );
+  ipcMain.handle(Channels.mainTrashEmpty, (event) =>
+    owns(event.sender) ? workspace.emptyTrash() : 0,
+  );
+  ipcMain.handle(Channels.mainArchiveRestore, (event, listId: unknown, key: unknown) =>
+    owns(event.sender) && typeof listId === 'string' && typeof key === 'string'
+      ? workspace.restoreArchived(listId, key, new Date()).catch((error: unknown) => {
+          log(`restore from the archive failed: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
   // TODAY-02 (M6): the rollover prompt's answer; Clear's label for the toast.
   ipcMain.handle(Channels.mainTodayAnswer, (event, clear: unknown) =>
     owns(event.sender) ? workspace.todayAnswer(clear === true, new Date()) : null,

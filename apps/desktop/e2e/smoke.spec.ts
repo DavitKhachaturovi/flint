@@ -2754,6 +2754,68 @@ test('the rest of M6: the Overdue card, Snooze, the missed toast, R, the chime (
   await expect(main.locator('.fl-picker')).toHaveCount(0);
 });
 
+test('Trash and Archived: restore, undo, Delete now, Empty Trash, an archived task back (DATA-02, TASK-06, D-97)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const file = join(flint, 'Bin test.md');
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: bin1\nmode: tasks\n---\n- [ ] Throw me away [id:: bin2]\n- [ ] And me too [id:: bin3]\n',
+  );
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Bin test' }).click();
+  await expect(main.locator('h1')).toContainText('Bin test');
+  // Delete, then Delete again: the selection moves on to the next task.
+  await main.locator('.row', { hasText: 'Throw me away' }).click({ position: { x: 300, y: 10 } });
+  await main.keyboard.press('Delete');
+  await expect(main.locator('.row', { hasText: 'Throw me away' })).toHaveCount(0);
+  await expect(main.locator('.row.sel')).toContainText('And me too');
+  await main.keyboard.press('Delete');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('And me too');
+
+  // The sidebar's Trash row, with its count, opens the view: deleted things by day.
+  const nav = main.locator('.sidebar-foot .nav', { hasText: 'Trash' });
+  await expect(nav.locator('.nav-count')).toHaveText(/^\d+$/);
+  await nav.click();
+  await expect(main.locator('h1')).toHaveText('Trash');
+  const row = (title: string) => main.locator('.trash-row:not(.leaving)', { hasText: title });
+  await expect(row('Throw me away')).toContainText('from Bin test');
+  await expect(main.locator('.trash-group-label').first()).toHaveText('Today');
+
+  // Restore: back at the top of its list; Ctrl+Z puts it back in the trash.
+  await row('Throw me away').locator('.trash-action', { hasText: 'Restore' }).click();
+  await expect(main.locator('.toast')).toContainText('Restored to Bin test');
+  await expect(row('Throw me away')).toHaveCount(0);
+  await expect.poll(() => readFile(file, 'utf8')).toContain('- [ ] Throw me away [id:: bin2]');
+  await main.keyboard.press('Control+z');
+  await expect(row('Throw me away')).toHaveCount(1);
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('Throw me away');
+
+  // Delete now asks first; then it is gone for good.
+  await row('And me too').locator('.trash-action', { hasText: 'Delete now' }).click();
+  await expect(row('And me too').locator('.trash-confirm')).toContainText('Delete forever?');
+  await row('And me too').locator('.trash-confirm .trash-action', { hasText: 'Delete' }).click();
+  await expect(row('And me too')).toHaveCount(0);
+
+  // Empty Trash asks too; afterwards the count is 0.
+  await main.locator('.trash-bar .trash-action', { hasText: 'Empty Trash' }).click();
+  await expect(main.locator('.trash-bar .trash-confirm')).toContainText('forever?');
+  await main.locator('.trash-bar .trash-confirm .trash-action', { hasText: 'Empty Trash' }).click();
+  await expect(main.locator('.trash-empty')).toHaveText('Trash is empty.');
+  await expect(nav.locator('.nav-count')).toHaveText('0');
+
+  // Archived: the auto-archived tasks by list; one goes back to its list, still completed.
+  await main.locator('.trash-tab', { hasText: 'Archived' }).click();
+  const archived = main.locator('.trash-row:not(.leaving)').first();
+  await expect(archived).toContainText('completed');
+  const title = (await archived.locator('.trash-title').textContent()) ?? '';
+  await archived.locator('.trash-action', { hasText: 'Restore' }).click();
+  await expect(main.locator('.toast')).toContainText('Restored to');
+  await expect(
+    main.locator('.trash-row:not(.leaving) .trash-title').getByText(title, { exact: true }),
+  ).toHaveCount(0);
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

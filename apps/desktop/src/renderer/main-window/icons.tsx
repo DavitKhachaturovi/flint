@@ -131,3 +131,14 @@ export const PinIcon = ({ size = 12 }: IconProps): ReactElement =>
       d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
     />,
   ]);
+
+/** DATA-02, D-97: the Trash row in the sidebar. */
+export const TrashIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />,
+    <path key="b" d="M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14M10 11v6M14 11v6" />,
+  ]);
+
+/** DATA-02, D-97: a task in the Trash view (an empty checkbox). */
+export const TaskIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, <rect x="4" y="4" width="16" height="16" rx="5" />);

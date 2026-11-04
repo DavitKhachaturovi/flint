@@ -624,8 +624,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Trash in the sidebar: deleted tasks, lists and notes by day; Restore, Delete now, Empty Trash; 30-day expiry | DATA-02 · v1 · M7 | 02, D-97 |
-| 2 | Archived tab: auto-archived tasks by list, restorable | DATA-02, TASK-06 · v1 · M7 | 02, D-97 |
+| 1 | Trash in the sidebar: deleted tasks, lists and notes by day; Restore, Delete now, Empty Trash; 30-day expiry | DATA-02 · Done (0.4.30) | 02, 04, 09, D-97 |
+| 2 | Archived tab: auto-archived tasks by list, restorable | DATA-02, TASK-06 · Done (0.4.30) | 02, D-97 |
 | 3 | Snapshots, hourly 48 h then daily 30 days; restore one list or note, or everything | DATA-04 · v1 · M7 | 02, 04, D-97 |
 | 4 | Export as zip and Restore from a snapshot in the tray (Settings and Ctrl+K in M8) | DATA-05, DATA-04 · v1 · M7 | 02, D-97 |
-| 5 | Orphaned attachments cleaned up at start-up | MEDIA-04 · v1 · M7 | 04, D-97 |
+| 5 | Orphaned attachments cleaned up at start-up | MEDIA-04 · Done (0.4.30) | 04, D-97 |

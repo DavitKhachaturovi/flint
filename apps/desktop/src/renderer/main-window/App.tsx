@@ -66,6 +66,7 @@ import {
   ReminderBellIcon,
   SortIcon,
   SunIcon,
+  TrashIcon,
 } from './icons.js';
 import { OverdueCard, ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
@@ -83,7 +84,8 @@ import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
-import { TODAY_ID } from '../../shared/ipc.js';
+import { TODAY_ID, TRASH_ID, type TrashView } from '../../shared/ipc.js';
+import { TrashScreen } from './Trash.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -640,11 +642,13 @@ export function App(): ReactElement {
   /** Reads the lists again; `then` runs in the same render (a name field giving way to its row). */
   const refresh = useCallback(
     async (then?: () => void): Promise<void> => {
-      const [nextLists, nextView, nextSidebar] = await Promise.all([
+      const [nextLists, nextView, nextSidebar, nextTrash] = await Promise.all([
         window.flintMain.lists(),
         window.flintMain.view(listId),
         window.flintMain.sidebar(),
+        window.flintMain.trash(),
       ]);
+      setTrash(nextTrash);
       // D-85: only a sidebar that changes moves its rows. A refresh that brings what is already on
       // screen (the echo of a fold, the minute's refresh) must not measure rows mid-animation and
       // play the fold a second time.
@@ -791,6 +795,8 @@ export function App(): ReactElement {
   } | null>(null);
   /** D-93: a new arrival, also of the task that is already selected. */
   const [arrival, setArrival] = useState(0);
+  /** DATA-02, D-97: the Trash view's contents (its count is in the sidebar). */
+  const [trash, setTrash] = useState<TrashView | null>(null);
   /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
   const [overdueCalled, setOverdueCalled] = useState(false);
   /**
@@ -2686,7 +2692,7 @@ export function App(): ReactElement {
             ? (element as HTMLElement).dataset['key']
             : undefined;
         // Inbox and Today stay where they are (M6).
-        return key && key !== inbox?.id && key !== TODAY_ID
+        return key && key !== inbox?.id && key !== TODAY_ID && key !== TRASH_ID
           ? [{ key, elements: [element as HTMLElement] }]
           : [];
       });
@@ -2709,7 +2715,7 @@ export function App(): ReactElement {
       return;
     }
     const id = nav?.dataset['key'];
-    if (!nav || !id || id === inbox?.id || id === TODAY_ID) return;
+    if (!nav || !id || id === inbox?.id || id === TODAY_ID || id === TRASH_ID) return;
     // Every visible list and group header, in order, each moving on its own.
     interface Spot {
       readonly unit: DragUnit;
@@ -2721,7 +2727,7 @@ export function App(): ReactElement {
     for (const element of aside.children) {
       if (element.matches('.nav[data-key]')) {
         const key = (element as HTMLElement).dataset['key'] ?? '';
-        if (key !== inbox?.id && key !== TODAY_ID)
+        if (key !== inbox?.id && key !== TODAY_ID && key !== TRASH_ID)
           spots.push({
             unit: { key, elements: [element as HTMLElement] },
             kind: 'list',
@@ -3706,6 +3712,22 @@ export function App(): ReactElement {
             onCancel={() => setNaming(null)}
           />
         )}
+        {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
+        <div className="sidebar-foot">
+          <NavItem
+            list={{
+              id: TRASH_ID,
+              name: 'Trash',
+              mode: 'tasks',
+              open: trash?.deleted.length ?? 0,
+              inbox: true,
+            }}
+            active={listId === TRASH_ID}
+            icon={<TrashIcon />}
+            onSelect={() => openList(TRASH_ID)}
+            onMenu={() => undefined}
+          />
+        </div>
         {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
       </aside>
 
@@ -3831,6 +3853,32 @@ export function App(): ReactElement {
                 />
               )}
 
+              {/* DATA-02, TASK-06, D-97: the Trash view. */}
+              {listId === TRASH_ID && !pageTask && (
+                <TrashScreen
+                  view={trash}
+                  onRestore={(id) =>
+                    void window.flintMain.restoreFromTrash(id).then((label) => {
+                      if (label) showToast(label, true);
+                    })
+                  }
+                  onDelete={(id) =>
+                    void window.flintMain.deleteFromTrash(id).then((done) => {
+                      if (done) showToast('Deleted for good', false);
+                    })
+                  }
+                  onEmpty={() =>
+                    void window.flintMain.emptyTrash().then((count) => {
+                      if (count > 0) showToast('Trash emptied', false);
+                    })
+                  }
+                  onRestoreArchived={(id, key) =>
+                    void window.flintMain.restoreArchived(id, key).then((label) => {
+                      if (label) showToast(label, true);
+                    })
+                  }
+                />
+              )}
               {/* TODAY-01, TODAY-02, TODAY-03 (M6, D-89, mockup 03): the greeting, the rollover
                   prompt and today's reminders, above the composer and Focus. */}
               {view && !pageTask && view.id === TODAY_ID && (

@@ -75,7 +75,7 @@ const isComing = (reminder: TodayReminder, now: Date): boolean =>
  * D-92: items that went away stay a moment, `leaving`, so they can animate out (at once under
  * reduce-motion); `gone` takes one away when its animation ends.
  */
-function usePresence<T>(
+export function usePresence<T>(
   items: readonly T[],
   keyOf: (item: T) => string,
 ): {

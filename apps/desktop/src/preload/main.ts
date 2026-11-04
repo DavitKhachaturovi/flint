@@ -15,6 +15,7 @@ import {
   type SidebarAction,
   type SidebarOutcome,
   type SidebarView,
+  type TrashView,
 } from '../shared/ipc.js';
 
 /** The main window's only way to the OS (docs/05 §2): its lists, and changing them (M4). */
@@ -84,6 +85,26 @@ const main = {
   /** TODAY-02 (M6): Roll over (false) or Clear (true) the unfinished pins; Clear's undo label. */
   todayAnswer(clear: boolean): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainTodayAnswer, clear) as Promise<string | null>;
+  },
+  /** DATA-02, D-97: the Trash view (deleted, archived). */
+  trash(): Promise<TrashView> {
+    return ipcRenderer.invoke(Channels.mainTrash) as Promise<TrashView>;
+  },
+  /** D-97: Restore from the trash; the toast's label, or null. */
+  restoreFromTrash(id: string): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainTrashRestore, id) as Promise<string | null>;
+  },
+  /** D-97: Delete now, for good. */
+  deleteFromTrash(id: string): Promise<boolean> {
+    return ipcRenderer.invoke(Channels.mainTrashDelete, id) as Promise<boolean>;
+  },
+  /** D-97: Empty Trash, for good; how many went. */
+  emptyTrash(): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainTrashEmpty) as Promise<number>;
+  },
+  /** TASK-06, D-97: an archived task back in its list; the toast's label, or null. */
+  restoreArchived(listId: string, key: string): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainArchiveRestore, listId, key) as Promise<string | null>;
   },
   /** TASK-06, D-88: the days after which completed tasks are archived; null when it is off. */
   autoArchive(): Promise<number | null> {
