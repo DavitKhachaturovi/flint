@@ -44,7 +44,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 |---|---|---|
 | Open capture popup (CAP-01) | Ctrl+Shift+Space, rebindable (D-37) | Decided |
 | Capture selected text (CAP-07) | Ctrl+Shift+X, rebindable (D-37) | Decided |
-| Change a global hotkey (APP-08) | Tray → Hotkeys…, click the hotkey, press the new keys; Esc cancels | Proposed (D-44) |
+| Change a global hotkey (APP-08) | Settings → Capture & hotkeys, click the hotkey, press the new keys; Esc cancels | Decided (D-102; was the Hotkeys window of D-44) |
 
 ### Capture popup
 | Action | Key | Status |
@@ -141,6 +141,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - The mouse's back and forward buttons navigate (NAV-04).
 - Cursor: the arrow on every control, the hand only on links (UI-01).
 - **D-98:** a page scrolled down shows a "back to top" button at the bottom right of the main column (NAV-09); the sidebar's foot (Trash) stays pinned while the lists scroll.
+- **D-102:** a comparison's actions stay at the bottom of its card while the diff scrolls under them; a hotkey being recorded shows by its keycap's ring breathing.
 
 ---
 

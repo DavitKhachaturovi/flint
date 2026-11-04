@@ -458,7 +458,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NOTE-08 — Quick notes (v1, D-99)
 - A **Quick note** row under Inbox, and **Ctrl+Shift+J** anywhere in the window, make an untitled note and focus its editor: no name to type. It saves as it is written and is listed under **Quick notes** (under Inbox), newest first, labelled by its first line or by when it was made.
-- A title (the "Add a title" field at its top, or renaming it in the sidebar), **Keep as a note** or **Move to group ▸** makes it a normal note. An empty quick note goes when it is left. Built (0.4.33); its file layout is in 04 §3.
+- **Keep as a note** or **Move to group ▸** makes it a normal note. An empty quick note goes when it is left. Built (0.4.33); its file layout is in 04 §3.
+- **D-102 (0.8.0):** a title (the "Add a title" field at its top, saved on Enter or when it is left, or renaming it in the sidebar) renames the file but keeps it under Quick notes, shown by its title, until Keep as a note, Move to group, or the next day change, when titled quick notes become normal notes. Untitled ones with text stay. A titled quick note is never discarded as empty (**Proposed**).
 
 ### NOTE-07 — Configurable auto-linking patterns (v1)
 - Users configure patterns that auto-link: e.g. `AB#1234` → the Azure DevOps work item URL.
@@ -627,7 +628,7 @@ Without sync, the local disk is the only copy, so this matters more.
 - Flint runs as a tray app and starts at login (configurable, default on). The global hotkeys and reminders depend on it running.
 - **D-68:** only the start-with-Windows launch stays hidden in the tray. Starting Flint by hand (Start menu, shortcut, the installer's finish, or starting it again while it runs) shows the main window.
 - Tray menu (**Proposed** items): Open Flint, Quick capture, Mini mode, Settings, Quit.
-- **D-99:** exactly these (and Hotkeys… until Settings has them, **Proposed**); Export and Restore from a snapshot live in Settings → Data (M8) and Ctrl+K, and until then in Trash's header.
+- **D-99:** exactly these (D-102: Hotkeys… is gone, the hotkeys are recorded in Settings); Export and Restore from a snapshot live in Settings → Data (M8) and Ctrl+K, and until then in Trash's header.
 
 ### APP-02 — Never destroy windows; only hide them (v1)
 - Closing the main window hides it to the tray. The capture popup and main window stay alive; mini mode stays alive after first open. This removes the "opening a closed window" cost entirely.
@@ -652,7 +653,8 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-08 — Rebindable global hotkeys with conflict detection (v1)
 - Both global hotkeys (capture, capture-selection) are rebindable. If a chosen hotkey is already taken by another app, Flint says so and asks for another one.
-- **Proposed (D-44, until the Settings screen in M8):** a small **Hotkeys** window from the tray: click a hotkey, press the new keys; Flint tries the combination at once and keeps the old one if another app owns it. A hotkey needs Ctrl, Alt or Win (Shift alone would swallow capital letters everywhere); the two must differ; Alt is allowed with a note that it is often a push-to-talk key. While recording, the current hotkeys are switched off. A hotkey that is taken at startup shows as a warning item at the top of the tray menu, which opens the window. Only combinations other apps register globally can be detected, not an app's own shortcuts (e.g. VS Code's).
+- **D-102 (0.8.0):** recorded in **Settings → Capture & hotkeys** with the rules below (the Hotkeys window is gone): click the keycap, press the new keys; Esc or clicking elsewhere cancels. The tray's warning item opens Settings at Capture & hotkeys.
+- **Proposed (D-44, until the Settings screen in M8; superseded by D-102 for where it lives):** a small **Hotkeys** window from the tray: click a hotkey, press the new keys; Flint tries the combination at once and keeps the old one if another app owns it. A hotkey needs Ctrl, Alt or Win (Shift alone would swallow capital letters everywhere); the two must differ; Alt is allowed with a note that it is often a push-to-talk key. While recording, the current hotkeys are switched off. A hotkey that is taken at startup shows as a warning item at the top of the tray menu, which opens the window. Only combinations other apps register globally can be detected, not an app's own shortcuts (e.g. VS Code's).
 
 ### APP-09 — No telemetry, stated plainly (v1)
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
@@ -679,7 +681,8 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Auto-link patterns.
 - **D-52:** until this screen exists (M8), the sidebar's Settings entry is **hidden**, not shown disabled (it did nothing).
 - **D-100 (0.4.34):** built as one page with a section index: General (start with Windows, the Flint folder), Capture & hotkeys (shown; Change… opens the Hotkeys window), Reminders (notifications, the reminder sound with Play and its info card, hide task text, the Focus Assist note), Today & lists (the rollover prompt, auto-archive), Data (snapshots: how often, how long, the space used, Clear old snapshots, Snapshots…, Export…), Appearance (interface size, animation speed), Keyboard shortcuts, About. A Settings row above Trash and the tray open it; Ctrl+F finds a setting. Next (step 1b): the link-patterns editor, changing the Flint folder, recording hotkeys in place.
-- **D-81, Interface size (M8):** the app zoom of UI-12 (per display), next to the animation speed.
+- **D-102 (0.8.0):** Capture & hotkeys records the hotkeys in place (APP-08); Reminders' chime is described as what is still heard when Do Not Disturb or Focus silences notifications, and the Focus Assist row is now **Do Not Disturb**; Appearance has Interface size as exact levels and, until Davit picks one, **Sidebar footer** (Card / Buttons).
+- **D-81, Interface size (M8):** the app zoom of UI-12 (per display), next to the animation speed. **D-102:** a segmented choice of exact levels, 80 / 90 / 100 / 110 / 125 / 150 % (**Proposed**), the current one marked.
 - **D-84, Link patterns (M8):** the editor for NOTE-07's patterns: paste an example link, type the short form, a live preview, a second example when ambiguous, an Advanced view of the generated pattern; presets for GitHub, Azure DevOps and Jira. **Monospace** default for notes (NOTE-06).
 - **D-80, Keyboard shortcuts (M8):** a section listing every non-obvious shortcut: Tab / Shift+Tab (indent, outdent), Shift+Enter (notes; Open as page in Navigate state), Alt+↑/↓, Ctrl+Shift+Space and Ctrl+Shift+X, the mini-mode shortcut, Alt+← / Alt+→ (back, forward), Ctrl+K, Ctrl+F, Ctrl+Shift+N, Ctrl+A, 1 / 2 / 3 / 0, Space, Delete, Ctrl+Z / Ctrl+Y. The **global hotkeys are rebound here** (APP-08: the Hotkeys window of D-44 moves into Settings). The `?` cheat sheet (NAV-02) shows the same list.
 
@@ -800,7 +803,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-12 — Wide screens and interface size (v1, D-81)
 - **D-82 (supersedes D-81's growing column):** task lists, notes and task pages share one centred column of at most 820 px with 40 px sides, as before 0.4.16. A right-side panel for wide screens is being designed by Davit (not specified yet; nothing is built for it).
 - **App zoom:** Ctrl+= (Ctrl++), Ctrl+− and Ctrl+0 zoom the main window in Chrome's steps (67, 75, 80, 90, 100, 110, 125, 150, 175, 200 %), remembered **per display** (a laptop panel and a monitor each keep their own); the level shows briefly in a small pill when it changes. The capture popup stays at 100 % (**Proposed**: it has its own fixed size and latency budget).
-- **M8:** Settings gets an **Interface size** option for the same zoom (APP-11).
+- **M8:** Settings gets an **Interface size** option for the same zoom (APP-11). **D-102 (0.8.0):** exact levels (80 to 150 %), each setting exactly that level on this display.
 
 ### UI-11 — Flint's own text selection colour (v1, D-69)
 - Selected text uses Flint's colour instead of Windows blue: a **soft translucent gray based on the accent** with **white text**, in text fields and selectable app text alike (`--fl-selection`, `--fl-selection-text`, 09 §8).

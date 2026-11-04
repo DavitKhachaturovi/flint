@@ -191,7 +191,8 @@ mode: note
 
 ### Quick notes (NOTE-08, D-99)
 - A quick note is an ordinary note file at the folder's top level, named after when it was made (`Quick note 2026-11-04 1530.md`; `(2)` added for a second one in the same minute), with `quick: true` in its header next to `flint`, `id` and `mode: note`. Plain markdown, readable in Obsidian; snapshots and export carry it like any note.
-- Flint lists it under Quick notes (not among Lists or groups) while the flag is there. Giving it a title renames the file and removes the flag (one undo step); Keep as a note removes the flag only. An empty quick note (nothing after its header) is deleted for good when it is left.
+- Flint lists it under Quick notes (not among Lists or groups) while the flag is there. Keep as a note (or a move to a group) removes the flag. An empty untitled quick note (nothing after its header) is deleted for good when it is left.
+- **D-102:** the flag has two values: `quick: true` (untitled, still its time-based name) and `quick: 2026-11-04` (given a title that day). A title renames the file and sets the day (one undo step); at the next day change (and at start-up) Flint removes the flag of quick notes titled on an earlier day, so they become normal notes. A reader that doesn't know the day form treats any `quick` line as an unknown header field and keeps it.
 
 ### Trash (DATA-02)
 - Deleted lists move to `.flint/trash/` with their deletion time. Deleted tasks are stored there with their original list ID and deletion time so they can be restored in place.

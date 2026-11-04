@@ -199,7 +199,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Popup: single-line title + selection area (compact highlighted blocks, notes), Enter accepts menu/card first, stays open with content, hint on the card, click-through shadow margin | D-38, D-40, D-41, D-42, `apps/desktop/src/renderer/capture-popup/` |
 | Main window in React: sidebar, rows (stripes, reminders, code rows, read-only non-task content), completion with Undo toast and Completed section | TASK-01, TASK-03, TASK-06, TASK-15, D-48, `apps/desktop/src/renderer/main-window/` |
 | Navigate/Edit model: composer with shorthand, inline edit with inert existing title, Edit-state Enter rows, 1/2/3/0, Alt+↑/↓, Tab/Shift+Tab, undo/redo (Proposed details) | TASK-02, TASK-03, TASK-04, 03 §2, Q-08, D-45, D-51 |
-| Rebindable global hotkeys with conflict detection: Hotkeys window from the tray, tray warning when a hotkey is taken | APP-08, D-44, `apps/desktop/src/main/hotkey-registry.ts`, `src/renderer/hotkeys/` |
+| Rebindable global hotkeys with conflict detection: recorded in Settings → Capture & hotkeys (D-102; was the Hotkeys window of D-44), tray warning when a hotkey is taken | APP-08, D-44, D-102, `apps/desktop/src/main/hotkey-registry.ts`, `src/renderer/main-window/Settings.tsx` |
 | Geist and Geist Mono bundled with the app (variable woff2 from Vercel's `geist` 1.8.2, OFL), never loaded from the web; since D-60 only Geist Mono, with Onest 2.001 and FiraGO 1.001 (Georgian only) | docs/09, APP-09, `apps/desktop/src/renderer/fonts/` |
 | R-1 laptop benchmark build (`npm run dist:bench`), kept for a re-measure only (D-36): over a real Teams call, installs nothing, not in normal builds or the installer | 06 §1, `apps/desktop/src/main/laptop-bench.ts`, `packages/core/src/bench` |
 
@@ -667,4 +667,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Snapshots: how often, how long, the space used, Clear old snapshots; Export | DATA-04, DATA-05 · Done (0.4.34) | 02, 04, D-99, D-100 |
 | 5 | Interface size and animation speed | UI-12, APP-12 · Done (0.4.34) | 02, D-67, D-100 |
 | 6 | Keyboard shortcuts from one list | APP-11, NAV-02 · Done (0.4.34; the cheat sheet in step 2) | 02, D-80, D-100 |
-| 7 | The link-patterns editor; changing the Flint folder; recording hotkeys in place | NOTE-07, DATA-07, APP-08 · v1 · M8 step 1b | D-100 |
+| 7 | The link-patterns editor; changing the Flint folder | NOTE-07, DATA-07 · v1 · M8 step 1b | D-100 |
+| 8 | Recording hotkeys in place | APP-08 · Done (0.8.0) | 02, D-102 |
+
+## AJ. Fixes after 0.4.33 and 0.4.34 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Version numbers follow the milestone: 0.8.0 next, 1.0.0 at the end of M9 | Q-22 · Decided | 06, D-101 |
+| 2 | Hotkeys recorded in Settings with conflict detection; the Hotkeys window and the tray's Hotkeys… removed | APP-08 · Done (0.8.0) | 02, 03, 09, D-102 |
+| 3 | A quick note's title saved when the field is left; a title keeps it a quick note until Keep as a note, a group or the next day | NOTE-08 · Done (0.8.0) | 02, 04, D-102 |
+| 4 | No flash of the selected row when a list or note is made in its group | LIST-05, UI-04 · Done (0.8.0) | D-102 |
+| 5 | Two designs for the sidebar's foot, chosen in Settings → Appearance (Davit picks one) | NAV-09, APP-11 · Done (0.8.0; one to remove after the choice) | 09, D-102 |
+| 6 | The snapshot comparison scrolls in the side panel; its action bar sticky on a solid ground | DATA-04 · Done (0.8.0) | 03, 09, D-102 |
+| 7 | The reminder sound described as heard through Do Not Disturb and Focus; the Do Not Disturb row | REM-06 · Done (0.8.0; Davit checks by ear) | 02, D-102 |
+| 8 | Interface size as exact levels; every segmented choice sets the value pressed | UI-12, APP-11 · Done (0.8.0) | 02, D-102 |
