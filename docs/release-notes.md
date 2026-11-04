@@ -2,6 +2,11 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.32 (4 Nov 2026)
+
+- **Snapshots**: Flint keeps a copy of your Flint folder every hour something changes (for two days), then once a day (for a month), on this computer. From the tray (Restore from a snapshot…) or Trash, bring back one list or note as it was, or everything. Ctrl+Z undoes a restore.
+- **Export**: the tray's Export Flint folder… saves everything as one zip file.
+
 ## 0.4.31 (4 Nov 2026)
 
 - **New lists right in a group**: right-click a group for New task list or New note.
