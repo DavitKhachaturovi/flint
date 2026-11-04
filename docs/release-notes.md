@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.3 (5 Nov 2026)
+
+- **Link patterns** can be edited, and Flint understands more of them: a part that changes can be a word with fixed text around it (`platform-repo`). A short form needs some fixed text (like `AB#` or `dx:`), so ordinary words never turn into links; Flint suggests one and shows how many places a pattern would link.
+- The built-in kinds (Azure DevOps, GitHub, Jira) are listed in Settings → Links, each with a switch.
+- **Links show while you type**: the composer and the capture popup show a chip for each link, and a pasted link turns into its short form right away in notes.
+- The Trash button is just "Trash"; the count is inside.
+
 ## 0.8.2 (4 Nov 2026)
 
 - **Move your Flint folder** from Settings → General → Change…: Flint copies everything to the new place, checks every file, and keeps the old folder as a backup. You can also start fresh somewhere else, or open a folder that already has Flint lists.
