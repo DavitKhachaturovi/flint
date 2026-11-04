@@ -16,6 +16,7 @@ import {
   type SidebarOutcome,
   type SidebarView,
   type RestoredItem,
+  type SnapshotDiff,
   type SnapshotFile,
   type SnapshotSummary,
   type TrashPreview,
@@ -107,6 +108,30 @@ const main = {
   },
   restoreSnapshot(id: string, path: string | null): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainSnapshotRestore, id, path) as Promise<string | null>;
+  },
+  /** NOTE-08, D-99: a new quick note (its ID), and discarding one left empty. */
+  quickNote(): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainQuickNote) as Promise<string | null>;
+  },
+  /** NOTE-08, D-99: Keep as a note: a normal note under its time-based name. */
+  keepQuickNote(id: string): Promise<ListActionOutcome | null> {
+    return ipcRenderer.invoke(Channels.mainKeepQuickNote, id) as Promise<ListActionOutcome | null>;
+  },
+  discardQuickNote(id: string): Promise<boolean> {
+    return ipcRenderer.invoke(Channels.mainDiscardQuickNote, id) as Promise<boolean>;
+  },
+  /** DATA-05, D-99: Export Flint folder… (a save dialog in the main process). */
+  exportFolder(): Promise<void> {
+    return ipcRenderer.invoke(Channels.mainExport) as Promise<void>;
+  },
+  /** D-99: a list's or note's comparison with now, and restoring chosen tasks of it. */
+  snapshotDiff(id: string, path: string): Promise<SnapshotDiff | null> {
+    return ipcRenderer.invoke(Channels.mainSnapshotDiff, id, path) as Promise<SnapshotDiff | null>;
+  },
+  restoreSnapshotTasks(id: string, path: string, keys: readonly string[]): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainSnapshotRestoreTasks, id, path, keys) as Promise<
+      string | null
+    >;
   },
   /** D-97: the tray's Restore from a snapshot…. */
   onShowSnapshots(listener: () => void): void {

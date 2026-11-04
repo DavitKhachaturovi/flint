@@ -379,7 +379,10 @@ async function start(): Promise<void> {
           ? workspace.newListInGroup(request.name, request.mode, request.group, now)
           : workspace.newList(request.name, request.mode, now)
         : request.kind === 'rename'
-          ? workspace.renameList(request.id, request.name, now)
+          ? // NOTE-08, D-99: renaming a quick note gives it its title (a normal note).
+            workspace.summaries(now).some((list) => list.id === request.id && list.quick)
+            ? workspace.keepQuickNote(request.id, request.name, now)
+            : workspace.renameList(request.id, request.name, now)
           : request.kind === 'duplicate'
             ? workspace.duplicateList(request.id, now)
             : request.kind === 'convert'
@@ -631,6 +634,27 @@ async function start(): Promise<void> {
         })
       : null,
   );
+  ipcMain.handle(Channels.mainSnapshotDiff, (event, id: unknown, path: unknown) =>
+    owns(event.sender) && typeof id === 'string' && typeof path === 'string'
+      ? workspace.snapshotDiff(snapshotStore, id, path)
+      : null,
+  );
+  ipcMain.handle(
+    Channels.mainSnapshotRestoreTasks,
+    (event, id: unknown, path: unknown, keys: unknown) =>
+      owns(event.sender) &&
+      typeof id === 'string' &&
+      typeof path === 'string' &&
+      Array.isArray(keys) &&
+      keys.every((key) => typeof key === 'string')
+        ? workspace
+            .restoreSnapshotTasks(snapshotStore, id, path, keys, new Date())
+            .catch((error: unknown) => {
+              log(`restoring tasks from a snapshot failed: ${String(error)}`);
+              return null;
+            })
+        : null,
+  );
   /** D-97: the tray's Restore from a snapshot…: the main window, on the Snapshots view. */
   const showSnapshots = (): void => {
     showMain();
@@ -642,7 +666,21 @@ async function start(): Promise<void> {
     testHooks.showSnapshots = () => showSnapshots();
     testHooks.exportTo = (path) => zipFolder(folder.folder, path);
   }
-  /** DATA-05, D-97: the tray's Export Flint folder…: a zip where the user chooses. */
+  // NOTE-08, D-99: quick notes: a new one, and an empty one left behind.
+  ipcMain.handle(Channels.mainQuickNote, (event) =>
+    owns(event.sender) ? workspace.newQuickNote(new Date()) : null,
+  );
+  ipcMain.handle(Channels.mainKeepQuickNote, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string'
+      ? workspace.keepQuickNote(id, null, new Date())
+      : null,
+  );
+  ipcMain.handle(Channels.mainDiscardQuickNote, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string' ? workspace.discardQuickNote(id) : false,
+  );
+  // D-99: Export, from Trash's header until Settings → Data (M8).
+  ipcMain.handle(Channels.mainExport, (event) => (owns(event.sender) ? exportFolder() : undefined));
+  /** DATA-05, D-97, D-99: Export Flint folder…: a zip where the user chooses. */
   const exportFolder = async (): Promise<void> => {
     const two = (value: number): string => String(value).padStart(2, '0');
     const now = new Date();
@@ -907,8 +945,6 @@ async function start(): Promise<void> {
     open: showMain,
     capture: () => popup.show(epochNow()),
     hotkeys: () => hotkeysPanel.show(),
-    exportFolder: () => void exportFolder(),
-    snapshots: showSnapshots,
     quit: () => app.quit(),
   });
   const hotkeysPanel = hotkeysWindow(pageUrl('hotkeys'), hotkeys, (name, accelerator) => {

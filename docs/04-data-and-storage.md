@@ -189,6 +189,10 @@ mode: note
 - **Re-read before writing (D-29):** if the file changed on disk since Flint last read it, Flint re-parses it and re-applies its pending operations by task ID, then writes. A CLI or Claude write is never overwritten by a stale in-memory copy.
 - **Unreadable files (D-24, Proposed):** a list that is cloud-only (OneDrive Files On-Demand) or locked shows that plainly on the list, never as an empty list.
 
+### Quick notes (NOTE-08, D-99)
+- A quick note is an ordinary note file at the folder's top level, named after when it was made (`Quick note 2026-11-04 1530.md`; `(2)` added for a second one in the same minute), with `quick: true` in its header next to `flint`, `id` and `mode: note`. Plain markdown, readable in Obsidian; snapshots and export carry it like any note.
+- Flint lists it under Quick notes (not among Lists or groups) while the flag is there. Giving it a title renames the file and removes the flag (one undo step); Keep as a note removes the flag only. An empty quick note (nothing after its header) is deleted for good when it is left.
+
 ### Trash (DATA-02)
 - Deleted lists move to `.flint/trash/` with their deletion time. Deleted tasks are stored there with their original list ID and deletion time so they can be restored in place.
 - **Layout (Proposed, M4 step 4, D-50):** plain markdown, readable and restorable by hand until the Trash screen (M7). A deleted list or note is its file, moved there as `<YYYY-MM-DD-HHmmss>-<name>.md`. A deleted task is `<YYYY-MM-DD-HHmmss>-task-<id>.md`: a header with `trashed` (the deletion time), `list` (the list ID) and `listName`, then the task block as it was, subtasks and body included. The task file is written before the task leaves its list, so it is never only in memory. IDs in the trash stay taken (D-29). Undo in the main window removes the trash file again or moves the list back.

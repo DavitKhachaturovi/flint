@@ -89,11 +89,12 @@ import {
   TODAY_ID,
   TRASH_ID,
   type RestoredItem,
+  type SnapshotDiff,
   type TrashPreview,
   type TrashView,
 } from '../../shared/ipc.js';
 import { TrashPreviewView, TrashScreen } from './Trash.js';
-import { SnapshotsScreen } from './Snapshots.js';
+import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -332,6 +333,9 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 /** NAV-07, D-85: what isn't blank space in the main area (a click there keeps the selection). */
 /** REM-06, D-94: Flint's own reminder sound (`scripts/make-chime.mjs`), bundled, never fetched. */
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
+
+/** D-99: a slow second click (renaming in the sidebar): longer than a double-click's gap. */
+const RENAME_DELAY_MS = 450;
 
 /** D-98: how far down a page is scrolled before "back to top" shows. */
 const TO_TOP_AFTER = 320;
@@ -815,6 +819,13 @@ export function App(): ReactElement {
   const [trash, setTrash] = useState<TrashView | null>(null);
   /** D-98: the trash item opened read-only (a page, or the side panel on wide screens). */
   const [trashOpen, setTrashOpen] = useState<TrashPreview | null>(null);
+  /** D-99: a snapshot's list or note opened against now (the side panel, or a page). */
+  const [snapshotOpen, setSnapshotOpen] = useState<{
+    readonly id: string;
+    readonly path: string;
+    readonly when: string;
+    readonly diff: SnapshotDiff;
+  } | null>(null);
   /** D-98: scrolled down far enough for the "back to top" button. */
   const [toTop, setToTop] = useState(false);
   /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
@@ -899,6 +910,20 @@ export function App(): ReactElement {
   /** D-98: the Trash view on a wide screen: an opened item shows in the panel's place. */
   const trashWide = wide && !panelHidden && listId === TRASH_ID;
   const trashPanel = trashWide && trashOpen !== null;
+  /** D-99: the Snapshots view on a wide screen: a comparison opens in the panel's place. */
+  const snapshotWide = wide && !panelHidden && listId === SNAPSHOTS_ID;
+  const snapshotPanel = snapshotWide && snapshotOpen !== null;
+  useEffect(() => {
+    if (listId !== SNAPSHOTS_ID) setSnapshotOpen(null);
+  }, [listId]);
+  useEffect(() => {
+    if (!snapshotOpen) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setSnapshotOpen(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [snapshotOpen]);
   // D-98: "back to top" shows once the page is scrolled down a little (and goes near the top).
   useEffect(() => {
     const element = scroller.current;
@@ -1683,6 +1708,107 @@ export function App(): ReactElement {
     [showToast],
   );
 
+  /** NOTE-08, D-99: the untitled quick notes, newest first; the one open, if it is one. */
+  const quickNotes = useMemo(
+    () =>
+      lists.filter((list) => list.quick).sort((a, b) => (b.quick?.at ?? 0) - (a.quick?.at ?? 0)),
+    [lists],
+  );
+  const quickHere = lists.find((list) => list.id === listId)?.quick ?? null;
+  /** NOTE-08, D-99: a new quick note, opened with its editor taking the caret. */
+  const newQuickNote = useCallback((): void => {
+    void window.flintMain.quickNote().then((id) => {
+      if (!id) return;
+      openList(id);
+      setFocusNote(id);
+    });
+  }, [openList]);
+  const newQuickNoteRef = useRef(newQuickNote);
+  newQuickNoteRef.current = newQuickNote;
+  // NOTE-08, D-99: a quick note left empty goes (main checks it is still empty a moment later).
+  const lastPlace = useRef(listId);
+  useEffect(() => {
+    const before = lastPlace.current;
+    lastPlace.current = listId;
+    if (before !== listId && lists.find((list) => list.id === before)?.quick)
+      void window.flintMain.discardQuickNote(before);
+  }, [listId, lists]);
+  /** NOTE-08, D-99: a quick note's right-click menu: a title, keep it, a group, delete. */
+  const quickMenu = useCallback(
+    (list: ListSummary, at: Point): void => {
+      const groups = (sidebarView?.items ?? []).filter(
+        (item): item is SidebarGroup => item.kind === 'group',
+      );
+      const keep = (group: string | null): void =>
+        void window.flintMain.keepQuickNote(list.id).then(async (outcome) => {
+          if (!outcome?.ok) return;
+          if (group)
+            await window.flintMain.sidebarAction({
+              kind: 'move',
+              id: list.id,
+              to: { group, index: Number.MAX_SAFE_INTEGER },
+            });
+          showToast(outcome.label, true);
+        });
+      openMenu(
+        [
+          {
+            label: 'Add a title…',
+            action: () => {
+              setNamingProblem(null);
+              setNaming({ kind: 'rename', id: list.id, name: list.name });
+            },
+          },
+          { label: 'Keep as a note', action: () => keep(null) },
+          ...(groups.length > 0
+            ? [
+                {
+                  label: 'Move to group',
+                  submenu: groups.map((group) => ({
+                    label: group.name,
+                    action: () => keep(group.id),
+                  })),
+                },
+              ]
+            : []),
+          'divider',
+          {
+            label: 'Delete',
+            action: () =>
+              void window.flintMain.listAction({ kind: 'delete', id: list.id }).then((outcome) => {
+                if (outcome?.ok) showToast(outcome.label, true);
+              }),
+          },
+        ],
+        at,
+      );
+    },
+    [sidebarView, showToast],
+  );
+
+  /** D-99: the opened comparison, in the panel or as a page. */
+  const snapshotDiffView = (page: boolean): ReactElement | null => {
+    if (!snapshotOpen) return null;
+    const { id, path, when, diff } = snapshotOpen;
+    const done = (label: string | null): void => {
+      if (!label) return;
+      setSnapshotOpen(null);
+      showToast(label, true);
+    };
+    return (
+      <SnapshotDiffView
+        key={`${id}/${path}`}
+        diff={diff}
+        when={when}
+        page={page}
+        onRestoreTasks={(keys) =>
+          void window.flintMain.restoreSnapshotTasks(id, path, keys).then(done)
+        }
+        onRestoreAll={() => void window.flintMain.restoreSnapshot(id, path).then(done)}
+        onClose={() => setSnapshotOpen(null)}
+      />
+    );
+  };
   /** D-98: a restored item where it now is: a task selected and flashed in its list, a list opened. */
   const goToRestored = useCallback(
     (restored: RestoredItem, edit = false): void => {
@@ -2380,6 +2506,12 @@ export function App(): ReactElement {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
+      // NOTE-08, D-99: Ctrl+Shift+J makes a quick note, anywhere in the window.
+      if (key === 'j' && event.ctrlKey && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        newQuickNoteRef.current();
+        return;
+      }
       // Ctrl+Shift+N works anywhere in the window (LIST-01, D-52).
       if (key === 'n' && event.ctrlKey && event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -2664,6 +2796,10 @@ export function App(): ReactElement {
         marked={markedLists.size > 1 && markedLists.has(list.id)}
         onSelect={(how) => sidebarSelect(list.id, how)}
         onMenu={(at) => listMenu(list, at)}
+        onRename={() => {
+          setNamingProblem(null);
+          setNaming({ kind: 'rename', id: list.id, name: list.name });
+        }}
       />
     );
   const listById = new Map(taskLists.map((list) => [list.id, list]));
@@ -3711,6 +3847,53 @@ export function App(): ReactElement {
             onMenu={(at) => listMenu(inbox, at)}
           />
         )}
+        {/* NOTE-08, D-99: a quick note in one click; the untitled ones listed below it. */}
+        <button
+          type="button"
+          className="nav quick-new"
+          title="Quick note (Ctrl+Shift+J)"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => newQuickNoteRef.current()}
+        >
+          <span className="tile">
+            <PlusIcon />
+          </span>
+          <span className="nav-name">Quick note</span>
+          <span className="nav-hint">Ctrl+Shift+J</span>
+        </button>
+        {quickNotes.length > 0 && (
+          <div className="quick-notes" aria-label="Quick notes">
+            <div className="section-label quick-label">
+              <span>Quick notes</span>
+            </div>
+            {quickNotes.map((list) =>
+              naming?.kind === 'rename' && naming.id === list.id ? (
+                <NameField
+                  key={list.id}
+                  initial=""
+                  placeholder="Title"
+                  icon={<NoteIcon />}
+                  problem={namingProblem}
+                  onSubmit={(name) => void submitName(name)}
+                  onCancel={() => setNaming(null)}
+                />
+              ) : (
+                <NavItem
+                  key={list.id}
+                  list={{ ...list, name: list.quick?.label ?? list.name }}
+                  active={listId === list.id}
+                  icon={<NoteIcon />}
+                  onSelect={() => openList(list.id)}
+                  onMenu={(at) => quickMenu(list, at)}
+                  onRename={() => {
+                    setNamingProblem(null);
+                    setNaming({ kind: 'rename', id: list.id, name: list.name });
+                  }}
+                />
+              ),
+            )}
+          </div>
+        )}
         <div className="section-label lists-label">
           <span>Lists</span>
           <button
@@ -3764,6 +3947,10 @@ export function App(): ReactElement {
               }
               onToggle={() => toggleGroup(item.id)}
               onMenu={(at) => groupMenu(item, at)}
+              onRename={() => {
+                setNamingProblem(null);
+                setNaming({ kind: 'renameGroup', id: item.id, name: item.name });
+              }}
             >
               {item.lists.map((id) => {
                 const list = listById.get(id);
@@ -3859,7 +4046,9 @@ export function App(): ReactElement {
           {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
           <div
             className={
-              panelState || todayColumn || trashPanel ? `pair ${pairSize ?? ''}` : 'pair single'
+              panelState || todayColumn || trashPanel || snapshotPanel
+                ? `pair ${pairSize ?? ''}`
+                : 'pair single'
             }
             style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
           >
@@ -3942,7 +4131,17 @@ export function App(): ReactElement {
 
               {/* DATA-04, D-97: the Snapshots view. */}
               {listId === SNAPSHOTS_ID && !pageTask && (
-                <SnapshotsScreen version={lists} onRestored={(label) => showToast(label, true)} />
+                <SnapshotsScreen
+                  version={lists}
+                  onRestored={(label) => showToast(label, true)}
+                  openFile={snapshotOpen}
+                  page={snapshotOpen && !snapshotWide ? snapshotDiffView(true) : null}
+                  onOpenFile={(id, path, when) =>
+                    void window.flintMain.snapshotDiff(id, path).then((diff) => {
+                      if (diff) setSnapshotOpen({ id, path, when, diff });
+                    })
+                  }
+                />
               )}
               {/* DATA-02, TASK-06, D-97: the Trash view. */}
               {listId === TRASH_ID && !pageTask && (
@@ -3956,6 +4155,7 @@ export function App(): ReactElement {
                   onClose={() => setTrashOpen(null)}
                   onRestoreToEdit={restoreToEdit}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
+                  onExport={() => void window.flintMain.exportFolder()}
                   onRestore={(id) =>
                     void window.flintMain.restoreFromTrash(id).then((restored) => {
                       // D-98: it stays in Trash; the toast offers the way to it.
@@ -4036,7 +4236,22 @@ export function App(): ReactElement {
                 // NOTE-01, D-85: the note's title and text on a card, so it is clear where to type.
                 <div className="card note-card">
                   <header className="list-header">
-                    <h1>{view.name}</h1>
+                    {quickHere ? (
+                      <QuickTitle
+                        key={view.id}
+                        at={quickHere.at}
+                        onTitle={(title) =>
+                          void window.flintMain
+                            .listAction({ kind: 'rename', id: view.id, name: title })
+                            .then((outcome) => {
+                              if (outcome?.ok && outcome.label) showToast(outcome.label, true);
+                              else if (outcome && !outcome.ok) showToast(outcome.problem, false);
+                            })
+                        }
+                      />
+                    ) : (
+                      <h1>{view.name}</h1>
+                    )}
                     {view.readOnly && (
                       <span className="subtitle">
                         Read-only: Flint can&apos;t change this file ({view.readOnly}).
@@ -4226,6 +4441,12 @@ export function App(): ReactElement {
                 </button>
               </div>
             </div>
+            {/* D-99: a snapshot's list or note against now, in the panel's place. */}
+            {snapshotPanel && (
+              <aside className="context-panel card trash-panel" aria-label="Changes">
+                <div className="panel-inner">{snapshotDiffView(false)}</div>
+              </aside>
+            )}
             {/* D-98: on wide screens a trash item opens read-only in the panel's place. */}
             {trashPanel && trashOpen && (
               <aside className="context-panel card trash-panel" aria-label="Deleted item">
@@ -4426,9 +4647,15 @@ function NavGroup(props: {
   readonly header: ReactElement | null;
   readonly onToggle: () => void;
   readonly onMenu: (at: Point) => void;
+  /**
+   * D-99: a double-click renames it. (Not a slow second click: a click on a group folds or opens
+   * it, and folding and unfolding again is two clicks on the same name.)
+   */
+  readonly onRename: () => void;
   readonly children: ReactNode;
 }): ReactElement {
-  const { group, collapsed, focused, header, onToggle, onMenu, children } = props;
+  const { group, collapsed, focused, header, onToggle, onMenu, onRename, children } = props;
+
   return (
     <div
       className={collapsed ? 'nav-group collapsed' : 'nav-group'}
@@ -4442,7 +4669,12 @@ function NavGroup(props: {
           className={focused ? 'nav-group-head focus' : 'nav-group-head'}
           aria-expanded={!collapsed}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={onToggle}
+          onClick={(event) => {
+            // The second click of a double-click doesn't fold it back: it renames (below).
+            if (event.detail > 1) return;
+            onToggle();
+          }}
+          onDoubleClick={onRename}
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -4524,8 +4756,16 @@ function NavItem(props: {
   readonly icon: ReactElement;
   readonly onSelect: (how: { readonly ctrl: boolean; readonly shift: boolean }) => void;
   readonly onMenu: (at: Point) => void;
+  /**
+   * D-99: the name edited in place, like a task's title: a double-click, or a slow second click
+   * on the open list. Absent for Today, Inbox and Trash.
+   */
+  readonly onRename?: () => void;
 }): ReactElement {
-  const { list, active, marked = false, icon, onSelect, onMenu } = props;
+  const { list, active, marked = false, icon, onSelect, onMenu, onRename } = props;
+  const wasActive = useRef(false);
+  const slow = useRef(0);
+  useEffect(() => () => window.clearTimeout(slow.current), []);
   const classes = ['nav'];
   if (active) classes.push('on');
   if (marked) classes.push('marked');
@@ -4536,8 +4776,28 @@ function NavItem(props: {
       {...(!list.inbox && { 'data-flip': `list:${list.id}` })}
       className={classes.join(' ')}
       // A click opens the list without taking the keyboard: the keys stay with the task list.
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={(event) => onSelect({ ctrl: event.ctrlKey, shift: event.shiftKey })}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        wasActive.current = active;
+      }}
+      onClick={(event) => {
+        onSelect({ ctrl: event.ctrlKey, shift: event.shiftKey });
+        // D-99: a slow second click on the open list (as in Explorer) edits its name.
+        window.clearTimeout(slow.current);
+        if (
+          onRename &&
+          wasActive.current &&
+          event.detail === 1 &&
+          !event.ctrlKey &&
+          !event.shiftKey
+        )
+          slow.current = window.setTimeout(onRename, RENAME_DELAY_MS);
+      }}
+      onDoubleClick={(event) => {
+        if (!onRename || event.ctrlKey || event.shiftKey) return;
+        window.clearTimeout(slow.current);
+        onRename();
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -5621,7 +5881,55 @@ function Glide(props: {
     }
   }, [box]);
   useLayoutEffect(() => {
-    const measure = (): void => {
+    // D-99: while the row (or the group card around it) slides in a FLIP or an easing, the
+    // highlight follows where it is on screen, frame by frame, instead of jumping to where it ends
+    // (it flashed over the row's neighbours, as when a name field opened in a group).
+    let frame = 0;
+    // Anything in the card that moves rows: a FLIP, a group card easing its height, a fold.
+    const sliding = (): boolean =>
+      (card.current?.getAnimations({ subtree: true }) ?? []).some(
+        (animation) =>
+          animation.playState === 'running' &&
+          animation.effect instanceof KeyframeEffect &&
+          animation.effect.target !== node.current &&
+          !(
+            animation instanceof CSSTransition &&
+            !['transform', 'height', 'top', 'grid-template-rows'].includes(
+              animation.transitionProperty,
+            )
+          ),
+      );
+    const track = (row: HTMLElement): void => {
+      frame = 0;
+      const element = card.current;
+      if (!element || !row.isConnected) return;
+      if (!sliding()) {
+        measure(false);
+        return;
+      }
+      const outer = element.getBoundingClientRect();
+      const inner = row.getBoundingClientRect();
+      const at = {
+        x: inner.left - outer.left - element.clientLeft + element.scrollLeft,
+        y: inner.top - outer.top - element.clientTop + element.scrollTop,
+        w: inner.width,
+        h: inner.height,
+        follow: true,
+      };
+      // Written at once (this frame), and to the state (which renders a frame later).
+      const glide = node.current;
+      if (glide) {
+        // As React writes it while following (so it takes this back over when it renders).
+        glide.style.transition =
+          'background-color var(--fl-dur-state) ease, box-shadow var(--fl-dur-state) ease';
+        glide.style.transform = `translate(${at.x}px, ${at.y}px)`;
+        glide.style.width = `${at.w}px`;
+        glide.style.height = `${at.h}px`;
+      }
+      setBox(at);
+      frame = requestAnimationFrame(() => track(row));
+    };
+    const measure = (watch = true): void => {
       const found = target
         ? card.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(target)}"]`)
         : null;
@@ -5659,18 +5967,27 @@ function Glide(props: {
             }
           : null,
       );
+      // The same row moved by the layout: if it slides there (the animations start after this
+      // render), the highlight goes with it.
+      // Checked before the frame is painted: the animations start later in this same commit.
+      if (watch && row && follow && frame === 0)
+        queueMicrotask(() => {
+          if (frame === 0 && sliding()) track(row);
+        });
     };
     measure();
-    window.addEventListener('resize', measure);
+    const onResize = (): void => measure();
+    window.addEventListener('resize', onResize);
     // Rows collapsing or easing in (D-67) move the selected row: follow it.
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(() => measure());
     if (card.current) observer.observe(card.current);
     // LIST-05: and sidebar groups folding above it.
     for (const group of card.current?.querySelectorAll('.group-inner') ?? [])
       observer.observe(group);
     return () => {
-      window.removeEventListener('resize', measure);
+      window.removeEventListener('resize', onResize);
       observer.disconnect();
+      cancelAnimationFrame(frame);
     };
   }, [card, target, version]);
   if (!box) return null;
@@ -5875,5 +6192,51 @@ function EditField(props: {
         }
       }}
     />
+  );
+}
+
+/**
+ * NOTE-08, D-99: a quick note's title row: when it was made (its label), and "Add a title", which
+ * on Enter makes it a normal note with that name.
+ */
+function QuickTitle(props: {
+  /** When it was made. */
+  readonly at: number;
+  readonly onTitle: (title: string) => void;
+}): ReactElement {
+  const { at, onTitle } = props;
+  const [text, setText] = useState('');
+  const made = new Date(at);
+  const two = (value: number): string => String(value).padStart(2, '0');
+  const clock = `${two(made.getHours())}:${two(made.getMinutes())}`;
+  const day =
+    made.toDateString() === new Date().toDateString()
+      ? ''
+      : `${made.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} `;
+  return (
+    <div className="quick-title">
+      <span className="subtitle">
+        Quick note · {day}
+        {clock}
+      </span>
+      <input
+        className="quick-title-input"
+        value={text}
+        placeholder="Add a title"
+        aria-label="Title"
+        spellCheck={false}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && text.trim() !== '') {
+            event.preventDefault();
+            onTitle(text.trim());
+          }
+          if (event.key === 'Escape') {
+            setText('');
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </div>
   );
 }

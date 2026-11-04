@@ -61,7 +61,16 @@ export const Channels = {
   mainSnapshots: 'main:snapshots',
   mainSnapshotFiles: 'main:snapshot-files',
   mainSnapshotRestore: 'main:snapshot-restore',
+  /** D-99: a list's or note's comparison with now, and restoring chosen tasks of it. */
+  mainSnapshotDiff: 'main:snapshot-diff',
+  mainSnapshotRestoreTasks: 'main:snapshot-restore-tasks',
   mainShowSnapshots: 'main:show-snapshots',
+  /** DATA-05, D-99: Export Flint folder… (a save dialog). */
+  mainExport: 'main:export',
+  /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
+  mainQuickNote: 'main:quick-note',
+  mainDiscardQuickNote: 'main:discard-quick-note',
+  mainKeepQuickNote: 'main:keep-quick-note',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',
   /** Main window → main: new, rename or delete a list or note (LIST-01). */
@@ -197,6 +206,11 @@ export interface ListSummary {
   readonly inbox: boolean;
   /** Most recently used rank (0 = last move or capture target), for the list picker (D-25). */
   readonly recentRank?: number;
+  /**
+   * NOTE-08, D-99: a quick note (no title yet): its label (its first line, or when it was made)
+   * and when it was made (newest first under Inbox).
+   */
+  readonly quick?: { readonly label: string; readonly at: number };
 }
 
 /** A task as a row (TASK-01..06). */
@@ -317,6 +331,39 @@ export interface SnapshotFile {
   readonly kind: 'list' | 'note';
   readonly state: 'same' | 'changed' | 'deleted';
 }
+
+/** D-99: one task in a snapshot's comparison with now (by task ID). */
+export interface SnapshotTaskDiff {
+  readonly key: string;
+  /** added: there now, not then (restoring removes it); deleted: then, not now; changed: both. */
+  readonly state: 'added' | 'deleted' | 'changed';
+  readonly title: string;
+  /** For a changed task, what differs: title, priority, reminder, notes, subtasks, completion. */
+  readonly changes: readonly string[];
+}
+
+/** D-99: a list or note in a snapshot against now (or, deleted since, as it was). */
+export type SnapshotDiff =
+  | { readonly kind: 'list'; readonly name: string; readonly tasks: readonly SnapshotTaskDiff[] }
+  | {
+      readonly kind: 'note';
+      readonly name: string;
+      readonly lines: readonly {
+        readonly kind: 'same' | 'added' | 'removed';
+        readonly text: string;
+      }[];
+    }
+  | {
+      readonly kind: 'deleted';
+      readonly name: string;
+      readonly mode: 'list' | 'note';
+      readonly text: string;
+      readonly tasks: readonly {
+        readonly title: string;
+        readonly done: boolean;
+        readonly sub: boolean;
+      }[];
+    };
 
 /** The Snapshots view's place (D-97): reached from the tray and from Trash, never a list. */
 export const SNAPSHOTS_ID = '@snapshots';

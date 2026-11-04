@@ -142,10 +142,6 @@ export interface TrayActions {
   readonly capture: () => void;
   /** APP-08: the Hotkeys window. */
   readonly hotkeys: () => void;
-  /** DATA-05, D-97: Export Flint folder… (a save dialog). */
-  readonly exportFolder: () => void;
-  /** DATA-04, D-97: Restore from a snapshot… (the Snapshots view). */
-  readonly snapshots: () => void;
   readonly quit: () => void;
 }
 
@@ -181,12 +177,10 @@ export function createTray(actions: TrayActions): TrayHandle {
       { label: 'Open Flint', click: actions.open },
       { label: 'Quick capture', click: actions.capture },
       { label: 'Mini mode', enabled: false },
+      // D-99: Open, Quick capture, Mini mode, Settings, Quit; Export and snapshots are in
+      // Settings → Data (M8) and, until then, in Trash's header. Hotkeys… until Settings has them.
       { label: 'Hotkeys…', click: actions.hotkeys },
       { label: 'Settings', enabled: false },
-      { type: 'separator' },
-      // D-97: until Settings and Ctrl+K have them (M8).
-      { label: 'Export Flint folder…', click: actions.exportFolder },
-      { label: 'Restore from a snapshot…', click: actions.snapshots },
       { type: 'separator' },
       { label: 'Quit Flint', click: actions.quit },
     ]);

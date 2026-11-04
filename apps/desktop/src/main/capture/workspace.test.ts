@@ -992,6 +992,111 @@ describe('restoring snapshots (DATA-04, D-97)', () => {
   });
 });
 
+describe('quick notes (NOTE-08, D-99)', () => {
+  it('an untitled note under Inbox, labelled by its first line; a title makes it a normal note', async () => {
+    const workspace = await open();
+    const id = (await workspace.newQuickNote(now)) ?? '';
+    const file = join(folder, 'Quick note 2026-10-29 1430.md');
+    expect(await readFile(file, 'utf8')).toBe(
+      `---\nflint: 1\nid: ${id}\nmode: note\nquick: true\n---\n`,
+    );
+    const quick = (): { label: string } | undefined =>
+      workspace.summaries(now).find((list) => list.id === id)?.quick;
+    expect(quick()?.label).toMatch(/^Quick note · \d\d:\d\d$/);
+    // Not among the sidebar's lists until it gets a title.
+    expect(JSON.stringify(workspace.sidebar().items)).not.toContain(id);
+    await workspace.saveNote(id, '# Call **Alex** back\nabout the quote\n', now);
+    expect(quick()?.label).toBe('Call Alex back');
+    expect(await workspace.keepQuickNote(id, 'Alex', now)).toMatchObject({ ok: true });
+    expect(await readFile(join(folder, 'Alex.md'), 'utf8')).not.toContain('quick: true');
+    expect(quick()).toBeUndefined();
+    expect(JSON.stringify(workspace.sidebar().items)).toContain(id);
+    // One undo step: its old name and its flag again.
+    await workspace.undoLast(now);
+    expect(await readFile(file, 'utf8')).toContain('quick: true');
+    expect(quick()).toBeDefined();
+  });
+
+  it('an empty one left behind goes; one with text stays', async () => {
+    const workspace = await open();
+    const empty = (await workspace.newQuickNote(now)) ?? '';
+    const kept = (await workspace.newQuickNote(now)) ?? '';
+    await workspace.saveNote(kept, 'keep me\n', now);
+    expect(await workspace.discardQuickNote(empty)).toBe(true);
+    expect(await workspace.discardQuickNote(kept)).toBe(false);
+    const names = workspace.listInfos().map((info) => info.name);
+    expect(names).toContain('Quick note 2026-10-29 1430 (2)');
+    expect(names).not.toContain('Quick note 2026-10-29 1430');
+  });
+});
+
+describe('a snapshot compared with now (DATA-04, D-99)', () => {
+  it('a task list by task ID; chosen tasks restored in place, one undo step', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Alpha [id:: aaaa]\n- [ ] Bravo [priority:: high] [id:: bbbb]\n- [ ] Charlie [id:: cccc]\n',
+    );
+    const store = new SnapshotStore(folder, join(base, 'snapshots'));
+    const workspace = await open();
+    const old = await store.take(new Date(2026, 9, 29, 9, 0));
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Alpha edited [id:: aaaa]\n- [ ] Charlie [id:: cccc]\n- [ ] Delta [id:: dddd]\n',
+    );
+    await workspace.fileChanged(join(folder, 'Work.md'));
+    expect(await workspace.snapshotDiff(store, old?.id ?? '', 'Work.md')).toEqual({
+      kind: 'list',
+      name: 'Work',
+      tasks: [
+        { key: 'aaaa', state: 'changed', title: 'Alpha', changes: ['title'] },
+        { key: 'bbbb', state: 'deleted', title: 'Bravo', changes: [] },
+        { key: 'dddd', state: 'added', title: 'Delta', changes: [] },
+      ],
+    });
+    expect(
+      await workspace.restoreSnapshotTasks(
+        store,
+        old?.id ?? '',
+        'Work.md',
+        ['aaaa', 'bbbb', 'dddd'],
+        now,
+      ),
+    ).toBe('Restored 3 tasks in Work');
+    const text = await readFile(join(folder, 'Work.md'), 'utf8');
+    expect(text).toMatch(
+      /- \[ \] Alpha \[id:: aaaa\]\n- \[ \] Bravo \[priority:: high\] \[id:: bbbb\]\n- \[ \] Charlie \[id:: cccc\]\n$/,
+    );
+    await workspace.undoLast(now);
+    expect(await readFile(join(folder, 'Work.md'), 'utf8')).toContain('Delta');
+  });
+
+  it('a note line by line', async () => {
+    await writeFile(
+      join(folder, 'Notes.md'),
+      '---\nflint: 1\nid: nte1\nmode: note\n---\none\ntwo\nthree\n',
+    );
+    const store = new SnapshotStore(folder, join(base, 'snapshots'));
+    const workspace = await open();
+    const old = await store.take(new Date(2026, 9, 29, 9, 0));
+    await writeFile(
+      join(folder, 'Notes.md'),
+      '---\nflint: 1\nid: nte1\nmode: note\n---\none\nTWO\nthree\nfour\n',
+    );
+    await workspace.fileChanged(join(folder, 'Notes.md'));
+    expect(await workspace.snapshotDiff(store, old?.id ?? '', 'Notes.md')).toEqual({
+      kind: 'note',
+      name: 'Notes',
+      lines: [
+        { kind: 'same', text: 'one' },
+        { kind: 'removed', text: 'two' },
+        { kind: 'added', text: 'TWO' },
+        { kind: 'same', text: 'three' },
+        { kind: 'added', text: 'four' },
+      ],
+    });
+  });
+});
+
 describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89, D-92)', () => {
   const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
   const all = (workspace: Workspace, at = now): string[] =>

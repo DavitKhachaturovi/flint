@@ -641,3 +641,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | A trash item opened read-only; "Restore to edit" with Restore | DATA-02 · Done (0.4.31) | 02, 09, D-98 |
 | 6 | Restore's toast: Undo and "Go to <list>" | DATA-02 · Done (0.4.31) | 02, D-98 |
 | 7 | Reminder sound: Windows sound or Flint chime (the toast silent then), with an info card | REM-06, APP-11 · v1 · M8 | 02, D-98 |
+
+## AH. Quick notes and fixes after 0.4.31 and 0.4.32 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Quick notes: one click or Ctrl+Shift+J, listed under Inbox, a title makes a normal note, an empty one goes | NOTE-08 · Done (0.4.33) | 01, 02, 03, 04, 09, D-99 |
+| 2 | Renaming lists, notes and groups in place in the sidebar | LIST-01, LIST-05 · Done (0.4.33) | 03, D-99 |
+| 3 | Reminder cards: a close shadow at rest and on hover | TODAY-03 · Done (0.4.33) | 09, D-99 |
+| 4 | A new list in a group: no flashes, the highlight stays on its row | LIST-05 · Done (0.4.33) | D-99 |
+| 5 | The pinned foot reaches the window's bottom edge | DATA-02 · Done (0.4.33) | D-99 |
+| 6 | "Restore to edit": in view with the same gap for every kind, fading after 4 s | DATA-02 · Done (0.4.33) | D-99 |
+| 7 | The tray slimmed; Export and Snapshots from Trash's header until Settings → Data | APP-03, DATA-04, DATA-05 · Done (0.4.33) | 02, D-99 |
+| 8 | Snapshots compared with now: tasks by ID restorable one by one, a note's line diff, deleted ones read-only | DATA-04 · Done (0.4.33) | 02, 09, D-99 |
+| 9 | Snapshot settings in Settings → Data | DATA-04, APP-11 · v1 · M8 | 02, D-99 |
+| 10 | Restoring single blocks inside a note | DATA-04 · Later | D-99 |

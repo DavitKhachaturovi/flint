@@ -47,6 +47,9 @@ function shortDate(stamp: string): string {
   return `${when.getDate()} ${MONTHS[when.getMonth()] ?? ''}`;
 }
 
+/** D-99: how long "Restore to edit" stays after a try to edit. */
+const LOCKED_MS = 4000;
+
 /** An action asked inline before it happens ("Delete forever?" Delete · Cancel). */
 function Confirm(props: {
   readonly question: string;
@@ -194,8 +197,18 @@ export function TrashPreviewView(props: {
   readonly page?: boolean;
 }): ReactElement {
   const { preview, onRestore, onClose, page = false } = props;
-  const [asked, setAsked] = useState(false);
-  const ask = (): void => setAsked(true);
+  // D-99: "Restore to edit" shows for a few seconds after each try, then fades away.
+  const [asked, setAsked] = useState(0);
+  const [fading, setFading] = useState(false);
+  const ask = (): void => {
+    setFading(false);
+    setAsked((count) => count + 1);
+  };
+  useEffect(() => {
+    if (asked === 0) return;
+    const timer = window.setTimeout(() => setFading(true), LOCKED_MS);
+    return () => window.clearTimeout(timer);
+  }, [asked]);
   const now = new Date();
   const kind = preview.kind === 'task' ? 'Task' : preview.kind === 'note' ? 'Note' : 'List';
   return (
@@ -256,8 +269,15 @@ export function TrashPreviewView(props: {
           />
         )}
       </div>
-      {asked && (
-        <div className="trash-locked" role="status">
+      {asked > 0 && (
+        <div
+          key={asked}
+          className={fading ? 'trash-locked leaving' : 'trash-locked'}
+          role="status"
+          onAnimationEnd={(event) => {
+            if (fading && event.target === event.currentTarget) setAsked(0);
+          }}
+        >
           <span>Restore to edit</span>
           <button type="button" className="primary-button" onClick={onRestore}>
             Restore
@@ -282,8 +302,10 @@ export function TrashScreen(props: {
   readonly onRestoreArchived: (listId: string, key: string) => void;
   /** D-97: "Looking for an older version? Snapshots". */
   readonly onSnapshots: () => void;
+  /** D-99: Export Flint folder…, here until Settings → Data (M8). */
+  readonly onExport: () => void;
 }): ReactElement {
-  const { view, open, asPage, onOpen, onClose, onRestoreToEdit, onSnapshots } = props;
+  const { view, open, asPage, onOpen, onClose, onRestoreToEdit, onSnapshots, onExport } = props;
   const { onRestore, onDelete, onEmpty, onRestoreArchived } = props;
   // D-98: Esc closes the opened item.
   useEffect(() => {
@@ -326,6 +348,11 @@ export function TrashScreen(props: {
           older version?{' '}
           <button type="button" className="subtitle-link" onClick={onSnapshots}>
             Snapshots
+          </button>
+          {/* D-99: until Settings → Data (M8). */}
+          {' · '}
+          <button type="button" className="subtitle-link" onClick={onExport}>
+            Export Flint folder…
           </button>
         </span>
       </header>

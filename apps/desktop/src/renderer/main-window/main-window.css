@@ -3922,6 +3922,7 @@ a.auto-link {
     transform var(--fl-dur-fast) cubic-bezier(0.2, 0.9, 0.3, 1),
     box-shadow var(--fl-dur-fast) ease,
     background-color var(--fl-dur-state) ease;
+  box-shadow: var(--fl-shadow-card-close);
 }
 
 /* D-93: the card hover lift (09 §8), its shadow kept close to the card so it never spills over
@@ -3933,15 +3934,7 @@ a.auto-link {
 
 .reminder-card.next {
   background: var(--fl-ground-float);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-float),
-    var(--fl-shadow-card);
-}
-
-.reminder-card.next:hover {
-  box-shadow:
-    0 0 0 1px var(--fl-edge-float),
-    var(--fl-shadow-card-hover);
+  box-shadow: var(--fl-shadow-card-hover);
 }
 
 .reminder-card.leaving {
@@ -4444,7 +4437,9 @@ a.auto-link {
    has the selection's own look, the sliding highlight staying with the rows that scroll. */
 .sidebar-foot {
   position: sticky;
-  bottom: 0;
+  /* D-99: sticky counts from the sidebar's content box: -14 px (its bottom padding) reaches the
+     window's edge, so nothing shows through below the row. */
+  bottom: -14px;
   z-index: 3;
   margin: auto -2px -14px -12px;
   padding: 12px 2px 14px 12px;
@@ -4712,7 +4707,13 @@ a.auto-link {
   color: var(--fl-text-muted);
 }
 
+/* D-99: kept in view at the bottom of the panel (or the page) with the same gap for every kind,
+   however long the item; it fades away after a few seconds. */
 .trash-locked {
+  position: sticky;
+  bottom: 20px;
+  z-index: 2;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4873,4 +4874,231 @@ a.auto-link {
   display: flex;
   justify-content: flex-end;
   padding-top: 6px;
+}
+
+.trash-locked.leaving {
+  pointer-events: none;
+  animation: trash-locked-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes trash-locked-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.trash-preview.page {
+  padding-bottom: 24px;
+}
+
+/* NOTE-08, D-99: "Quick note" under Inbox (quieter than a list), its untitled notes below, and
+   a quick note's "Add a title" field in place of its title. */
+.nav.quick-new {
+  color: var(--fl-text-muted);
+}
+
+.nav.quick-new .tile {
+  color: var(--fl-text-muted);
+}
+
+.nav.quick-new:hover {
+  color: var(--fl-text-primary);
+}
+
+.nav-hint {
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  color: var(--fl-text-faint);
+  opacity: 0;
+  transition: opacity var(--fl-dur-fast) ease;
+}
+
+.nav.quick-new:hover .nav-hint {
+  opacity: 1;
+}
+
+.quick-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.quick-notes .nav-name {
+  color: var(--fl-text-secondary);
+}
+
+.quick-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.quick-title-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 27px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+  caret-color: var(--fl-accent);
+}
+
+.quick-title-input::placeholder {
+  color: var(--fl-text-faint);
+}
+
+/* D-99: a snapshot's list or note against now (the side panel, or a page): tasks with their
+   checkboxes and what changed; a note's lines added (raised) and removed (struck, faint). */
+.snapshot-file.opens {
+  cursor: default;
+}
+
+.snapshot-file.sel,
+.snapshot-file.sel:hover {
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+.snapshot-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.snapshot-diff.page {
+  padding-bottom: 24px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.diff-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diff-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.diff-task:hover {
+  background: var(--fl-ground-hover);
+}
+
+.diff-check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
+  color: var(--fl-strong-fg);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    box-shadow var(--fl-dur-fast) ease;
+}
+
+.diff-check.on {
+  background: var(--fl-strong-bg);
+  box-shadow: none;
+}
+
+.diff-task-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diff-task-title {
+  font-size: 14px;
+  color: var(--fl-text-body);
+}
+
+.diff-task.deleted .diff-task-title {
+  color: var(--fl-text-secondary);
+}
+
+.diff-task.added .diff-task-title {
+  color: var(--fl-text-muted);
+}
+
+.diff-task-state {
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.diff-lines {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--fl-ground-well);
+  padding: 8px 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.diff-line {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 0 6px;
+  color: var(--fl-text-secondary);
+}
+
+.diff-line.added {
+  background: var(--fl-ground-float);
+  color: var(--fl-text-highlight);
+}
+
+.diff-line.removed {
+  color: var(--fl-text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--fl-edge-chip);
+}
+
+.diff-mark {
+  flex: 0 0 12px;
+  font-family: var(--fl-font-mono);
+  color: var(--fl-text-muted);
+  text-decoration: none;
+}
+
+.diff-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-actions {
+  position: sticky;
+  bottom: 14px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.primary-button:disabled {
+  opacity: 0.45;
+  box-shadow: none;
 }

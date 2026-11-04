@@ -456,6 +456,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - A setting (and per-note toggle, **Proposed**) to render text in a monospace font.
 - **D-84:** the per-note toggle is a checked **Monospace** item in the note's right-click menu (and **Ctrl+Shift+M**), remembered per note on this machine (UI state), the file unchanged. The global default comes with Settings (M8, APP-11).
 
+### NOTE-08 — Quick notes (v1, D-99)
+- A **Quick note** row under Inbox, and **Ctrl+Shift+J** anywhere in the window, make an untitled note and focus its editor: no name to type. It saves as it is written and is listed under **Quick notes** (under Inbox), newest first, labelled by its first line or by when it was made.
+- A title (the "Add a title" field at its top, or renaming it in the sidebar), **Keep as a note** or **Move to group ▸** makes it a normal note. An empty quick note goes when it is left. Built (0.4.33); its file layout is in 04 §3.
+
 ### NOTE-07 — Configurable auto-linking patterns (v1)
 - Users configure patterns that auto-link: e.g. `AB#1234` → the Azure DevOps work item URL.
 - Configuration = a pattern + a URL template (e.g. `AB#(\d+)` → `https://dev.azure.com/<org>/<project>/_workitems/edit/$1`).
@@ -599,10 +603,11 @@ Without sync, the local disk is the only copy, so this matters more.
 ### DATA-04 — Local snapshots (v1)
 - Flint keeps automatic local snapshots of the Flint folder so a bad change can be restored. Retention policy: see Q-05.
 - **D-97:** restore one list or note at a time (what differs from now shown; a fresh snapshot first; one undo step), or **Restore everything** behind a confirm. From the tray's **Restore from a snapshot…** and the Trash view until Settings (M8). **Built (0.4.32).**
+- **D-99 (0.4.33):** no longer in the tray (Trash's header links to Snapshots). A changed or deleted list or note opens its comparison with now: a task list task by task (added, deleted, changed and what), each restorable on its own, or the whole list; a note line by line ("Restore this note" / "Keep current"); a deleted one as it was, with Restore. Settings → Data (M8): how often, how long hourly and daily ones are kept, the space they use, "Clear old snapshots".
 
 ### DATA-05 — One-click zip export (v1)
 - Export the whole Flint folder (lists + attachments) as a zip.
-- **D-97:** the tray's **Export Flint folder…** (a save dialog, a dated file name) until Settings and Ctrl+K (M8). **Built (0.4.32).**
+- **D-97:** the tray's **Export Flint folder…** (a save dialog, a dated file name) until Settings and Ctrl+K (M8). **Built (0.4.32).** **D-99:** in Settings → Data (M8) and Ctrl+K; until then a link in Trash's header, no longer in the tray.
 
 ### DATA-06 — File watcher (v1)
 - Flint watches the Flint folder and reloads lists changed on disk by anything else (the CLI, Claude via the CLI, a text editor) **live**, without losing the cursor position or selection.
@@ -622,6 +627,7 @@ Without sync, the local disk is the only copy, so this matters more.
 - Flint runs as a tray app and starts at login (configurable, default on). The global hotkeys and reminders depend on it running.
 - **D-68:** only the start-with-Windows launch stays hidden in the tray. Starting Flint by hand (Start menu, shortcut, the installer's finish, or starting it again while it runs) shows the main window.
 - Tray menu (**Proposed** items): Open Flint, Quick capture, Mini mode, Settings, Quit.
+- **D-99:** exactly these (and Hotkeys… until Settings has them, **Proposed**); Export and Restore from a snapshot live in Settings → Data (M8) and Ctrl+K, and until then in Trash's header.
 
 ### APP-02 — Never destroy windows; only hide them (v1)
 - Closing the main window hides it to the tray. The capture popup and main window stay alive; mini mode stays alive after first open. This removes the "opening a closed window" cost entirely.

@@ -110,6 +110,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Keyboard cheat sheet | ? (Navigate state) | Decided |
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z (and Ctrl+Y) | Undo decided; redo proposed |
 | New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
+| Quick note (NOTE-08) | Ctrl+Shift+J, anywhere in the window | Decided (D-99) |
+| Rename a list or note in the sidebar | Double-click, or a slow second click on the open one; Enter saves, Esc cancels (a group: double-click) | Decided (D-99) |
 | Back / forward (NAV-04) | Alt+← / Alt+→, the mouse's side buttons | Decided (D-53) |
 | Find in page (NAV-06) | Ctrl+F; Enter / Shift+Enter next / previous match; Esc closes | Decided (D-72) |
 | Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓ with the focus in the sidebar, Manual sort only; with the focus in the task list it moves the selected task; nothing selected, nothing moves | Decided (D-73, D-79) |

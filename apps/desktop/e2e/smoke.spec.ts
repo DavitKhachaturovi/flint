@@ -2973,6 +2973,88 @@ test('M7 step 2: snapshots restored one list or everything, undoable; export as 
   expect((await readFile(zip)).subarray(0, 2).toString('ascii')).toBe('PK');
 });
 
+test('fixes after 0.4.32: quick notes, renaming in place, the pinned foot, a snapshot compared task by task (NOTE-08, LIST-01, LIST-05, DATA-04, D-99)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+
+  // NOTE-08: Ctrl+Shift+J: an untitled note, its editor taking the caret; listed by its first line.
+  await main.keyboard.press('Control+Shift+J');
+  await expect(main.locator('.quick-title-input')).toHaveAttribute('placeholder', 'Add a title');
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
+  await main.keyboard.type('Ask Alex about the DNS change');
+  const quick = main.locator('.quick-notes .nav', { hasText: 'Ask Alex about the DNS change' });
+  await expect(quick).toHaveCount(1);
+  // An empty one left behind goes.
+  await main.locator('.nav.quick-new').click();
+  await expect(main.locator('.quick-title-input')).toBeVisible();
+  await main.locator('.sidebar > .nav').first().click();
+  await expect.poll(() => main.locator('.quick-notes .nav').count(), { timeout: 8000 }).toBe(1);
+  // A title makes it a normal note in Lists.
+  await quick.click();
+  await main.locator('.quick-title-input').fill('DNS change');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.note-card h1')).toHaveText('DNS change');
+  await expect(main.locator('.quick-notes')).toHaveCount(0);
+  await expect
+    .poll(() => readFile(join(flint, 'DNS change.md'), 'utf8'))
+    .not.toContain('quick: true');
+
+  // LIST-01, D-99: a double-click on a list's name edits it in place; Esc cancels, Enter saves.
+  const nav = main.locator('.nav:not(.flip-ghost)', { hasText: 'DNS change' });
+  await nav.dblclick();
+  const field = main.locator('.sidebar .name-field input');
+  await expect(field).toBeFocused();
+  await main.keyboard.press('Escape');
+  await expect(field).toHaveCount(0);
+  await nav.dblclick();
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('DNS notes');
+  await main.keyboard.press('Enter');
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'DNS notes' })).toHaveCount(1);
+
+  // The pinned foot reaches the window's bottom edge.
+  const bottom = await main.evaluate(() => {
+    const foot = document.querySelector('.sidebar-foot')?.getBoundingClientRect();
+    const side = document.querySelector('.sidebar')?.getBoundingClientRect();
+    return foot && side ? Math.round(side.bottom - foot.bottom) : -1;
+  });
+  expect(bottom).toBe(0);
+
+  // DATA-04, D-99: a snapshot's list compared task by task; one chosen task restored in place.
+  type Hooks = { snapshot?: () => Promise<string | null> };
+  const file = join(flint, 'Diff test.md');
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: dif1\nmode: tasks\n---\n- [ ] First [id:: dif2]\n- [ ] Second [id:: dif3]\n- [ ] Third [id:: dif4]\n',
+  );
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Diff test' }).click();
+  await expect(main.locator('.row', { hasText: 'Second' })).toHaveCount(1);
+  await app.evaluate(() => (globalThis as { __flintE2E?: Hooks }).__flintE2E?.snapshot?.());
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: dif1\nmode: tasks\n---\n- [ ] First [id:: dif2]\n- [ ] Third [id:: dif4]\n',
+  );
+  await expect(main.locator('.row', { hasText: 'Second' })).toHaveCount(0);
+  await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).click();
+  // Export now sits in Trash's header too (until Settings, M8).
+  await expect(main.locator('.subtitle-link', { hasText: 'Export Flint folder' })).toBeVisible();
+  await main.locator('.subtitle-link', { hasText: 'Snapshots' }).click();
+  await main.locator('.snapshot-head').first().click();
+  const changed = main.locator('.snapshot-file', { hasText: 'Diff test' });
+  await changed.locator('.trash-title').click();
+  const diff = main.locator('.snapshot-diff');
+  await expect(diff.locator('.diff-task', { hasText: 'Second' })).toContainText('Deleted since');
+  await diff.locator('.diff-task', { hasText: 'Second' }).locator('.diff-check').click();
+  await diff.locator('.primary-button', { hasText: 'Restore 1 task' }).click();
+  await expect(main.locator('.toast')).toContainText('Restored 1 task in Diff test');
+  await expect
+    .poll(() => readFile(file, 'utf8'))
+    .toMatch(/First \[id:: dif2\]\n- \[ \] Second \[id:: dif3\]\n- \[ \] Third/);
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('Second');
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

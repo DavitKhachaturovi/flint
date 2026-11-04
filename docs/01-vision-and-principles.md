@@ -63,7 +63,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 - "Copy as branch name" for tasks.
 - "Add to last capture" (append to the previous capture's body within ~2 minutes).
 - Region-screenshot capture hotkey.
-- Permanent Scratchpad note.
+- ~~Permanent Scratchpad note.~~ Superseded by D-99: **quick notes** (NOTE-08), untitled notes made in one click, kept until given a title or left empty.
 - Note templates (e.g. `/bug`).
 - Collapsible headings in notes.
 - "Send selection to list" (highlighted note lines → tasks).

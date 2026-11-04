@@ -3,6 +3,7 @@ import { copyFile, mkdir, readdir, readFile, rename, stat, unlink } from 'node:f
 import { basename, dirname, join } from 'node:path';
 import {
   addTask,
+  applyOp,
   allTasks,
   bulk,
   completeTask,
@@ -59,8 +60,10 @@ import type {
   TodayEntry,
   TodayReminder,
   RestoredItem,
+  SnapshotDiff,
   SnapshotFile,
   SnapshotSummary,
+  SnapshotTaskDiff,
   TrashItem,
   TrashPreview,
   TrashView,
@@ -69,6 +72,76 @@ import { TODAY_ID } from '../../shared/ipc.js';
 import { dayStamp, TodayFile } from '../today-file.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import type { SnapshotStore } from '../storage/snapshots.js';
+
+/**
+ * D-99: what differs between a task then and now: its title, priority, reminder, notes, subtasks
+ * (any of them, by their text), completion.
+ */
+function taskChanges(
+  then: TaskNode,
+  now: TaskNode,
+  thenDocument: Parameters<typeof serializeDocument>[0],
+  nowDocument: Parameters<typeof serializeDocument>[0],
+): string[] {
+  const changes: string[] = [];
+  if (then.line.title.trim() !== now.line.title.trim()) changes.push('title');
+  if ((then.line.fields.priority?.value ?? null) !== (now.line.fields.priority?.value ?? null))
+    changes.push('priority');
+  const reminder = (task: TaskNode): string =>
+    task.line.fields.reminder ? formatLocalDateTime(task.line.fields.reminder.value.value) : '';
+  if (reminder(then) !== reminder(now) || !!then.line.fields.muted !== !!now.line.fields.muted)
+    changes.push('reminder');
+  if (getBody(then).trim() !== getBody(now).trim()) changes.push('notes');
+  const subtasks = (task: TaskNode, document: Parameters<typeof serializeDocument>[0]): string =>
+    [...allTasks({ ...document, blocks: [task] })]
+      .filter(({ parent }) => parent !== null)
+      .map(({ task: sub }) => `${sub.line.status}${sub.line.title}`)
+      .join('\n');
+  if (subtasks(then, thenDocument) !== subtasks(now, nowDocument)) changes.push('subtasks');
+  if ((then.line.status !== ' ') !== (now.line.status !== ' ')) changes.push('completion');
+  return changes;
+}
+
+/**
+ * D-99: a note's lines then and now: kept, added since, or removed since (a longest common run;
+ * a changed line reads as the old one removed, then the new one added).
+ */
+function lineDiff(
+  before: readonly string[],
+  after: readonly string[],
+): { kind: 'same' | 'added' | 'removed'; text: string }[] {
+  const rows = before.length;
+  const cols = after.length;
+  const table: number[][] = Array.from({ length: rows + 1 }, () =>
+    new Array<number>(cols + 1).fill(0),
+  );
+  for (let i = rows - 1; i >= 0; i--)
+    for (let j = cols - 1; j >= 0; j--)
+      (table[i] as number[])[j] =
+        before[i] === after[j]
+          ? ((table[i + 1] as number[])[j + 1] ?? 0) + 1
+          : Math.max((table[i + 1] as number[])[j] ?? 0, (table[i] as number[])[j + 1] ?? 0);
+  const lines: { kind: 'same' | 'added' | 'removed'; text: string }[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < rows || j < cols) {
+    if (i < rows && j < cols && before[i] === after[j]) {
+      lines.push({ kind: 'same', text: before[i] ?? '' });
+      i++;
+      j++;
+    } else if (
+      j < cols &&
+      (i >= rows || ((table[i] as number[])[j + 1] ?? 0) > ((table[i + 1] as number[])[j] ?? 0))
+    ) {
+      lines.push({ kind: 'added', text: after[j] ?? '' });
+      j++;
+    } else {
+      lines.push({ kind: 'removed', text: before[i] ?? '' });
+      i++;
+    }
+  }
+  return lines;
+}
 
 /** DATA-04, D-97: a list or a note in a snapshot (a markdown file at the folder's top level). */
 const isListPath = (path: string): boolean =>
@@ -304,17 +377,20 @@ export class Workspace {
 
   /** The lists the sidebar places (Inbox stays pinned above it), with their file times. */
   private sidebarLists(): SidebarList[] {
-    return this.lists
-      .filter(({ entry }) => entry.id !== INBOX_ID)
-      .map(({ entry }) => {
-        let edited = entry.created;
-        try {
-          edited = statSync(entry.path).mtimeMs;
-        } catch {
-          // Gone meanwhile: the watcher will drop it.
-        }
-        return { id: this.listId(entry), edited, created: entry.created };
-      });
+    return (
+      this.lists
+        // NOTE-08, D-99: quick notes have their own section under Inbox until they get a title.
+        .filter((loaded) => loaded.entry.id !== INBOX_ID && !this.isQuick(loaded))
+        .map(({ entry }) => {
+          let edited = entry.created;
+          try {
+            edited = statSync(entry.path).mtimeMs;
+          } catch {
+            // Gone meanwhile: the watcher will drop it.
+          }
+          return { id: this.listId(entry), edited, created: entry.created };
+        })
+    );
   }
 
   /** LIST-05, LIST-06, D-73, D-74: the sidebar as shown: groups, order, sort, folded groups. */
@@ -485,6 +561,7 @@ export class Workspace {
         loaded && info.mode === 'tasks'
           ? listView(loaded.file.document, { ...info, readOnly: null }, now).open
           : 0;
+      const quick = loaded && this.isQuick(loaded) ? this.quickLabel(loaded, now) : null;
       return {
         id: info.id,
         name: info.name,
@@ -492,8 +569,127 @@ export class Workspace {
         open,
         inbox: info.id === INBOX_ID,
         ...(info.recentRank === undefined ? {} : { recentRank: info.recentRank }),
+        ...(quick && { quick }),
       };
     });
+  }
+
+  /** NOTE-08, D-99: a note with `quick: true` in its header, not titled yet. */
+  private isQuick(list: Loaded): boolean {
+    if (list.entry.mode !== 'note') return false;
+    const header = /^---\r?\n([\s\S]*?)\r?\n---/.exec(serializeDocument(list.file.document))?.[1];
+    return header !== undefined && /^quick:\s*true\s*$/m.test(header);
+  }
+
+  /** NOTE-08, D-99: a quick note's label: its first line, or when it was made. */
+  private quickLabel(list: Loaded, now: Date): { label: string; at: number } {
+    const body = serializeDocument(list.file.document).replace(
+      /^---\r?\n[\s\S]*?\r?\n---\r?\n?/,
+      '',
+    );
+    const first = body
+      .split(/\r?\n/)
+      .map((line) =>
+        titlePlain(line.replace(/^\s*(#{1,6}\s+|[-*+]\s+(\[.\]\s+)?|\d+\.\s+|>\s*)/, '')).trim(),
+      )
+      .find((line) => line !== '' && !line.startsWith('!['));
+    // When it was made: its name says (`Quick note 2026-11-04 1530`), else the file's time.
+    const named = /^Quick note (\d{4})-(\d{2})-(\d{2}) (\d{2})(\d{2})/.exec(list.entry.name);
+    const made = named
+      ? new Date(
+          Number(named[1]),
+          Number(named[2]) - 1,
+          Number(named[3]),
+          Number(named[4]),
+          Number(named[5]),
+        )
+      : new Date(list.entry.created);
+    const at = made.getTime();
+    const two = (value: number): string => String(value).padStart(2, '0');
+    const clock = `${two(made.getHours())}:${two(made.getMinutes())}`;
+    const sameDay = made.toDateString() === now.toDateString();
+    const when = sameDay
+      ? `Quick note · ${clock}`
+      : `Quick note · ${made.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][made.getMonth()] ?? ''} ${clock}`;
+    return { label: first ? first.slice(0, 60) : when, at };
+  }
+
+  /**
+   * NOTE-08, D-99: a new quick note: an untitled note file at the folder's top level, named after
+   * when it was made (`Quick note 2026-11-04 1530.md`), `quick: true` in its header. Not an undo
+   * step (an empty one goes by itself). Its ID.
+   */
+  newQuickNote(now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const two = (value: number): string => String(value).padStart(2, '0');
+      const base = `Quick note ${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}${two(now.getMinutes())}`;
+      let name = base;
+      for (let count = 2; this.sameName(name); count++) name = `${base} (${count})`;
+      const id = generateId(this.isTaken);
+      const path = join(this.folder, `${name}.md`);
+      await writeFileAtomic(path, `---\nflint: 1\nid: ${id}\nmode: note\nquick: true\n---\n`, {
+        tempDirectory: tempDirectoryFor(path),
+      });
+      await this.refresh(path);
+      return this.find(id) ? id : null;
+    });
+  }
+
+  /**
+   * NOTE-08, D-99: a quick note left empty goes (for good: nothing was in it). Checked after a
+   * moment, so an edit still being saved as the note was left keeps it.
+   */
+  async discardQuickNote(id: string): Promise<boolean> {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return this.serial(async () => {
+      const list = this.find(id);
+      if (!list || !this.isQuick(list)) return false;
+      const body = serializeDocument(list.file.document).replace(
+        /^---\r?\n[\s\S]*?\r?\n---\r?\n?/,
+        '',
+      );
+      if (body.trim() !== '') return false;
+      await unlink(list.entry.path).catch(() => undefined);
+      await this.refresh(list.entry.path);
+      return true;
+    });
+  }
+
+  /**
+   * NOTE-08, D-99: a quick note made a normal note: its `quick` flag goes, and with a title
+   * (`name`) its file takes that name; one undo step. Without a name it keeps its time-based one.
+   */
+  async keepQuickNote(id: string, name: string | null, now: Date): Promise<ListOutcome> {
+    const start = this.undoStack.length;
+    const flagged = await this.serial(async () => {
+      const list = this.find(id);
+      if (!list || !this.isQuick(list)) return false;
+      const text = serializeDocument(list.file.document).replace(
+        /^(---\r?\n[\s\S]*?)^quick:\s*true\s*\r?\n/m,
+        '$1',
+      );
+      await this.record(
+        list,
+        { type: 'setText', list: list.file.path, text },
+        'Kept as a note',
+        now,
+      );
+      return true;
+    });
+    if (!flagged) return { ok: false, problem: 'Not a quick note' };
+    const outcome =
+      name === null
+        ? { ok: true as const, listId: id, label: 'Kept as a note' }
+        : await this.renameList(id, name, now);
+    if (!outcome.ok) {
+      await this.undoLast(now);
+      return outcome;
+    }
+    await this.serial(() => {
+      this.mergeSince(start, outcome.label || 'Kept as a note');
+      return Promise.resolve();
+    });
+    return outcome;
   }
 
   /** One list as the main window shows it (M4). */
@@ -1835,6 +2031,154 @@ export class Workspace {
         },
       });
       this.remember(step(snapshot.files, safety.files));
+      return label;
+    });
+  }
+
+  /**
+   * D-99: a list or note in a snapshot against now: a task list by task ID (added, deleted,
+   * changed, and what changed), a note line by line, one deleted since as it was.
+   */
+  async snapshotDiff(store: SnapshotStore, id: string, path: string): Promise<SnapshotDiff | null> {
+    const snapshot = (await store.list()).find((each) => each.id === id);
+    const hash = snapshot?.files[path];
+    if (!hash || !isListPath(path)) return null;
+    const text = (await store.content(hash))?.toString('utf8') ?? '';
+    const name = path.slice(0, -3);
+    const then = parseDocument(text);
+    const list = this.lists.find(
+      ({ entry }) => entry.path.toLowerCase() === join(this.folder, path).toLowerCase(),
+    );
+    const label = (task: TaskNode): string =>
+      taskLabel(titlePlain(task.line.title.trim()), getBody(task));
+    const mode = documentMode(then) === 'note' ? 'note' : 'list';
+    if (!list) {
+      return {
+        kind: 'deleted',
+        name,
+        mode,
+        text: mode === 'note' ? text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : '',
+        tasks:
+          mode === 'list'
+            ? [...allTasks(then)].map(({ task, parent }) => ({
+                title: label(task),
+                done: task.line.status !== ' ',
+                sub: parent !== null,
+              }))
+            : [],
+      };
+    }
+    if (mode === 'note') {
+      const strip = (value: string): string[] =>
+        value
+          .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+          .replace(/\n$/, '')
+          .split(/\r?\n/);
+      return {
+        kind: 'note',
+        name,
+        lines: lineDiff(strip(text), strip(serializeDocument(list.file.document))),
+      };
+    }
+    const top = (document: typeof then): Map<string, TaskNode> =>
+      new Map(
+        document.blocks.flatMap((block): [string, TaskNode][] =>
+          block.kind === 'task' ? [[block.key, block]] : [],
+        ),
+      );
+    const before = top(then);
+    const now = top(list.file.document);
+    const tasks: SnapshotTaskDiff[] = [];
+    for (const [key, task] of before) {
+      const current = now.get(key);
+      if (!current) {
+        tasks.push({ key, state: 'deleted', title: label(task), changes: [] });
+        continue;
+      }
+      const changes = taskChanges(task, current, then, list.file.document);
+      if (changes.length > 0) tasks.push({ key, state: 'changed', title: label(task), changes });
+    }
+    for (const [key, task] of now)
+      if (!before.has(key)) tasks.push({ key, state: 'added', title: label(task), changes: [] });
+    return { kind: 'list', name, tasks };
+  }
+
+  /**
+   * D-99: chosen tasks of a list as they were in a snapshot: a deleted one back where it was
+   * (after the nearest earlier task that is still there), a changed one replaced in place, one
+   * added since removed. A fresh snapshot first; one undo step. Its label, or null.
+   */
+  restoreSnapshotTasks(
+    store: SnapshotStore,
+    id: string,
+    path: string,
+    keys: readonly string[],
+    now: Date,
+  ): Promise<string | null> {
+    return this.serial(async () => {
+      const snapshot = (await store.list()).find((each) => each.id === id);
+      const hash = snapshot?.files[path];
+      const list = this.lists.find(
+        ({ entry }) => entry.path.toLowerCase() === join(this.folder, path).toLowerCase(),
+      );
+      if (!hash || !list || list.file.readOnly || keys.length === 0) return null;
+      const then = parseDocument((await store.content(hash))?.toString('utf8') ?? '');
+      const order = then.blocks.flatMap((block) => (block.kind === 'task' ? [block] : []));
+      if (!(await store.take(now, true))) return null;
+      const target = list.file.path;
+      let documents: ReadonlyMap<string, typeof list.file.document> = new Map([
+        [target, list.file.document],
+      ]);
+      const run = (op: Op | null): void => {
+        const next = op ? applyOp(documents, op) : null;
+        if (next) documents = next.documents;
+      };
+      const topKeys = (): string[] =>
+        (documents.get(target)?.blocks ?? []).flatMap((block) =>
+          block.kind === 'task' ? [block.key] : [],
+        );
+      for (const key of keys) {
+        const was = order.find((task) => task.key === key);
+        const keysNow = topKeys();
+        const at = keysNow.indexOf(key);
+        if (!was) {
+          if (at >= 0) run(deleteTask(target, key));
+          continue;
+        }
+        let where: Where = { at: 'top' };
+        if (at >= 0) {
+          // Changed: replaced in its place.
+          const previous = keysNow[at - 1];
+          const next = keysNow[at + 1];
+          run(deleteTask(target, key));
+          where = previous
+            ? { at: 'after', key: previous }
+            : next
+              ? { at: 'before', key: next }
+              : { at: 'top' };
+        } else {
+          // Deleted: after the nearest earlier task that is still there, else before the next one.
+          const index = order.indexOf(was);
+          const earlier = order
+            .slice(0, index)
+            .reverse()
+            .find((task) => keysNow.includes(task.key));
+          const later = order.slice(index + 1).find((task) => keysNow.includes(task.key));
+          if (earlier) where = { at: 'after', key: earlier.key };
+          else if (later) where = { at: 'before', key: later.key };
+        }
+        run({ type: 'insert', list: target, task: { ...was, eol: '\n' }, where });
+      }
+      const document = documents.get(target);
+      if (!document) return null;
+      const name = path.slice(0, -3);
+      const label = `Restored ${keys.length === 1 ? '1 task' : `${keys.length} tasks`} in ${name}`;
+      await this.record(
+        list,
+        { type: 'setText', list: target, text: serializeDocument(document) },
+        label,
+        now,
+      );
       return label;
     });
   }
