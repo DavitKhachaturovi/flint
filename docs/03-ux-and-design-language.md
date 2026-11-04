@@ -143,6 +143,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - The mouse's back and forward buttons navigate (NAV-04).
 - Cursor: the arrow on every control, the hand only on links (UI-01).
 - **D-98:** a page scrolled down shows a "back to top" button at the bottom right of the main column (NAV-09); the sidebar's foot (Trash) stays pinned while the lists scroll.
+- **D-105:** links show as they will while a task is typed: a link chip in the composer and the capture popup for each, and in the editors a pasted URL as its short form once the caret isn't inside it.
 - **D-103:** the context panel's bottom (and Today's column's) is always in the window, wherever the page is scrolled; the lists blend out above the sidebar's foot.
 - **D-102:** a comparison's actions stay at the bottom of its card while the diff scrolls under them; a hotkey being recorded shows by its keycap's ring breathing.
 

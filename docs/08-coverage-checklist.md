@@ -704,3 +704,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Merging the current lists into another Flint folder | DATA-07 · Later | 06, D-104 |
 | 6 | Settings → Links: patterns listed with Delete; Add from an example with presets, a live preview, a second example, Advanced | NOTE-07 · Done (0.8.2) | 02, 09, D-84, D-104 |
 | 7 | The Settings index opens on General | APP-11 · Done (0.8.2) | D-104 |
+
+## AM. Fixes after 0.8.2 (5 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The Trash button without its count, the size of Settings | NAV-09, DATA-02 · Done (0.8.3) | 02, 09, D-105 |
+| 2 | Edit a link pattern (the same editor, prefilled; examples kept) | NOTE-07 · Done (0.8.3) | 02, 04, D-105 |
+| 3 | Inference of a word between fixed text (`{name}-repo`), with test fixtures; the second example stays while typed | NOTE-07 · Done (0.8.3) | D-105 |
+| 4 | Over-broad patterns refused with a suggested fixed part; the match count and its warning | NOTE-07 · Done (0.8.3) | 02, D-105 |
+| 5 | The built-in recognizers listed with a switch each | TASK-10, NOTE-07 · Done (0.8.3) | 02, 04, 09, D-105 |
+| 6 | Links everywhere text shows; link chips in the composer and the capture popup; pasted URLs short in the editors at once | NOTE-07, TASK-10, CAP-04 · Done (0.8.3) | 02, 03, D-105 |
+
