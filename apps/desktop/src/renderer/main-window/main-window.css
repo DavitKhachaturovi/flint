@@ -4478,16 +4478,16 @@ a.auto-link {
   flex: 0 0 26px;
 }
 
-/* D-103 (D-102's "Buttons", chosen): Settings and Trash as two rounded buttons side by side, each
-   sized to its content and sharing what is left; the hover and the selection are the button's
-   own shape. */
+/* D-103 (D-102's "Buttons", chosen), D-105: Settings and Trash as two rounded buttons of one size
+   side by side; the hover and the selection are the button's own shape. */
 .sidebar-foot {
   display: flex;
   gap: 6px;
 }
 
 .sidebar-foot .nav {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   width: auto;
   height: 36px;
   justify-content: center;
@@ -4518,20 +4518,8 @@ a.auto-link {
   height: 22px;
 }
 
-/* The name and its count on one line; a count that doesn't fit wraps out of sight. */
-.foot-label {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 6px;
-  height: 18px;
-  line-height: 18px;
-  overflow: hidden;
-}
-
-.foot-label .nav-name {
-  flex: none;
-  overflow: visible;
+.sidebar-foot .nav-name {
+  flex: 0 1 auto;
   font-size: 13px;
 }
 
@@ -5569,4 +5557,36 @@ a.auto-link {
   flex-direction: column;
   gap: 6px;
   margin: 0;
+}
+
+/* D-105: the link chips while a task is typed (the composer, the capture popup). */
+.link-chip {
+  gap: 4px;
+}
+
+/* D-105: Settings → Links: the built-in recognizers, read-only, each with its switch. */
+.link-builtins {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.link-builtins-label {
+  margin: 4px 0 6px;
+}
+
+.link-pattern-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--fl-text-body);
+}
+
+.link-pattern-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }

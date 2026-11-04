@@ -1,3 +1,4 @@
+import { knownLinks } from '../../shared/link-patterns.js';
 import type { CaptureBlock, CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
 import type { AttachmentChip } from '../../shared/ipc.js';
 import { enableAutoPair } from '../auto-pair.js';
@@ -11,6 +12,7 @@ const ICONS = {
   hash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"></path></svg>',
   bell: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg>',
   x: '<svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>',
+  link: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><path d="M8 12h8"></path></svg>',
 } as const;
 
 const PRIORITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' } as const;
@@ -115,6 +117,12 @@ export function renderChips(
       const node = element('span', 'chip note', note);
       chips.push(node);
     }
+  }
+  // D-105: the links the text will show (a pasted URL as its short form), while it is typed.
+  for (const link of knownLinks(parsed.title)) {
+    chip(icon(ICONS.link), link.label);
+    chips.at(-1)?.setAttribute('title', link.href);
+    chips.at(-1)?.classList.add('link-chip');
   }
   for (const attachment of attachments) {
     const thumb = element('img', 'thumb');

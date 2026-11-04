@@ -489,9 +489,15 @@ function decorate(view: EditorView): DecorationSet {
             if (parent === 'Link' || parent === 'Image') return;
             const href = doc.sliceString(node.from, node.to);
             // TASK-10 (D-84, D-88): a bare URL shows its smart title (a link pattern's short form,
-            // a built-in one, or its domain and path); the line being typed shows the URL.
+            // a built-in one, or its domain and path). D-105: as soon as the cursor isn't inside
+            // it (just pasted, the caret after it, it shows short already); inside, the URL.
             const title = linkTitle(href, activeLinkPatterns());
-            const short = isActive(node.from) || title === href ? null : title;
+            const inside = state.selection.ranges.some((range) =>
+              range.empty
+                ? range.head > node.from && range.head < node.to
+                : range.from < node.to && range.to > node.from,
+            );
+            const short = inside || title === href ? null : title;
             ranges.push(
               short
                 ? Decoration.replace({ widget: new ShortLinkWidget(short, href) }).range(

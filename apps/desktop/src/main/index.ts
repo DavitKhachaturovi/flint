@@ -74,7 +74,7 @@ import {
 } from './attachments.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
 import { checkFolder, clashes, copyFlintFolder } from './storage/folder-change.js';
-import { readLinkPatterns } from '../shared/link-patterns.js';
+import { compileLinkPatterns, findShortForms, readLinkPatterns } from '../shared/link-patterns.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
@@ -530,6 +530,24 @@ async function start(): Promise<void> {
     await settingsFile.update({ linkPatterns: kept });
     return kept;
   });
+  // D-105: the built-ins turned off; and how much a pattern would link in the lists and notes.
+  ipcMain.handle(Channels.mainBuiltInLinksOff, (event) =>
+    owns(event.sender) ? settingsFile.current.builtInLinksOff : [],
+  );
+  ipcMain.handle(Channels.mainSetBuiltInLinksOff, async (event, off: unknown) => {
+    if (!owns(event.sender) || !Array.isArray(off)) return null;
+    const kept = off.filter((id): id is string => typeof id === 'string');
+    await settingsFile.update({ builtInLinksOff: kept });
+    return kept;
+  });
+  ipcMain.handle(Channels.mainCountLinkMatches, (event, pattern: unknown) => {
+    if (!owns(event.sender)) return 0;
+    const compiled = compileLinkPatterns(readLinkPatterns([pattern]));
+    if (compiled.length === 0) return 0;
+    let count = 0;
+    for (const text of workspace.texts()) count += findShortForms(text, compiled).length;
+    return count;
+  });
   // NOTE-02, D-82: Insert ▸ Image: a picture from the file picker, copied into attachments/.
   ipcMain.handle(Channels.mainPickImage, async (event) => {
     if (!owns(event.sender)) return null;
@@ -938,6 +956,8 @@ async function start(): Promise<void> {
     })),
     notice: notice?.popup ?? null,
     lists: workspace.listInfos(),
+    linkPatterns: settingsFile.current.linkPatterns,
+    builtInLinksOff: settingsFile.current.builtInLinksOff,
   });
 
   const saveCapture = async (capture: PopupSubmit): Promise<void> => {

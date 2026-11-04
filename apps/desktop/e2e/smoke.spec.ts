@@ -2797,7 +2797,8 @@ test('Trash and Archived: restore, undo, Delete now, Empty Trash, an archived ta
 
   // The sidebar's Trash row, with its count, opens the view: deleted things by day.
   const nav = main.locator('.sidebar-foot .nav', { hasText: 'Trash' });
-  await expect(nav.locator('.nav-count')).toHaveText(/^\d+$/);
+  // D-105: the button is just "Trash"; the count is inside.
+  await expect(nav.locator('.nav-count')).toHaveCount(0);
   await nav.click();
   await expect(main.locator('h1')).toHaveText('Trash');
   const row = (title: string) => main.locator('.trash-row:not(.leaving)', { hasText: title });
@@ -2824,7 +2825,7 @@ test('Trash and Archived: restore, undo, Delete now, Empty Trash, an archived ta
   await expect(main.locator('.trash-bar .trash-confirm')).toContainText('forever?');
   await main.locator('.trash-bar .trash-confirm .trash-action', { hasText: 'Empty Trash' }).click();
   await expect(main.locator('.trash-empty')).toHaveText('Trash is empty.');
-  await expect(nav.locator('.nav-count')).toHaveText('0');
+  await expect(main.locator('.trash-tab', { hasText: 'Deleted' })).toContainText('0');
 
   // Archived: the auto-archived tasks by list; one goes back to its list, still completed.
   await main.locator('.trash-tab', { hasText: 'Archived' }).click();
@@ -3189,26 +3190,23 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(size.locator('[aria-checked=true]')).toHaveText('125%');
   await choose('Interface size', '100%');
   await expect.poll(zoomFactor).toBeCloseTo(1);
-  // D-103: the foot's buttons show their names whole (the count only where it fits), and their
-  // hover is their own shape (the foot around them keeps the sidebar's ground).
+  // D-103, D-105: the foot's two buttons, of one size, show their names whole (no count), and
+  // their hover is their own shape (the foot around them keeps the sidebar's ground).
   const foot = await main.evaluate(() =>
     [...document.querySelectorAll('.sidebar-foot .nav')].map((button) => {
       const name = button.querySelector('.nav-name');
-      const count = button.querySelector('.nav-count');
-      const label = button.querySelector('.foot-label')?.getBoundingClientRect();
-      const shown = (element: Element | null): boolean =>
-        !!element && !!label && element.getBoundingClientRect().top < label.bottom;
       return {
         whole: !!name && name.scrollWidth <= name.clientWidth + 0.5,
-        named: shown(name),
-        counted: count === null || shown(count),
+        width: Math.round(button.getBoundingClientRect().width),
+        count: button.querySelector('.nav-count') !== null,
       };
     }),
   );
-  expect(foot).toEqual([
-    { whole: true, named: true, counted: true },
-    { whole: true, named: true, counted: true },
+  expect(foot.map((button) => [button.whole, button.count])).toEqual([
+    [true, false],
+    [true, false],
   ]);
+  expect(Math.abs((foot[0]?.width ?? 0) - (foot[1]?.width ?? 99))).toBeLessThanOrEqual(1);
   await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).hover();
   expect(
     await main.evaluate(
@@ -3279,8 +3277,8 @@ test('M8 step 1b: link patterns made from an example; the Flint folder moved, ch
   );
   await editor.locator('.primary-button', { hasText: 'Save pattern' }).click();
   await expect(main.locator('.link-editor')).toHaveCount(0);
-  await expect(main.locator('.link-pattern')).toHaveCount(1);
-  await expect(main.locator('.link-pattern')).toContainText('AB#1234');
+  await expect(main.locator('.link-patterns .link-pattern')).toHaveCount(1);
+  await expect(main.locator('.link-patterns .link-pattern')).toContainText('AB#1234');
   await expect
     .poll(async () => JSON.stringify((await settingsFile())['linkPatterns']))
     .toContain('"short":"AB#{id}"');
@@ -3293,9 +3291,11 @@ test('M8 step 1b: link patterns made from an example; the Flint folder moved, ch
   await expect(main.locator('.link-editor .primary-button')).toBeDisabled();
   await main.locator('.link-editor .trash-action', { hasText: 'Cancel' }).click();
   // Delete, asked inline.
-  await main.locator('.link-pattern .trash-action', { hasText: 'Delete' }).click();
-  await main.locator('.link-pattern .trash-action.danger', { hasText: 'Delete' }).click();
-  await expect(main.locator('.link-pattern')).toHaveCount(0);
+  await main.locator('.link-patterns .link-pattern .trash-action', { hasText: 'Delete' }).click();
+  await main
+    .locator('.link-patterns .link-pattern .trash-action.danger', { hasText: 'Delete' })
+    .click();
+  await expect(main.locator('.link-patterns .link-pattern')).toHaveCount(0);
   await expect.poll(async () => (await settingsFile())['linkPatterns']).toEqual([]);
 
   // DATA-07, D-104: the Flint folder itself is refused; an empty folder gets everything, checked.
@@ -3330,6 +3330,136 @@ test('M8 step 1b: link patterns made from an example; the Flint folder moved, ch
   await pick('');
   await bounds(1120, 780);
   await main.locator('.sidebar > .nav').first().click();
+});
+
+test('fixes after 0.8.2: link patterns between fixed text, guarded, edited; built-ins; links everywhere (NOTE-07, TASK-10, D-105)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const flint = join(dataDirectory, 'Flint');
+  const settingsFile = (): Promise<Record<string, unknown>> =>
+    readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8')
+      .then((text) => JSON.parse(text) as Record<string, unknown>)
+      .catch(() => ({}));
+  await writeFile(
+    join(flint, 'Links today.md'),
+    '---\nflint: 1\nid: lk05\nmode: tasks\n---\n- [ ] check DEV-123 today [pinned:: true] [id:: lk1]\n    see DEV-117 in the notes\n',
+  );
+  const bounds = (width: number, height: number): Promise<void> =>
+    app.evaluate(
+      ({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().includes('main-window'),
+        );
+        win?.setBounds({ x: -6000, y: 0, ...size });
+      },
+      { width, height },
+    );
+  await bounds(1800, 900);
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  const add = (): Promise<void> =>
+    main.locator('#settings-links .trash-action', { hasText: 'Add a link pattern' }).click();
+  const editor = main.locator('.link-editor');
+  const field = (label: string) => editor.locator(`input[aria-label="${label}"]`);
+
+  // A repository's name between fixed text ("-repo"): two examples, the second typed key by key
+  // (its fields stay while it is typed).
+  await add();
+  await field('Example link').fill('https://dev.azure.com/acme/web/_git/unicorn-api');
+  await field('Short form').fill('unicorn-api-repo');
+  await expect(field('Second link')).toBeVisible();
+  await field('Second link').pressSequentially(
+    'https://dev.azure.com/acme/web/_git/platform',
+  );
+  await field('Second short form').pressSequentially('platform-repo');
+  await expect(field('Second short form')).toHaveValue('platform-repo');
+  await expect(editor.locator('.link-preview')).toContainText('unicorn-api-repo');
+  await expect(editor.locator('.link-preview')).toContainText(
+    'Nothing in your lists and notes matches it yet.',
+  );
+  await editor.locator('.primary-button', { hasText: 'Save pattern' }).click();
+  await expect(main.locator('.link-patterns .link-pattern')).toContainText('name-repo');
+  // Edit opens the same editor as it was left.
+  await main.locator('.link-patterns .trash-action', { hasText: 'Edit' }).click();
+  await expect(field('Example link')).toHaveValue(
+    'https://dev.azure.com/acme/web/_git/unicorn-api',
+  );
+  await expect(field('Second short form')).toHaveValue('platform-repo');
+  await editor.locator('.trash-action', { hasText: 'Cancel' }).click();
+
+  // No fixed text: refused, with a suggestion that fixes both examples.
+  await add();
+  await field('Example link').fill('https://drop.example/Qx7Lp-M42sTn');
+  await field('Short form').fill('Qx7Lp-M42sTn');
+  await field('Second link').fill('https://drop.example/aB3dE-Xy9Zq');
+  await field('Second short form').fill('aB3dE-Xy9Zq');
+  await expect(editor.locator('.settings-warning')).toContainText('needs fixed text');
+  await expect(editor.locator('.primary-button')).toBeDisabled();
+  await editor.locator('.settings-warning .trash-action', { hasText: 'Use it' }).click();
+  await expect(field('Short form')).toHaveValue('de:Qx7Lp-M42sTn');
+  await expect(field('Second short form')).toHaveValue('de:aB3dE-Xy9Zq');
+  await expect(editor.locator('.primary-button')).toBeEnabled();
+  await editor.locator('.trash-action', { hasText: 'Cancel' }).click();
+
+  // DEV-123 and DEV-200: a number between fixed text; it already matches two places.
+  await add();
+  await field('Example link').fill('https://tracker.example/t/DEV-123');
+  await field('Short form').fill('DEV-123');
+  await field('Second link').fill('https://tracker.example/t/DEV-200');
+  await field('Second short form').fill('DEV-200');
+  await expect(editor.locator('.link-preview')).toContainText(
+    'It matches 2 places in your lists and notes now.',
+  );
+  await editor.locator('.primary-button', { hasText: 'Save pattern' }).click();
+  await expect(main.locator('.link-patterns .link-pattern')).toHaveCount(2);
+
+  // The built-ins, each with its switch.
+  const builtIn = main.locator('.link-builtins .switch[aria-label="Azure DevOps pull request"]');
+  await expect(builtIn).toHaveAttribute('aria-checked', 'true');
+  await builtIn.click();
+  await expect
+    .poll(async () => JSON.stringify((await settingsFile())['builtInLinksOff']))
+    .toBe('["ado-pull-request"]');
+  await builtIn.click();
+  await expect.poll(async () => (await settingsFile())['builtInLinksOff']).toEqual([]);
+
+  // Everywhere text shows: the title, the panel's notes, Today; the composer while typing.
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Links today' }).click();
+  await expect(main.locator('.row .title a.auto-link')).toHaveText('DEV-123');
+  await main.locator('.row', { hasText: 'check' }).click({ position: { x: 400, y: 10 } });
+  await expect(main.locator('.context-panel .cm-fl-auto-link', { hasText: 'DEV-117' })).toHaveCount(
+    1,
+  );
+  await main.locator('.composer-input').click();
+  await main.keyboard.type('follow up https://tracker.example/t/DEV-300');
+  await expect(main.locator('.composer .link-chip')).toHaveText('DEV-300');
+  await main.locator('.composer-input').fill('');
+  await main.keyboard.press('Escape');
+  await main.locator('.sidebar > .nav').first().click();
+  await expect(main.locator('.today-greeting')).toBeVisible();
+  await expect(main.locator('a.auto-link', { hasText: 'DEV-123' }).first()).toBeVisible();
+
+  // The note editor: a pasted link shows short at once (the caret just after it).
+  await main.keyboard.press('Control+Shift+J');
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
+  await main.keyboard.type('ask about https://tracker.example/t/DEV-301');
+  await expect(main.locator('.note-editor .cm-fl-auto-link', { hasText: 'DEV-301' })).toHaveCount(
+    1,
+  );
+  await main.keyboard.press('Control+a');
+  await main.keyboard.press('Delete');
+
+  // The capture popup's chips know the patterns too.
+  await app.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  const popup = app.windows().find((page) => page.url().includes('capture-popup'));
+  if (!popup) throw new Error('capture popup page not found');
+  await popup.locator('#capture').fill('review https://tracker.example/t/DEV-302');
+  await expect(popup.locator('.link-chip')).toHaveText('DEV-302');
+  await popup.locator('#capture').fill('');
+  await popup.keyboard.press('Escape');
+  await bounds(1120, 780);
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

@@ -97,6 +97,14 @@ export const FlagIcon = ({ size = 15 }: IconProps): ReactElement =>
 export const HashIcon = ({ size = 15 }: IconProps): ReactElement =>
   svg(size, <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />, 1.9);
 
+/** D-105: a link (the composer's link chips). */
+export const LinkIcon = ({ size = 12 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M9 17H7A5 5 0 0 1 7 7h2" />,
+    <path key="b" d="M15 7h2a5 5 0 1 1 0 10h-2" />,
+    <path key="c" d="M8 12h8" />,
+  ]);
+
 export const PlusIcon = ({ size = 13 }: IconProps): ReactElement =>
   svg(size, <path d="M12 5v14M5 12h14" />, 2);
 

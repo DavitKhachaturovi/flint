@@ -123,6 +123,20 @@ describe('link patterns and ==highlight== in titles and bodies (D-84)', () => {
     setLinkPatterns([]);
     expect(titleHtml('fix AB#1234')).toBe('fix AB#1234');
   });
+
+  it('D-105: a short form with a hyphen links in titles and bodies too (as in the note editor)', async () => {
+    const { setLinkPatterns } = await import('./link-patterns.js');
+    const { titleHtml } = await import('./inline-markdown.js');
+    const { bodyHtml } = await import('./body-markdown.js');
+    setLinkPatterns([{ short: 'DEV-{id}', url: 'https://tracker.example/t/DEV-{id}' }]);
+    expect(titleHtml('check DEV-123 today')).toBe(
+      'check <a href="https://tracker.example/t/DEV-123" class="auto-link">DEV-123</a> today',
+    );
+    expect(bodyHtml('see DEV-7.')).toContain(
+      '<a href="https://tracker.example/t/DEV-7" class="auto-link">DEV-7</a>.',
+    );
+    setLinkPatterns([]);
+  });
 });
 
 describe('smart link titles (TASK-10, D-88)', () => {
@@ -149,5 +163,90 @@ describe('smart link titles (TASK-10, D-88)', () => {
       ),
     ).toBe('learn.example.com/en-us/…/clipboard-his…');
     expect(linkTitle('not a url', user)).toBe('not a url');
+  });
+});
+
+describe('D-105: inference, the fixed part, built-ins', () => {
+  it('a varying word between fixed text: repositories with a "-repo" suffix', async () => {
+    const { compileLinkPatterns, inferLinkPattern, shortFormOf, findShortForms } =
+      await import('./link-patterns.js');
+    const examples = [
+      {
+        url: 'https://dev.azure.com/acme/web/_git/unicorn-api',
+        short: 'unicorn-api-repo',
+      },
+      { url: 'https://dev.azure.com/acme/web/_git/platform', short: 'platform-repo' },
+    ];
+    // One example can't say which parts change.
+    expect(inferLinkPattern(examples.slice(0, 1)).ambiguous).toBe(true);
+    const inference = inferLinkPattern(examples);
+    expect(inference.problem).toBeUndefined();
+    expect(inference.ambiguous).toBe(false);
+    expect(inference.pattern).toMatchObject({
+      short: '{name}-repo',
+      url: 'https://dev.azure.com/acme/web/_git/{name}',
+    });
+    const compiled = compileLinkPatterns(inference.pattern ? [inference.pattern] : []);
+    expect(shortFormOf('https://dev.azure.com/acme/web/_git/web-shell', compiled)).toBe(
+      'web-shell-repo',
+    );
+    expect(findShortForms('see unicorn-api-repo and docs', compiled)[0]?.href).toBe(
+      'https://dev.azure.com/acme/web/_git/unicorn-api',
+    );
+  });
+
+  it('a number between fixed text: DEV-123 and DEV-200', async () => {
+    const { inferLinkPattern } = await import('./link-patterns.js');
+    expect(
+      inferLinkPattern([
+        { url: 'https://tracker.example/t/DEV-123', short: 'DEV-123' },
+        { url: 'https://tracker.example/t/DEV-200', short: 'DEV-200' },
+      ]).pattern,
+    ).toMatchObject({ short: 'DEV-{id}', url: 'https://tracker.example/t/DEV-{id}' });
+  });
+
+  it('a short form with no fixed part is refused, with a suggestion', async () => {
+    const { fixedPartProblem, suggestShortForm } = await import('./link-patterns.js');
+    expect(
+      fixedPartProblem({ short: '{name}', url: 'https://drop.example/{name}' }),
+    ).toContain('fixed text');
+    expect(fixedPartProblem({ short: 'AB#{id}', url: 'https://x.dev/{id}' })).toBeNull();
+    expect(fixedPartProblem({ short: '{name}-repo', url: 'https://x.dev/{name}' })).toBeNull();
+    expect(fixedPartProblem({ short: '#{id}', url: 'https://x.dev/{id}' })).toContain('fixed');
+    expect(suggestShortForm('https://drop.example/Qx7Lp-M42sTn', 'Qx7Lp-M42sTn')).toBe(
+      'de:Qx7Lp-M42sTn',
+    );
+  });
+
+  it('a built-in turned off no longer shortens pasted links; examples are kept', async () => {
+    const { linkTitle, setBuiltInLinksOff, readLinkPatterns, presetSample, LINK_PRESETS } =
+      await import('./link-patterns.js');
+    const url = 'https://dev.azure.com/acme/web/_git/api/pullrequest/42';
+    expect(linkTitle(url, [])).toBe('PR 42');
+    setBuiltInLinksOff(['ado-pull-request']);
+    expect(linkTitle(url, [])).not.toBe('PR 42');
+    setBuiltInLinksOff([]);
+    expect(LINK_PRESETS.map(presetSample)).toEqual([
+      'AB#42',
+      'PR 42',
+      'repo#42',
+      'repo!42',
+      'KEY-42',
+    ]);
+    expect(
+      readLinkPatterns([
+        {
+          short: 'AB#{id}',
+          url: 'https://x.dev/{id}',
+          examples: [{ url: 'https://x.dev/1', short: 'AB#1' }, 3],
+        },
+      ]),
+    ).toEqual([
+      {
+        short: 'AB#{id}',
+        url: 'https://x.dev/{id}',
+        examples: [{ url: 'https://x.dev/1', short: 'AB#1' }],
+      },
+    ]);
   });
 });

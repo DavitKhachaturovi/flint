@@ -29,6 +29,8 @@ export interface Settings {
   readonly hideNotificationText: boolean;
   /** NOTE-07, TASK-10, D-84: the user's link patterns (edited in M8's Settings). */
   readonly linkPatterns: readonly LinkPattern[];
+  /** D-105: the built-in link recognizers turned off in Settings → Links (preset ids). */
+  readonly builtInLinksOff: readonly string[];
   /**
    * TASK-06, Q-13, D-88: completed tasks older than this many days move to `.flint/archive/`; null
    * is off (the default; Flint offers it when a Completed section grows large).
@@ -64,6 +66,7 @@ export function defaultSettings(development = false): Settings {
     reminderSound: false,
     hideNotificationText: false,
     linkPatterns: [],
+    builtInLinksOff: [],
     autoArchiveDays: null,
     rolloverPrompt: true,
     snapshotEveryMinutes: 60,
@@ -115,6 +118,11 @@ export function readSettings(stored: Stored, development = false): Settings {
       defaults.hideNotificationText,
     ),
     linkPatterns: readLinkPatterns(stored['linkPatterns']),
+    builtInLinksOff: Array.isArray(stored['builtInLinksOff'])
+      ? (stored['builtInLinksOff'] as unknown[]).filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : [],
     autoArchiveDays: isDays(stored['autoArchiveDays']) ? stored['autoArchiveDays'] : null,
     rolloverPrompt: pick(stored, 'rolloverPrompt', isBoolean, defaults.rolloverPrompt),
     snapshotEveryMinutes: pick(

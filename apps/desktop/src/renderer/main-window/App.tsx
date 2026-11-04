@@ -57,6 +57,7 @@ import {
   FlagIcon,
   ImageIcon,
   HashIcon,
+  LinkIcon,
   InboxIcon,
   ListIcon,
   NoteIcon,
@@ -102,7 +103,7 @@ import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
 import { codeLanguage } from '../../shared/code-language.js';
-import { setLinkPatterns } from '../../shared/link-patterns.js';
+import { knownLinks, setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { imageMenuItems, relink, showInViewer, type LinkedNotice } from '../media/media.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
@@ -620,10 +621,13 @@ export function App(): ReactElement {
   /** NOTE-07, D-84: the user's link patterns, for titles, bodies and notes. */
   const [, setPatternsLoaded] = useState(0);
   useEffect(() => {
-    void window.flintMain.linkPatterns().then((patterns) => {
-      setLinkPatterns(patterns);
-      setPatternsLoaded((count) => count + 1);
-    });
+    void Promise.all([window.flintMain.linkPatterns(), window.flintMain.builtInLinksOff()]).then(
+      ([patterns, off]) => {
+        setLinkPatterns(patterns);
+        setBuiltInLinksOff(off);
+        setPatternsLoaded((count) => count + 1);
+      },
+    );
   }, []);
   /** UI-12, D-81: the interface size, shown a moment when it changes. */
   const [zoomShown, setZoomShown] = useState<{ readonly text: string; readonly id: number } | null>(
@@ -4085,7 +4089,6 @@ export function App(): ReactElement {
           <FootButton
             id={TRASH_ID}
             name="Trash"
-            count={trash?.deleted.length ?? 0}
             active={listId === TRASH_ID}
             icon={<TrashIcon />}
             onSelect={() => openList(TRASH_ID)}
@@ -4228,6 +4231,10 @@ export function App(): ReactElement {
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
                   onLinkPatterns={(patterns) => {
                     setLinkPatterns(patterns);
+                    setPatternsLoaded((count) => count + 1);
+                  }}
+                  onBuiltInLinksOff={(off) => {
+                    setBuiltInLinksOff(off);
                     setPatternsLoaded((count) => count + 1);
                   }}
                   zoom={zoomFactor}
@@ -4918,19 +4925,17 @@ function NavItem(props: {
 }
 
 /**
- * D-98, D-100, D-103: Settings or Trash at the sidebar's foot, one of two buttons side by side,
- * sized to its content. Its name is never cut: where its count can't fit too, the count wraps onto
- * a second line the button doesn't show.
+ * D-98, D-100, D-103, D-105: Settings or Trash at the sidebar's foot, two buttons of one size side
+ * by side, each its icon and name (Trash's count is in Trash).
  */
 function FootButton(props: {
   readonly id: string;
   readonly name: string;
-  readonly count?: number;
   readonly active: boolean;
   readonly icon: ReactElement;
   readonly onSelect: () => void;
 }): ReactElement {
-  const { id, name, count, active, icon, onSelect } = props;
+  const { id, name, active, icon, onSelect } = props;
   return (
     <button
       type="button"
@@ -4945,10 +4950,7 @@ function FootButton(props: {
       }}
     >
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
-      <span className="foot-label">
-        <span className="nav-name">{name}</span>
-        {count !== undefined && <span className="nav-count">{count}</span>}
-      </span>
+      <span className="nav-name">{name}</span>
     </button>
   );
 }
@@ -5108,6 +5110,8 @@ function Composer(props: {
   if ((target?.kind === 'existing' || target?.kind === 'close-match') && target.list.id !== listId)
     chips.push(`→ ${target.list.name}`);
   if (target?.kind === 'new') chips.push(`New list ${target.name}`);
+  // D-105: the links the task will show, while it is typed (a pasted URL as its short form).
+  const links = parsed ? knownLinks(parsed.title) : [];
 
   /**
    * CAP-11, D-57: a picker's choice becomes the same shorthand typing would give. The token of
@@ -5352,11 +5356,17 @@ function Composer(props: {
             <BellIcon size={15} />
           </button>
         </div>
-        {chips.length > 0 || parsed?.reminderLabel ? (
+        {chips.length > 0 || parsed?.reminderLabel || links.length > 0 ? (
           <span className="composer-chips">
             {chips.map((chip) => (
               <span key={chip} className="chip">
                 {chip}
+              </span>
+            ))}
+            {links.map((link) => (
+              <span key={`link:${link.label}`} className="chip link-chip" title={link.href}>
+                <LinkIcon />
+                {link.label}
               </span>
             ))}
             {parsed?.reminderLabel && (

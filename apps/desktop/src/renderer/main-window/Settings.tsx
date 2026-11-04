@@ -22,9 +22,13 @@ import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accele
 import { SHORTCUTS } from '../../shared/shortcuts.js';
 import {
   compileLinkPatterns,
+  fixedPartProblem,
   inferLinkPattern,
+  LINK_PRESETS,
   patternFromPreset,
+  presetSample,
   shortFormOf,
+  suggestShortForm,
   type LinkPattern,
 } from '../../shared/link-patterns.js';
 
@@ -260,13 +264,15 @@ export function SettingsScreen(props: {
   readonly onSnapshots: () => void;
   /** NOTE-07, D-104: link patterns saved in Settings → Links, for the window to use at once. */
   readonly onLinkPatterns: (patterns: readonly LinkPattern[]) => void;
+  /** D-105: the built-in recognizers turned off there. */
+  readonly onBuiltInLinksOff: (off: readonly string[]) => void;
   /** D-102: the interface size now, and setting an exact one. */
   readonly zoom: number;
   readonly onZoom: (level: number) => void;
   /** Bumped by Ctrl+F: the filter takes the caret. */
   readonly find: number;
 }): ReactElement {
-  const { onToast, onSnapshots, onLinkPatterns, zoom, onZoom, find } = props;
+  const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
   const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
   // NOTE-07, D-104: the link-pattern editor open.
@@ -537,7 +543,12 @@ export function SettingsScreen(props: {
             </button>
           )}
         </Row>
-        <LinkPatternList adding={addingLink} onAdding={setAddingLink} onPatterns={onLinkPatterns} />
+        <LinkPatternList
+          adding={addingLink}
+          onAdding={setAddingLink}
+          onPatterns={onLinkPatterns}
+          onBuiltInLinksOff={onBuiltInLinksOff}
+        />
       </Section>
 
       <Section id="data" filter={filter}>
@@ -961,19 +972,24 @@ function sampleOf(pattern: LinkPattern): { short: string; url: string } {
 }
 
 /**
- * NOTE-07, D-84, D-104: the user's link patterns, each as its short form and where it links, with
- * Delete (asked inline); and the editor that makes one from an example.
+ * NOTE-07, D-84, D-104, D-105: the user's link patterns, each as its short form and where it links,
+ * with Edit (the same editor, as it was left) and Delete (asked inline); the editor that makes one
+ * from examples; and the built-in recognizers, read-only, each with a switch.
  */
 function LinkPatternList(props: {
   readonly adding: boolean;
   readonly onAdding: (adding: boolean) => void;
   readonly onPatterns: (patterns: readonly LinkPattern[]) => void;
+  readonly onBuiltInLinksOff: (off: readonly string[]) => void;
 }): ReactElement {
-  const { adding, onAdding, onPatterns } = props;
+  const { adding, onAdding, onPatterns, onBuiltInLinksOff } = props;
   const [patterns, setPatterns] = useState<readonly LinkPattern[] | null>(null);
+  const [off, setOff] = useState<readonly string[]>([]);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
   useEffect(() => {
     void window.flintMain.linkPatterns().then(setPatterns);
+    void window.flintMain.builtInLinksOff().then(setOff);
   }, []);
   const save = (next: readonly LinkPattern[]): void => {
     void window.flintMain.saveLinkPatterns(next).then((kept) => {
@@ -982,12 +998,39 @@ function LinkPatternList(props: {
       onPatterns(kept);
     });
   };
+  const toggle = (id: string, on: boolean): void => {
+    const next = on ? off.filter((other) => other !== id) : [...off, id];
+    setOff(next);
+    void window.flintMain.setBuiltInLinksOff(next).then((kept) => {
+      if (kept) onBuiltInLinksOff(kept);
+    });
+  };
+  const editor = (index: number | null): ReactElement | null =>
+    patterns ? (
+      <LinkPatternEditor
+        key={index ?? 'new'}
+        initial={index === null ? null : (patterns[index] ?? null)}
+        existing={patterns.filter((_, at) => at !== index)}
+        onSave={(pattern) => {
+          save(
+            index === null
+              ? [...patterns, pattern]
+              : patterns.map((other, at) => (at === index ? pattern : other)),
+          );
+          if (index === null) onAdding(false);
+          else setEditing(null);
+        }}
+        onCancel={() => (index === null ? onAdding(false) : setEditing(null))}
+      />
+    ) : null;
   return (
     <>
       {patterns && patterns.length > 0 && (
         <ul className="link-patterns">
           {patterns.map((pattern, index) => {
             const sample = sampleOf(pattern);
+            if (editing === index)
+              return <li key={`${pattern.short} ${pattern.url}`}>{editor(index)}</li>;
             return (
               <li key={`${pattern.short} ${pattern.url}`} className="link-pattern">
                 <span className="keycap">{sample.short}</span>
@@ -1014,46 +1057,85 @@ function LinkPatternList(props: {
                     </button>
                   </span>
                 ) : (
-                  <button type="button" className="trash-action" onClick={() => setDeleting(index)}>
-                    Delete
-                  </button>
+                  <span className="link-pattern-actions">
+                    <button
+                      type="button"
+                      className="trash-action"
+                      onClick={() => {
+                        onAdding(false);
+                        setEditing(index);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="trash-action"
+                      onClick={() => setDeleting(index)}
+                    >
+                      Delete
+                    </button>
+                  </span>
                 )}
               </li>
             );
           })}
         </ul>
       )}
-      {adding && patterns && (
-        <LinkPatternEditor
-          existing={patterns}
-          onSave={(pattern) => {
-            save([...patterns, pattern]);
-            onAdding(false);
-          }}
-          onCancel={() => onAdding(false)}
-        />
-      )}
+      {adding && editing === null && editor(null)}
+      <span className="settings-name link-builtins-label">Built in</span>
+      <span className="settings-note">
+        Pasted links of these kinds show short, like PR 42. Turn one off to see its whole link.
+      </span>
+      <ul className="link-builtins">
+        {LINK_PRESETS.map((preset) => (
+          <li key={preset.id} className="link-pattern">
+            <span className="keycap">{presetSample(preset)}</span>
+            <span className="link-pattern-label">{preset.label}</span>
+            <Switch
+              on={!off.includes(preset.id)}
+              label={preset.label}
+              onChange={(on) => toggle(preset.id, on)}
+            />
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
 
+/** More places than this a pattern would link now, and the editor warns (D-105, Proposed). */
+const MANY_MATCHES = 20;
+
 /**
- * NOTE-07, D-84: a pattern from an example. Paste a link: a known kind (the presets) is recognised
- * and its short form filled in; else type the short form wanted. A live preview shows both ways
- * with another number; a second example when it's ambiguous; Advanced shows the pattern made.
+ * NOTE-07, D-84, D-105: a pattern from examples. Paste a link: a known kind (the presets) is
+ * recognised and its short form filled in; else type the short form wanted. When one example can't
+ * say which part changes, a second one is asked for (and stays while it is typed). A short form
+ * needs fixed text around what changes; the preview shows both ways and how many places in the
+ * lists and notes it would link now. Advanced shows the pattern made.
  */
 function LinkPatternEditor(props: {
+  /** Edit: the pattern as it was left (its examples, or one made from it). */
+  readonly initial: LinkPattern | null;
   readonly existing: readonly LinkPattern[];
   readonly onSave: (pattern: LinkPattern) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const { existing, onSave, onCancel } = props;
-  const [url, setUrl] = useState('');
-  const [short, setShort] = useState('');
-  const [typed, setTyped] = useState(false);
-  const [url2, setUrl2] = useState('');
-  const [short2, setShort2] = useState('');
+  const { initial, existing, onSave, onCancel } = props;
+  const start = initial
+    ? (initial.examples ?? [
+        { url: `https://${sampleOf(initial).url}`, short: sampleOf(initial).short },
+      ])
+    : [];
+  const [url, setUrl] = useState(start[0]?.url ?? '');
+  const [short, setShort] = useState(start[0]?.short ?? '');
+  const [typed, setTyped] = useState(initial !== null);
+  const [url2, setUrl2] = useState(start[1]?.url ?? '');
+  const [short2, setShort2] = useState(start[1]?.short ?? '');
+  // Once asked for, the second example stays while it is typed (it vanished mid-word: D-105).
+  const [second, setSecond] = useState(start.length > 1);
   const [advanced, setAdvanced] = useState(false);
+  const [matches, setMatches] = useState<number | null>(null);
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
   const preset = url.trim() === '' ? null : patternFromPreset(url);
@@ -1061,8 +1143,8 @@ function LinkPatternEditor(props: {
     ? shortFormOf(url.trim(), compileLinkPatterns([preset.pattern]))
     : null;
   const examples = [
-    { url, short },
-    ...(url2.trim() && short2.trim() ? [{ url: url2, short: short2 }] : []),
+    { url: url.trim(), short: short.trim() },
+    ...(second && url2.trim() && short2.trim() ? [{ url: url2.trim(), short: short2.trim() }] : []),
   ];
   const inference =
     url.trim() === ''
@@ -1072,27 +1154,48 @@ function LinkPatternEditor(props: {
         : short.trim() === ''
           ? null
           : inferLinkPattern(examples);
-  const pattern = inference?.pattern ?? null;
+  useEffect(() => {
+    if (inference?.ambiguous && !second) setSecond(true);
+  }, [inference?.ambiguous, second]);
+  const found = inference?.pattern ?? null;
+  const pattern: LinkPattern | null = found ? { ...found, examples } : null;
+  const loose = found ? fixedPartProblem(found) : null;
+  const suggestion = loose ? suggestShortForm(url, short) : null;
   const duplicate =
-    pattern !== null && existing.some((other) => other.short === pattern.short)
-      ? `You already have a pattern for ${sampleOf(pattern).short}.`
+    found !== null && existing.some((other) => other.short === found.short)
+      ? `You already have a pattern for ${sampleOf(found).short}.`
       : null;
-  const problem = inference?.problem ?? duplicate;
-  const ready = pattern !== null && !inference?.ambiguous && !problem;
+  const waiting = inference?.ambiguous === true && examples.length < 2;
+  const problem = waiting ? null : (inference?.problem ?? loose ?? duplicate);
+  const ready = found !== null && !inference?.ambiguous && !problem;
+  // D-105: how much it would link now, asked once it is clear (and not while it's typed fast).
+  const key = ready ? `${found.short} ${found.url}` : '';
+  useEffect(() => {
+    setMatches(null);
+    if (!ready || !found) return;
+    const timer = window.setTimeout(() => {
+      void window.flintMain.countLinkMatches(found).then(setMatches);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [key]);
   // The preview: the example with its number one higher, both ways.
   let preview: { short: string; url: string } | null = null;
   if (ready) {
-    const compiled = compileLinkPatterns([pattern]);
+    const compiled = compileLinkPatterns([found]);
     const groups = compiled[0]?.fullUrl.exec(url.trim())?.groups ?? {};
     const values: Record<string, string> = {};
     for (const [name, value] of Object.entries(groups))
       values[name] = /^\d+$/.test(value) ? String(Number(value) + 1) : value;
-    const nextUrl = fillTemplate(pattern.url, values);
-    const nextShort = fillTemplate(pattern.short, values);
+    const nextUrl = fillTemplate(found.url, values);
+    const nextShort = fillTemplate(found.short, values);
     if (shortFormOf(nextUrl, compiled) === nextShort) preview = { short: nextShort, url: nextUrl };
   }
   return (
-    <div className="settings-panel link-editor" role="group" aria-label="Add a link pattern">
+    <div
+      className="settings-panel link-editor"
+      role="group"
+      aria-label={initial ? 'Edit the link pattern' : 'Add a link pattern'}
+    >
       <label className="settings-field">
         <span className="settings-name">Example link</span>
         <input
@@ -1105,11 +1208,12 @@ function LinkPatternEditor(props: {
           onChange={(event) => {
             const next = event.target.value;
             setUrl(next);
+            if (next.trim() === '') setSecond(false);
             // A known kind fills in its short form, until one is typed.
             if (!typed) {
-              const found = next.trim() === '' ? null : patternFromPreset(next);
+              const known = next.trim() === '' ? null : patternFromPreset(next);
               setShort(
-                found ? (shortFormOf(next.trim(), compileLinkPatterns([found.pattern])) ?? '') : '',
+                known ? (shortFormOf(next.trim(), compileLinkPatterns([known.pattern])) ?? '') : '',
               );
             }
           }}
@@ -1134,10 +1238,10 @@ function LinkPatternEditor(props: {
           Recognised: {preset.preset.label}.
         </p>
       )}
-      {inference?.ambiguous && !inference.problem && (
+      {second && (
         <div className="settings-said">
           <p className="settings-note">
-            Another example, so Flint knows which parts change from link to link:
+            Another example, so Flint knows which part changes from link to link:
           </p>
           <label className="settings-field">
             <span className="settings-name">Second link</span>
@@ -1164,6 +1268,26 @@ function LinkPatternEditor(props: {
       {problem && url.trim() !== '' && (
         <p key={problem} className="settings-warning settings-said">
           {problem}
+          {suggestion && (
+            <>
+              {' '}
+              Try <span className="keycap">{suggestion}</span>{' '}
+              <button
+                type="button"
+                className="trash-action"
+                onClick={() => {
+                  // The same fixed text before the second example's short form too.
+                  const prefix = suggestion.slice(0, suggestion.length - short.trim().length);
+                  setShort(suggestion);
+                  if (short2.trim() !== '' && !short2.startsWith(prefix))
+                    setShort2(prefix + short2.trim());
+                  setTyped(true);
+                }}
+              >
+                Use it
+              </button>
+            </>
+          )}
         </p>
       )}
       {preview && (
@@ -1175,15 +1299,29 @@ function LinkPatternEditor(props: {
           <div>
             Pasting that link shows <span className="keycap">{preview.short}</span>
           </div>
+          {matches !== null && (
+            <div
+              key={matches}
+              className={
+                matches > MANY_MATCHES ? 'settings-warning settings-said' : 'settings-said'
+              }
+            >
+              {matches === 0
+                ? 'Nothing in your lists and notes matches it yet.'
+                : `It matches ${matches === 1 ? '1 place' : `${matches} places`} in your lists and notes now.`}
+              {matches > MANY_MATCHES &&
+                ' That looks like too many: a short form with clearer fixed text links only what you mean.'}
+            </div>
+          )}
         </div>
       )}
-      {advanced && pattern && (
+      {advanced && found && (
         <div className="settings-info settings-said">
           <div>
-            Short form: <span className="settings-path">{pattern.short}</span>
+            Short form: <span className="settings-path">{found.short}</span>
           </div>
           <div>
-            Link: <span className="settings-path">{pattern.url}</span>
+            Link: <span className="settings-path">{found.url}</span>
           </div>
         </div>
       )}

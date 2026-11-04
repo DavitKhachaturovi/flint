@@ -2443,6 +2443,11 @@ export class Workspace {
   }
 
   /** Lists as the shorthand sees them, Inbox first, with their most-recently-used rank. */
+  /** D-105: every list's and note's text, for counting what a link pattern would match. */
+  texts(): string[] {
+    return this.lists.map((list) => serializeDocument(list.file.document));
+  }
+
   listInfos(): ListInfo[] {
     const recent = this.recent;
     const infos = this.lists.map(({ entry }) => {

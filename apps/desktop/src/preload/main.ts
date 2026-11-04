@@ -143,6 +143,19 @@ const main = {
       readonly LinkPattern[] | null
     >;
   },
+  /** D-105: the built-in link recognizers turned off, and setting them. */
+  builtInLinksOff(): Promise<readonly string[]> {
+    return ipcRenderer.invoke(Channels.mainBuiltInLinksOff) as Promise<readonly string[]>;
+  },
+  setBuiltInLinksOff(off: readonly string[]): Promise<readonly string[] | null> {
+    return ipcRenderer.invoke(Channels.mainSetBuiltInLinksOff, off) as Promise<
+      readonly string[] | null
+    >;
+  },
+  /** D-105: how many places in the lists and notes the pattern would link now. */
+  countLinkMatches(pattern: LinkPattern): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainCountLinkMatches, pattern) as Promise<number>;
+  },
   snapshotSpace(): Promise<number> {
     return ipcRenderer.invoke(Channels.mainSnapshotSpace) as Promise<number>;
   },

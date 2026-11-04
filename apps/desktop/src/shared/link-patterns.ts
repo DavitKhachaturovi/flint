@@ -15,6 +15,14 @@ export interface LinkPattern {
   readonly url: string;
   /** What each varying placeholder matches; digits when not given. */
   readonly kinds?: Readonly<Record<string, 'digits' | 'word'>>;
+  /** D-105: the examples it was made from, so Edit opens the editor as it was left. */
+  readonly examples?: readonly LinkExample[];
+}
+
+/** An example link and the short form wanted for it (D-84). */
+export interface LinkExample {
+  readonly url: string;
+  readonly short: string;
 }
 
 const PLACEHOLDER = /\{([a-z][a-z0-9]*)\}/gi;
@@ -29,7 +37,7 @@ export function readLinkPatterns(stored: unknown): LinkPattern[] {
   if (!Array.isArray(stored)) return [];
   return stored.flatMap((item): LinkPattern[] => {
     if (typeof item !== 'object' || item === null) return [];
-    const { short, url, kinds } = item as Record<string, unknown>;
+    const { short, url, kinds, examples } = item as Record<string, unknown>;
     if (typeof short !== 'string' || typeof url !== 'string') return [];
     if (!/^https?:\/\//i.test(url)) return [];
     const varying = placeholders(short);
@@ -39,7 +47,26 @@ export function readLinkPatterns(stored: unknown): LinkPattern[] {
     if (typeof kinds === 'object' && kinds !== null)
       for (const [name, kind] of Object.entries(kinds as Record<string, unknown>))
         if (kind === 'digits' || kind === 'word') cleanKinds[name] = kind;
-    return [{ short, url, ...(Object.keys(cleanKinds).length > 0 && { kinds: cleanKinds }) }];
+    const cleanExamples = Array.isArray(examples)
+      ? examples
+          .filter(
+            (example): example is LinkExample =>
+              typeof example === 'object' &&
+              example !== null &&
+              typeof (example as Record<string, unknown>)['url'] === 'string' &&
+              typeof (example as Record<string, unknown>)['short'] === 'string',
+          )
+          .slice(0, 2)
+          .map((example) => ({ url: example.url, short: example.short }))
+      : [];
+    return [
+      {
+        short,
+        url,
+        ...(Object.keys(cleanKinds).length > 0 && { kinds: cleanKinds }),
+        ...(cleanExamples.length > 0 && { examples: cleanExamples }),
+      },
+    ];
   });
 }
 
@@ -131,6 +158,8 @@ export const linkPatternsVersion = (): number => version;
 
 /** Presets for M8's editor (D-84): what to recognise in an example link; no company URLs. */
 export interface LinkPreset {
+  /** D-105: stable, for turning a built-in off in the settings. */
+  readonly id: string;
   readonly label: string;
   /** The URL shape; `{…}` parts come from the example. */
   readonly url: string;
@@ -141,30 +170,35 @@ export interface LinkPreset {
 
 export const LINK_PRESETS: readonly LinkPreset[] = [
   {
+    id: 'ado-work-item',
     label: 'Azure DevOps work item',
     url: 'https://dev.azure.com/{org}/{project}/_workitems/edit/{id}',
     short: 'AB#{id}',
     kinds: { org: 'word', project: 'word' },
   },
   {
+    id: 'ado-pull-request',
     label: 'Azure DevOps pull request',
     url: 'https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}',
     short: 'PR {id}',
     kinds: { org: 'word', project: 'word', repo: 'word' },
   },
   {
+    id: 'github-issue',
     label: 'GitHub issue',
     url: 'https://github.com/{owner}/{repo}/issues/{n}',
     short: '{repo}#{n}',
     kinds: { owner: 'word', repo: 'word' },
   },
   {
+    id: 'github-pull-request',
     label: 'GitHub pull request',
     url: 'https://github.com/{owner}/{repo}/pull/{n}',
     short: '{repo}!{n}',
     kinds: { owner: 'word', repo: 'word' },
   },
   {
+    id: 'jira-issue',
     label: 'Jira issue',
     url: 'https://{site}.atlassian.net/browse/{key}-{n}',
     short: '{key}-{n}',
@@ -294,10 +328,113 @@ export function inferLinkPattern(
   const pattern: LinkPattern = { short: shortTemplate, url: urlTemplate, kinds };
   // The examples must come out of the pattern again.
   const compiled = compileLinkPatterns([pattern]);
-  for (const example of examples)
-    if (shortFormOf(example.url, compiled) !== example.short.trim())
-      return { pattern, ambiguous: true, problem: 'The examples don’t follow one pattern.' };
-  return { pattern, ambiguous };
+  if (examples.every((example) => shortFormOf(example.url, compiled) === example.short.trim()))
+    return { pattern, ambiguous };
+  // D-105: with two examples, one part that changes (a number or a word, like a repository's
+  // name) between fixed text in both the short form and the link.
+  const between = second ? inferBetween(first, second) : null;
+  if (between) return { pattern: between, ambiguous: false };
+  return { pattern, ambiguous: true, problem: 'The examples don’t follow one pattern.' };
+}
+
+const WORD_CHAR = /[A-Za-z0-9]/;
+
+/** The longest common start of two texts, ending where a word starts (so it never cuts one). */
+function commonStart(a: string, b: string): number {
+  let at = 0;
+  while (at < a.length && at < b.length && a[at] === b[at]) at++;
+  while (
+    at > 0 &&
+    WORD_CHAR.test(a[at - 1] ?? '') &&
+    (WORD_CHAR.test(a[at] ?? '') || WORD_CHAR.test(b[at] ?? ''))
+  )
+    at--;
+  return at;
+}
+
+/** The longest common end of two texts, starting where a word ends. */
+function commonEnd(a: string, b: string, start: number): number {
+  let at = 0;
+  while (
+    at < a.length - start &&
+    at < b.length - start &&
+    a[a.length - 1 - at] === b[b.length - 1 - at]
+  )
+    at++;
+  while (
+    at > 0 &&
+    WORD_CHAR.test(a[a.length - at] ?? '') &&
+    (WORD_CHAR.test(a[a.length - 1 - at] ?? '') || WORD_CHAR.test(b[b.length - 1 - at] ?? ''))
+  )
+    at--;
+  return at;
+}
+
+/** The part that differs between two texts, and the fixed text around it. */
+function split(a: string, b: string): { head: string; tail: string; one: string; two: string } {
+  const start = commonStart(a, b);
+  const end = commonEnd(a, b, start);
+  return {
+    head: a.slice(0, start),
+    tail: a.slice(a.length - end),
+    one: a.slice(start, a.length - end),
+    two: b.slice(start, b.length - end),
+  };
+}
+
+function inferBetween(first: LinkExample, second: LinkExample): LinkPattern | null {
+  const short = split(first.short.trim(), second.short.trim());
+  const url = split(first.url.trim(), second.url.trim());
+  if (short.one === '' || short.two === '') return null;
+  if (url.one !== short.one || url.two !== short.two) return null;
+  const digits = /^\d+$/.test(short.one) && /^\d+$/.test(short.two);
+  const kind = digits ? 'digits' : 'word';
+  const whole = new RegExp(`^${KIND_SOURCE[kind]}$`);
+  if (!whole.test(short.one) || !whole.test(short.two)) return null;
+  const name = digits ? 'id' : 'name';
+  const pattern: LinkPattern = {
+    short: `${short.head}{${name}}${short.tail}`,
+    url: `${url.head}{${name}}${url.tail}`,
+    kinds: { [name]: kind },
+  };
+  const compiled = compileLinkPatterns([pattern]);
+  return [first, second].every(
+    (example) => shortFormOf(example.url, compiled) === example.short.trim(),
+  )
+    ? pattern
+    : null;
+}
+
+/**
+ * NOTE-07, D-105: a short form needs fixed text before or after what changes (`AB#`, `-repo`,
+ * `dx:`), or ordinary words in lists and notes would become links. The problem, or null.
+ */
+export function fixedPartProblem(pattern: LinkPattern): string | null {
+  const first = pattern.short.search(PLACEHOLDER);
+  const head = first < 0 ? pattern.short : pattern.short.slice(0, first);
+  const tail = pattern.short.slice(pattern.short.lastIndexOf('}') + 1);
+  const fixed = (text: string): boolean => text.trim().length >= 2;
+  return fixed(head) || fixed(tail)
+    ? null
+    : 'The short form needs fixed text before or after the part that changes, or ordinary words would become links.';
+}
+
+/** D-105: a short form to suggest when one has no fixed part: the site's initials and a colon. */
+export function suggestShortForm(url: string, short: string): string {
+  let host: string;
+  try {
+    host = new URL(url.trim()).hostname;
+  } catch {
+    host = '';
+  }
+  const labels = host.split('.').filter((label) => label !== '' && label !== 'www');
+  if (labels.length > 1 && /^(com|org|net|io|ge|dev|app)$/.test(labels.at(-1) ?? '')) labels.pop();
+  const initials =
+    labels
+      .map((label) => label[0] ?? '')
+      .join('')
+      .toLowerCase() || 'go';
+  return `${initials.slice(0, 3)}:${short.trim()}`;
 }
 
 /** Where `token` stands last in `text` as a whole token. */
@@ -311,15 +448,36 @@ function lastToken(text: string, token: string): number {
  * TASK-10, D-84, D-88: the presets as built-in recognizers, for smart link titles (every part of
  * their URLs varies: they hold no company's address).
  */
-const BUILT_IN = compileLinkPatterns(
-  LINK_PRESETS.map((preset) => ({
-    short: preset.short,
-    url: preset.url,
-    kinds: Object.fromEntries(
-      placeholders(preset.url).map((name) => [name, preset.kinds?.[name] ?? 'digits'] as const),
+const builtIn = (presets: readonly LinkPreset[]): CompiledPattern[] =>
+  compileLinkPatterns(
+    presets.map((preset) => ({
+      short: preset.short,
+      url: preset.url,
+      kinds: Object.fromEntries(
+        placeholders(preset.url).map((name) => [name, preset.kinds?.[name] ?? 'digits'] as const),
+      ),
+    })),
+  );
+let BUILT_IN = builtIn(LINK_PRESETS);
+
+/** D-105: the built-in recognizers turned off in Settings → Links (by preset id). */
+export function setBuiltInLinksOff(off: readonly string[]): void {
+  BUILT_IN = builtIn(LINK_PRESETS.filter((preset) => !off.includes(preset.id)));
+  version++;
+}
+
+/** D-105: how a built-in reads, as an example (`PR 42`, `AB#1234`, `repo#12`). */
+export function presetSample(preset: LinkPreset): string {
+  return fill(
+    preset.short,
+    Object.fromEntries(
+      placeholders(preset.short).map((name) => [
+        name,
+        preset.kinds?.[name] === 'word' ? (name === 'key' ? 'KEY' : name) : '42',
+      ]),
     ),
-  })),
-);
+  );
+}
 
 /** The most characters a smart link title of another address shows (TASK-10). */
 const TITLE_LIMIT = 40;
@@ -357,4 +515,22 @@ export function linkTitle(url: string, compiled: readonly CompiledPattern[]): st
   const room = Math.max(8, TITLE_LIMIT - host.length - first.length - 4);
   const end = last.length > room ? `${last.slice(0, room - 1)}…` : last;
   return parts.length <= 1 ? `${host}/${end}` : `${host}/${first}/…/${end}`;
+}
+
+/**
+ * D-105: the links a text will show once saved, for chips while it is typed (the composer, the
+ * capture popup): a URL a pattern or a built-in knows, as its short form, and typed short forms.
+ */
+export function knownLinks(text: string): { readonly label: string; readonly href: string }[] {
+  const links: { label: string; href: string }[] = [];
+  for (const match of text.matchAll(/https?:\/\/[^\s<>()]+/gi)) {
+    const url = match[0].replace(/[.,;:!?]+$/, '');
+    const label = shortFormOf(url, active) ?? shortFormOf(url, BUILT_IN);
+    if (label) links.push({ label, href: url });
+  }
+  for (const link of findShortForms(text, active))
+    links.push({ label: link.text, href: link.href });
+  return links.filter(
+    (link, index) => links.findIndex((other) => other.label === link.label) === index,
+  );
 }

@@ -1,3 +1,4 @@
+import type { LinkPattern } from './link-patterns.js';
 import type { CaptureBlock, ListInfo, TextRange } from '@flint/core/shorthand';
 
 /**
@@ -81,6 +82,11 @@ export const Channels = {
   mainChangeFolder: 'main:change-folder',
   /** Main window → main: the user's link patterns, saved from Settings → Links (D-104). */
   mainSaveLinkPatterns: 'main:save-link-patterns',
+  /** Main window → main: the built-in link recognizers turned off, and setting them (D-105). */
+  mainBuiltInLinksOff: 'main:built-in-links-off',
+  mainSetBuiltInLinksOff: 'main:set-built-in-links-off',
+  /** Main window → main: how many places in the lists and notes a pattern would link (D-105). */
+  mainCountLinkMatches: 'main:count-link-matches',
   /** D-67, D-100: the animation speed changed (every window scales its motion). */
   mainAppearance: 'main:appearance',
   /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
@@ -173,6 +179,9 @@ export interface PopupShown {
   readonly prefill?: string;
   /** A one-off line at the top of the popup, e.g. why no selection could be read (CAP-07). */
   readonly hint?: string;
+  /** D-105: the link patterns and the built-ins turned off, for the link chips. */
+  readonly linkPatterns: readonly LinkPattern[];
+  readonly builtInLinksOff: readonly string[];
 }
 
 /** Popup → main: the input has focus and a frame with it has been produced (R-1). */

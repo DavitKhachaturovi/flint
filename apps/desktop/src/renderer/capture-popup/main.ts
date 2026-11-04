@@ -1,3 +1,4 @@
+import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import {
   blockFor,
   classifyPaste,
@@ -438,6 +439,9 @@ function blockKey(event: KeyboardEvent, index: number, field: HTMLTextAreaElemen
 }
 
 window.flintPopup.onShown((shown) => {
+  // D-105: the link chips know the user's patterns and the built-ins left on.
+  setLinkPatterns(shown.linkPatterns);
+  setBuiltInLinksOff(shown.builtInLinksOff);
   apply(shown, shown.replaceDraft === true);
   if (shown.prefill !== undefined) {
     // CAP-07, D-39, D-45: the selection is the task, or its body once something is typed.
