@@ -27,6 +27,8 @@ import {
   type PopupShown,
   type PopupSubmit,
   type ToastKind,
+  type SettingChange,
+  type SettingsView,
 } from '../shared/ipc.js';
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
@@ -611,13 +613,21 @@ async function start(): Promise<void> {
       .take(new Date())
       .then((taken) => {
         if (taken) log(`snapshot ${taken.id}`);
-        return snapshotStore.prune(new Date());
+        return snapshotStore.prune(new Date(), {
+          hourlyHours: settingsFile.current.keepHourlyHours,
+          dailyDays: settingsFile.current.keepDailyDays,
+        });
       })
       .catch((error: unknown) => log(`snapshot failed: ${String(error)}`));
   };
   const testHooks = e2eHooks();
   setTimeout(snapshot, testHooks ? 1000 : 60_000);
-  setInterval(snapshot, 3_600_000);
+  // D-100: as often as Settings says (an hour by default).
+  let snapshotTimer = setInterval(snapshot, settingsFile.current.snapshotEveryMinutes * 60_000);
+  const reschedule = (): void => {
+    clearInterval(snapshotTimer);
+    snapshotTimer = setInterval(snapshot, settingsFile.current.snapshotEveryMinutes * 60_000);
+  };
   if (testHooks)
     testHooks.snapshot = () => snapshotStore.take(new Date()).then((taken) => taken?.id ?? null);
   ipcMain.handle(Channels.mainSnapshots, (event) =>
@@ -655,6 +665,73 @@ async function start(): Promise<void> {
             })
         : null,
   );
+  // APP-11, D-100: Settings: what it shows, and each change applied at once.
+  const settingsView = (): SettingsView => {
+    const current = settingsFile.current;
+    return {
+      startWithWindows: current.startWithWindows,
+      notifications: current.notifications,
+      reminderSound: current.reminderSound,
+      hideNotificationText: current.hideNotificationText,
+      rolloverPrompt: current.rolloverPrompt,
+      autoArchiveDays: archiveDays,
+      snapshotEveryMinutes: current.snapshotEveryMinutes,
+      keepHourlyHours: current.keepHourlyHours,
+      keepDailyDays: current.keepDailyDays,
+      animationSpeed: current.animationSpeed,
+      flintFolder: folder.folder,
+      captureHotkey: current.captureHotkey,
+      captureSelectionHotkey: current.captureSelectionHotkey,
+      version: app.getVersion(),
+    };
+  };
+  workspace.rolloverPrompt = settingsFile.current.rolloverPrompt;
+  ipcMain.handle(Channels.mainSettings, (event) => (owns(event.sender) ? settingsView() : null));
+  ipcMain.handle(Channels.mainSetSetting, async (event, change: unknown) => {
+    if (!owns(event.sender) || typeof change !== 'object' || change === null) return null;
+    const { key, value } = change as SettingChange;
+    if (key === 'autoArchiveDays') {
+      if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1))
+        return settingsView();
+      archiveDays = value;
+      await settingsFile.update({ autoArchiveDays: value });
+      void archive();
+      return settingsView();
+    }
+    const before = settingsFile.current;
+    await settingsFile.update({ [key]: value });
+    const after = settingsFile.current;
+    if (before[key] === after[key] && after[key] !== value) return settingsView();
+    if (key === 'startWithWindows' && BUILD === 'installed')
+      applyStartWithWindows(after.startWithWindows);
+    if (key === 'rolloverPrompt') {
+      workspace.rolloverPrompt = after.rolloverPrompt;
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
+    }
+    if (key === 'snapshotEveryMinutes') reschedule();
+    if (key === 'keepHourlyHours' || key === 'keepDailyDays') snapshot();
+    if (key === 'animationSpeed' && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(Channels.mainAppearance, after.animationSpeed);
+    log(`setting ${key} is now ${JSON.stringify(after[key])}`);
+    return settingsView();
+  });
+  ipcMain.handle(Channels.mainSnapshotSpace, (event) =>
+    owns(event.sender) ? snapshotStore.size() : 0,
+  );
+  ipcMain.handle(Channels.mainClearSnapshots, async (event) => {
+    if (!owns(event.sender)) return 0;
+    const removed = await snapshotStore.clearOld();
+    log(`cleared ${removed} old snapshot(s)`);
+    return removed;
+  });
+  ipcMain.handle(Channels.mainOpenFolder, async (event, which: unknown) => {
+    if (!owns(event.sender)) return;
+    const path = which === 'logs' ? app.getPath('logs') : which === 'flint' ? folder.folder : null;
+    if (path) await shell.openPath(path);
+  });
+  ipcMain.handle(Channels.mainShowHotkeys, (event) => {
+    if (owns(event.sender)) hotkeysPanel.show();
+  });
   /** D-97: the tray's Restore from a snapshot…: the main window, on the Snapshots view. */
   const showSnapshots = (): void => {
     showMain();
@@ -945,6 +1022,12 @@ async function start(): Promise<void> {
     open: showMain,
     capture: () => popup.show(epochNow()),
     hotkeys: () => hotkeysPanel.show(),
+    settings: () => {
+      showMain();
+      const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings);
+      if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+      else send();
+    },
     quit: () => app.quit(),
   });
   const hotkeysPanel = hotkeysWindow(pageUrl('hotkeys'), hotkeys, (name, accelerator) => {
@@ -964,12 +1047,20 @@ async function start(): Promise<void> {
   // Reminders (REM-01, REM-05, REM-07 basic; D-64): toasts while Flint runs, missed ones once at
   // the next start or wake. Not in the R-1 benchmark build, which has no toast scheme.
   const toastOptions = (): ToastOptions | null =>
-    protocol ? { protocol, hideText: settings.hideNotificationText } : null;
+    protocol
+      ? {
+          protocol,
+          hideText: settingsFile.current.hideNotificationText,
+          silent: settingsFile.current.reminderSound,
+        }
+      : null;
   const showReminders = (plan: ToastPlan): void => {
+    // APP-11, D-100: notifications off: no toast, no chime (the Overdue card still has them).
+    if (!settingsFile.current.notifications && !hooks) return;
     // REM-06, D-94: Flint's own chime, once for what fires together, when it is turned on.
     if (
       (plan.separate.length > 0 || plan.summary) &&
-      (hooks?.reminderSound ?? settings.reminderSound)
+      (hooks?.reminderSound ?? settingsFile.current.reminderSound)
     ) {
       if (hooks) hooks.chimes = (hooks.chimes ?? 0) + 1;
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChime);

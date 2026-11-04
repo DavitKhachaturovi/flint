@@ -34,7 +34,24 @@ export interface Settings {
    * is off (the default; Flint offers it when a Completed section grows large).
    */
   readonly autoArchiveDays: number | null;
+  /** TODAY-02, D-100: "Unfinished from yesterday" on a new day's first open of Today. */
+  readonly rolloverPrompt: boolean;
+  /** DATA-04, D-99, D-100: how often a snapshot is taken (minutes), when something changed. */
+  readonly snapshotEveryMinutes: number;
+  /** D-99, D-100: how long every hour's newest snapshot is kept (hours). */
+  readonly keepHourlyHours: number;
+  /** D-99, D-100: how long every day's newest snapshot is kept (days). */
+  readonly keepDailyDays: number;
+  /** D-67, D-100: all motion slower, as it is, or quicker. */
+  readonly animationSpeed: AnimationSpeed;
 }
+
+export type AnimationSpeed = 'relaxed' | 'normal' | 'quick';
+
+/** D-100: the values Settings offers (anything else in the file falls back to the default). */
+export const SNAPSHOT_EVERY = [30, 60, 120, 240] as const;
+export const KEEP_HOURLY = [24, 48, 72, 168] as const;
+export const KEEP_DAILY = [14, 30, 60, 90] as const;
 
 /** Development builds default to their own folder, so they never write into the real one. */
 export function defaultSettings(development = false): Settings {
@@ -48,6 +65,11 @@ export function defaultSettings(development = false): Settings {
     hideNotificationText: false,
     linkPatterns: [],
     autoArchiveDays: null,
+    rolloverPrompt: true,
+    snapshotEveryMinutes: 60,
+    keepHourlyHours: 48,
+    keepDailyDays: 30,
+    animationSpeed: 'normal',
   };
 }
 
@@ -65,6 +87,10 @@ function pick<T>(
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+const oneOf =
+  (values: readonly number[]) =>
+  (value: unknown): value is number =>
+    typeof value === 'number' && values.includes(value);
 const isDays = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 365;
 
@@ -90,6 +116,22 @@ export function readSettings(stored: Stored, development = false): Settings {
     ),
     linkPatterns: readLinkPatterns(stored['linkPatterns']),
     autoArchiveDays: isDays(stored['autoArchiveDays']) ? stored['autoArchiveDays'] : null,
+    rolloverPrompt: pick(stored, 'rolloverPrompt', isBoolean, defaults.rolloverPrompt),
+    snapshotEveryMinutes: pick(
+      stored,
+      'snapshotEveryMinutes',
+      oneOf(SNAPSHOT_EVERY),
+      defaults.snapshotEveryMinutes,
+    ),
+    keepHourlyHours: pick(stored, 'keepHourlyHours', oneOf(KEEP_HOURLY), defaults.keepHourlyHours),
+    keepDailyDays: pick(stored, 'keepDailyDays', oneOf(KEEP_DAILY), defaults.keepDailyDays),
+    animationSpeed: pick(
+      stored,
+      'animationSpeed',
+      (value): value is AnimationSpeed =>
+        value === 'relaxed' || value === 'normal' || value === 'quick',
+      defaults.animationSpeed,
+    ),
   };
 }
 

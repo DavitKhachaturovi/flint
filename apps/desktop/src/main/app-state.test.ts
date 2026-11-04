@@ -32,6 +32,34 @@ describe('settings (APP-11)', () => {
     expect(readSettings({ hideNotificationText: true }).hideNotificationText).toBe(true);
   });
 
+  it('D-100: the new settings, their defaults, and only the values Settings offers', () => {
+    expect(readSettings({})).toMatchObject({
+      rolloverPrompt: true,
+      snapshotEveryMinutes: 60,
+      keepHourlyHours: 48,
+      keepDailyDays: 30,
+      animationSpeed: 'normal',
+    });
+    expect(
+      readSettings({
+        rolloverPrompt: false,
+        snapshotEveryMinutes: 240,
+        keepHourlyHours: 168,
+        keepDailyDays: 90,
+        animationSpeed: 'quick',
+      }),
+    ).toMatchObject({
+      rolloverPrompt: false,
+      snapshotEveryMinutes: 240,
+      keepHourlyHours: 168,
+      keepDailyDays: 90,
+      animationSpeed: 'quick',
+    });
+    expect(
+      readSettings({ snapshotEveryMinutes: 7, keepDailyDays: 'long', animationSpeed: 'warp' }),
+    ).toMatchObject({ snapshotEveryMinutes: 60, keepDailyDays: 30, animationSpeed: 'normal' });
+  });
+
   it("REM-06, D-94: Flint's own reminder sound is off unless turned on", () => {
     expect(readSettings({}).reminderSound).toBe(false);
     expect(readSettings({ reminderSound: true }).reminderSound).toBe(true);

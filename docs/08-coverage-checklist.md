@@ -656,3 +656,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 8 | Snapshots compared with now: tasks by ID restorable one by one, a note's line diff, deleted ones read-only | DATA-04 · Done (0.4.33) | 02, 09, D-99 |
 | 9 | Snapshot settings in Settings → Data | DATA-04, APP-11 · v1 · M8 | 02, D-99 |
 | 10 | Restoring single blocks inside a note | DATA-04 · Later | D-99 |
+
+## AI. M8 step 1: Settings (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Settings as one page with a section index; the Settings row above Trash; the tray's Settings | APP-11 · Done (0.4.34) | 02, 09, D-100 |
+| 2 | The reminder sound (Windows / Flint chime, the toast silent), notifications on/off, hide task text, the Focus Assist note | REM-06, REM-10 · Done (0.4.34) | 02, D-98, D-100 |
+| 3 | The rollover prompt on/off; auto-archive days | TODAY-02, TASK-06 · Done (0.4.34) | 02, D-100 |
+| 4 | Snapshots: how often, how long, the space used, Clear old snapshots; Export | DATA-04, DATA-05 · Done (0.4.34) | 02, 04, D-99, D-100 |
+| 5 | Interface size and animation speed | UI-12, APP-12 · Done (0.4.34) | 02, D-67, D-100 |
+| 6 | Keyboard shortcuts from one list | APP-11, NAV-02 · Done (0.4.34; the cheat sheet in step 2) | 02, D-80, D-100 |
+| 7 | The link-patterns editor; changing the Flint folder; recording hotkeys in place | NOTE-07, DATA-07, APP-08 · v1 · M8 step 1b | D-100 |

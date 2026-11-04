@@ -159,34 +159,40 @@ export class SnapshotStore {
    * hours, then the newest of each day for 30 days; older or redundant snapshots go, then the
    * blobs no snapshot uses. How many snapshots went.
    */
-  async prune(now: Date): Promise<number> {
+  async prune(
+    now: Date,
+    keep: { readonly hourlyHours: number; readonly dailyDays: number } = {
+      hourlyHours: 48,
+      dailyDays: 30,
+    },
+  ): Promise<number> {
     const snapshots = await this.list();
-    const keep = new Set<string>();
+    const kept = new Set<string>();
     const hours = new Set<string>();
     const days = new Set<string>();
     for (const snapshot of snapshots) {
       const age = now.getTime() - snapshot.at.getTime();
       const hour = snapshot.id.slice(0, 13);
       const day = snapshot.id.slice(0, 10);
-      if (age <= 3_600_000) keep.add(snapshot.id);
-      else if (age <= 48 * 3_600_000) {
-        if (!hours.has(hour)) keep.add(snapshot.id);
-      } else if (age <= 30 * 86_400_000) {
-        if (!days.has(day)) keep.add(snapshot.id);
+      if (age <= 3_600_000) kept.add(snapshot.id);
+      else if (age <= keep.hourlyHours * 3_600_000) {
+        if (!hours.has(hour)) kept.add(snapshot.id);
+      } else if (age <= keep.dailyDays * 86_400_000) {
+        if (!days.has(day)) kept.add(snapshot.id);
       }
       hours.add(hour);
       days.add(day);
     }
     // The newest is always kept, however old.
-    if (snapshots[0]) keep.add(snapshots[0].id);
+    if (snapshots[0]) kept.add(snapshots[0].id);
     let removed = 0;
     for (const snapshot of snapshots) {
-      if (keep.has(snapshot.id)) continue;
+      if (kept.has(snapshot.id)) continue;
       await unlink(join(this.store, `${snapshot.id}.json`)).catch(() => undefined);
       removed++;
     }
     const used = new Set(
-      snapshots.filter((each) => keep.has(each.id)).flatMap((each) => Object.values(each.files)),
+      snapshots.filter((each) => kept.has(each.id)).flatMap((each) => Object.values(each.files)),
     );
     for (const hash of this.hashes.values()) used.add(hash[2]);
     for (const shard of await readdir(this.blobs).catch(() => [] as string[])) {
@@ -197,6 +203,32 @@ export class SnapshotStore {
       if (names.every((name) => !used.has(name)))
         await rm(folder, { recursive: true, force: true });
     }
+    return removed;
+  }
+
+  /** D-99, D-100: the space the snapshots use, in bytes. */
+  async size(): Promise<number> {
+    let total = 0;
+    const walk = async (at: string): Promise<void> => {
+      for (const item of await readdir(at, { withFileTypes: true }).catch(() => [])) {
+        const path = join(at, item.name);
+        if (item.isDirectory()) await walk(path);
+        else total += (await stat(path).catch(() => null))?.size ?? 0;
+      }
+    };
+    await walk(this.store);
+    return total;
+  }
+
+  /** D-99, D-100: Clear old snapshots: all but the newest go (and what only they used). */
+  async clearOld(): Promise<number> {
+    const snapshots = await this.list();
+    let removed = 0;
+    for (const snapshot of snapshots.slice(1)) {
+      await unlink(join(this.store, `${snapshot.id}.json`)).catch(() => undefined);
+      removed++;
+    }
+    await this.prune(new Date(), { hourlyHours: 0, dailyDays: 0 });
     return removed;
   }
 }

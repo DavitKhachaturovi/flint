@@ -67,6 +67,16 @@ export const Channels = {
   mainShowSnapshots: 'main:show-snapshots',
   /** DATA-05, D-99: Export Flint folder… (a save dialog). */
   mainExport: 'main:export',
+  /** APP-11, D-100: Settings: read, change, and what goes with them. */
+  mainSettings: 'main:settings',
+  mainSetSetting: 'main:set-setting',
+  mainSnapshotSpace: 'main:snapshot-space',
+  mainClearSnapshots: 'main:clear-snapshots',
+  mainOpenFolder: 'main:open-folder',
+  mainShowHotkeys: 'main:show-hotkeys',
+  mainShowSettings: 'main:show-settings',
+  /** D-67, D-100: the animation speed changed (every window scales its motion). */
+  mainAppearance: 'main:appearance',
   /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
   mainQuickNote: 'main:quick-note',
   mainDiscardQuickNote: 'main:discard-quick-note',
@@ -367,6 +377,41 @@ export type SnapshotDiff =
 
 /** The Snapshots view's place (D-97): reached from the tray and from Trash, never a list. */
 export const SNAPSHOTS_ID = '@snapshots';
+
+/** APP-11, D-100: what the Settings view shows and changes. */
+export interface SettingsView {
+  readonly startWithWindows: boolean;
+  readonly notifications: boolean;
+  readonly reminderSound: boolean;
+  readonly hideNotificationText: boolean;
+  readonly rolloverPrompt: boolean;
+  readonly autoArchiveDays: number | null;
+  readonly snapshotEveryMinutes: number;
+  readonly keepHourlyHours: number;
+  readonly keepDailyDays: number;
+  readonly animationSpeed: 'relaxed' | 'normal' | 'quick';
+  readonly flintFolder: string;
+  readonly captureHotkey: string;
+  readonly captureSelectionHotkey: string;
+  readonly version: string;
+}
+
+/** The settings the Settings view can change, and the values they take. */
+export type SettingChange =
+  | {
+      readonly key: 'startWithWindows' | 'notifications' | 'reminderSound';
+      readonly value: boolean;
+    }
+  | { readonly key: 'hideNotificationText' | 'rolloverPrompt'; readonly value: boolean }
+  | { readonly key: 'autoArchiveDays'; readonly value: number | null }
+  | {
+      readonly key: 'snapshotEveryMinutes' | 'keepHourlyHours' | 'keepDailyDays';
+      readonly value: number;
+    }
+  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' };
+
+/** The Settings view's place (D-100): the row above Trash, never a list. */
+export const SETTINGS_ID = '@settings';
 
 /** The Trash view's place in the sidebar (D-97): a view, never a list. */
 export const TRASH_ID = '@trash';

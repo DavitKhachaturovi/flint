@@ -64,6 +64,7 @@ import {
   PinIcon,
   PlusIcon,
   ReminderBellIcon,
+  SettingsIcon,
   SortIcon,
   SunIcon,
   TrashIcon,
@@ -85,6 +86,7 @@ import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {
+  SETTINGS_ID,
   SNAPSHOTS_ID,
   TODAY_ID,
   TRASH_ID,
@@ -95,6 +97,7 @@ import {
 } from '../../shared/ipc.js';
 import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
+import { SettingsIndex, SettingsScreen } from './Settings.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -333,6 +336,29 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 /** NAV-07, D-85: what isn't blank space in the main area (a click there keeps the selection). */
 /** REM-06, D-94: Flint's own reminder sound (`scripts/make-chime.mjs`), bundled, never fetched. */
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
+
+/** D-67, D-100: every duration token scaled by the animation speed (this window). */
+const SPEEDS = { relaxed: 1.35, normal: 1, quick: 0.7 } as const;
+const DURATIONS = [
+  '--fl-dur-fast',
+  '--fl-dur-base',
+  '--fl-dur-page',
+  '--fl-dur-state',
+  '--fl-dur-complete',
+];
+const baseDurations = new Map<string, number>();
+function applySpeed(speed: keyof typeof SPEEDS): void {
+  const root = document.documentElement;
+  for (const name of DURATIONS) {
+    if (!baseDurations.has(name)) {
+      root.style.removeProperty(name);
+      baseDurations.set(name, parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0);
+    }
+    const base = baseDurations.get(name) ?? 0;
+    if (speed === 'normal') root.style.removeProperty(name);
+    else root.style.setProperty(name, `${Math.round(base * SPEEDS[speed])}ms`);
+  }
+}
 
 /** D-99: a slow second click (renaming in the sidebar): longer than a double-click's gap. */
 const RENAME_DELAY_MS = 450;
@@ -706,6 +732,12 @@ export function App(): ReactElement {
     // A reminder's Open (D-91): its list, the task scrolled into view, selected and flashed once
     // the rows are there; the panel shows it on wide screens, the body stays closed.
     window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
+    // APP-11, D-100: the tray's Settings; D-67: the animation speed, now and when it changes.
+    window.flintMain.onShowSettings(() => goRef.current({ list: SETTINGS_ID, page: null }));
+    void window.flintMain.settings().then((settings) => {
+      if (settings) applySpeed(settings.animationSpeed);
+    });
+    window.flintMain.onAppearance(applySpeed);
     // DATA-04, D-97: the tray's Restore from a snapshot…: the Snapshots view.
     window.flintMain.onShowSnapshots(() => goRef.current({ list: SNAPSHOTS_ID, page: null }));
     // REM-07, D-94: "N reminders you missed": Today, its Overdue card open and in view.
@@ -826,6 +858,8 @@ export function App(): ReactElement {
     readonly when: string;
     readonly diff: SnapshotDiff;
   } | null>(null);
+  /** D-100: Ctrl+F in Settings: its filter takes the caret. */
+  const [settingsFind, setSettingsFind] = useState(0);
   /** D-98: scrolled down far enough for the "back to top" button. */
   const [toTop, setToTop] = useState(false);
   /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
@@ -913,6 +947,8 @@ export function App(): ReactElement {
   /** D-99: the Snapshots view on a wide screen: a comparison opens in the panel's place. */
   const snapshotWide = wide && !panelHidden && listId === SNAPSHOTS_ID;
   const snapshotPanel = snapshotWide && snapshotOpen !== null;
+  /** D-100: Settings on a wide screen: its index in the panel's place. */
+  const settingsPanel = wide && !panelHidden && listId === SETTINGS_ID;
   useEffect(() => {
     if (listId !== SNAPSHOTS_ID) setSnapshotOpen(null);
   }, [listId]);
@@ -2533,6 +2569,12 @@ export function App(): ReactElement {
       }
       // Typing in a text field or the note editor (contenteditable) is never a command.
       if (isTextField(event.target)) return;
+      // D-100: Ctrl+F in Settings finds a setting.
+      if (key === 'f' && event.ctrlKey && !event.altKey && listIdRef.current === SETTINGS_ID) {
+        event.preventDefault();
+        setSettingsFind((count) => count + 1);
+        return;
+      }
       // NAV-06, D-88: Ctrl+F in a task list opens its find bar.
       if (
         key === 'f' &&
@@ -2796,10 +2838,13 @@ export function App(): ReactElement {
         marked={markedLists.size > 1 && markedLists.has(list.id)}
         onSelect={(how) => sidebarSelect(list.id, how)}
         onMenu={(at) => listMenu(list, at)}
-        onRename={() => {
-          setNamingProblem(null);
-          setNaming({ kind: 'rename', id: list.id, name: list.name });
-        }}
+        // D-99: not while its task's page is open (the click goes back to the list).
+        {...(!(pageTask && listId === list.id) && {
+          onRename: () => {
+            setNamingProblem(null);
+            setNaming({ kind: 'rename', id: list.id, name: list.name });
+          },
+        })}
       />
     );
   const listById = new Map(taskLists.map((list) => [list.id, list]));
@@ -3692,11 +3737,11 @@ export function App(): ReactElement {
   const [panelTop, setPanelTop] = useState(4);
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (!element || !(panelShown || trashPanel)) return;
+    if (!element || !(panelShown || trashPanel || settingsPanel)) return;
     const measure = (): void => {
       // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card, .content > .trash-bar',
+        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card, .content > .trash-bar, .content > .settings > .card',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -3716,7 +3761,7 @@ export function App(): ReactElement {
     const observer = new ResizeObserver(measure);
     if (content.current) observer.observe(content.current);
     return () => observer.disconnect();
-  }, [panelShown, trashPanel, view?.id, view?.mode, pageTask?.key]);
+  }, [panelShown, trashPanel, settingsPanel, view?.id, view?.mode, pageTask?.key]);
   // D-89: Shift+Enter or "Add notes" with the context panel: its notes editor takes the caret.
   useEffect(() => {
     const key = panelNotesFor.current;
@@ -3814,7 +3859,7 @@ export function App(): ReactElement {
       >
         <Glide
           card={sidebar}
-          target={listId === TRASH_ID ? null : listId}
+          target={listId === TRASH_ID || listId === SETTINGS_ID ? null : listId}
           version={[lists, naming, sidebarView]}
           className="nav-glide"
         />
@@ -3986,6 +4031,14 @@ export function App(): ReactElement {
         )}
         {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
         <div className="sidebar-foot">
+          {/* APP-11, D-100: Settings, above Trash. */}
+          <NavItem
+            list={{ id: SETTINGS_ID, name: 'Settings', mode: 'note', open: 0, inbox: true }}
+            active={listId === SETTINGS_ID}
+            icon={<SettingsIcon />}
+            onSelect={() => openList(SETTINGS_ID)}
+            onMenu={() => undefined}
+          />
           <NavItem
             list={{
               id: TRASH_ID,
@@ -4046,7 +4099,7 @@ export function App(): ReactElement {
           {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
           <div
             className={
-              panelState || todayColumn || trashPanel || snapshotPanel
+              panelState || todayColumn || trashPanel || snapshotPanel || settingsPanel
                 ? `pair ${pairSize ?? ''}`
                 : 'pair single'
             }
@@ -4129,6 +4182,15 @@ export function App(): ReactElement {
                 />
               )}
 
+              {/* APP-11, D-100: Settings. */}
+              {listId === SETTINGS_ID && !pageTask && (
+                <SettingsScreen
+                  find={settingsFind}
+                  onToast={(text) => showToast(text, false)}
+                  onSnapshots={() => openList(SNAPSHOTS_ID)}
+                  onZoom={(how) => void window.flintMain.zoom(how)}
+                />
+              )}
               {/* DATA-04, D-97: the Snapshots view. */}
               {listId === SNAPSHOTS_ID && !pageTask && (
                 <SnapshotsScreen
@@ -4441,6 +4503,14 @@ export function App(): ReactElement {
                 </button>
               </div>
             </div>
+            {/* D-100: Settings' index, in the panel's place. */}
+            {settingsPanel && (
+              <aside className="context-panel card trash-panel" aria-label="Settings sections">
+                <div className="panel-inner">
+                  <SettingsIndex scroller={scroller} />
+                </div>
+              </aside>
+            )}
             {/* D-99: a snapshot's list or note against now, in the panel's place. */}
             {snapshotPanel && (
               <aside className="context-panel card trash-panel" aria-label="Changes">

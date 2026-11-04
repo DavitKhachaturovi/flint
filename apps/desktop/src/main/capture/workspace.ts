@@ -1443,7 +1443,7 @@ export class Workspace {
     // Stable: the same list keeps its file order.
     high.sort((a, b) => a.rank - b.rank);
     const rollover =
-      this.today.answered() === today
+      !this.rolloverPrompt || this.today.answered() === today
         ? []
         : open
             .filter((task) => task.day < today)
@@ -2182,6 +2182,9 @@ export class Workspace {
       return label;
     });
   }
+
+  /** TODAY-02, D-100: whether "Unfinished from yesterday" is asked (Settings). */
+  rolloverPrompt = true;
 
   /** D-97: Delete now (gone for good, not undoable); true when it was there. */
   deleteFromTrash(name: string): Promise<boolean> {

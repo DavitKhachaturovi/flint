@@ -5102,3 +5102,233 @@ a.auto-link {
   opacity: 0.45;
   box-shadow: none;
 }
+
+/* APP-11, D-100: Settings: one page of section cards (rows: name and note on the left, the
+   control on the right), a filter at the top, the index in the side panel's place. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 32px;
+}
+
+.settings-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-find {
+  width: 220px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  outline: none;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font: inherit;
+  font-size: 13px;
+  color: var(--fl-text-primary);
+  transition: box-shadow var(--fl-dur-fast) ease;
+}
+
+.settings-find:focus {
+  box-shadow: inset 0 0 0 1px var(--fl-accent);
+}
+
+.settings-find::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 8px;
+  scroll-margin-top: 16px;
+  animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.settings-section-label {
+  padding-bottom: 6px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 52px;
+  padding: 10px 0;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.settings-section-label + .settings-row {
+  border-top: 0;
+}
+
+.settings-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-name {
+  font-size: 14px;
+  color: var(--fl-text-body);
+}
+
+.settings-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-muted);
+}
+
+.settings-path {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.settings-control {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-choice {
+  flex-wrap: wrap;
+}
+
+.settings-info {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fl-text-secondary);
+}
+
+.settings-info strong {
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+
+/* A switch: the track lights up, the knob slides. */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  transition:
+    background-color var(--fl-dur-base) ease,
+    box-shadow var(--fl-dur-base) ease;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fl-text-muted);
+  transition:
+    transform var(--fl-dur-base) var(--fl-ease-spring),
+    background-color var(--fl-dur-base) ease;
+}
+
+.switch.on {
+  background: var(--fl-strong-bg);
+  box-shadow: none;
+}
+
+.switch.on .switch-knob {
+  transform: translateX(16px);
+  background: var(--fl-strong-fg);
+}
+
+.settings-shortcuts {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 10px;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.settings-section-label + .settings-shortcuts {
+  border-top: 0;
+}
+
+.settings-shortcut-group {
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fl-text-secondary);
+}
+
+.settings-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 30px;
+  font-size: 13.5px;
+  color: var(--fl-text-body);
+}
+
+.settings-index {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-index .panel-label {
+  padding-bottom: 8px;
+}
+
+.settings-index-item {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9px;
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.settings-index-item:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.settings-index-item.on {
+  background: var(--fl-ground-float);
+  color: var(--fl-text-primary);
+}
+
+/* D-100: a key or a combination, as on the keyboard (Settings, later the cheat sheet). */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--fl-text-primary);
+}

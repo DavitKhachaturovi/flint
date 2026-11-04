@@ -323,7 +323,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - At the end of the day, Flint can optionally prompt: **"Roll over unfinished pinned tasks?"** (D-85): keep the unfinished pinned tasks pinned for tomorrow, or unpin them (they stay in their home lists).
 - The prompt is on by default and can be turned off in Settings. When and how the prompt appears is open question Q-04.
 
-- **Built (0.4.24, D-90, Q-04):** on the first open of Today on a new day, "Unfinished from yesterday" with **Clear** (unpins them, one undo step) and **Roll over**; × is Roll over. Turning it off comes with Settings (M8).
+- **Built (0.4.24, D-90, Q-04):** on the first open of Today on a new day, "Unfinished from yesterday" with **Clear** (unpins them, one undo step) and **Roll over**; × is Roll over. Turning it off comes with Settings (M8). **D-100 (0.4.34):** Settings → Today & lists → "Ask about unfinished pins".
 - **D-92:** the card stays on every open that day until Roll over, Clear or × is chosen.
 
 ### TODAY-03 — Reminders section in Today (v1)
@@ -380,7 +380,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### REM-06 — Sound option and Focus Assist (v1)
 - Settings: notification on/off, sound on/off (and choice of a short sound).
-- **D-98 (for M8):** "Reminder sound: Windows sound (default) / Flint chime"; the chime makes the toast silent, so one sound plays; an info card explains why one would choose it and what changes.
+- **D-98 (for M8):** "Reminder sound: Windows sound (default) / Flint chime"; the chime makes the toast silent, so one sound plays; an info card explains why one would choose it and what changes. **Built (0.4.34, D-100).**
 - **D-94 (0.4.28):** Flint's own sound is a short soft chime made for Flint, **off by default** (the reminder toast already plays Windows' sound); until Settings (M8) it is `reminderSound: true` in `settings.json`. The in-app alert comes with mini mode (M8).
 - **D-95:** the chime is **"Nudge"**: two soft rounded taps on one pitch, about half a second (`apps/desktop/scripts/make-chime.mjs`). Drop and Mallet, the runners-up, are candidates for the choice of sounds in Settings.
 - **D-96:** the bundled `sounds/chime.wav` is Davit's file and the source of truth; `make-chime.mjs` is a one-off tool that never runs in the build or the tests and refuses to write over it, and a test checks the file's hash.
@@ -678,6 +678,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Auto-archive completed tasks after N days (on/off, N).
 - Auto-link patterns.
 - **D-52:** until this screen exists (M8), the sidebar's Settings entry is **hidden**, not shown disabled (it did nothing).
+- **D-100 (0.4.34):** built as one page with a section index: General (start with Windows, the Flint folder), Capture & hotkeys (shown; Change… opens the Hotkeys window), Reminders (notifications, the reminder sound with Play and its info card, hide task text, the Focus Assist note), Today & lists (the rollover prompt, auto-archive), Data (snapshots: how often, how long, the space used, Clear old snapshots, Snapshots…, Export…), Appearance (interface size, animation speed), Keyboard shortcuts, About. A Settings row above Trash and the tray open it; Ctrl+F finds a setting. Next (step 1b): the link-patterns editor, changing the Flint folder, recording hotkeys in place.
 - **D-81, Interface size (M8):** the app zoom of UI-12 (per display), next to the animation speed.
 - **D-84, Link patterns (M8):** the editor for NOTE-07's patterns: paste an example link, type the short form, a live preview, a second example when ambiguous, an Advanced view of the generated pattern; presets for GitHub, Azure DevOps and Jira. **Monospace** default for notes (NOTE-06).
 - **D-80, Keyboard shortcuts (M8):** a section listing every non-obvious shortcut: Tab / Shift+Tab (indent, outdent), Shift+Enter (notes; Open as page in Navigate state), Alt+↑/↓, Ctrl+Shift+Space and Ctrl+Shift+X, the mini-mode shortcut, Alt+← / Alt+→ (back, forward), Ctrl+K, Ctrl+F, Ctrl+Shift+N, Ctrl+A, 1 / 2 / 3 / 0, Space, Delete, Ctrl+Z / Ctrl+Y. The **global hotkeys are rebound here** (APP-08: the Hotkeys window of D-44 moves into Settings). The `?` cheat sheet (NAV-02) shows the same list.

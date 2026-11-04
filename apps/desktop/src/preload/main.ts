@@ -16,6 +16,8 @@ import {
   type SidebarOutcome,
   type SidebarView,
   type RestoredItem,
+  type SettingChange,
+  type SettingsView,
   type SnapshotDiff,
   type SnapshotFile,
   type SnapshotSummary,
@@ -108,6 +110,35 @@ const main = {
   },
   restoreSnapshot(id: string, path: string | null): Promise<string | null> {
     return ipcRenderer.invoke(Channels.mainSnapshotRestore, id, path) as Promise<string | null>;
+  },
+  /** APP-11, D-100: Settings. */
+  settings(): Promise<SettingsView | null> {
+    return ipcRenderer.invoke(Channels.mainSettings) as Promise<SettingsView | null>;
+  },
+  setSetting(change: SettingChange): Promise<SettingsView | null> {
+    return ipcRenderer.invoke(Channels.mainSetSetting, change) as Promise<SettingsView | null>;
+  },
+  snapshotSpace(): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainSnapshotSpace) as Promise<number>;
+  },
+  clearSnapshots(): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainClearSnapshots) as Promise<number>;
+  },
+  openFolder(which: 'flint' | 'logs'): Promise<void> {
+    return ipcRenderer.invoke(Channels.mainOpenFolder, which) as Promise<void>;
+  },
+  showHotkeys(): Promise<void> {
+    return ipcRenderer.invoke(Channels.mainShowHotkeys) as Promise<void>;
+  },
+  /** D-100: the tray's Settings. */
+  onShowSettings(listener: () => void): void {
+    ipcRenderer.on(Channels.mainShowSettings, () => listener());
+  },
+  /** D-67, D-100: the animation speed (a scale for every duration). */
+  onAppearance(listener: (speed: 'relaxed' | 'normal' | 'quick') => void): void {
+    ipcRenderer.on(Channels.mainAppearance, (_event, speed: 'relaxed' | 'normal' | 'quick') =>
+      listener(speed),
+    );
   },
   /** NOTE-08, D-99: a new quick note (its ID), and discarding one left empty. */
   quickNote(): Promise<string | null> {

@@ -39,11 +39,13 @@ export interface ToastOptions {
   readonly protocol: string;
   /** REM-10: show only "Flint reminder", never the task or its time (screen sharing). */
   readonly hideText: boolean;
+  /** REM-06, D-98: Flint's own chime plays instead, so the toast is silent (one sound). */
+  readonly silent?: boolean;
 }
 
 export function reminderToastXml(
   toast: ReminderToast,
-  { protocol, hideText }: ToastOptions,
+  { protocol, hideText, silent = false }: ToastOptions,
 ): string {
   const actionUrl = (action: ReminderAction): string =>
     escapeXml(`${protocol}://reminder/${action}?id=${encodeURIComponent(toast.id)}`);
@@ -60,6 +62,7 @@ export function reminderToastXml(
     `<action content="Snooze 10m" arguments="${actionUrl('snooze')}" activationType="protocol"/>`,
     `<action content="Open" arguments="${actionUrl('open')}" activationType="protocol"/>`,
     '</actions>',
+    ...(silent ? ['<audio silent="true"/>'] : []),
     '</toast>',
   ].join('');
 }
@@ -73,7 +76,7 @@ export const MISSED_SUMMARY_ID = '*';
  */
 export function missedSummaryXml(
   summary: { readonly count: number; readonly titles: readonly string[] },
-  { protocol, hideText }: ToastOptions,
+  { protocol, hideText, silent = false }: ToastOptions,
 ): string {
   const open = escapeXml(`${protocol}://reminder/open?id=${encodeURIComponent(MISSED_SUMMARY_ID)}`);
   const shown = summary.titles.slice(0, 3).join(', ');
@@ -87,6 +90,7 @@ export function missedSummaryXml(
     '<actions>',
     `<action content="Open" arguments="${open}" activationType="protocol"/>`,
     '</actions>',
+    ...(silent ? ['<audio silent="true"/>'] : []),
     '</toast>',
   ].join('');
 }

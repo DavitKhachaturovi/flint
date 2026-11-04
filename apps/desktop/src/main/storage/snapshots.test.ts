@@ -45,6 +45,23 @@ describe('snapshots (DATA-04, D-84, D-97)', () => {
     ]);
   });
 
+  it('D-100: keeps as Settings says, and Clear old snapshots keeps only the newest', async () => {
+    const now = new Date(2026, 10, 30, 12, 0);
+    for (const [index, at] of [
+      new Date(2026, 10, 25, 9, 0),
+      new Date(2026, 10, 29, 9, 0),
+      new Date(2026, 10, 30, 11, 50),
+    ].entries()) {
+      await writeFile(join(folder, 'Inbox.md'), `version ${index}`);
+      await store.take(at);
+    }
+    // Daily ones kept 3 days only: the one from the 25th goes.
+    expect(await store.prune(now, { hourlyHours: 24, dailyDays: 3 })).toBe(1);
+    expect(await store.size()).toBeGreaterThan(0);
+    expect(await store.clearOld()).toBe(1);
+    expect((await store.list()).map((each) => each.id)).toEqual(['2026-11-30-115000']);
+  });
+
   it('keeps the last hour, one an hour for 48 hours, one a day for 30 days', async () => {
     const now = new Date(2026, 10, 30, 12, 0);
     const times = [

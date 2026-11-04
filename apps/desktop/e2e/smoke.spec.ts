@@ -619,7 +619,9 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   if (!main) throw new Error('main window page not found');
   const menu = main.locator('.fl-menu');
   const menuItems = menu.locator('.fl-menu-item > span:first-child');
-  await main.locator('.nav', { hasText: 'Errands' }).click();
+  // Only when it isn't open already: a second click on the open list renames it (D-99).
+  if (!/^Errands/.test((await main.locator('h1').textContent()) ?? ''))
+    await main.locator('.nav', { hasText: 'Errands' }).click();
   await expect(main.locator('h1')).toHaveText(/^Errands/);
 
   // Delete (Del): the task goes to .flint/trash, with Undo.
@@ -2051,10 +2053,18 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
   await resetMotion();
   await main.locator('.row', { hasText: 'First' }).click({ button: 'right' });
   await main.locator('.fl-menu .fl-menu-item', { hasText: 'More' }).hover();
+  // Watched frame by frame: the nudge starts once the change comes back (an IPC round trip).
+  await main.locator('.row', { hasText: 'First' }).evaluate((row) => {
+    (window as { nudged?: boolean }).nudged = false;
+    const until = performance.now() + 3000;
+    const look = (): void => {
+      if (row.getAnimations().length > 0) (window as { nudged?: boolean }).nudged = true;
+      else if (performance.now() < until) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
   await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Indent' }).click();
-  expect(
-    await main.locator('.row', { hasText: 'First' }).evaluate((row) => row.getAnimations().length),
-  ).toBeGreaterThan(0);
+  await expect.poll(() => main.evaluate(() => (window as { nudged?: boolean }).nudged)).toBe(true);
 
   // TASK-08, D-89: sorting moves the rows with a glide, and the line eases in and out.
   await resetMotion();
@@ -2994,7 +3004,9 @@ test('fixes after 0.4.32: quick notes, renaming in place, the pinned foot, a sna
   // An empty one left behind goes.
   await main.locator('.nav.quick-new').click();
   await expect(main.locator('.quick-title-input')).toBeVisible();
-  await main.locator('.sidebar > .nav').first().click();
+  await expect(main.locator('.quick-notes .nav')).toHaveCount(2);
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('h1')).toContainText('Inbox');
   await expect.poll(() => main.locator('.quick-notes .nav').count(), { timeout: 8000 }).toBe(1);
   // A title makes it a normal note in Lists.
   await quick.click();
@@ -3059,6 +3071,98 @@ test('fixes after 0.4.32: quick notes, renaming in place, the pinned foot, a sna
     .toMatch(/First \[id:: dif2\]\n- \[ \] Second \[id:: dif3\]\n- \[ \] Third/);
   await main.keyboard.press('Control+z');
   await expect.poll(() => readFile(file, 'utf8')).not.toContain('Second');
+});
+
+test('M8 step 1: Settings, one page with its index, every change applied and saved (APP-11, D-100)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const settingsFile = (): Promise<Record<string, unknown>> =>
+    readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8')
+      .then((text) => JSON.parse(text) as Record<string, unknown>)
+      .catch(() => ({}));
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: -6000, y: 0, width: 1800, height: 900 });
+  });
+  // The Settings row above Trash opens the page; its index sits in the panel's place.
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  await expect(main.locator('.settings-header h1')).toHaveText('Settings');
+  await expect(main.locator('.settings-section')).toHaveCount(8);
+  await expect(main.locator('.settings-index-item')).toHaveCount(8);
+  await main.locator('.settings-index-item', { hasText: 'Keyboard shortcuts' }).click();
+  await expect(main.locator('#settings-shortcuts')).toBeInViewport();
+  await expect(main.locator('#settings-shortcuts')).toContainText('Ctrl+Shift+J');
+
+  // A switch: applied and saved at once.
+  const rollover = main.locator('.switch[aria-label="Ask about unfinished pins"]');
+  await expect(rollover).toHaveAttribute('aria-checked', 'true');
+  await rollover.click();
+  await expect(rollover).toHaveAttribute('aria-checked', 'false');
+  await expect.poll(async () => (await settingsFile())['rolloverPrompt']).toBe(false);
+  await rollover.click();
+  await expect.poll(async () => (await settingsFile())['rolloverPrompt']).toBe(true);
+  // A choice: the reminder sound (the toast goes silent with the chime).
+  await main
+    .locator('[role=radiogroup][aria-label="Reminder sound"] [role=radio]', {
+      hasText: 'Flint chime',
+    })
+    .click();
+  await expect.poll(async () => (await settingsFile())['reminderSound']).toBe(true);
+  await main
+    .locator('[role=radiogroup][aria-label="Reminder sound"] [role=radio]', {
+      hasText: 'Windows sound',
+    })
+    .click();
+  await expect.poll(async () => (await settingsFile())['reminderSound']).toBe(false);
+  // The animation speed scales every duration in the window.
+  await main
+    .locator('[role=radiogroup][aria-label="Animation speed"] [role=radio]', { hasText: 'Quick' })
+    .click();
+  await expect
+    .poll(() =>
+      main.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-state').trim(),
+      ),
+    )
+    .toBe('182ms');
+  await main
+    .locator('[role=radiogroup][aria-label="Animation speed"] [role=radio]', { hasText: 'Normal' })
+    .click();
+  await expect
+    .poll(() =>
+      main.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-state').trim(),
+      ),
+    )
+    .toBe('260ms');
+  // Snapshots: how often, kept how long, the space they use.
+  await main
+    .locator('[role=radiogroup][aria-label="Take a snapshot"] [role=radio]', { hasText: '2 h' })
+    .click();
+  await expect.poll(async () => (await settingsFile())['snapshotEveryMinutes']).toBe(120);
+  await main
+    .locator('[role=radiogroup][aria-label="Take a snapshot"] [role=radio]', { hasText: 'Hourly' })
+    .click();
+  await expect(main.locator('.settings-row', { hasText: 'Space snapshots use' })).toContainText(
+    'MB',
+  );
+
+  // Ctrl+F finds a setting.
+  await main.keyboard.press('Control+f');
+  await expect(main.locator('.settings-find')).toBeFocused();
+  await main.keyboard.type('chime');
+  await expect(main.locator('.settings-section')).toHaveCount(1);
+  await expect(main.locator('.settings-section')).toHaveAttribute('aria-label', 'Reminders');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.settings-section')).toHaveCount(8);
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('main-window'),
+    );
+    win?.setBounds({ x: -6000, y: 0, width: 1120, height: 780 });
+  });
 });
 
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {

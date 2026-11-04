@@ -48,6 +48,14 @@ describe('reminder toasts (REM-05, R-3)', () => {
     expect(xml).not.toContain('flint://');
   });
 
+  it("D-98, D-100: with Flint's chime, the toast is silent (one sound)", () => {
+    const toast = { id: 'k3f9', title: 'Fix', label: 'Reminder', kind: 'reminder' as const };
+    expect(reminderToastXml(toast, { protocol: 'flint', hideText: false })).not.toContain('<audio');
+    expect(reminderToastXml(toast, { protocol: 'flint', hideText: false, silent: true })).toContain(
+      '<audio silent="true"/></toast>',
+    );
+  });
+
   it('a default toast has no scenario', () => {
     expect(
       reminderToastXml({ ...toast, kind: 'default' }, { protocol: 'flint', hideText: false }),

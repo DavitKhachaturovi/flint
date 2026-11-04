@@ -35,7 +35,7 @@ App data (not in the Flint folder):
 
 ```
 %APPDATA%\Flint\
-  settings.json                 ← all settings (APP-11), incl. Flint folder path and hotkeys; `reminderSound` (Flint's own chime, off by default, D-94)
+  settings.json                 ← all settings (APP-11), incl. Flint folder path and hotkeys; `reminderSound` (Flint's own chime, off by default, D-94); `rolloverPrompt`, `snapshotEveryMinutes`, `keepHourlyHours`, `keepDailyDays`, `animationSpeed` (D-100)
   window-state.json             ← window sizes/positions per monitor setup, and whether maximized (APP-05, D-96)
   ui-state.json                 ← collapsed sections and sidebar groups, the sidebar sort (LIST-06), last opened list, guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
   drafts.json                   ← capture popup draft (CAP-08)
