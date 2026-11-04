@@ -676,6 +676,21 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
       { key: 'Tab', run: indentMore, shift: indentLess },
+      // D-106 (docs/03 §3): Ctrl+K with text selected makes it a link, the caret where its address
+      // goes; with nothing selected the palette opens (the window has it).
+      {
+        key: 'Mod-k',
+        run: (view: EditorView): boolean => {
+          const { from, to } = view.state.selection.main;
+          if (from === to) return false;
+          const text = view.state.sliceDoc(from, to);
+          view.dispatch({
+            changes: { from, to, insert: `[${text}]()` },
+            selection: { anchor: from + text.length + 3 },
+          });
+          return true;
+        },
+      },
       ...(options.commands ? formatKeys(options.commands) : []),
       ...closeBracketsKeymap,
       ...defaultKeymap,

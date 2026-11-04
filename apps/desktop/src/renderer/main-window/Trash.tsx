@@ -304,6 +304,8 @@ export function TrashScreen(props: {
   readonly onSnapshots: () => void;
   /** D-99: Export Flint folder…, here until Settings → Data (M8). */
   readonly onExport: () => void;
+  /** D-106: a tab asked for (an archived task found with Ctrl+K). */
+  readonly tabRequest?: { readonly tab: 'deleted' | 'archived'; readonly at: number } | null;
 }): ReactElement {
   const { view, open, asPage, onOpen, onClose, onRestoreToEdit, onSnapshots, onExport } = props;
   const { onRestore, onDelete, onEmpty, onRestoreArchived } = props;
@@ -316,7 +318,12 @@ export function TrashScreen(props: {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-  const [tab, setTab] = useState<'deleted' | 'archived'>('deleted');
+  const [tab, setTab] = useState<'deleted' | 'archived'>(props.tabRequest?.tab ?? 'deleted');
+  const asked = props.tabRequest?.at;
+  useEffect(() => {
+    if (props.tabRequest) setTab(props.tabRequest.tab);
+    // Only a new request moves the tab.
+  }, [asked]);
   const [emptying, setEmptying] = useState(false);
   const now = new Date();
   const deleted = view?.deleted ?? [];

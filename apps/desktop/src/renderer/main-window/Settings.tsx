@@ -20,6 +20,7 @@ import type {
 } from '../../shared/ipc.js';
 import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
+import { PalettePill } from './Palette.js';
 import {
   compileLinkPatterns,
   fixedPartProblem,
@@ -266,13 +267,16 @@ export function SettingsScreen(props: {
   readonly onLinkPatterns: (patterns: readonly LinkPattern[]) => void;
   /** D-105: the built-in recognizers turned off there. */
   readonly onBuiltInLinksOff: (off: readonly string[]) => void;
+  /** NAV-01, D-106: the header's pill opens the palette. */
+  readonly onPalette: () => void;
   /** D-102: the interface size now, and setting an exact one. */
   readonly zoom: number;
   readonly onZoom: (level: number) => void;
   /** Bumped by Ctrl+F: the filter takes the caret. */
   readonly find: number;
 }): ReactElement {
-  const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
+  const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, onPalette, zoom, onZoom, find } =
+    props;
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
   const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
   // NOTE-07, D-104: the link-pattern editor open.
@@ -318,6 +322,7 @@ export function SettingsScreen(props: {
     <div className="settings">
       <header className="list-header settings-header">
         <h1>Settings</h1>
+        <PalettePill onOpen={onPalette} />
         <input
           ref={field}
           className="settings-find"

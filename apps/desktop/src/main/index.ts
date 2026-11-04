@@ -23,6 +23,7 @@ import {
   type ListAction,
   type SidebarAction,
   type ListChange,
+  type ListView,
   type PopupNotice,
   type PopupShown,
   type PopupSubmit,
@@ -74,6 +75,7 @@ import {
 } from './attachments.js';
 import { prepareFlintFolder } from './storage/flint-folder.js';
 import { checkFolder, clashes, copyFlintFolder } from './storage/folder-change.js';
+import { searchLists, searchTrash } from './search.js';
 import { compileLinkPatterns, findShortForms, readLinkPatterns } from '../shared/link-patterns.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
@@ -539,6 +541,21 @@ async function start(): Promise<void> {
     const kept = off.filter((id): id is string => typeof id === 'string');
     await settingsFile.update({ builtInLinksOff: kept });
     return kept;
+  });
+  // APP-03, D-106: Quit Flint from the palette (explicit, as the tray's).
+  ipcMain.on(Channels.mainQuit, (event) => {
+    if (owns(event.sender)) app.quit();
+  });
+  // NAV-01, D-106: the Ctrl+K palette's search.
+  ipcMain.handle(Channels.mainSearch, async (event, query: unknown, scope: unknown) => {
+    if (!owns(event.sender) || typeof query !== 'string' || query.trim() === '') return [];
+    if (scope === 'trash') return searchTrash(await workspace.trashView(), query);
+    const now = new Date();
+    const views = workspace
+      .summaries(now)
+      .map((list) => workspace.view(list.id, now))
+      .filter((view): view is ListView => view !== null);
+    return searchLists(views, query);
   });
   ipcMain.handle(Channels.mainCountLinkMatches, (event, pattern: unknown) => {
     if (!owns(event.sender)) return 0;

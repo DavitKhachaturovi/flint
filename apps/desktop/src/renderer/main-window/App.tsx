@@ -38,6 +38,7 @@ import type {
   ListSummary,
   ListItem,
   ListView,
+  SearchHit,
   UpNextItem,
   SidebarAction,
   SidebarItem,
@@ -98,7 +99,9 @@ import {
 } from '../../shared/ipc.js';
 import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
-import { SettingsIndex, SettingsScreen } from './Settings.js';
+import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js';
+import { Palette, PalettePill, type PaletteItem, type PaletteSources } from './Palette.js';
+import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -1265,6 +1268,14 @@ export function App(): ReactElement {
     };
   }, [travel]);
 
+  /** NAV-01, NAV-02, D-106: the Ctrl+K palette and the `?` cheat sheet. */
+  const [palette, setPalette] = useState(false);
+  const [cheatSheet, setCheatSheet] = useState(false);
+  /** D-106: Trash's tab asked for (an archived task found with Ctrl+K). */
+  const [trashTab, setTrashTab] = useState<{
+    readonly tab: 'deleted' | 'archived';
+    readonly at: number;
+  } | null>(null);
   /** NAV-06, D-88: the list's find bar: 0 closed; a new number focuses it again (Ctrl+F). */
   const [finding, setFinding] = useState(0);
   useEffect(() => setFinding(0), [listId]);
@@ -1949,20 +1960,9 @@ export function App(): ReactElement {
     [showToast],
   );
 
-  /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
-  const taskMenu = useCallback(
-    (row: TaskRow, at: Point, keepSelection = false): void => {
-      // TASK-07, D-86: inside the marks, the menu acts on all of them; outside, the right-clicked
-      // task alone is selected first (Windows Explorer).
-      if (!keepSelection && marked.size > 1 && marked.has(row.key)) {
-        bulkMenu(at);
-        return;
-      }
-      // D-87: a subtask's menu in the panel leaves the selection (the panel's task) as it is.
-      if (!keepSelection) {
-        setMarked(NOTHING);
-        setSelected(row.key);
-      }
+  /** UI-08, D-55, D-106: a task's actions: its right-click menu, and the Ctrl+K palette's. */
+  const taskEntries = useCallback(
+    (row: TaskRow, at: Point): MenuEntry[] => {
       const open = !row.done;
       const priority = (label: string, hint: string, value: TaskRow['priority']): MenuEntry => ({
         label,
@@ -1981,151 +1981,145 @@ export function App(): ReactElement {
           ]
         : [];
       // D-91: the menu in groups: the task, its properties, additions, moves, the rest, deleting.
-      openMenu(
-        [
-          {
-            label: open ? 'Complete' : 'Reopen',
-            hint: 'Space',
-            action: () => void toggle(row.key),
-          },
-          ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
-          { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
-          'divider',
-          ...(open
-            ? [
-                {
-                  label: 'Priority',
-                  submenu: [
-                    priority('High', '3', 'high'),
-                    priority('Medium', '2', 'medium'),
-                    priority('Low', '1', 'low'),
-                    priority('None', '0', null),
-                  ],
-                },
-                {
-                  label: 'Reminder',
-                  submenu: [
-                    {
-                      label: row.reminder ? 'Change…' : 'Set…',
-                      hint: 'R',
-                      action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
-                    },
-                    // REM-12, D-66.
-                    ...(row.reminder
-                      ? [
-                          {
-                            label: row.reminderState === 'muted' ? 'Turn on' : 'Turn off',
-                            action: () => void mute(row.key, row.reminderState !== 'muted'),
-                          },
-                        ]
-                      : []),
-                  ],
-                },
-              ]
-            : []),
-          // TODAY-01, D-85.
-          {
-            label: row.pinned ? 'Unpin' : 'Pin',
-            hint: 'P',
-            action: () => void pin([row], !row.pinned),
-          },
-          ...(add.length > 0 ? ['divider' as const, { label: 'Add', submenu: add }] : []),
-          'divider',
-          {
-            label: 'Move to…',
-            action: () =>
-              openListPicker(
-                {
-                  anchor: new DOMRect(at.x, at.y, 0, 0),
-                  returnFocus: null,
-                },
-                listInfos(lists),
-                { exclude: listId, placeholder: 'Move to list…' },
-                (pick) =>
-                  void moveTask(
-                    row.key,
-                    'newList' in pick ? { newList: pick.newList } : { list: pick.list.id },
-                  ),
-              ),
-          },
-          ...(open
-            ? [
-                {
-                  label: 'Duplicate',
-                  action: () =>
-                    void change({ kind: 'duplicate', key: row.key }).then((outcome) => {
-                      if (!outcome) return;
-                      showToast(outcome.label, true);
-                      if (outcome.key) setSelected(outcome.key);
-                    }),
-                },
-              ]
-            : []),
-          'divider',
-          {
-            label: 'More',
-            submenu: [
-              // D-79: Tab and Shift+Tab, made findable; D-89: an impossible one nudges the row.
-              ...(open
-                ? [
-                    {
-                      label: 'Indent',
-                      hint: 'Tab',
-                      action: () =>
-                        void change({ kind: 'indent', key: row.key }).then((outcome) => {
-                          if (!outcome) nudge(row.key, 'right');
-                        }),
-                    },
-                    {
-                      label: 'Outdent',
-                      hint: 'Shift+Tab',
-                      action: () =>
-                        void change({ kind: 'outdent', key: row.key }).then((outcome) => {
-                          if (!outcome) nudge(row.key, 'left');
-                        }),
-                    },
-                  ]
-                : []),
-              ...(unfenced
-                ? [
-                    {
-                      label: 'Format as code',
-                      action: () =>
-                        void change({
-                          kind: 'body',
-                          key: row.key,
-                          body: fencedBlock(
-                            row.body.trim(),
-                            classifyPaste(row.body) === 'json' ? 'json' : '',
-                          ),
-                        }),
-                    },
-                  ]
-                : []),
-              // TASK-17, D-85.
+      return [
+        {
+          label: open ? 'Complete' : 'Reopen',
+          hint: 'Space',
+          action: () => void toggle(row.key),
+        },
+        ...(open ? [{ label: 'Edit', hint: 'Enter', action: () => edit(row.key) }] : []),
+        { label: 'Open as page', hint: 'Shift+Enter', action: () => openPage(row.key) },
+        'divider',
+        ...(open
+          ? [
               {
-                label: 'Convert to note',
+                label: 'Priority',
+                submenu: [
+                  priority('High', '3', 'high'),
+                  priority('Medium', '2', 'medium'),
+                  priority('Low', '1', 'low'),
+                  priority('None', '0', null),
+                ],
+              },
+              {
+                label: 'Reminder',
+                submenu: [
+                  {
+                    label: row.reminder ? 'Change…' : 'Set…',
+                    hint: 'R',
+                    action: () => changeReminder(row, new DOMRect(at.x, at.y, 0, 0)),
+                  },
+                  // REM-12, D-66.
+                  ...(row.reminder
+                    ? [
+                        {
+                          label: row.reminderState === 'muted' ? 'Turn on' : 'Turn off',
+                          action: () => void mute(row.key, row.reminderState !== 'muted'),
+                        },
+                      ]
+                    : []),
+                ],
+              },
+            ]
+          : []),
+        // TODAY-01, D-85.
+        {
+          label: row.pinned ? 'Unpin' : 'Pin',
+          hint: 'P',
+          action: () => void pin([row], !row.pinned),
+        },
+        ...(add.length > 0 ? ['divider' as const, { label: 'Add', submenu: add }] : []),
+        'divider',
+        {
+          label: 'Move to…',
+          action: () =>
+            openListPicker(
+              {
+                anchor: new DOMRect(at.x, at.y, 0, 0),
+                returnFocus: null,
+              },
+              listInfos(lists),
+              { exclude: listId, placeholder: 'Move to list…' },
+              (pick) =>
+                void moveTask(
+                  row.key,
+                  'newList' in pick ? { newList: pick.newList } : { list: pick.list.id },
+                ),
+            ),
+        },
+        ...(open
+          ? [
+              {
+                label: 'Duplicate',
                 action: () =>
-                  void change({ kind: 'toNote', key: row.key }).then((outcome) => {
+                  void change({ kind: 'duplicate', key: row.key }).then((outcome) => {
                     if (!outcome) return;
                     showToast(outcome.label, true);
-                    // D-86: the new note opens, ready to type.
-                    setFocusNote(outcome.listId);
-                    go({ list: outcome.listId, page: null });
+                    if (outcome.key) setSelected(outcome.key);
                   }),
               },
-            ],
-          },
-          'divider',
-          { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
-        ],
-        at,
-      );
+            ]
+          : []),
+        'divider',
+        {
+          label: 'More',
+          submenu: [
+            // D-79: Tab and Shift+Tab, made findable; D-89: an impossible one nudges the row.
+            ...(open
+              ? [
+                  {
+                    label: 'Indent',
+                    hint: 'Tab',
+                    action: () =>
+                      void change({ kind: 'indent', key: row.key }).then((outcome) => {
+                        if (!outcome) nudge(row.key, 'right');
+                      }),
+                  },
+                  {
+                    label: 'Outdent',
+                    hint: 'Shift+Tab',
+                    action: () =>
+                      void change({ kind: 'outdent', key: row.key }).then((outcome) => {
+                        if (!outcome) nudge(row.key, 'left');
+                      }),
+                  },
+                ]
+              : []),
+            ...(unfenced
+              ? [
+                  {
+                    label: 'Format as code',
+                    action: () =>
+                      void change({
+                        kind: 'body',
+                        key: row.key,
+                        body: fencedBlock(
+                          row.body.trim(),
+                          classifyPaste(row.body) === 'json' ? 'json' : '',
+                        ),
+                      }),
+                  },
+                ]
+              : []),
+            // TASK-17, D-85.
+            {
+              label: 'Convert to note',
+              action: () =>
+                void change({ kind: 'toNote', key: row.key }).then((outcome) => {
+                  if (!outcome) return;
+                  showToast(outcome.label, true);
+                  // D-86: the new note opens, ready to type.
+                  setFocusNote(outcome.listId);
+                  go({ list: outcome.listId, page: null });
+                }),
+            },
+          ],
+        },
+        'divider',
+        { label: 'Delete', hint: 'Del', action: () => void remove(row.key) },
+      ];
     },
-    // D-86: the marks are read here (inside or outside them), so they are a dependency.
     [
-      marked,
-      bulkMenu,
       view,
       change,
       edit,
@@ -2143,6 +2137,25 @@ export function App(): ReactElement {
       showToast,
       go,
     ],
+  );
+  /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
+  const taskMenu = useCallback(
+    (row: TaskRow, at: Point, keepSelection = false): void => {
+      // TASK-07, D-86: inside the marks, the menu acts on all of them; outside, the right-clicked
+      // task alone is selected first (Windows Explorer).
+      if (!keepSelection && marked.size > 1 && marked.has(row.key)) {
+        bulkMenu(at);
+        return;
+      }
+      // D-87: a subtask's menu in the panel leaves the selection (the panel's task) as it is.
+      if (!keepSelection) {
+        setMarked(NOTHING);
+        setSelected(row.key);
+      }
+      openMenu(taskEntries(row, at), at);
+    },
+    // D-86: the marks are read here (inside or outside them), so they are a dependency.
+    [marked, bulkMenu, taskEntries],
   );
 
   /** LIST-01, D-52: the + next to "Lists", Ctrl+Shift+N and the sidebar's background. */
@@ -2575,6 +2588,19 @@ export function App(): ReactElement {
         newQuickNoteRef.current();
         return;
       }
+      // NAV-01, D-106: Ctrl+K opens the palette anywhere (in an editor with text selected, it
+      // makes that text a link instead: the editor has it).
+      if (key === 'k' && event.ctrlKey && !event.shiftKey && !event.altKey) {
+        // The editor made the selected text a link already.
+        if (event.defaultPrevented) return;
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (target?.closest('.cm-editor') && (window.getSelection()?.toString() ?? '') !== '')
+          return;
+        event.preventDefault();
+        setCheatSheet(false);
+        setPalette(true);
+        return;
+      }
       // Ctrl+Shift+N works anywhere in the window (LIST-01, D-52).
       if (key === 'n' && event.ctrlKey && event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -2596,6 +2622,12 @@ export function App(): ReactElement {
       }
       // Typing in a text field or the note editor (contenteditable) is never a command.
       if (isTextField(event.target)) return;
+      // NAV-02, D-106: `?` shows every shortcut.
+      if (event.key === '?' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        setCheatSheet(true);
+        return;
+      }
       // D-100: Ctrl+F in Settings finds a setting.
       if (key === 'f' && event.ctrlKey && !event.altKey && listIdRef.current === SETTINGS_ID) {
         event.preventDefault();
@@ -3658,6 +3690,261 @@ export function App(): ReactElement {
 
   // NAV-07, D-83: what the context panel shows.
   const selectedRow = view && selected && marked.size <= 1 ? findRow(view, selected) : null;
+
+  /** NAV-01, D-106: a place's name for the palette. */
+  const placeName = (id: string): string =>
+    id === TODAY_ID
+      ? 'Today'
+      : id === SETTINGS_ID
+        ? 'Settings'
+        : id === TRASH_ID
+          ? 'Trash'
+          : id === SNAPSHOTS_ID
+            ? 'Snapshots'
+            : (lists.find((list) => list.id === id)?.name ?? '');
+  /** D-106: Settings, at a section. */
+  const openSettings = (section?: string): void => {
+    openList(SETTINGS_ID);
+    if (section)
+      window.setTimeout(
+        () =>
+          document
+            .getElementById(`settings-${section}`)
+            ?.scrollIntoView({ block: 'start', behavior: 'instant' }),
+        200,
+      );
+  };
+  /** D-106: a right-click menu's entries as palette items (a submenu is a second step). */
+  const fromMenu = (entries: readonly MenuEntry[], prefix: string): PaletteItem[] =>
+    entries.flatMap((entry): PaletteItem[] => {
+      if (entry === 'divider' || entry.disabled) return [];
+      const id = `${prefix}:${entry.label}`;
+      const submenu = entry.submenu;
+      return submenu
+        ? [
+            {
+              id,
+              label: entry.label,
+              step: () => ({ title: entry.label, items: fromMenu(submenu, id) }),
+            },
+          ]
+        : [
+            {
+              id,
+              label: entry.label,
+              hint: entry.hint,
+              ...(entry.action && { run: entry.action }),
+            },
+          ];
+    });
+  /** D-106: what the palette offers now (built when it opens). */
+  const paletteSources = (): PaletteSources => {
+    const go =
+      (id: string): (() => void) =>
+      () =>
+        openList(id);
+    const groups = (sidebarView?.items ?? []).filter(
+      (item): item is Extract<SidebarItem, { kind: 'group' }> => item.kind === 'group',
+    );
+    const places: PaletteItem[] = [
+      { id: 'go:today', label: 'Today', hint: undefined, run: go(TODAY_ID) },
+      ...lists.map((list) => ({
+        id: `go:${list.id}`,
+        label: list.name,
+        detail: list.mode === 'note' ? 'Note' : undefined,
+        run: go(list.id),
+      })),
+      ...groups.map((group) => ({
+        id: `go:group:${group.id}`,
+        label: group.name,
+        detail: 'Group',
+        run: () => {
+          if (sidebarView?.collapsed.includes(group.id)) toggleGroup(group.id);
+          const first = group.lists[0];
+          if (first) openList(first);
+        },
+      })),
+      { id: 'go:settings', label: 'Settings', run: () => openSettings() },
+      ...SETTINGS_SECTIONS.map((section) => ({
+        id: `go:settings:${section.id}`,
+        label: `Settings: ${section.name}`,
+        run: () => openSettings(section.id),
+      })),
+      { id: 'go:trash', label: 'Trash', run: go(TRASH_ID) },
+      { id: 'go:snapshots', label: 'Snapshots', run: go(SNAPSHOTS_ID) },
+    ];
+    // Recent: the places gone through this session, newest first, not the one shown.
+    const seen = new Set<string>([listId]);
+    const recent: PaletteItem[] = [];
+    for (const place of [...history.current.places].reverse()) {
+      if (seen.has(place.list)) continue;
+      seen.add(place.list);
+      const name = placeName(place.list);
+      if (name) recent.push({ id: `recent:${place.list}`, label: name, run: go(place.list) });
+    }
+    // The selected task's actions (its right-click menu); Move to… lists the lists.
+    let task: PaletteItem[] = [];
+    if (selectedRow) {
+      const row = selectedRow;
+      const box = document
+        .querySelector(`.row[data-key="${CSS.escape(row.key)}"]`)
+        ?.getBoundingClientRect();
+      const at = box ? { x: box.left + 48, y: box.bottom } : { x: 240, y: 160 };
+      const home = view?.id === TODAY_ID ? (row.home?.listId ?? listId) : listId;
+      task = fromMenu(taskEntries(row, at), 'task').map((item) =>
+        item.label === 'Move to…'
+          ? {
+              id: 'task:move',
+              label: 'Move to…',
+              step: () => ({
+                title: 'Move to',
+                items: lists
+                  .filter((list) => list.mode === 'tasks' && list.id !== home)
+                  .map((list) => ({
+                    id: `move:${list.id}`,
+                    label: list.name,
+                    run: () => void moveTask(row.key, { list: list.id }),
+                  })),
+              }),
+            }
+          : item,
+      );
+    }
+    const zoomLevels = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
+    const commands: PaletteItem[] = [
+      {
+        id: 'new:list',
+        label: 'New task list',
+        hint: 'Ctrl+Shift+N',
+        run: () => setNaming({ kind: 'new', mode: 'tasks' }),
+      },
+      { id: 'new:note', label: 'New note', run: () => setNaming({ kind: 'new', mode: 'note' }) },
+      { id: 'new:group', label: 'New group', run: () => setNaming({ kind: 'newGroup' }) },
+      { id: 'new:quick', label: 'Quick note', hint: 'Ctrl+Shift+J', run: () => newQuickNote() },
+      ...(view?.mode === 'tasks' && !pageTask && view.id !== TODAY_ID
+        ? [
+            {
+              id: 'list:find',
+              label: 'Find in list',
+              hint: 'Ctrl+F',
+              run: () => setFinding((count) => count + 1),
+            },
+          ]
+        : []),
+      ...fromMenu(sortItems(), 'sort'),
+      ...(view && !lists.find((list) => list.id === view.id)?.inbox && view.id !== TODAY_ID
+        ? [
+            {
+              id: 'list:rename',
+              label: `Rename ${view.mode === 'note' ? 'note' : 'list'}`,
+              run: () => setNaming({ kind: 'rename', id: view.id, name: view.name }),
+            },
+          ]
+        : []),
+      ...fromMenu(panelItem(), 'panel'),
+      {
+        id: 'app:size',
+        label: 'Interface size',
+        keywords: 'zoom bigger smaller',
+        hint: 'Ctrl+= / Ctrl+−',
+        step: () => ({
+          title: 'Interface size',
+          items: zoomLevels.map((level) => ({
+            id: `size:${level}`,
+            label: `${Math.round(level * 100)}%`,
+            run: () => void window.flintMain.zoom(level),
+          })),
+        }),
+      },
+      {
+        id: 'app:folder',
+        label: 'Open Flint folder',
+        run: () => void window.flintMain.openFolder('flint'),
+      },
+      {
+        id: 'app:export',
+        label: 'Export Flint folder…',
+        keywords: 'zip backup',
+        run: () => void window.flintMain.exportFolder(),
+      },
+      {
+        id: 'app:snapshot',
+        label: 'Restore from a snapshot…',
+        keywords: 'older version',
+        run: go(SNAPSHOTS_ID),
+      },
+      {
+        id: 'app:shortcuts',
+        label: 'Keyboard shortcuts',
+        hint: '?',
+        run: () => setCheatSheet(true),
+      },
+      {
+        id: 'app:quit',
+        label: 'Quit Flint',
+        keywords: 'exit close',
+        run: () => window.flintMain.quit(),
+      },
+    ];
+    return { recent, task, places, commands };
+  };
+  /** D-106: the lists and notes searched in the main process. */
+  const paletteSearch = useCallback(
+    (query: string, scope: 'live' | 'trash') => window.flintMain.search(query, scope),
+    [],
+  );
+  /** D-106: a search result, opening where it is. */
+  const hitItem = useCallback(
+    (hit: SearchHit): PaletteItem => {
+      if (hit.kind === 'task')
+        return {
+          id: `task:${hit.listId}:${hit.key ?? ''}`,
+          label: hit.text,
+          detail: hit.detail ? `${hit.listName} · ${hit.detail}` : hit.listName,
+          indices: hit.indices,
+          quiet: hit.done === true,
+          run: () => {
+            if (hit.key) reveal(hit.listId, hit.key);
+          },
+        };
+      if (hit.kind === 'line')
+        return {
+          id: `line:${hit.listId}:${hit.line ?? 0}`,
+          label: hit.text,
+          detail: hit.listName,
+          indices: hit.indices,
+          run: () => openList(hit.listId),
+        };
+      if (hit.kind === 'deleted')
+        return {
+          id: `deleted:${hit.trashId ?? ''}`,
+          label: hit.text,
+          detail: `Deleted · from ${hit.listName}`,
+          indices: hit.indices,
+          quiet: true,
+          run: () => {
+            openList(TRASH_ID);
+            setTrashTab({ tab: 'deleted', at: Date.now() });
+            if (hit.trashId)
+              void window.flintMain
+                .trashPreview(hit.trashId)
+                .then((preview) => setTrashOpen(preview));
+          },
+        };
+      return {
+        id: `archived:${hit.listId}:${hit.key ?? ''}`,
+        label: hit.text,
+        detail: `Archived · ${hit.listName}`,
+        indices: hit.indices,
+        quiet: true,
+        run: () => {
+          openList(TRASH_ID);
+          setTrashTab({ tab: 'archived', at: Date.now() });
+        },
+      };
+    },
+    [reveal, openList],
+  );
   // D-92, D-93: Today has its own column; the selected task's details take its place.
   const todayWide = panelShown && view?.id === TODAY_ID && !pageTask;
   todayWideRef.current = todayWide;
@@ -4233,6 +4520,7 @@ export function App(): ReactElement {
                     setLinkPatterns(patterns);
                     setPatternsLoaded((count) => count + 1);
                   }}
+                  onPalette={() => setPalette(true)}
                   onBuiltInLinksOff={(off) => {
                     setBuiltInLinksOff(off);
                     setPatternsLoaded((count) => count + 1);
@@ -4268,6 +4556,7 @@ export function App(): ReactElement {
                   onRestoreToEdit={restoreToEdit}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
                   onExport={() => void window.flintMain.exportFolder()}
+                  tabRequest={trashTab}
                   onRestore={(id) =>
                     void window.flintMain.restoreFromTrash(id).then((restored) => {
                       // D-98: it stays in Trash; the toast offers the way to it.
@@ -4299,11 +4588,14 @@ export function App(): ReactElement {
                   prompt and today's reminders, above the composer and Focus. */}
               {view && !pageTask && view.id === TODAY_ID && (
                 <>
-                  <TodayGreeting
-                    open={view.open}
-                    reminders={view.today?.reminders ?? []}
-                    progress={view.today?.progress}
-                  />
+                  <div className="list-header-top today-top">
+                    <TodayGreeting
+                      open={view.open}
+                      reminders={view.today?.reminders ?? []}
+                      progress={view.today?.progress}
+                    />
+                    <PalettePill onOpen={() => setPalette(true)} />
+                  </div>
                   <RolloverCard
                     tasks={view.today?.rollover ?? []}
                     onAnswer={(clear) =>
@@ -4329,10 +4621,13 @@ export function App(): ReactElement {
               )}
               {view && !pageTask && view.mode === 'tasks' && view.id !== TODAY_ID && (
                 <header className="list-header">
-                  <h1>
-                    {view.name}
-                    {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                  </h1>
+                  <div className="list-header-top">
+                    <h1>
+                      {view.name}
+                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                    </h1>
+                    <PalettePill onOpen={() => setPalette(true)} />
+                  </div>
                   {lists.find((list) => list.id === view.id)?.inbox && (
                     <span className="subtitle">{INBOX_SUBTITLE}</span>
                   )}
@@ -4706,6 +5001,17 @@ export function App(): ReactElement {
         </div>
       )}
 
+      {/* NAV-01, D-106: the Ctrl+K palette. */}
+      {palette && (
+        <Palette
+          sources={paletteSources()}
+          search={paletteSearch}
+          hitItem={hitItem}
+          onClose={() => setPalette(false)}
+        />
+      )}
+      {/* NAV-02, D-106: the `?` cheat sheet. */}
+      {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
       {lightbox && (
         <Lightbox
           images={lightbox.images}

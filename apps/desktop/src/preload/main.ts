@@ -20,6 +20,7 @@ import {
   type FolderChange,
   type FolderChangeOutcome,
   type FolderChoice,
+  type SearchHit,
   type HotkeyName,
   type HotkeysView,
   type RebindOutcome,
@@ -155,6 +156,14 @@ const main = {
   /** D-105: how many places in the lists and notes the pattern would link now. */
   countLinkMatches(pattern: LinkPattern): Promise<number> {
     return ipcRenderer.invoke(Channels.mainCountLinkMatches, pattern) as Promise<number>;
+  },
+  /** NAV-01, D-106: the palette's search: the lists and notes, or Trash and the archive. */
+  search(query: string, scope: 'live' | 'trash'): Promise<readonly SearchHit[]> {
+    return ipcRenderer.invoke(Channels.mainSearch, query, scope) as Promise<readonly SearchHit[]>;
+  },
+  /** APP-03, D-106: Quit Flint (the palette's command). */
+  quit(): void {
+    ipcRenderer.send(Channels.mainQuit);
   },
   snapshotSpace(): Promise<number> {
     return ipcRenderer.invoke(Channels.mainSnapshotSpace) as Promise<number>;

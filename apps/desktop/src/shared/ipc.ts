@@ -87,6 +87,10 @@ export const Channels = {
   mainSetBuiltInLinksOff: 'main:set-built-in-links-off',
   /** Main window → main: how many places in the lists and notes a pattern would link (D-105). */
   mainCountLinkMatches: 'main:count-link-matches',
+  /** Main window → main: the Ctrl+K palette's search, live or in Trash and the archive (D-106). */
+  mainSearch: 'main:search',
+  /** Main window → main: Quit Flint, from the palette (APP-03, D-106). */
+  mainQuit: 'main:quit',
   /** D-67, D-100: the animation speed changed (every window scales its motion). */
   mainAppearance: 'main:appearance',
   /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
@@ -701,4 +705,25 @@ export type FolderChange = 'move' | 'fresh' | 'open';
 export interface FolderChangeOutcome {
   readonly ok: boolean;
   readonly problem?: string;
+}
+
+/** NAV-01, D-106: one palette result from the lists and notes, or from Trash and the archive. */
+export interface SearchHit {
+  readonly kind: 'task' | 'line' | 'deleted' | 'archived';
+  readonly listId: string;
+  readonly listName: string;
+  /** A task's key (open, completed or archived). */
+  readonly key?: string;
+  /** What it shows: a task's title, a note's line, a deleted item's title. */
+  readonly text: string;
+  /** A task's notes line that matched, when its title didn't. */
+  readonly detail?: string | undefined;
+  readonly done?: boolean;
+  /** A note's line number (0-based, in its text). */
+  readonly line?: number;
+  /** A deleted item's file in Trash. */
+  readonly trashId?: string;
+  readonly score: number;
+  /** The letters of `text` that matched, to highlight. */
+  readonly indices: readonly number[];
 }

@@ -5590,3 +5590,270 @@ a.auto-link {
   align-items: center;
   gap: 4px;
 }
+
+/* NAV-01, NAV-02, D-106: the Ctrl+K palette and the `?` cheat sheet: a solid floating card like the
+   capture popup's (its ground, radius and deep shadow), 12 % from the top, over a very light dim
+   (no blur, no translucency). It rises in quickly and goes the same way; input is never held. */
+.palette-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 24px 24px;
+  background: color-mix(in srgb, var(--fl-ground-window) 28%, transparent);
+  animation: palette-dim var(--fl-dur-fast) ease;
+}
+
+.palette-layer.leaving {
+  animation: palette-dim-out var(--fl-dur-fast) ease forwards;
+}
+
+@keyframes palette-dim {
+  from {
+    background: transparent;
+  }
+}
+
+@keyframes palette-dim-out {
+  to {
+    background: transparent;
+  }
+}
+
+.palette {
+  width: min(640px, 100%);
+  max-height: min(560px, 76vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--fl-radius-popup);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  animation: palette-in var(--fl-dur-base) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.palette-layer.leaving .palette {
+  animation: palette-out var(--fl-dur-fast) ease forwards;
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+@keyframes palette-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+}
+
+.palette-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fl-edge-divider);
+}
+
+.palette-crumb {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--fl-text-secondary);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.palette-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--fl-text-primary);
+}
+
+.palette-field::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.palette-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette-group + .palette-group {
+  margin-top: 4px;
+}
+
+.palette-label {
+  padding: 8px 10px 4px;
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  cursor: default;
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.palette-item.on {
+  background: var(--fl-ground-hover);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+
+.palette-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  color: var(--fl-text-body);
+}
+
+.palette-item.quiet .palette-text {
+  color: var(--fl-text-secondary);
+}
+
+.palette-hit {
+  color: var(--fl-text-highlight);
+  font-weight: 600;
+}
+
+.palette-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fl-text-faint);
+}
+
+.palette-more {
+  margin-left: auto;
+  color: var(--fl-text-muted);
+}
+
+.palette-item .keycap {
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 20px;
+  font-size: 10.5px;
+}
+
+.palette-detail + .keycap,
+.palette-more + .keycap {
+  margin-left: 0;
+}
+
+.palette-empty {
+  margin: 0;
+  padding: 18px 12px;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+/* The header's "Search or run a command · Ctrl K" (mockup 01). */
+.list-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.list-header-top > h1,
+.list-header-top > :first-child {
+  min-width: 0;
+}
+
+.palette-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 7px 0 13px;
+  border-radius: 12px;
+  background: var(--fl-ground-card);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-card),
+    var(--fl-shadow-card-close);
+  font-size: 13px;
+  color: var(--fl-text-secondary);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    box-shadow var(--fl-dur-fast) ease;
+}
+
+.palette-pill:hover {
+  background: var(--fl-ground-hover);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-card-close);
+}
+
+.palette-pill:active {
+  transform: scale(0.98);
+}
+
+.palette-pill .keycap {
+  height: 24px;
+}
+
+/* On a narrow column the pill keeps its icon and key. */
+@media (max-width: 1020px) {
+  .palette-pill-label {
+    display: none;
+  }
+}
+
+.cheat-sheet {
+  width: min(780px, 100%);
+}
+
+.cheat-columns {
+  overflow-y: auto;
+  padding: 6px 10px 14px;
+  columns: 2 320px;
+  column-gap: 24px;
+}
+
+.cheat-group {
+  break-inside: avoid;
+  padding-bottom: 6px;
+}
+
+.cheat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--fl-text-body);
+}
+
+.cheat-row .keycap {
+  height: 22px;
+  font-size: 11px;
+}

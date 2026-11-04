@@ -3462,6 +3462,110 @@ test('fixes after 0.8.2: link patterns between fixed text, guarded, edited; buil
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 
+test('M8 step 2: the Ctrl+K palette and the ? cheat sheet (NAV-01, NAV-02, D-106)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const flint = join(dataDirectory, 'Flint');
+  const file = join(flint, 'Palette test.md');
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: plt1\nmode: tasks\n---\n- [ ] Renew the palette certificate [id:: pl1]\n- [ ] Throw the palette draft away [id:: pl2]\n',
+  );
+  await writeFile(join(flint, 'Palette target.md'), '---\nflint: 1\nid: plt2\nmode: tasks\n---\n');
+  const palette = main.locator('.palette[aria-label="Search or run a command"]');
+  const field = palette.locator('.palette-field');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+
+  // Ctrl+K anywhere; a list by its name.
+  await main.keyboard.press('Control+k');
+  await expect(field).toBeFocused();
+  await main.keyboard.type('palette tes');
+  await expect(palette.locator('.palette-item.on')).toContainText('Palette test');
+  await main.keyboard.press('Enter');
+  await expect(palette).toHaveCount(0);
+  await expect(main.locator('h1')).toContainText('Palette test');
+
+  // A task anywhere, by words of its title: opened in its list, selected.
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('renew certificate');
+  const task = palette.locator('.palette-item', { hasText: 'Renew the palette certificate' });
+  await expect(task).toContainText('Palette test');
+  await task.click();
+  await expect(main.locator('.row.sel')).toContainText('Renew the palette certificate');
+
+  // The selected task's actions; Move to… is a second step (Backspace goes back).
+  await main.keyboard.press('Control+k');
+  await expect(palette.locator('.palette-label', { hasText: 'This task' })).toBeVisible();
+  await palette.locator('.palette-item', { hasText: 'Move to…' }).click();
+  await expect(palette.locator('.palette-crumb')).toHaveText('Move to ›');
+  await main.keyboard.press('Backspace');
+  await expect(palette.locator('.palette-crumb')).toHaveCount(0);
+  await palette.locator('.palette-item', { hasText: 'Move to…' }).click();
+  await main.keyboard.type('palette target');
+  await main.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(join(flint, 'Palette target.md'), 'utf8'))
+    .toContain('Renew the palette certificate');
+
+  // Trash and the archive only when asked: the last row. (After the move the selection is on
+  // the next task already; a click on a selected row would edit it.)
+  await expect(main.locator('.row', { hasText: 'Renew the palette certificate' })).toHaveCount(0);
+  await main.waitForTimeout(400);
+  const draft = main.locator('.row', { hasText: 'Throw the palette draft away' });
+  if (!(await draft.evaluate((row) => row.classList.contains('sel'))))
+    await draft.click({ position: { x: 400, y: 10 } });
+  await expect(draft).toHaveClass(/(^| )sel( |$)/);
+  await main.keyboard.press('Delete');
+  await expect(main.locator('.row', { hasText: 'Throw the palette draft away' })).toHaveCount(0);
+  await expect.poll(() => readFile(file, 'utf8')).not.toContain('Throw the palette draft away');
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('palette draft');
+  const more = palette.locator('.palette-item', { hasText: 'Search Trash and Archive' });
+  await expect(more).toContainText('Nothing else matches.');
+  await more.click();
+  await expect(palette.locator('.palette-crumb')).toHaveText('Trash and Archive ›');
+  const deleted = palette.locator('.palette-item', { hasText: 'Throw the palette draft away' });
+  await expect(deleted).toContainText('Deleted · from Palette test');
+  await deleted.click();
+  // Trash, with the item open (as a page on this narrow window).
+  await expect(main.locator('.trash-preview-title')).toHaveText('Throw the palette draft away');
+  await expect(main.locator('.sidebar-foot .nav.on')).toHaveText('Trash');
+  await main.keyboard.press('Escape');
+
+  // The header's pill; Esc closes.
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await main.locator('.palette-pill').first().click();
+  await expect(field).toBeFocused();
+  await main.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+
+  // NAV-02: `?` shows every shortcut; typing narrows it; Esc closes.
+  await main.keyboard.press('Shift+Slash');
+  const sheet = main.locator('.cheat-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('.cheat-row', { hasText: 'Quick note' })).toHaveCount(1);
+  await main.keyboard.type('interface');
+  await expect(sheet.locator('.cheat-row')).toHaveCount(1);
+  await expect(sheet.locator('.cheat-row')).toContainText('Interface size');
+  await main.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+
+  // In the note editor, Ctrl+K with text selected makes it a link.
+  await main.keyboard.press('Control+Shift+J');
+  await main.locator('.note-editor .cm-content').click();
+  await main.keyboard.type('see the runbook');
+  await main.keyboard.press('Shift+Control+ArrowLeft');
+  await main.keyboard.press('Control+k');
+  await expect(palette).toHaveCount(0);
+  await main.keyboard.press('Control+a');
+  await expect
+    .poll(() => main.locator('.note-editor .cm-content').innerText())
+    .toContain('[runbook]()');
+  await main.keyboard.press('Delete');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

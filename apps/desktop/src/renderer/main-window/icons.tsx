@@ -97,6 +97,10 @@ export const FlagIcon = ({ size = 15 }: IconProps): ReactElement =>
 export const HashIcon = ({ size = 15 }: IconProps): ReactElement =>
   svg(size, <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />, 1.9);
 
+/** NAV-01, D-106: the palette's pill (mockup 01). */
+export const SearchIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [<circle key="a" cx="11" cy="11" r="7" />, <path key="b" d="m20 20-3.5-3.5" />], 2);
+
 /** D-105: a link (the composer's link chips). */
 export const LinkIcon = ({ size = 12 }: IconProps): ReactElement =>
   svg(size, [
