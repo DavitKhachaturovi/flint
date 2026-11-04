@@ -2,6 +2,18 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.0 (4 Nov 2026)
+
+Versions now follow the milestone: 0.8 is M8 (polish), and 1.0 is the first release for coworkers.
+
+- **Change your hotkeys in Settings → Capture & hotkeys**: click the hotkey, press the new keys. Flint still tells you when another app already uses them. The tray is shorter: Open Flint, Quick capture, Mini mode, Settings, Quit Flint.
+- **Quick notes keep their title**: the title saves when you click away, and a titled quick note stays under Quick notes until you keep it as a note or the day ends.
+- **Two designs for Settings and Trash at the bottom of the sidebar**: try Card and Buttons in Settings → Appearance → Sidebar footer.
+- **Snapshot comparisons scroll** in the side panel, with their buttons always readable at the bottom.
+- **Interface size** sets exactly the size you press (80 % to 150 %).
+- The reminder sound explains what Flint's chime is for: you still hear it when Do Not Disturb or Focus silences notifications.
+- Fixed: making a list or note in a group no longer makes the selected item flash.
+
 ## 0.4.34 (4 Nov 2026)
 
 - **Settings**, above Trash in the sidebar (and in the tray): start with Windows, your hotkeys, notifications and the reminder sound (Windows' or Flint's chime), unfinished pins, auto-archive, snapshots and how long they're kept, export, interface size, animation speed, and every keyboard shortcut. Ctrl+F finds a setting.
