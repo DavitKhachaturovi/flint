@@ -678,7 +678,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | Hotkeys recorded in Settings with conflict detection; the Hotkeys window and the tray's Hotkeys… removed | APP-08 · Done (0.8.0) | 02, 03, 09, D-102 |
 | 3 | A quick note's title saved when the field is left; a title keeps it a quick note until Keep as a note, a group or the next day | NOTE-08 · Done (0.8.0) | 02, 04, D-102 |
 | 4 | No flash of the selected row when a list or note is made in its group | LIST-05, UI-04 · Done (0.8.0) | D-102 |
-| 5 | Two designs for the sidebar's foot, chosen in Settings → Appearance (Davit picks one) | NAV-09, APP-11 · Done (0.8.0; one to remove after the choice) | 09, D-102 |
+| 5 | Two designs for the sidebar's foot, chosen in Settings → Appearance (Davit picks one) | NAV-09, APP-11 · Done (0.8.0); Buttons chosen, the rest removed (0.8.1, D-103) | 09, D-102, D-103 |
 | 6 | The snapshot comparison scrolls in the side panel; its action bar sticky on a solid ground | DATA-04 · Done (0.8.0) | 03, 09, D-102 |
 | 7 | The reminder sound described as heard through Do Not Disturb and Focus; the Do Not Disturb row | REM-06 · Done (0.8.0; Davit checks by ear) | 02, D-102 |
 | 8 | Interface size as exact levels; every segmented choice sets the value pressed | UI-12, APP-11 · Done (0.8.0) | 02, D-102 |
+
+## AK. Fixes after 0.8.0 (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The sidebar's foot as two buttons; the Card design and its setting removed | NAV-09, APP-11 · Done (0.8.1) | 02, 09, D-103 |
+| 2 | The foot buttons' hover in their own shape | UI-03 · Done (0.8.1) | D-103 |
+| 3 | A soft fade above the foot, the last list clear of it at the end | NAV-09 · Done (0.8.1) | 03, 09, D-103 |
+| 4 | "Settings" and "Trash" with its count in full; the count left out where it can't fit | NAV-09 · Done (0.8.1) | 02, 09, D-103 |
+| 5 | The context panel's and Today's column's bottom always in the window | NAV-07, TODAY-01 · Done (0.8.1) | 03, D-103 |
