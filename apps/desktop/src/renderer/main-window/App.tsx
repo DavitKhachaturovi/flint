@@ -108,6 +108,7 @@ import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from './inert-text.js';
 import { sidebarMotion } from './sidebar-motion.js';
+import { useScrollsWhenTaller } from './scrolls.js';
 
 /**
  * The main window (M4, D-48 daily-use slice): the sidebar with the lists, a list's tasks with the
@@ -632,6 +633,8 @@ export function App(): ReactElement {
     // Zoom keys the main process didn't take first (it normally does, before the page).
     const onKey = (event: KeyboardEvent): void => {
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
+      // D-102: a hotkey being recorded in Settings takes every key.
+      if (document.body.dataset['recordingHotkey']) return;
       const how =
         event.key === '=' || event.key === '+' || event.code === 'NumpadAdd'
           ? 'in'
@@ -648,9 +651,13 @@ export function App(): ReactElement {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
+  /** D-102: the interface size now (Settings shows it). */
+  const [zoomFactor, setZoomFactor] = useState(1);
   useEffect(() => {
     let timer: number | undefined;
+    void window.flintMain.zoomLevel().then(setZoomFactor);
     window.flintMain.onZoomed((factor) => {
+      setZoomFactor(factor);
       window.clearTimeout(timer);
       setZoomShown({ text: `${Math.round(factor * 100)}%`, id: Date.now() });
       timer = window.setTimeout(() => setZoomShown(null), 1500);
@@ -733,11 +740,27 @@ export function App(): ReactElement {
     // the rows are there; the panel shows it on wide screens, the body stays closed.
     window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
     // APP-11, D-100: the tray's Settings; D-67: the animation speed, now and when it changes.
-    window.flintMain.onShowSettings(() => goRef.current({ list: SETTINGS_ID, page: null }));
-    void window.flintMain.settings().then((settings) => {
-      if (settings) applySpeed(settings.animationSpeed);
+    window.flintMain.onShowSettings((section) => {
+      goRef.current({ list: SETTINGS_ID, page: null });
+      // D-102: a section asked for (the tray's taken-hotkey warning): brought into view.
+      if (section)
+        window.setTimeout(
+          () =>
+            document
+              .getElementById(`settings-${section}`)
+              ?.scrollIntoView({ block: 'start', behavior: 'instant' }),
+          200,
+        );
     });
-    window.flintMain.onAppearance(applySpeed);
+    void window.flintMain.settings().then((settings) => {
+      if (!settings) return;
+      applySpeed(settings.animationSpeed);
+      setFooter(settings.sidebarFooter);
+    });
+    window.flintMain.onAppearance((appearance) => {
+      applySpeed(appearance.animationSpeed);
+      setFooter(appearance.sidebarFooter);
+    });
     // DATA-04, D-97: the tray's Restore from a snapshot…: the Snapshots view.
     window.flintMain.onShowSnapshots(() => goRef.current({ list: SNAPSHOTS_ID, page: null }));
     // REM-07, D-94: "N reminders you missed": Today, its Overdue card open and in view.
@@ -858,6 +881,8 @@ export function App(): ReactElement {
     readonly when: string;
     readonly diff: SnapshotDiff;
   } | null>(null);
+  /** D-102: the sidebar foot's design (two to choose from, Settings → Appearance). */
+  const [footer, setFooter] = useState<'card' | 'row'>('card');
   /** D-100: Ctrl+F in Settings: its filter takes the caret. */
   const [settingsFind, setSettingsFind] = useState(0);
   /** D-98: scrolled down far enough for the "back to top" button. */
@@ -4030,7 +4055,7 @@ export function App(): ReactElement {
           />
         )}
         {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
-        <div className="sidebar-foot">
+        <div className={`sidebar-foot ${footer}`}>
           {/* APP-11, D-100: Settings, above Trash. */}
           <NavItem
             list={{ id: SETTINGS_ID, name: 'Settings', mode: 'note', open: 0, inbox: true }}
@@ -4188,7 +4213,8 @@ export function App(): ReactElement {
                   find={settingsFind}
                   onToast={(text) => showToast(text, false)}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
-                  onZoom={(how) => void window.flintMain.zoom(how)}
+                  zoom={zoomFactor}
+                  onZoom={(level) => void window.flintMain.zoom(level)}
                 />
               )}
               {/* DATA-04, D-97: the Snapshots view. */}
@@ -4302,6 +4328,7 @@ export function App(): ReactElement {
                       <QuickTitle
                         key={view.id}
                         at={quickHere.at}
+                        title={quickHere.label === view.name ? view.name : ''}
                         onTitle={(title) =>
                           void window.flintMain
                             .listAction({ kind: 'rename', id: view.id, name: title })
@@ -4505,30 +4532,22 @@ export function App(): ReactElement {
             </div>
             {/* D-100: Settings' index, in the panel's place. */}
             {settingsPanel && (
-              <aside className="context-panel card trash-panel" aria-label="Settings sections">
-                <div className="panel-inner">
-                  <SettingsIndex scroller={scroller} />
-                </div>
-              </aside>
+              <PanelAside label="Settings sections">
+                <SettingsIndex scroller={scroller} />
+              </PanelAside>
             )}
             {/* D-99: a snapshot's list or note against now, in the panel's place. */}
-            {snapshotPanel && (
-              <aside className="context-panel card trash-panel" aria-label="Changes">
-                <div className="panel-inner">{snapshotDiffView(false)}</div>
-              </aside>
-            )}
+            {snapshotPanel && <PanelAside label="Changes">{snapshotDiffView(false)}</PanelAside>}
             {/* D-98: on wide screens a trash item opens read-only in the panel's place. */}
             {trashPanel && trashOpen && (
-              <aside className="context-panel card trash-panel" aria-label="Deleted item">
-                <div className="panel-inner">
-                  <TrashPreviewView
-                    key={trashOpen.id}
-                    preview={trashOpen}
-                    onRestore={() => restoreToEdit(trashOpen.id)}
-                    onClose={() => setTrashOpen(null)}
-                  />
-                </div>
-              </aside>
+              <PanelAside label="Deleted item">
+                <TrashPreviewView
+                  key={trashOpen.id}
+                  preview={trashOpen}
+                  onRestore={() => restoreToEdit(trashOpen.id)}
+                  onClose={() => setTrashOpen(null)}
+                />
+              </PanelAside>
             )}
             {panelState && (
               <ContextPanel
@@ -6272,10 +6291,17 @@ function EditField(props: {
 function QuickTitle(props: {
   /** When it was made. */
   readonly at: number;
+  /** D-102: its title, once it has one (it stays a quick note until kept or the next day). */
+  readonly title: string;
   readonly onTitle: (title: string) => void;
 }): ReactElement {
-  const { at, onTitle } = props;
-  const [text, setText] = useState('');
+  const { at, title, onTitle } = props;
+  const [text, setText] = useState(title);
+  // D-102: saved on Enter and when the field is left (as everything in Flint), when it changed.
+  const save = (): void => {
+    const next = text.trim();
+    if (next !== '' && next !== title) onTitle(next);
+  };
   const made = new Date(at);
   const two = (value: number): string => String(value).padStart(2, '0');
   const clock = `${two(made.getHours())}:${two(made.getMinutes())}`;
@@ -6296,17 +6322,32 @@ function QuickTitle(props: {
         aria-label="Title"
         spellCheck={false}
         onChange={(event) => setText(event.target.value)}
+        onBlur={save}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && text.trim() !== '') {
+          if (event.key === 'Enter') {
             event.preventDefault();
-            onTitle(text.trim());
+            event.currentTarget.blur();
           }
           if (event.key === 'Escape') {
-            setText('');
+            setText(title);
             event.currentTarget.blur();
           }
         }}
       />
     </div>
+  );
+}
+
+/**
+ * D-98, D-99, D-100, D-102: something in the context panel's place (Settings' index, a snapshot
+ * comparison, a trash item). Like the panel it scrolls while its content is taller (D-93).
+ */
+function PanelAside(props: { readonly label: string; readonly children: ReactNode }): ReactElement {
+  const ref = useRef<HTMLElement>(null);
+  useScrollsWhenTaller(ref);
+  return (
+    <aside ref={ref} className="context-panel card trash-panel" aria-label={props.label}>
+      <div className="panel-inner">{props.children}</div>
+    </aside>
   );
 }

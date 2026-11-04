@@ -2,13 +2,21 @@ import {
   Children,
   cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useRef,
   useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
-import type { SettingChange, SettingsView } from '../../shared/ipc.js';
+import type {
+  HotkeyName,
+  HotkeysView,
+  RebindOutcome,
+  SettingChange,
+  SettingsView,
+} from '../../shared/ipc.js';
+import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
 
 /**
@@ -143,15 +151,125 @@ function withFilter(children: ReactNode, filter: string): ReactNode {
 
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 
+const DOES: Record<HotkeyName, string> = {
+  capture: 'opens the capture popup',
+  selection: 'captures the selected text',
+};
+
+function explain(outcome: RebindOutcome, name: HotkeyName, accelerator: string): string {
+  const keys = displayAccelerator(accelerator);
+  switch (outcome) {
+    case 'saved':
+      return `Saved: ${keys} ${DOES[name]}.${usesAlt(accelerator) ? ' Note: Alt is often a push-to-talk key (Discord).' : ''}`;
+    case 'in-use':
+      return `${keys} is already used by another app. Try another combination.`;
+    case 'needs-modifier':
+      return 'Use Ctrl, Alt or Win together with a key.';
+    case 'same-as-other':
+      return 'That is already the other Flint hotkey.';
+    case 'invalid':
+      return 'Flint cannot use that key. Try another.';
+  }
+}
+
+/**
+ * APP-08, D-102: a global hotkey, recorded in place: click it, press the new keys. Flint tries
+ * them at once; if another app owns them, the old hotkey stays and it says so. While recording,
+ * the current hotkeys are off; Esc, a click elsewhere or leaving the window cancels.
+ */
+function HotkeyButton(props: {
+  readonly name: HotkeyName;
+  readonly view: HotkeysView | null;
+  readonly recording: HotkeyName | null;
+  readonly onRecord: (name: HotkeyName | null) => void;
+  readonly onSaid: (name: HotkeyName, text: string) => void;
+  readonly onChanged: () => void;
+}): ReactElement {
+  const { name, view, recording, onRecord, onSaid, onChanged } = props;
+  const state = view?.[name];
+  const active = recording === name;
+  useEffect(() => {
+    if (!active) return;
+    window.flintMain.recordingHotkey(true);
+    document.body.dataset['recordingHotkey'] = '1';
+    const stop = (): void => {
+      window.flintMain.recordingHotkey(false);
+      delete document.body.dataset['recordingHotkey'];
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.key === 'Escape') {
+        onRecord(null);
+        onSaid(name, '');
+        return;
+      }
+      const accelerator = acceleratorFor(event);
+      if (!accelerator) return; // only modifiers so far
+      void window.flintMain.rebindHotkey(name, accelerator).then((outcome) => {
+        onRecord(null);
+        if (outcome) onSaid(name, explain(outcome, name, accelerator));
+        onChanged();
+      });
+    };
+    const onBlur = (): void => {
+      onRecord(null);
+      onSaid(name, '');
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('blur', onBlur);
+      stop();
+    };
+  }, [active, name, onRecord, onSaid, onChanged]);
+  return (
+    <button
+      type="button"
+      className={[
+        'keycap',
+        'hotkey-record',
+        active ? 'recording' : '',
+        state && !state.registered ? 'taken' : '',
+      ].join(' ')}
+      title={
+        state && !state.registered
+          ? 'Another app uses this combination'
+          : 'Click, then press the new keys'
+      }
+      onClick={() => onRecord(active ? null : name)}
+    >
+      {active ? 'Press the new keys…' : state ? displayAccelerator(state.accelerator) : '…'}
+    </button>
+  );
+}
+
 export function SettingsScreen(props: {
   readonly onToast: (text: string) => void;
   readonly onSnapshots: () => void;
-  readonly onZoom: (how: 'in' | 'out' | 'reset') => void;
+  /** D-102: the interface size now, and setting an exact one. */
+  readonly zoom: number;
+  readonly onZoom: (level: number) => void;
   /** Bumped by Ctrl+F: the filter takes the caret. */
   readonly find: number;
 }): ReactElement {
-  const { onToast, onSnapshots, onZoom, find } = props;
+  const { onToast, onSnapshots, zoom, onZoom, find } = props;
+  // D-102: the levels offered (Ctrl+= and Ctrl+− reach the rest, 67–200 %).
+  const sizes = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
+  const size = sizes.find((level) => Math.abs(level - zoom) < 0.001);
   const [view, setView] = useState<SettingsView | null>(null);
+  // D-102: the hotkeys, the one being recorded, and what the last try said.
+  const [hotkeys, setHotkeys] = useState<HotkeysView | null>(null);
+  const [recording, setRecording] = useState<HotkeyName | null>(null);
+  const [said, setSaid] = useState<Partial<Record<HotkeyName, string>>>({});
+  const loadHotkeys = useCallback((): void => {
+    void window.flintMain.hotkeys().then(setHotkeys);
+  }, []);
+  const onSaid = useCallback(
+    (name: HotkeyName, text: string): void => setSaid((current) => ({ ...current, [name]: text })),
+    [],
+  );
   const [space, setSpace] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
   const [query, setQuery] = useState('');
@@ -159,7 +277,8 @@ export function SettingsScreen(props: {
   useEffect(() => {
     void window.flintMain.settings().then(setView);
     void window.flintMain.snapshotSpace().then(setSpace);
-  }, []);
+    loadHotkeys();
+  }, [loadHotkeys]);
   useEffect(() => {
     if (find > 0) field.current?.focus();
   }, [find]);
@@ -224,26 +343,42 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="capture" filter={filter}>
-        <Row name="Quick capture" filter={filter} words="hotkey shortcut popup">
-          <span className="keycap">{view.captureHotkey}</span>
-        </Row>
-        <Row name="Capture the selected text" filter={filter} words="hotkey shortcut selection">
-          <span className="keycap">{view.captureSelectionHotkey}</span>
-        </Row>
-        <Row
-          name="Change the hotkeys"
-          note="They work over any app, even in a full-screen call."
-          filter={filter}
-          words="hotkey rebind"
-        >
-          <button
-            type="button"
-            className="trash-action"
-            onClick={() => void window.flintMain.showHotkeys()}
+        {(['capture', 'selection'] as const).map((name) => (
+          <Row
+            key={name}
+            name={name === 'capture' ? 'Quick capture' : 'Capture the selected text'}
+            note={(() => {
+              const taken = hotkeys !== null && !hotkeys[name].registered;
+              const text =
+                said[name] ||
+                (taken && hotkeys
+                  ? `${displayAccelerator(hotkeys[name].accelerator)} is used by another app, so it doesn't work. Choose another.`
+                  : recording === name
+                    ? 'Esc cancels.'
+                    : 'Works over any app, even in a full-screen call. Click to change.');
+              // D-89: a new message fades in (keyed by its text).
+              return (
+                <span
+                  key={text}
+                  className={taken ? 'settings-said settings-warning' : 'settings-said'}
+                >
+                  {text}
+                </span>
+              );
+            })()}
+            filter={filter}
+            words="hotkey shortcut rebind popup selection"
           >
-            Change…
-          </button>
-        </Row>
+            <HotkeyButton
+              name={name}
+              view={hotkeys}
+              recording={recording}
+              onRecord={setRecording}
+              onSaid={onSaid}
+              onChanged={loadHotkeys}
+            />
+          </Row>
+        ))}
       </Section>
 
       <Section id="reminders" filter={filter}>
@@ -259,7 +394,12 @@ export function SettingsScreen(props: {
             onChange={(on) => set({ key: 'notifications', value: on })}
           />
         </Row>
-        <Row name="Reminder sound" filter={filter} words="chime audio windows sound">
+        <Row
+          name="Reminder sound"
+          note="Flint chime: heard even when Do Not Disturb or Focus silences notifications."
+          filter={filter}
+          words="chime audio windows sound do not disturb focus"
+        >
           <Choice
             label="Reminder sound"
             value={view.reminderSound}
@@ -281,11 +421,15 @@ export function SettingsScreen(props: {
             Play
           </button>
         </Row>
-        {(filter === '' || 'chime sound'.includes(filter) || 'reminder sound'.includes(filter)) && (
+        {(filter === '' ||
+          'chime sound'.includes(filter) ||
+          'reminder sound'.includes(filter) ||
+          'do not disturb'.includes(filter)) && (
           <div className="settings-info">
-            <strong>Why Flint's chime:</strong> it's a distinct sound you learn to recognise, at the
-            same volume every time. With it, the reminder notification goes quiet, so you hear one
-            sound, and Windows' notification sound settings no longer apply to Flint's reminders.
+            <strong>Why Flint's chime:</strong> when Windows' Do Not Disturb or Focus holds
+            notifications back, it silences their sound too, so a reminder can pass unheard. Flint
+            plays its chime itself, and Windows doesn't silence it, so you still hear the reminder.
+            The notification itself then goes quiet, so you never hear two sounds.
           </div>
         )}
         <Row
@@ -301,10 +445,10 @@ export function SettingsScreen(props: {
           />
         </Row>
         <Row
-          name="Focus Assist"
-          note="Windows lets reminders through Do Not Disturb by default, so Flint's show during calls. In a full-screen app Windows may still hold them back; they wait in Today's Overdue card."
+          name="Do Not Disturb"
+          note="Windows lets reminders through Do Not Disturb by default. When it holds one back (reminders off in its priority list, a full-screen app, a game), the Flint chime still sounds and the reminder waits in Today's Overdue card."
           filter={filter}
-          words="do not disturb focus assist full screen"
+          words="do not disturb focus assist full screen game"
         />
       </Section>
 
@@ -442,19 +586,22 @@ export function SettingsScreen(props: {
       <Section id="appearance" filter={filter}>
         <Row
           name="Interface size"
-          note="Ctrl+= and Ctrl+− too; kept for each display."
+          note={
+            size === undefined
+              ? `Now ${Math.round(zoom * 100)}% (with Ctrl+= or Ctrl+−); kept for each display.`
+              : 'Ctrl+= and Ctrl+− too; kept for each display.'
+          }
           filter={filter}
           words="zoom size bigger smaller"
         >
-          <button type="button" className="trash-action" onClick={() => onZoom('out')}>
-            Smaller
-          </button>
-          <button type="button" className="trash-action" onClick={() => onZoom('reset')}>
-            100%
-          </button>
-          <button type="button" className="trash-action" onClick={() => onZoom('in')}>
-            Larger
-          </button>
+          <Choice
+            label="Interface size"
+            value={size ?? null}
+            options={sizes.map((level) => ({ value: level, label: `${Math.round(level * 100)}%` }))}
+            onChange={(level) => {
+              if (level !== null) onZoom(level);
+            }}
+          />
         </Row>
         <Row
           name="Animation speed"
@@ -475,6 +622,22 @@ export function SettingsScreen(props: {
               { value: 'quick', label: 'Quick' },
             ]}
             onChange={(value) => set({ key: 'animationSpeed', value })}
+          />
+        </Row>
+        <Row
+          name="Sidebar footer"
+          note="Two designs for Settings and Trash at the bottom of the sidebar, to choose one."
+          filter={filter}
+          words="sidebar footer trash settings design"
+        >
+          <Choice
+            label="Sidebar footer"
+            value={view.sidebarFooter}
+            options={[
+              { value: 'card', label: 'Card' },
+              { value: 'row', label: 'Buttons' },
+            ]}
+            onChange={(value) => set({ key: 'sidebarFooter', value })}
           />
         </Row>
       </Section>

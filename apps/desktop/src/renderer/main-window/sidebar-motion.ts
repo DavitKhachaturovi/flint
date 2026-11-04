@@ -119,13 +119,18 @@ export function sidebarMotion(aside: () => HTMLElement | null): SidebarMotion {
       const y = total.y - carried.y;
       const resized = Math.abs(old.height - now.height) > 0.5 && element.matches('.nav-group');
       if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5 && !resized) continue;
+      // D-102: a group card moves by its offsets, not a transform: a transform would make it a
+      // stacking context for the animation, and the open list's highlight (drawn apart from the
+      // rows, under them) would paint over a selected list inside it: a flash.
+      const group = element.matches('.nav-group');
+      const from = group
+        ? { top: `${y}px`, left: `${x}px` }
+        : { transform: `translate(${x}px, ${y}px)` };
+      const to = group ? { top: '0px', left: '0px' } : { transform: 'none' };
       element.animate(
         [
-          {
-            transform: `translate(${x}px, ${y}px)`,
-            ...(resized && { height: `${old.height}px`, overflow: 'hidden' }),
-          },
-          { transform: 'none', ...(resized && { height: `${now.height}px`, overflow: 'hidden' }) },
+          { ...from, ...(resized && { height: `${old.height}px`, overflow: 'hidden' }) },
+          { ...to, ...(resized && { height: `${now.height}px`, overflow: 'hidden' }) },
         ],
         timing,
       );

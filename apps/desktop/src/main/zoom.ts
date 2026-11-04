@@ -12,8 +12,25 @@ export const ZOOM_STEPS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as 
 
 export type ZoomStep = 'in' | 'out' | 'reset';
 
-/** The next zoom from `current`: one step in or out (from the nearest step), or back to 100 %. */
-export function stepZoom(current: number, how: ZoomStep): number {
+/** D-102: a step, or an exact level (one of `ZOOM_STEPS`, as Settings' Interface size sets). */
+export type ZoomRequest = ZoomStep | number;
+
+export function isZoomRequest(value: unknown): value is ZoomRequest {
+  return (
+    value === 'in' ||
+    value === 'out' ||
+    value === 'reset' ||
+    (typeof value === 'number' && ZOOM_STEPS.some((step) => Math.abs(step - value) < 0.001))
+  );
+}
+
+/**
+ * The next zoom from `current`: one step in or out (from the nearest step), back to 100 %, or
+ * exactly the level asked for (D-102: Settings' choice sets that value, never one step from now).
+ */
+export function stepZoom(current: number, how: ZoomRequest): number {
+  if (typeof how === 'number')
+    return ZOOM_STEPS.find((step) => Math.abs(step - how) < 0.001) ?? current;
   if (how === 'reset') return 1;
   if (how === 'in')
     return ZOOM_STEPS.find((step) => step > current + 0.001) ?? ZOOM_STEPS.at(-1) ?? 1;

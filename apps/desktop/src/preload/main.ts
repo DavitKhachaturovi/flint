@@ -16,6 +16,10 @@ import {
   type SidebarOutcome,
   type SidebarView,
   type RestoredItem,
+  type Appearance,
+  type HotkeyName,
+  type HotkeysView,
+  type RebindOutcome,
   type SettingChange,
   type SettingsView,
   type SnapshotDiff,
@@ -127,17 +131,30 @@ const main = {
   openFolder(which: 'flint' | 'logs'): Promise<void> {
     return ipcRenderer.invoke(Channels.mainOpenFolder, which) as Promise<void>;
   },
-  showHotkeys(): Promise<void> {
-    return ipcRenderer.invoke(Channels.mainShowHotkeys) as Promise<void>;
+  /** APP-08, D-102: the global hotkeys: their state, recording on or off, a new combination. */
+  hotkeys(): Promise<HotkeysView | null> {
+    return ipcRenderer.invoke(Channels.mainHotkeys) as Promise<HotkeysView | null>;
+  },
+  recordingHotkey(active: boolean): void {
+    ipcRenderer.send(Channels.mainHotkeysRecording, active);
+  },
+  rebindHotkey(name: HotkeyName, accelerator: string): Promise<RebindOutcome | null> {
+    return ipcRenderer.invoke(
+      Channels.mainHotkeysRebind,
+      name,
+      accelerator,
+    ) as Promise<RebindOutcome | null>;
   },
   /** D-100: the tray's Settings. */
-  onShowSettings(listener: () => void): void {
-    ipcRenderer.on(Channels.mainShowSettings, () => listener());
+  onShowSettings(listener: (section: string | undefined) => void): void {
+    ipcRenderer.on(Channels.mainShowSettings, (_event, section: string | undefined) =>
+      listener(section),
+    );
   },
   /** D-67, D-100: the animation speed (a scale for every duration). */
-  onAppearance(listener: (speed: 'relaxed' | 'normal' | 'quick') => void): void {
-    ipcRenderer.on(Channels.mainAppearance, (_event, speed: 'relaxed' | 'normal' | 'quick') =>
-      listener(speed),
+  onAppearance(listener: (appearance: Appearance) => void): void {
+    ipcRenderer.on(Channels.mainAppearance, (_event, appearance: Appearance) =>
+      listener(appearance),
     );
   },
   /** NOTE-08, D-99: a new quick note (its ID), and discarding one left empty. */
@@ -239,9 +256,13 @@ const main = {
     ipcRenderer.on(Channels.mainChanged, () => listener());
   },
   /** A reminder's Open (REM-05): show this task. */
-  /** UI-12, D-81: zoom in, out or back to 100 % on this display. */
-  zoom(how: 'in' | 'out' | 'reset'): Promise<void> {
+  /** UI-12, D-81: zoom in, out or back to 100 % on this display; or (D-102) to an exact level. */
+  zoom(how: 'in' | 'out' | 'reset' | number): Promise<void> {
     return ipcRenderer.invoke(Channels.mainZoom, how) as Promise<void>;
+  },
+  /** D-102: the interface size on this display now. */
+  zoomLevel(): Promise<number> {
+    return ipcRenderer.invoke(Channels.mainZoomLevel) as Promise<number>;
   },
   /** UI-12, D-81: the interface size changed (Ctrl+= / Ctrl+− / Ctrl+0, or another display). */
   onZoomed(listener: (factor: number) => void): void {

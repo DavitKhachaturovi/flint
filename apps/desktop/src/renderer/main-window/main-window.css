@@ -4638,6 +4638,13 @@ a.auto-link {
   animation: panel-crossfade var(--fl-dur-state) ease;
 }
 
+/* D-102: what sits in the panel's place (a comparison, a trash item, Settings' index) fits the
+   window where it rests (the title bar, the column's 4 px, its offset, 16 px below), so its
+   bottom and the actions there are in view on a page too short to scroll. */
+.context-panel.trash-panel {
+  max-height: calc(100vh - 60px - var(--panel-top, 4px));
+}
+
 .trash-preview {
   display: flex;
   flex-direction: column;
@@ -5088,14 +5095,41 @@ a.auto-link {
   overflow-wrap: anywhere;
 }
 
+/* D-102: the actions stay at the bottom of the card (or the page) on a solid ground, the diff
+   scrolling under them and fading out just above. Their ground reaches the card's edges (the
+   panel's padding: 20 px left, 4 px right before the scrollbar's gutter, 14 px below). */
 .diff-actions {
   position: sticky;
-  bottom: 14px;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  padding-top: 4px;
+  margin: 0 -4px -14px -20px;
+  padding: 10px 4px 14px 20px;
+  background: var(--fl-ground-card);
+}
+
+.diff-actions::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 16px;
+  background: linear-gradient(to bottom, transparent, var(--fl-ground-card));
+  pointer-events: none;
+}
+
+.snapshot-diff.page .diff-actions {
+  margin: 0 -8px -24px;
+  padding: 10px 8px 24px;
+  background: var(--fl-ground-window);
+}
+
+.snapshot-diff.page .diff-actions::before {
+  background: linear-gradient(to bottom, transparent, var(--fl-ground-window));
 }
 
 .primary-button:disabled {
@@ -5331,4 +5365,120 @@ a.auto-link {
   font-size: 11.5px;
   white-space: nowrap;
   color: var(--fl-text-primary);
+}
+
+/* D-102: two designs for the sidebar's foot, to choose one (Settings → Appearance).
+   (a) Card: Settings and Trash on a rounded card, inset from the sidebar's edges; the strip
+   around it stays solid, so no list shows through, and the lists fade out above it. */
+.sidebar-foot.card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 8px 18px 16px;
+}
+
+.sidebar-foot.card::after {
+  content: '';
+  position: absolute;
+  inset: 8px 2px 10px 10px;
+  z-index: -1;
+  border-radius: 14px;
+  background: var(--fl-ground-card);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-card),
+    var(--fl-shadow-card-close);
+}
+
+/* (b) Buttons: Settings and Trash as two smaller rounded buttons side by side. */
+.sidebar-foot.row {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  padding: 12px 2px 14px 12px;
+}
+
+.sidebar-foot.row .nav {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 36px;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--fl-ground-card);
+  box-shadow: 0 0 0 1px var(--fl-edge-card);
+}
+
+.sidebar-foot.row .nav:hover {
+  background: var(--fl-ground-hover);
+  box-shadow: 0 0 0 1px var(--fl-edge-float);
+}
+
+.sidebar-foot.row .nav.on {
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-selected);
+}
+
+.sidebar-foot.row .nav .tile {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar-foot.row .nav-name {
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+
+.sidebar-foot.row .nav-count {
+  margin-left: 0;
+}
+
+/* APP-08, D-102: a hotkey recorded in Settings: click the keycap, press the keys. While it
+   listens its ring lights and breathes; one another app holds is struck through. */
+.hotkey-record {
+  min-width: 150px;
+  height: 30px;
+  justify-content: center;
+  border: 0;
+  cursor: default;
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    box-shadow var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.hotkey-record:hover {
+  background: var(--fl-ground-hover);
+}
+
+.hotkey-record:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--fl-accent);
+}
+
+.hotkey-record.recording {
+  color: var(--fl-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--fl-accent);
+  animation: hotkey-listening 1.6s ease-in-out infinite;
+}
+
+@keyframes hotkey-listening {
+  50% {
+    box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  }
+}
+
+.hotkey-record.taken:not(.recording) {
+  color: var(--fl-text-muted);
+  text-decoration: line-through;
+}
+
+.settings-said {
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.settings-warning {
+  color: var(--fl-text-highlight);
 }

@@ -41,11 +41,18 @@ import { zipFolder } from './storage/zip.js';
 import { displayAccelerator } from '../shared/accelerator.js';
 import { HotkeyRegistry } from './hotkey-registry.js';
 import { acceleratorKeys } from './hotkeys.js';
-import { hotkeysWindow } from './hotkeys-window.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { SettingsFile } from './settings.js';
-import { displayKey, PanelFile, stepZoom, zoomKey, ZoomFile, type ZoomStep } from './zoom.js';
+import {
+  displayKey,
+  isZoomRequest,
+  PanelFile,
+  stepZoom,
+  zoomKey,
+  ZoomFile,
+  type ZoomRequest,
+} from './zoom.js';
 import { upNext } from './up-next.js';
 import {
   APP_SCHEME,
@@ -383,7 +390,7 @@ async function start(): Promise<void> {
         : request.kind === 'rename'
           ? // NOTE-08, D-99: renaming a quick note gives it its title (a normal note).
             workspace.summaries(now).some((list) => list.id === request.id && list.quick)
-            ? workspace.keepQuickNote(request.id, request.name, now)
+            ? workspace.titleQuickNote(request.id, request.name, now)
             : workspace.renameList(request.id, request.name, now)
           : request.kind === 'duplicate'
             ? workspace.duplicateList(request.id, now)
@@ -591,6 +598,13 @@ async function start(): Promise<void> {
       .unpinDone(new Date())
       .catch((error: unknown) => log(`unpin failed: ${String(error)}`));
     void archive();
+    // NOTE-08, D-102: quick notes titled before today become normal notes.
+    workspace
+      .settleQuickNotes(new Date())
+      .then((count) => {
+        if (count > 0) log(`${count} titled quick note(s) became notes`);
+      })
+      .catch((error: unknown) => log(`quick notes not settled: ${String(error)}`));
     const orphans = !started;
     started = true;
     workspace
@@ -679,6 +693,7 @@ async function start(): Promise<void> {
       keepHourlyHours: current.keepHourlyHours,
       keepDailyDays: current.keepDailyDays,
       animationSpeed: current.animationSpeed,
+      sidebarFooter: current.sidebarFooter,
       flintFolder: folder.folder,
       captureHotkey: current.captureHotkey,
       captureSelectionHotkey: current.captureSelectionHotkey,
@@ -710,8 +725,11 @@ async function start(): Promise<void> {
     }
     if (key === 'snapshotEveryMinutes') reschedule();
     if (key === 'keepHourlyHours' || key === 'keepDailyDays') snapshot();
-    if (key === 'animationSpeed' && !mainWindow.isDestroyed())
-      mainWindow.webContents.send(Channels.mainAppearance, after.animationSpeed);
+    if ((key === 'animationSpeed' || key === 'sidebarFooter') && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(Channels.mainAppearance, {
+        animationSpeed: after.animationSpeed,
+        sidebarFooter: after.sidebarFooter,
+      });
     log(`setting ${key} is now ${JSON.stringify(after[key])}`);
     return settingsView();
   });
@@ -728,9 +746,6 @@ async function start(): Promise<void> {
     if (!owns(event.sender)) return;
     const path = which === 'logs' ? app.getPath('logs') : which === 'flint' ? folder.folder : null;
     if (path) await shell.openPath(path);
-  });
-  ipcMain.handle(Channels.mainShowHotkeys, (event) => {
-    if (owns(event.sender)) hotkeysPanel.show();
   });
   /** D-97: the tray's Restore from a snapshot…: the main window, on the Snapshots view. */
   const showSnapshots = (): void => {
@@ -1021,28 +1036,48 @@ async function start(): Promise<void> {
   const tray = createTray({
     open: showMain,
     capture: () => popup.show(epochNow()),
-    hotkeys: () => hotkeysPanel.show(),
-    settings: () => {
+    settings: (section) => {
       showMain();
-      const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings);
+      const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings, section);
       if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
       else send();
     },
     quit: () => app.quit(),
   });
-  const hotkeysPanel = hotkeysWindow(pageUrl('hotkeys'), hotkeys, (name, accelerator) => {
-    log(`${name} hotkey changed to ${accelerator}`);
-    tray.setWarning(hotkeyWarning());
-    settingsFile
-      .update(
-        name === 'capture'
-          ? { captureHotkey: accelerator }
-          : { captureSelectionHotkey: accelerator },
-      )
-      .catch((error: unknown) => log(`hotkey not saved: ${String(error)}`));
+  // APP-08, D-102: the global hotkeys, recorded in Settings → Capture & hotkeys. Flint tries a
+  // new combination at once; one another app owns is refused and the old one stays.
+  ipcMain.handle(Channels.mainHotkeys, (event) =>
+    owns(event.sender)
+      ? { capture: hotkeys.get('capture'), selection: hotkeys.get('selection') }
+      : null,
+  );
+  ipcMain.on(Channels.mainHotkeysRecording, (event, active: unknown) => {
+    if (!owns(event.sender)) return;
+    // While a new hotkey is recorded the current ones must not fire.
+    if (active === true) hotkeys.pause();
+    else hotkeys.resume();
+  });
+  // Recording ends with the window's focus, whatever the page did.
+  mainWindow.on('blur', () => hotkeys.resume());
+  ipcMain.handle(Channels.mainHotkeysRebind, (event, name: unknown, accelerator: unknown) => {
+    if (!owns(event.sender)) return null;
+    if ((name !== 'capture' && name !== 'selection') || typeof accelerator !== 'string')
+      return null;
+    const result = hotkeys.rebind(name, accelerator);
+    if (result.kind === 'saved') {
+      log(`${name} hotkey changed to ${accelerator}`);
+      tray.setWarning(hotkeyWarning());
+      settingsFile
+        .update(
+          name === 'capture'
+            ? { captureHotkey: accelerator }
+            : { captureSelectionHotkey: accelerator },
+        )
+        .catch((error: unknown) => log(`hotkey not saved: ${String(error)}`));
+    }
+    return result.kind;
   });
   tray.setWarning(hotkeyWarning());
-  if (hooks) hooks.showHotkeys = () => hotkeysPanel.show();
 
   // Reminders (REM-01, REM-05, REM-07 basic; D-64): toasts while Flint runs, missed ones once at
   // the next start or wake. Not in the R-1 benchmark build, which has no toast scheme.
@@ -1271,7 +1306,7 @@ function setUpZoom(window: BrowserWindow): void {
       if (!window.isDestroyed() && displayOf() !== shownOn) apply(true);
     }, 250);
   });
-  const zoomBy = async (how: ZoomStep): Promise<void> => {
+  const zoomBy = async (how: ZoomRequest): Promise<void> => {
     const display = displayOf();
     await zooms
       .set(display, stepZoom(zooms.get(display), how))
@@ -1287,11 +1322,16 @@ function setUpZoom(window: BrowserWindow): void {
     void zoomBy(how);
   });
   // Keys that reach the page anyway (synthesized ones, as in the end-to-end tests) ask here.
+  // D-102: Settings' Interface size sets an exact level too.
   ipcMain.handle(Channels.mainZoom, (event, how: unknown) =>
-    event.sender === window.webContents && (how === 'in' || how === 'out' || how === 'reset')
-      ? zoomBy(how)
-      : undefined,
+    event.sender === window.webContents && isZoomRequest(how) ? zoomBy(how) : undefined,
   );
+  // D-102: the level on this display now, for Settings.
+  ipcMain.handle(Channels.mainZoomLevel, async (event) => {
+    if (event.sender !== window.webContents) return 1;
+    await loaded;
+    return zooms.get(displayOf());
+  });
 }
 
 /**

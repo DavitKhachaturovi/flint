@@ -29,7 +29,6 @@ export default defineConfig(({ mode }) => ({
         input: {
           popup: resolve(root, 'src/preload/popup.ts'),
           main: resolve(root, 'src/preload/main.ts'),
-          hotkeys: resolve(root, 'src/preload/hotkeys.ts'),
         },
         output: { format: 'cjs', entryFileNames: '[name].cjs' },
       },
@@ -48,7 +47,6 @@ export default defineConfig(({ mode }) => ({
         input: {
           'capture-popup': resolve(root, 'src/renderer/capture-popup/index.html'),
           'main-window': resolve(root, 'src/renderer/main-window/index.html'),
-          hotkeys: resolve(root, 'src/renderer/hotkeys/index.html'),
         },
       },
     },

@@ -63,7 +63,6 @@ export interface E2EHooks {
   showPopup?: () => void;
   /** A toast button's activation URL, as Windows would hand it over (REM-05). */
   activate?: (url: string) => void;
-  showHotkeys?: () => void;
   /**
    * D-93: tests never leave a mark on the user's clipboard: a step that writes to it (a copy
    * button) saves it first and puts it back after.
@@ -140,10 +139,8 @@ export function applyStartWithWindows(enabled: boolean): void {
 export interface TrayActions {
   readonly open: () => void;
   readonly capture: () => void;
-  /** APP-08: the Hotkeys window. */
-  readonly hotkeys: () => void;
-  /** APP-11, D-100: the main window on Settings. */
-  readonly settings: () => void;
+  /** APP-11, D-100: the main window on Settings (D-102: on a section, e.g. a taken hotkey's). */
+  readonly settings: (section?: string) => void;
   readonly quit: () => void;
 }
 
@@ -174,15 +171,17 @@ export function createTray(actions: TrayActions): TrayHandle {
   const menu = (warning: string | null): Menu =>
     Menu.buildFromTemplate([
       ...(warning
-        ? ([{ label: warning, click: actions.hotkeys }, { type: 'separator' }] as const)
+        ? ([
+            { label: warning, click: () => actions.settings('capture') },
+            { type: 'separator' },
+          ] as const)
         : []),
       { label: 'Open Flint', click: actions.open },
       { label: 'Quick capture', click: actions.capture },
       { label: 'Mini mode', enabled: false },
-      // D-99: Open, Quick capture, Mini mode, Settings, Quit; Export and snapshots are in
-      // Settings → Data (M8) and, until then, in Trash's header. Hotkeys… until Settings has them.
-      { label: 'Hotkeys…', click: actions.hotkeys },
-      { label: 'Settings', click: actions.settings },
+      // D-99, D-102: Open, Quick capture, Mini mode, Settings, Quit; the hotkeys, snapshots and
+      // export are in Settings.
+      { label: 'Settings', click: () => actions.settings() },
       { type: 'separator' },
       { label: 'Quit Flint', click: actions.quit },
     ]);

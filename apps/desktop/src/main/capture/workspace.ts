@@ -143,6 +143,9 @@ function lineDiff(
   return lines;
 }
 
+/** NOTE-08, D-99, D-102: a quick note's flag line in its header (`quick: true` or a day). */
+const QUICK_LINE = /^(---\r?\n[\s\S]*?)^quick:\s*(?:true|\d{4}-\d{2}-\d{2})\s*\r?\n/m;
+
 /** DATA-04, D-97: a list or a note in a snapshot (a markdown file at the folder's top level). */
 const isListPath = (path: string): boolean =>
   !path.includes('/') && path.toLowerCase().endsWith('.md');
@@ -574,11 +577,23 @@ export class Workspace {
     });
   }
 
-  /** NOTE-08, D-99: a note with `quick: true` in its header, not titled yet. */
-  private isQuick(list: Loaded): boolean {
-    if (list.entry.mode !== 'note') return false;
+  /**
+   * NOTE-08, D-99, D-102: a quick note: `quick: true` in its header (untitled), or
+   * `quick: 2026-11-04` (given a title that day; it becomes a normal note at the next day change).
+   */
+  private quickFlag(list: Loaded): string | null {
+    if (list.entry.mode !== 'note') return null;
     const header = /^---\r?\n([\s\S]*?)\r?\n---/.exec(serializeDocument(list.file.document))?.[1];
-    return header !== undefined && /^quick:\s*true\s*$/m.test(header);
+    return header ? (/^quick:\s*(true|\d{4}-\d{2}-\d{2})\s*$/m.exec(header)?.[1] ?? null) : null;
+  }
+
+  private isQuick(list: Loaded): boolean {
+    return this.quickFlag(list) !== null;
+  }
+
+  /** D-102: a quick note still under its time-based name (no title given). */
+  private isUntitledQuick(list: Loaded): boolean {
+    return /^Quick note \d{4}-\d{2}-\d{2} \d{4}( \(\d+\))?$/.test(list.entry.name);
   }
 
   /** NOTE-08, D-99: a quick note's label: its first line, or when it was made. */
@@ -611,6 +626,8 @@ export class Workspace {
     const when = sameDay
       ? `Quick note · ${clock}`
       : `Quick note · ${made.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][made.getMonth()] ?? ''} ${clock}`;
+    // D-102: a titled one shows its title.
+    if (!this.isUntitledQuick(list)) return { label: list.entry.name, at };
     return { label: first ? first.slice(0, 60) : when, at };
   }
 
@@ -643,7 +660,8 @@ export class Workspace {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     return this.serial(async () => {
       const list = this.find(id);
-      if (!list || !this.isQuick(list)) return false;
+      // D-102: only an untitled one (a title is something to keep).
+      if (!list || !this.isQuick(list) || !this.isUntitledQuick(list)) return false;
       const body = serializeDocument(list.file.document).replace(
         /^---\r?\n[\s\S]*?\r?\n---\r?\n?/,
         '',
@@ -656,6 +674,54 @@ export class Workspace {
   }
 
   /**
+   * NOTE-08, D-102: a title for a quick note: the file takes it, and the note stays under Quick
+   * notes (`quick: <today>`) until Keep as a note, a group, or the next day change. One undo step.
+   */
+  async titleQuickNote(id: string, name: string, now: Date): Promise<ListOutcome> {
+    const start = this.undoStack.length;
+    const flagged = await this.serial(async () => {
+      const list = this.find(id);
+      if (!list || !this.isQuick(list)) return false;
+      const text = serializeDocument(list.file.document).replace(
+        QUICK_LINE,
+        `$1quick: ${dayStamp(now)}\n`,
+      );
+      await this.record(list, { type: 'setText', list: list.file.path, text }, 'Titled', now);
+      return true;
+    });
+    if (!flagged) return this.renameList(id, name, now);
+    const outcome = await this.renameList(id, name, now);
+    if (!outcome.ok || outcome.label === '') {
+      await this.undoLast(now);
+      return outcome;
+    }
+    await this.serial(() => {
+      this.mergeSince(start, outcome.label);
+      return Promise.resolve();
+    });
+    return outcome;
+  }
+
+  /**
+   * NOTE-08, D-102: at the day change (and at start-up), quick notes titled on an earlier day
+   * become normal notes (not an undo step); untitled ones stay. How many.
+   */
+  settleQuickNotes(now: Date): Promise<number> {
+    return this.serial(async () => {
+      const today = dayStamp(now);
+      let count = 0;
+      for (const list of [...this.lists]) {
+        const flag = this.quickFlag(list);
+        if (!flag || flag === 'true' || flag >= today || list.file.readOnly) continue;
+        const text = serializeDocument(list.file.document).replace(QUICK_LINE, '$1');
+        await this.applyAndSave(list, { type: 'setText', list: list.file.path, text }, now);
+        count++;
+      }
+      return count;
+    });
+  }
+
+  /**
    * NOTE-08, D-99: a quick note made a normal note: its `quick` flag goes, and with a title
    * (`name`) its file takes that name; one undo step. Without a name it keeps its time-based one.
    */
@@ -664,10 +730,7 @@ export class Workspace {
     const flagged = await this.serial(async () => {
       const list = this.find(id);
       if (!list || !this.isQuick(list)) return false;
-      const text = serializeDocument(list.file.document).replace(
-        /^(---\r?\n[\s\S]*?)^quick:\s*true\s*\r?\n/m,
-        '$1',
-      );
+      const text = serializeDocument(list.file.document).replace(QUICK_LINE, '$1');
       await this.record(
         list,
         { type: 'setText', list: list.file.path, text },

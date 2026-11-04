@@ -369,29 +369,33 @@ test('pasted or selected text is never shorthand; typed text is (D-45, CAP-03)',
     .toContain('- [ ] deploy the hotfix @15:00, see ##infra !l [priority:: high] [id:: ');
 });
 
-test('rebinding a hotkey in the Hotkeys window (APP-08)', async () => {
-  await app.evaluate(() =>
-    (globalThis as { __flintE2E?: { showHotkeys?: () => void } }).__flintE2E?.showHotkeys?.(),
-  );
-  const page = () => app.windows().find((window) => window.url().includes('/hotkeys/'));
-  await expect.poll(() => page() !== undefined, { timeout: 15_000 }).toBe(true);
-  const hotkeys = page();
-  if (!hotkeys) throw new Error('hotkeys page not found');
-  const capture = hotkeys.locator('.row[data-name="capture"] .record');
+test('recording a hotkey in Settings → Capture & hotkeys (APP-08, D-102)', async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  const capture = main
+    .locator('.settings-row', { hasText: 'Quick capture' })
+    .locator('.hotkey-record');
+  const note = main
+    .locator('.settings-row', { hasText: 'Quick capture' })
+    .locator('.settings-note');
   await expect(capture).toHaveText('Ctrl+Shift+Space');
   await capture.click();
   await expect(capture).toHaveText('Press the new keys…');
-  await hotkeys.keyboard.press('Shift+K');
-  await expect(hotkeys.locator('.message')).toHaveText('Use Ctrl, Alt or Win together with a key.');
+  await main.keyboard.press('Shift+K');
+  await expect(note).toHaveText('Use Ctrl, Alt or Win together with a key.');
   await capture.click();
-  await hotkeys.keyboard.press('Control+Shift+F9');
-  await expect(hotkeys.locator('.message')).toHaveText(
-    'Saved: Ctrl+Shift+F9 opens the capture popup.',
-  );
+  await main.keyboard.press('Control+Shift+F9');
+  await expect(note).toHaveText('Saved: Ctrl+Shift+F9 opens the capture popup.');
   await expect(capture).toHaveText('Ctrl+Shift+F9');
   await expect
     .poll(() => readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8').catch(() => ''))
     .toContain('"captureHotkey": "Control+Shift+F9"');
+  // Esc cancels a recording, the hotkey as it was.
+  await capture.click();
+  await main.keyboard.press('Escape');
+  await expect(capture).toHaveText('Ctrl+Shift+F9');
+  await main.locator('.sidebar > .nav').first().click();
 });
 
 test('main window: a list from the sidebar, complete with Space, undo with Ctrl+Z (TASK-06, D-48)', async () => {
@@ -3008,15 +3012,23 @@ test('fixes after 0.4.32: quick notes, renaming in place, the pinned foot, a sna
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
   await expect(main.locator('h1')).toContainText('Inbox');
   await expect.poll(() => main.locator('.quick-notes .nav').count(), { timeout: 8000 }).toBe(1);
-  // A title makes it a normal note in Lists.
+  // D-102: a title (saved when the field is left) keeps it under Quick notes; Keep as a note
+  // makes it a normal note in Lists.
   await quick.click();
   await main.locator('.quick-title-input').fill('DNS change');
-  await main.keyboard.press('Enter');
-  await expect(main.locator('.note-card h1')).toHaveText('DNS change');
+  await main.locator('.note-editor .cm-content').click();
+  // (Its file renamed: read until it is there.)
+  await expect
+    .poll(() => readFile(join(flint, 'DNS change.md'), 'utf8').catch(() => ''))
+    .toMatch(/quick: \d{4}-\d{2}-\d{2}/);
+  const titled = main.locator('.quick-notes .nav', { hasText: 'DNS change', hasNotText: 'Ask' });
+  await expect(titled).toHaveCount(1);
+  await titled.click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Keep as a note' }).click();
   await expect(main.locator('.quick-notes')).toHaveCount(0);
   await expect
-    .poll(() => readFile(join(flint, 'DNS change.md'), 'utf8'))
-    .not.toContain('quick: true');
+    .poll(() => readFile(join(flint, 'DNS change.md'), 'utf8').catch(() => 'quick:'))
+    .not.toContain('quick:');
 
   // LIST-01, D-99: a double-click on a list's name edits it in place; Esc cancels, Enter saves.
   const nav = main.locator('.nav:not(.flip-ghost)', { hasText: 'DNS change' });
@@ -3137,6 +3149,43 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
       ),
     )
     .toBe('260ms');
+  // D-102: a choice sets exactly the value pressed, never one step from the current one.
+  const choose = (group: string, option: string): Promise<void> =>
+    main
+      .locator(`[role=radiogroup][aria-label="${group}"] [role=radio]`, { hasText: option })
+      .click();
+  const duration = (): Promise<string> =>
+    main.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-state').trim(),
+    );
+  await choose('Animation speed', 'Quick');
+  await expect.poll(duration).toBe('182ms');
+  await choose('Animation speed', 'Relaxed');
+  await expect.poll(duration).toBe('351ms');
+  await expect.poll(async () => (await settingsFile())['animationSpeed']).toBe('relaxed');
+  await choose('Animation speed', 'Normal');
+  await expect.poll(duration).toBe('260ms');
+  const zoomFactor = (): Promise<number> =>
+    app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().includes('main-window'),
+      );
+      return win?.webContents.getZoomFactor() ?? 0;
+    });
+  const size = main.locator('[role=radiogroup][aria-label="Interface size"]');
+  await expect(size.locator('[aria-checked=true]')).toHaveText('100%');
+  await choose('Interface size', '90%');
+  await expect.poll(zoomFactor).toBeCloseTo(0.9);
+  await choose('Interface size', '125%');
+  await expect.poll(zoomFactor).toBeCloseTo(1.25);
+  await expect(size.locator('[aria-checked=true]')).toHaveText('125%');
+  await choose('Interface size', '100%');
+  await expect.poll(zoomFactor).toBeCloseTo(1);
+  // D-102: the sidebar's foot, two designs.
+  await choose('Sidebar footer', 'Buttons');
+  await expect(main.locator('.sidebar-foot.row')).toHaveCount(1);
+  await choose('Sidebar footer', 'Card');
+  await expect(main.locator('.sidebar-foot.card')).toHaveCount(1);
   // Snapshots: how often, kept how long, the space they use.
   await main
     .locator('[role=radiogroup][aria-label="Take a snapshot"] [role=radio]', { hasText: '2 h' })

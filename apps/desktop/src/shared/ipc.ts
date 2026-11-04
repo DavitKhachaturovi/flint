@@ -27,9 +27,10 @@ export const Channels = {
   popupResize: 'popup:resize',
   popupAttach: 'popup:attach',
   popupDetach: 'popup:detach',
-  hotkeysState: 'hotkeys:state',
-  hotkeysRecording: 'hotkeys:recording',
-  hotkeysRebind: 'hotkeys:rebind',
+  /** APP-08, D-102: the global hotkeys, recorded in Settings (the main window). */
+  mainHotkeys: 'main:hotkeys',
+  mainHotkeysRecording: 'main:hotkeys-recording',
+  mainHotkeysRebind: 'main:hotkeys-rebind',
   mainLists: 'main:lists',
   mainView: 'main:view',
   mainToggle: 'main:toggle',
@@ -73,7 +74,6 @@ export const Channels = {
   mainSnapshotSpace: 'main:snapshot-space',
   mainClearSnapshots: 'main:clear-snapshots',
   mainOpenFolder: 'main:open-folder',
-  mainShowHotkeys: 'main:show-hotkeys',
   mainShowSettings: 'main:show-settings',
   /** D-67, D-100: the animation speed changed (every window scales its motion). */
   mainAppearance: 'main:appearance',
@@ -116,6 +116,8 @@ export const Channels = {
   mainZoomed: 'main:zoomed',
   /** Main window → main: zoom in, out or back to 100 % (keys the main process didn't see first). */
   mainZoom: 'main:zoom',
+  /** Main window → main: the interface size on its display now (D-102, Settings). */
+  mainZoomLevel: 'main:zoom-level',
   /** Main window → main: a note's text, edited as plain text until M5 (D-64). */
   mainSaveNote: 'main:save-note',
 } as const;
@@ -390,6 +392,7 @@ export interface SettingsView {
   readonly keepHourlyHours: number;
   readonly keepDailyDays: number;
   readonly animationSpeed: 'relaxed' | 'normal' | 'quick';
+  readonly sidebarFooter: 'card' | 'row';
   readonly flintFolder: string;
   readonly captureHotkey: string;
   readonly captureSelectionHotkey: string;
@@ -408,7 +411,14 @@ export type SettingChange =
       readonly key: 'snapshotEveryMinutes' | 'keepHourlyHours' | 'keepDailyDays';
       readonly value: number;
     }
-  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' };
+  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' }
+  | { readonly key: 'sidebarFooter'; readonly value: 'card' | 'row' };
+
+/** D-67, D-100, D-102: how the main window looks (sent when it changes). */
+export interface Appearance {
+  readonly animationSpeed: 'relaxed' | 'normal' | 'quick';
+  readonly sidebarFooter: 'card' | 'row';
+}
 
 /** The Settings view's place (D-100): the row above Trash, never a list. */
 export const SETTINGS_ID = '@settings';

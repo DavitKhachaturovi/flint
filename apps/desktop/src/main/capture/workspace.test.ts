@@ -1017,6 +1017,43 @@ describe('quick notes (NOTE-08, D-99)', () => {
     expect(quick()).toBeDefined();
   });
 
+  it('D-102: a quick note with text takes its title (the file renamed, still a quick note)', async () => {
+    const workspace = await open();
+    const id = (await workspace.newQuickNote(now)) ?? '';
+    await workspace.saveNote(id, 'Ask Alex about the DNS change', now);
+    expect(await workspace.titleQuickNote(id, 'DNS change', now)).toMatchObject({ ok: true });
+    const text = await readFile(join(folder, 'DNS change.md'), 'utf8');
+    expect(text).toContain('quick: 2026-10-29');
+    expect(text).toContain('Ask Alex about the DNS change');
+    expect(workspace.summaries(now).find((list) => list.id === id)?.quick?.label).toBe(
+      'DNS change',
+    );
+  });
+
+  it('D-102: a title keeps it a quick note until the next day; a titled empty one stays', async () => {
+    const workspace = await open();
+    const id = (await workspace.newQuickNote(now)) ?? '';
+    expect(await workspace.titleQuickNote(id, 'Call plan', now)).toMatchObject({ ok: true });
+    const text = await readFile(join(folder, 'Call plan.md'), 'utf8');
+    expect(text).toContain('quick: 2026-10-29');
+    const quick = (): { label: string } | undefined =>
+      workspace.summaries(now).find((list) => list.id === id)?.quick;
+    // Still under Quick notes, with its title; and not discarded though empty.
+    expect(quick()?.label).toBe('Call plan');
+    expect(await workspace.discardQuickNote(id)).toBe(false);
+    // One undo step back to its time-based name and the untitled flag.
+    await workspace.undoLast(now);
+    expect(await readFile(join(folder, 'Quick note 2026-10-29 1430.md'), 'utf8')).toContain(
+      'quick: true',
+    );
+    await workspace.titleQuickNote(id, 'Call plan', now);
+    // The same day nothing changes; the next day it is a normal note.
+    expect(await workspace.settleQuickNotes(now)).toBe(0);
+    expect(await workspace.settleQuickNotes(new Date(2026, 9, 30, 9, 0))).toBe(1);
+    expect(await readFile(join(folder, 'Call plan.md'), 'utf8')).not.toContain('quick:');
+    expect(quick()).toBeUndefined();
+  });
+
   it('an empty one left behind goes; one with text stays', async () => {
     const workspace = await open();
     const empty = (await workspace.newQuickNote(now)) ?? '';
