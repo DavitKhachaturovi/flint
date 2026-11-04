@@ -2,6 +2,10 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.34 (4 Nov 2026)
+
+- **Settings**, above Trash in the sidebar (and in the tray): start with Windows, your hotkeys, notifications and the reminder sound (Windows' or Flint's chime), unfinished pins, auto-archive, snapshots and how long they're kept, export, interface size, animation speed, and every keyboard shortcut. Ctrl+F finds a setting.
+
 ## 0.4.33 (4 Nov 2026)
 
 - **Quick notes**: Quick note under Inbox, or Ctrl+Shift+J anywhere, opens a fresh note ready to type, no name needed. They wait under Quick notes; add a title when you want to keep one as a normal note. Empty ones disappear by themselves.
