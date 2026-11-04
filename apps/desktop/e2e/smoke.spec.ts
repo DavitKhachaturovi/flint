@@ -2853,11 +2853,17 @@ test('fixes after 0.4.30: a new list in a group, the pinned Trash row, back to t
   const file = join(flint, 'Scroll me.md');
   await writeFile(file, `---\nflint: 1\nid: scr1\nmode: tasks\n---\n${tasks.join('\n')}\n`);
   await main.locator('.nav:not(.flip-ghost)', { hasText: 'Scroll me' }).click();
+  // Its rows first: a scroll before they are there goes nowhere (CI is slower).
+  await expect(main.locator('.row', { hasText: 'Scroll task 60' })).toHaveCount(1);
   await expect(main.locator('.to-top')).not.toHaveClass(/shown/);
-  await main.evaluate(() =>
-    document.querySelector('.scroller')?.scrollTo({ top: 1200, behavior: 'instant' }),
-  );
-  await expect(main.locator('.to-top')).toHaveClass(/shown/);
+  await expect
+    .poll(async () => {
+      await main.evaluate(() =>
+        document.querySelector('.scroller')?.scrollTo({ top: 1200, behavior: 'instant' }),
+      );
+      return main.locator('.to-top').getAttribute('class');
+    })
+    .toContain('shown');
   await main.locator('.to-top').click();
   await expect
     .poll(() => main.evaluate(() => document.querySelector('.scroller')?.scrollTop ?? -1))
