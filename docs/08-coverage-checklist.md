@@ -667,7 +667,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Snapshots: how often, how long, the space used, Clear old snapshots; Export | DATA-04, DATA-05 · Done (0.4.34) | 02, 04, D-99, D-100 |
 | 5 | Interface size and animation speed | UI-12, APP-12 · Done (0.4.34) | 02, D-67, D-100 |
 | 6 | Keyboard shortcuts from one list | APP-11, NAV-02 · Done (0.4.34; the cheat sheet in step 2) | 02, D-80, D-100 |
-| 7 | The link-patterns editor; changing the Flint folder | NOTE-07, DATA-07 · v1 · M8 step 1b | D-100 |
+| 7 | The link-patterns editor; changing the Flint folder | NOTE-07, DATA-07 · Done (0.8.2) | D-100, D-104 |
 | 8 | Recording hotkeys in place | APP-08 · Done (0.8.0) | 02, D-102 |
 
 ## AJ. Fixes after 0.4.33 and 0.4.34 (4 Nov 2026)
@@ -692,3 +692,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | A soft fade above the foot, the last list clear of it at the end | NAV-09 · Done (0.8.1) | 03, 09, D-103 |
 | 4 | "Settings" and "Trash" with its count in full; the count left out where it can't fit | NAV-09 · Done (0.8.1) | 02, 09, D-103 |
 | 5 | The context panel's and Today's column's bottom always in the window | NAV-07, TODAY-01 · Done (0.8.1) | 03, D-103 |
+
+## AL. M8 step 1b: the Flint folder and link patterns (4 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Changing the Flint folder: choices by the chosen folder's state, the likeliest preselected, a confirmation that says what happens | DATA-07 · Done (0.8.2) | 02, 03, 04, D-104 |
+| 2 | Move: copied file by file, checked, nothing overwritten, undone on failure; the old folder kept | DATA-07 · Done (0.8.2) | 04, D-104 |
+| 3 | The OneDrive warning; the folder itself and folders inside it refused | DATA-07 · Done (0.8.2) | 02, D-24, D-104 |
+| 4 | Flint restarts on the new folder, back on Settings | DATA-07 · Done (0.8.2) | D-104 |
+| 5 | Merging the current lists into another Flint folder | DATA-07 · Later | 06, D-104 |
+| 6 | Settings → Links: patterns listed with Delete; Add from an example with presets, a live preview, a second example, Advanced | NOTE-07 · Done (0.8.2) | 02, 09, D-84, D-104 |
+| 7 | The Settings index opens on General | APP-11 · Done (0.8.2) | D-104 |

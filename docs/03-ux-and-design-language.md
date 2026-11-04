@@ -45,6 +45,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Open capture popup (CAP-01) | Ctrl+Shift+Space, rebindable (D-37) | Decided |
 | Capture selected text (CAP-07) | Ctrl+Shift+X, rebindable (D-37) | Decided |
 | Change a global hotkey (APP-08) | Settings → Capture & hotkeys, click the hotkey, press the new keys; Esc cancels | Decided (D-102; was the Hotkeys window of D-44) |
+| Change the Flint folder (DATA-07) | Settings → General → Change…, pick a folder, choose what to do in the row (the likeliest preselected), confirm; Flint restarts on it | Decided (D-104) |
+| Add a link pattern (NOTE-07) | Settings → Links → Add a link pattern, paste an example link, adjust the short form, Save | Decided (D-104) |
 
 ### Capture popup
 | Action | Key | Status |

@@ -189,6 +189,11 @@ mode: note
 - **Re-read before writing (D-29):** if the file changed on disk since Flint last read it, Flint re-parses it and re-applies its pending operations by task ID, then writes. A CLI or Claude write is never overwritten by a stale in-memory copy.
 - **Unreadable files (D-24, Proposed):** a list that is cloud-only (OneDrive Files On-Demand) or locked shows that plainly on the list, never as an empty list.
 
+### Changing the Flint folder (DATA-07, D-104)
+- **Move:** every file in the Flint folder (lists, notes, `attachments/`, `.flint/` except its `tmp/` scratch) is copied to the new folder, never over an existing file, and each copy is checked against the original (size and SHA-256) before `settings.json`'s `flintFolder` changes; on any failure the copies are removed and nothing changes. The old folder is left as it was, as a backup.
+- **Start fresh:** the new folder gets a new Inbox at the next start (as a first start does); **Open:** the folder's own lists are used as they are. Either way the old folder isn't touched.
+- Snapshots (`%LOCALAPPDATA%\Flint\snapshots`) are of whichever folder is in use; older ones stay until they expire. Flint restarts to switch.
+
 ### Quick notes (NOTE-08, D-99)
 - A quick note is an ordinary note file at the folder's top level, named after when it was made (`Quick note 2026-11-04 1530.md`; `(2)` added for a second one in the same minute), with `quick: true` in its header next to `flint`, `id` and `mode: note`. Plain markdown, readable in Obsidian; snapshots and export carry it like any note.
 - Flint lists it under Quick notes (not among Lists or groups) while the flag is there. Keep as a note (or a move to a group) removes the flag. An empty untitled quick note (nothing after its header) is deleted for good when it is left.
