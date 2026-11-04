@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.31 (4 Nov 2026)
+
+- **New lists right in a group**: right-click a group for New task list or New note.
+- **Trash stays at the bottom** of the sidebar, however many lists you have.
+- **Back to top**: once you scroll down, a small button at the bottom right takes you up again.
+- **Look inside the Trash**: click a deleted task, list or note to read it. Restore to edit it where it was; after Restore, "Go to" takes you there.
+- Fixed: the shadow flicker under reminder cards after hovering.
+
 ## 0.4.30 (4 Nov 2026)
 
 - **Trash**, at the bottom of the sidebar: everything you deleted in the last 30 days, by day. Restore puts it back where it was (Ctrl+Z undoes that); Delete now and Empty Trash remove things for good, after asking.
