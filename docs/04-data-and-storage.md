@@ -201,9 +201,11 @@ mode: note
 ### Snapshots (DATA-04)
 - Periodic zipped copies of the Flint folder (excluding nothing; it's small) in `%LOCALAPPDATA%\Flint\snapshots`, taken only when something changed. Restore from settings. Retention: Q-05 (**Proposed:** hourly for 48 h, then daily for 30 days).
 - **D-84:** snapshots store each attachment once (an unchanged attachment, large ones especially, is never zipped again); linked files (MEDIA-03) are never in a snapshot.
+- **D-97 (0.4.32):** not zips but a manifest per snapshot (`<YYYY-MM-DD-HHmmss>.json`: path → content hash) and each content once, gzipped, under `blobs/<first two hex>/<sha-256>`; taken a minute after start-up and hourly when something changed; pruned as Q-05 says; `.git` and temp files left out. Restoring (one list or note, or everything) takes a fresh snapshot first and is one undo step.
 
 ### Export (DATA-05)
 - One click → a zip of the entire Flint folder, saved where the user chooses.
+- **D-97 (0.4.32):** the tray's Export Flint folder…; a standard zip (deflate, UTF-8 names) with the folder inside named `Flint`; `.git` and temp files left out; written to `<name>.part` and renamed when complete.
 
 ### File watcher (DATA-06)
 - Watch the Flint folder recursively; debounce bursts.

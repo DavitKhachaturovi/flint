@@ -1,6 +1,6 @@
 import { statSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, stat, unlink } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   addTask,
   allTasks,
@@ -59,6 +59,8 @@ import type {
   TodayEntry,
   TodayReminder,
   RestoredItem,
+  SnapshotFile,
+  SnapshotSummary,
   TrashItem,
   TrashPreview,
   TrashView,
@@ -66,6 +68,11 @@ import type {
 import { TODAY_ID } from '../../shared/ipc.js';
 import { dayStamp, TodayFile } from '../today-file.js';
 import { writeFileAtomic } from '../storage/atomic.js';
+import type { SnapshotStore } from '../storage/snapshots.js';
+
+/** DATA-04, D-97: a list or a note in a snapshot (a markdown file at the folder's top level). */
+const isListPath = (path: string): boolean =>
+  !path.includes('/') && path.toLowerCase().endsWith('.md');
 import { IMAGE_TYPES } from './drafts.js';
 import {
   EMPTY_SIDEBAR,
@@ -1699,6 +1706,136 @@ export class Workspace {
             key: null,
           }
         : null;
+    });
+  }
+
+  /**
+   * DATA-04, D-97: everything read again from disk (after "Restore everything"): the lists, the
+   * sidebar's file, Today's order, task metadata and the IDs in the trash.
+   */
+  private async reloadAll(): Promise<void> {
+    await this.refresh(join(this.folder, '.none'));
+    for (const list of this.lists) await list.file.reload();
+    this.sidebarFile = readSidebar(await readFile(this.sidebarPath, 'utf8').catch(() => null));
+    await this.meta.load();
+    await this.today.load();
+    this.trashed.clear();
+    for (const id of await trashedIds(this.folder)) this.trashed.add(id);
+  }
+
+  /** DATA-04, D-97: the snapshots, newest first, each with how many lists or notes differ from now. */
+  async snapshots(store: SnapshotStore): Promise<SnapshotSummary[]> {
+    const now = await store.current();
+    return (await store.list()).map((snapshot) => ({
+      id: snapshot.id,
+      at: formatLocalDateTime(fromDate(snapshot.at)).slice(0, 16),
+      differs: Object.entries(snapshot.files).filter(
+        ([path, hash]) => isListPath(path) && now[path] !== hash,
+      ).length,
+    }));
+  }
+
+  /** DATA-04, D-97: a snapshot's lists and notes (the folder's top level), against now. */
+  async snapshotFiles(store: SnapshotStore, id: string): Promise<SnapshotFile[]> {
+    const snapshot = (await store.list()).find((each) => each.id === id);
+    if (!snapshot) return [];
+    const now = await store.current();
+    const files: SnapshotFile[] = [];
+    for (const [path, hash] of Object.entries(snapshot.files)) {
+      if (!isListPath(path)) continue;
+      const text = (await store.content(hash))?.toString('utf8') ?? '';
+      files.push({
+        path,
+        name: path.slice(0, -3),
+        kind: /^mode:\s*note\s*$/m.test(text) ? 'note' : 'list',
+        state: now[path] === undefined ? 'deleted' : now[path] === hash ? 'same' : 'changed',
+      });
+    }
+    const rank = { changed: 0, deleted: 1, same: 2 } as const;
+    return files.sort((a, b) => rank[a.state] - rank[b.state] || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * DATA-04, D-97: a snapshot restored: one list or note (`path`), or everything (null). A fresh
+   * snapshot of how things are is taken first; one undo step puts them back. A restored list's
+   * pictures and files that are gone come back too. Its label, or null.
+   */
+  restoreSnapshot(
+    store: SnapshotStore,
+    id: string,
+    path: string | null,
+    now: Date,
+  ): Promise<string | null> {
+    return this.serial(async () => {
+      const snapshot = (await store.list()).find((each) => each.id === id);
+      if (!snapshot || (path !== null && snapshot.files[path] === undefined)) return null;
+      const safety = await store.take(now, true);
+      if (!safety) return null;
+      const label =
+        path === null ? 'Restored the whole Flint folder' : `Restored ${path.slice(0, -3)}`;
+      const apply = async (files: Readonly<Record<string, string>>, only: string | null) => {
+        const current = await store.current();
+        const wanted = only === null ? files : pick(files, only);
+        for (const [file, hash] of Object.entries(wanted)) {
+          if (current[file] === hash) continue;
+          const content = await store.content(hash);
+          if (!content) continue;
+          const target = join(this.folder, ...file.split('/'));
+          await mkdir(dirname(target), { recursive: true });
+          await writeFileAtomic(target, content, { tempDirectory: tempDirectoryFor(target) });
+        }
+        if (only === null) {
+          for (const file of Object.keys(current))
+            if (files[file] === undefined)
+              await unlink(join(this.folder, ...file.split('/'))).catch(() => undefined);
+          await this.reloadAll();
+        } else if (files[only] === undefined) {
+          // Undoing the restore of a list that didn't exist before: it goes again.
+          await unlink(join(this.folder, ...only.split('/'))).catch(() => undefined);
+          await this.refresh(join(this.folder, ...only.split('/')));
+        } else await this.refresh(join(this.folder, ...only.split('/')));
+      };
+      /** One restored list's attachments that are gone now (named in its text). */
+      const pick = (
+        files: Readonly<Record<string, string>>,
+        only: string,
+      ): Record<string, string> => {
+        const chosen: Record<string, string> = {};
+        const hash = files[only];
+        if (hash) chosen[only] = hash;
+        return chosen;
+      };
+      const text = path
+        ? ((await store.content(snapshot.files[path] ?? ''))?.toString('utf8') ?? '')
+        : '';
+      const current = await store.current();
+      const attachments = Object.entries(snapshot.files).filter(
+        ([file]) =>
+          path !== null &&
+          file.startsWith('attachments/') &&
+          current[file] === undefined &&
+          (text.includes(file.slice(12)) || text.includes(encodeURIComponent(file.slice(12)))),
+      );
+      for (const [file, hash] of attachments) {
+        const content = await store.content(hash);
+        if (!content) continue;
+        const target = join(this.folder, ...file.split('/'));
+        await mkdir(dirname(target), { recursive: true });
+        await writeFileAtomic(target, content, { tempDirectory: tempDirectoryFor(target) });
+      }
+      await apply(snapshot.files, path);
+      const step = (
+        from: Readonly<Record<string, string>>,
+        to: Readonly<Record<string, string>>,
+      ): UndoEntry => ({
+        label,
+        run: async () => {
+          await apply(to, path);
+          return step(to, from);
+        },
+      });
+      this.remember(step(snapshot.files, safety.files));
+      return label;
     });
   }
 

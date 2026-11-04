@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prepareFlintFolder } from '../storage/flint-folder.js';
 import { DraftFile } from './drafts.js';
 import { Workspace } from './workspace.js';
+import { SnapshotStore } from '../storage/snapshots.js';
 import { TODAY_ID } from '../../shared/ipc.js';
 
 let base: string;
@@ -919,6 +920,75 @@ describe('Trash and Archived (DATA-02, TASK-06, MEDIA-04, D-97)', () => {
     await workspace.undoLast(now);
     expect(await work()).not.toContain('Old');
     expect((await workspace.trashView()).archived[0]?.tasks).toHaveLength(1);
+  });
+});
+
+describe('restoring snapshots (DATA-04, D-97)', () => {
+  const work = (): Promise<string> => readFile(join(folder, 'Work.md'), 'utf8');
+
+  it('restores one list (a fresh snapshot first), one undo step; a note with its picture', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] First version [id:: aaaa]\n',
+    );
+    await mkdir(join(folder, 'attachments'), { recursive: true });
+    await writeFile(join(folder, 'attachments', 'shot.png'), 'png');
+    await writeFile(
+      join(folder, 'Notes.md'),
+      '---\nflint: 1\nid: nte1\nmode: note\n---\nPicture ![](attachments/shot.png)\n',
+    );
+    const store = new SnapshotStore(folder, join(base, 'snapshots'));
+    const workspace = await open();
+    const old = await store.take(new Date(2026, 9, 29, 9, 0));
+    await workspace.change('wrk1', { kind: 'edit', key: 'aaaa', text: 'Second version' }, now);
+    await rm(join(folder, 'Notes.md'));
+    await rm(join(folder, 'attachments', 'shot.png'));
+    await workspace.fileChanged(join(folder, 'Notes.md'));
+    expect(await workspace.snapshotFiles(store, old?.id ?? '')).toEqual([
+      { path: 'Work.md', name: 'Work', kind: 'list', state: 'changed' },
+      { path: 'Notes.md', name: 'Notes', kind: 'note', state: 'deleted' },
+      { path: 'Inbox.md', name: 'Inbox', kind: 'list', state: 'same' },
+    ]);
+    expect((await workspace.snapshots(store))[0]?.differs).toBe(2);
+    expect(await workspace.restoreSnapshot(store, old?.id ?? '', 'Work.md', now)).toBe(
+      'Restored Work',
+    );
+    expect(await work()).toContain('First version');
+    expect(workspace.view('wrk1', now)?.items[0]).toMatchObject({
+      task: { title: 'First version' },
+    });
+    // The undo goes back to how it was just before.
+    expect(await workspace.undoLast(now)).toBe('Restored Work');
+    expect(await work()).toContain('Second version');
+    // A deleted note comes back with its picture.
+    await workspace.restoreSnapshot(store, old?.id ?? '', 'Notes.md', now);
+    expect(await readFile(join(folder, 'Notes.md'), 'utf8')).toContain('Picture');
+    expect(await readFile(join(folder, 'attachments', 'shot.png'), 'utf8')).toBe('png');
+    expect(workspace.listInfos().map((info) => info.name)).toContain('Notes');
+  });
+
+  it('restores everything (files added since go, they are in the fresh snapshot), undoable', async () => {
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] First version [id:: aaaa]\n',
+    );
+    const store = new SnapshotStore(folder, join(base, 'snapshots'));
+    const workspace = await open();
+    const old = await store.take(new Date(2026, 9, 29, 9, 0));
+    await writeFile(
+      join(folder, 'Work.md'),
+      '---\nflint: 1\nid: wrk1\nmode: tasks\n---\n- [ ] Second version [id:: aaaa]\n',
+    );
+    await writeFile(join(folder, 'Later.md'), '---\nflint: 1\nid: ltr1\nmode: note\n---\nlater\n');
+    await workspace.fileChanged(join(folder, 'Later.md'));
+    expect(await workspace.restoreSnapshot(store, old?.id ?? '', null, now)).toBe(
+      'Restored the whole Flint folder',
+    );
+    expect(await work()).toContain('First version');
+    expect(workspace.listInfos().map((info) => info.name)).not.toContain('Later');
+    await workspace.undoLast(now);
+    expect(await work()).toContain('Second version');
+    expect(workspace.listInfos().map((info) => info.name)).toContain('Later');
   });
 });
 

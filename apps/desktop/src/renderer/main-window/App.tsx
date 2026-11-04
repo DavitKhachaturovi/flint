@@ -85,6 +85,7 @@ import { openFindIn } from '../editor/find.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {
+  SNAPSHOTS_ID,
   TODAY_ID,
   TRASH_ID,
   type RestoredItem,
@@ -92,6 +93,7 @@ import {
   type TrashView,
 } from '../../shared/ipc.js';
 import { TrashPreviewView, TrashScreen } from './Trash.js';
+import { SnapshotsScreen } from './Snapshots.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
 import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
@@ -700,6 +702,8 @@ export function App(): ReactElement {
     // A reminder's Open (D-91): its list, the task scrolled into view, selected and flashed once
     // the rows are there; the panel shows it on wide screens, the body stays closed.
     window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
+    // DATA-04, D-97: the tray's Restore from a snapshot…: the Snapshots view.
+    window.flintMain.onShowSnapshots(() => goRef.current({ list: SNAPSHOTS_ID, page: null }));
     // REM-07, D-94: "N reminders you missed": Today, its Overdue card open and in view.
     window.flintMain.onShowOverdue(() => {
       goRef.current({ list: TODAY_ID, page: null });
@@ -3936,6 +3940,10 @@ export function App(): ReactElement {
                 />
               )}
 
+              {/* DATA-04, D-97: the Snapshots view. */}
+              {listId === SNAPSHOTS_ID && !pageTask && (
+                <SnapshotsScreen version={lists} onRestored={(label) => showToast(label, true)} />
+              )}
               {/* DATA-02, TASK-06, D-97: the Trash view. */}
               {listId === TRASH_ID && !pageTask && (
                 <TrashScreen
@@ -3947,6 +3955,7 @@ export function App(): ReactElement {
                   }
                   onClose={() => setTrashOpen(null)}
                   onRestoreToEdit={restoreToEdit}
+                  onSnapshots={() => openList(SNAPSHOTS_ID)}
                   onRestore={(id) =>
                     void window.flintMain.restoreFromTrash(id).then((restored) => {
                       // D-98: it stays in Trash; the toast offers the way to it.

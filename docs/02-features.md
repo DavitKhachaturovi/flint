@@ -598,11 +598,11 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### DATA-04 — Local snapshots (v1)
 - Flint keeps automatic local snapshots of the Flint folder so a bad change can be restored. Retention policy: see Q-05.
-- **D-97:** restore one list or note at a time (what differs from now shown; a fresh snapshot first; one undo step), or **Restore everything** behind a confirm. From the tray's **Restore from a snapshot…** and the Trash view until Settings (M8).
+- **D-97:** restore one list or note at a time (what differs from now shown; a fresh snapshot first; one undo step), or **Restore everything** behind a confirm. From the tray's **Restore from a snapshot…** and the Trash view until Settings (M8). **Built (0.4.32).**
 
 ### DATA-05 — One-click zip export (v1)
 - Export the whole Flint folder (lists + attachments) as a zip.
-- **D-97:** the tray's **Export Flint folder…** (a save dialog, a dated file name) until Settings and Ctrl+K (M8).
+- **D-97:** the tray's **Export Flint folder…** (a save dialog, a dated file name) until Settings and Ctrl+K (M8). **Built (0.4.32).**
 
 ### DATA-06 — File watcher (v1)
 - Flint watches the Flint folder and reloads lists changed on disk by anything else (the CLI, Claude via the CLI, a text editor) **live**, without losing the cursor position or selection.

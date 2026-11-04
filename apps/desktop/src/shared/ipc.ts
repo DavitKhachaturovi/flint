@@ -57,6 +57,11 @@ export const Channels = {
   mainTrashDelete: 'main:trash-delete',
   mainTrashEmpty: 'main:trash-empty',
   mainArchiveRestore: 'main:archive-restore',
+  /** DATA-04, D-97: snapshots, their files, a restore, and the tray asking for the view. */
+  mainSnapshots: 'main:snapshots',
+  mainSnapshotFiles: 'main:snapshot-files',
+  mainSnapshotRestore: 'main:snapshot-restore',
+  mainShowSnapshots: 'main:show-snapshots',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',
   /** Main window → main: new, rename or delete a list or note (LIST-01). */
@@ -295,6 +300,26 @@ export interface RestoredItem {
   /** The task, for a restored task; null for a list or a note. */
   readonly key: string | null;
 }
+
+/** DATA-04, D-97: a snapshot in the Snapshots view. */
+export interface SnapshotSummary {
+  readonly id: string;
+  /** When it was taken, `YYYY-MM-DDTHH:MM`. */
+  readonly at: string;
+  /** How many of its lists and notes differ from now (changed, or deleted since). */
+  readonly differs: number;
+}
+
+/** DATA-04, D-97: a list or note in a snapshot, and how it compares with now. */
+export interface SnapshotFile {
+  readonly path: string;
+  readonly name: string;
+  readonly kind: 'list' | 'note';
+  readonly state: 'same' | 'changed' | 'deleted';
+}
+
+/** The Snapshots view's place (D-97): reached from the tray and from Trash, never a list. */
+export const SNAPSHOTS_ID = '@snapshots';
 
 /** The Trash view's place in the sidebar (D-97): a view, never a list. */
 export const TRASH_ID = '@trash';

@@ -280,8 +280,10 @@ export function TrashScreen(props: {
   readonly onDelete: (id: string) => void;
   readonly onEmpty: () => void;
   readonly onRestoreArchived: (listId: string, key: string) => void;
+  /** D-97: "Looking for an older version? Snapshots". */
+  readonly onSnapshots: () => void;
 }): ReactElement {
-  const { view, open, asPage, onOpen, onClose, onRestoreToEdit } = props;
+  const { view, open, asPage, onOpen, onClose, onRestoreToEdit, onSnapshots } = props;
   const { onRestore, onDelete, onEmpty, onRestoreArchived } = props;
   // D-98: Esc closes the opened item.
   useEffect(() => {
@@ -320,7 +322,11 @@ export function TrashScreen(props: {
       <header className="list-header trash-header">
         <h1>Trash</h1>
         <span className="subtitle">
-          Deleted tasks, lists and notes are kept for 30 days, then removed for good.
+          Deleted tasks, lists and notes are kept for 30 days, then removed for good. Looking for an
+          older version?{' '}
+          <button type="button" className="subtitle-link" onClick={onSnapshots}>
+            Snapshots
+          </button>
         </span>
       </header>
       <div className="trash-bar">

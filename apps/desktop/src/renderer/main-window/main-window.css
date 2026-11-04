@@ -4785,3 +4785,92 @@ a.auto-link {
     transition: none;
   }
 }
+
+/* DATA-04, D-97: the Snapshots view: snapshots by day as folding rows, each opening to its lists
+   and notes with how they compare with now. */
+.subtitle-link {
+  color: var(--fl-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--fl-edge-chip);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--fl-dur-fast) ease;
+}
+
+.subtitle-link:hover {
+  text-decoration-color: var(--fl-text-secondary);
+}
+
+.snapshot-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: var(--fl-radius-row);
+  text-align: left;
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.snapshot-head:hover {
+  background: var(--fl-ground-hover);
+}
+
+.snapshot-head .chev {
+  display: inline-flex;
+  color: var(--fl-text-muted);
+}
+
+.snapshot-time {
+  font-family: var(--fl-font-mono);
+  font-size: 13px;
+  color: var(--fl-text-body);
+}
+
+.snapshot-files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 8px 26px;
+}
+
+.snapshot-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 2px 6px 2px 8px;
+  border-radius: 10px;
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.snapshot-file:hover {
+  background: var(--fl-ground-hover);
+}
+
+.snapshot-file .tile {
+  color: var(--fl-text-muted);
+}
+
+.snapshot-file.same .trash-title {
+  color: var(--fl-text-secondary);
+}
+
+.snapshot-state {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.snapshot-file.changed .snapshot-state,
+.snapshot-file.deleted .snapshot-state {
+  color: var(--fl-text-secondary);
+}
+
+.snapshot-all {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+}

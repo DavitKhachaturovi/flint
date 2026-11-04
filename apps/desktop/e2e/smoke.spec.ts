@@ -2914,6 +2914,65 @@ test('fixes after 0.4.30: a new list in a group, the pinned Trash row, back to t
   await size(1120, 780);
 });
 
+test('M7 step 2: snapshots restored one list or everything, undoable; export as zip (DATA-04, DATA-05, D-97)', async () => {
+  const flint = join(dataDirectory, 'Flint');
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  type Hooks = {
+    snapshot?: () => Promise<string | null>;
+    showSnapshots?: () => void;
+    exportTo?: (path: string) => Promise<number>;
+  };
+  const file = join(flint, 'Snap test.md');
+  await writeFile(file, '---\nflint: 1\nid: snp1\nmode: tasks\n---\n- [ ] As it was [id:: snp2]\n');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Snap test' }).click();
+  await expect(main.locator('.row', { hasText: 'As it was' })).toHaveCount(1);
+  expect(
+    await app.evaluate(() => (globalThis as { __flintE2E?: Hooks }).__flintE2E?.snapshot?.()),
+  ).toMatch(/^\d{4}-\d{2}-\d{2}-\d{6}$/);
+  await writeFile(
+    file,
+    '---\nflint: 1\nid: snp1\nmode: tasks\n---\n- [ ] Changed since [id:: snp2]\n',
+  );
+  await expect(main.locator('.row', { hasText: 'Changed since' })).toHaveCount(1);
+
+  // From Trash's header (and the tray): the snapshots by day; one opens to its lists and notes.
+  await main.locator('.sidebar-foot .nav', { hasText: 'Trash' }).click();
+  await main.locator('.subtitle-link', { hasText: 'Snapshots' }).click();
+  await expect(main.locator('h1')).toHaveText('Snapshots');
+  await main.locator('.snapshot-head').first().click();
+  const row = main.locator('.snapshot-file', { hasText: 'Snap test' });
+  await expect(row).toHaveClass(/changed/);
+  await expect(row.locator('.snapshot-state')).toHaveText('Changed since');
+  await row.locator('.trash-action', { hasText: 'Restore' }).click();
+  await expect(main.locator('.toast')).toContainText('Restored Snap test');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('As it was');
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('Changed since');
+
+  // Restore everything asks first; it is one undo step too.
+  await app.evaluate(() => (globalThis as { __flintE2E?: Hooks }).__flintE2E?.showSnapshots?.());
+  await expect(main.locator('h1')).toHaveText('Snapshots');
+  const all = main.locator('.snapshot-all').first();
+  await expect(all).toBeVisible();
+  await all.locator('.trash-action', { hasText: 'Restore everything' }).click();
+  await expect(all.locator('.trash-confirm')).toContainText('Replace the whole Flint folder');
+  await all.locator('.trash-confirm .trash-action', { hasText: 'Restore everything' }).click();
+  await expect(main.locator('.toast')).toContainText('Restored the whole Flint folder');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('As it was');
+  await main.keyboard.press('Control+z');
+  await expect.poll(() => readFile(file, 'utf8')).toContain('Changed since');
+
+  // DATA-05: the whole folder as one zip.
+  const zip = join(dataDirectory, 'export.zip');
+  const count = await app.evaluate(
+    (_electron, path) => (globalThis as { __flintE2E?: Hooks }).__flintE2E?.exportTo?.(path),
+    zip,
+  );
+  expect(count).toBeGreaterThan(3);
+  expect((await readFile(zip)).subarray(0, 2).toString('ascii')).toBe('PK');
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });

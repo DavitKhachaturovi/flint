@@ -16,6 +16,8 @@ import {
   type SidebarOutcome,
   type SidebarView,
   type RestoredItem,
+  type SnapshotFile,
+  type SnapshotSummary,
   type TrashPreview,
   type TrashView,
 } from '../shared/ipc.js';
@@ -95,6 +97,20 @@ const main = {
   /** D-97, D-98: Restore from the trash; where it went (the toast's label, its list), or null. */
   restoreFromTrash(id: string): Promise<RestoredItem | null> {
     return ipcRenderer.invoke(Channels.mainTrashRestore, id) as Promise<RestoredItem | null>;
+  },
+  /** DATA-04, D-97: the snapshots, a snapshot's lists and notes, and restoring (one, or all: null). */
+  snapshots(): Promise<SnapshotSummary[]> {
+    return ipcRenderer.invoke(Channels.mainSnapshots) as Promise<SnapshotSummary[]>;
+  },
+  snapshotFiles(id: string): Promise<SnapshotFile[]> {
+    return ipcRenderer.invoke(Channels.mainSnapshotFiles, id) as Promise<SnapshotFile[]>;
+  },
+  restoreSnapshot(id: string, path: string | null): Promise<string | null> {
+    return ipcRenderer.invoke(Channels.mainSnapshotRestore, id, path) as Promise<string | null>;
+  },
+  /** D-97: the tray's Restore from a snapshot…. */
+  onShowSnapshots(listener: () => void): void {
+    ipcRenderer.on(Channels.mainShowSnapshots, () => listener());
   },
   /** D-98: a trash item opened read-only. */
   trashPreview(id: string): Promise<TrashPreview | null> {

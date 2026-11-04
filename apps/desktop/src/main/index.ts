@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
-import { extname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import {
   app,
   BrowserWindow,
@@ -34,6 +34,8 @@ import { IDENTITIES, type BuildKind } from './identity.js';
 import { showMissedSummary, showReminderToast } from './notifications.js';
 import { DraftFile } from './capture/drafts.js';
 import { captureSelection, restoreClipboard, saveClipboard } from './capture/selection.js';
+import { SnapshotStore } from './storage/snapshots.js';
+import { zipFolder } from './storage/zip.js';
 import { displayAccelerator } from '../shared/accelerator.js';
 import { HotkeyRegistry } from './hotkey-registry.js';
 import { acceleratorKeys } from './hotkeys.js';
@@ -595,6 +597,71 @@ async function start(): Promise<void> {
       .catch((error: unknown) => log(`trash expiry failed: ${String(error)}`));
   };
   ipcMain.handle(Channels.mainAutoArchive, (event) => (owns(event.sender) ? archiveDays : null));
+  // DATA-04, D-97: snapshots of the Flint folder in app data, taken every hour when something
+  // changed (and a minute after start-up), kept as Q-05 says; restored from the Snapshots view.
+  const snapshotStore = new SnapshotStore(
+    folder.folder,
+    join(dirname(app.getPath('logs')), 'snapshots'),
+  );
+  const snapshot = (): void => {
+    snapshotStore
+      .take(new Date())
+      .then((taken) => {
+        if (taken) log(`snapshot ${taken.id}`);
+        return snapshotStore.prune(new Date());
+      })
+      .catch((error: unknown) => log(`snapshot failed: ${String(error)}`));
+  };
+  const testHooks = e2eHooks();
+  setTimeout(snapshot, testHooks ? 1000 : 60_000);
+  setInterval(snapshot, 3_600_000);
+  if (testHooks)
+    testHooks.snapshot = () => snapshotStore.take(new Date()).then((taken) => taken?.id ?? null);
+  ipcMain.handle(Channels.mainSnapshots, (event) =>
+    owns(event.sender) ? workspace.snapshots(snapshotStore) : [],
+  );
+  ipcMain.handle(Channels.mainSnapshotFiles, (event, id: unknown) =>
+    owns(event.sender) && typeof id === 'string' ? workspace.snapshotFiles(snapshotStore, id) : [],
+  );
+  ipcMain.handle(Channels.mainSnapshotRestore, (event, id: unknown, path: unknown) =>
+    owns(event.sender) && typeof id === 'string' && (typeof path === 'string' || path === null)
+      ? workspace.restoreSnapshot(snapshotStore, id, path, new Date()).catch((error: unknown) => {
+          log(`snapshot restore failed: ${String(error)}`);
+          return null;
+        })
+      : null,
+  );
+  /** D-97: the tray's Restore from a snapshot…: the main window, on the Snapshots view. */
+  const showSnapshots = (): void => {
+    showMain();
+    const send = (): void => mainWindow.webContents.send(Channels.mainShowSnapshots);
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  };
+  if (testHooks) {
+    testHooks.showSnapshots = () => showSnapshots();
+    testHooks.exportTo = (path) => zipFolder(folder.folder, path);
+  }
+  /** DATA-05, D-97: the tray's Export Flint folder…: a zip where the user chooses. */
+  const exportFolder = async (): Promise<void> => {
+    const two = (value: number): string => String(value).padStart(2, '0');
+    const now = new Date();
+    const name = `Flint ${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}.zip`;
+    const chosen = await dialog.showSaveDialog({
+      title: 'Export Flint folder',
+      defaultPath: join(app.getPath('documents'), name),
+      filters: [{ name: 'Zip archive', extensions: ['zip'] }],
+    });
+    if (chosen.canceled || !chosen.filePath) return;
+    try {
+      const count = await zipFolder(folder.folder, chosen.filePath);
+      log(`exported ${count} files to ${chosen.filePath}`);
+      shell.showItemInFolder(chosen.filePath);
+    } catch (error) {
+      log(`export failed: ${String(error)}`);
+      dialog.showErrorBox('Flint', `The Flint folder couldn't be exported: ${String(error)}`);
+    }
+  };
   // DATA-02, TASK-06, D-97: the Trash view and what it does.
   ipcMain.handle(Channels.mainTrash, (event) =>
     owns(event.sender) ? workspace.trashView() : { deleted: [], archived: [] },
@@ -840,6 +907,8 @@ async function start(): Promise<void> {
     open: showMain,
     capture: () => popup.show(epochNow()),
     hotkeys: () => hotkeysPanel.show(),
+    exportFolder: () => void exportFolder(),
+    snapshots: showSnapshots,
     quit: () => app.quit(),
   });
   const hotkeysPanel = hotkeysWindow(pageUrl('hotkeys'), hotkeys, (name, accelerator) => {

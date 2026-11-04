@@ -70,6 +70,11 @@ export interface E2EHooks {
    */
   saveClipboard?: () => Promise<void>;
   restoreClipboard?: () => Promise<void>;
+  /** DATA-04, D-97: a snapshot now (if anything changed); its id. */
+  snapshot?: () => Promise<string | null>;
+  /** D-97: the tray's Restore from a snapshot…, and Export without its save dialog. */
+  showSnapshots?: () => void;
+  exportTo?: (path: string) => Promise<number>;
 }
 
 export function e2eHooks(): E2EHooks | undefined {
@@ -137,6 +142,10 @@ export interface TrayActions {
   readonly capture: () => void;
   /** APP-08: the Hotkeys window. */
   readonly hotkeys: () => void;
+  /** DATA-05, D-97: Export Flint folder… (a save dialog). */
+  readonly exportFolder: () => void;
+  /** DATA-04, D-97: Restore from a snapshot… (the Snapshots view). */
+  readonly snapshots: () => void;
   readonly quit: () => void;
 }
 
@@ -174,6 +183,10 @@ export function createTray(actions: TrayActions): TrayHandle {
       { label: 'Mini mode', enabled: false },
       { label: 'Hotkeys…', click: actions.hotkeys },
       { label: 'Settings', enabled: false },
+      { type: 'separator' },
+      // D-97: until Settings and Ctrl+K have them (M8).
+      { label: 'Export Flint folder…', click: actions.exportFolder },
+      { label: 'Restore from a snapshot…', click: actions.snapshots },
       { type: 'separator' },
       { label: 'Quit Flint', click: actions.quit },
     ]);
