@@ -108,7 +108,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Everywhere in the main window
 | Action | Key | Status |
 |---|---|---|
-| Command palette / fuzzy search | Ctrl+K | Decided |
+| Command palette / fuzzy search | Ctrl+K, or the header's pill (D-106) | Decided |
+| Keyboard cheat sheet | `?` in Navigate state (D-106) | Decided |
 | Keyboard cheat sheet | ? (Navigate state) | Decided |
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z (and Ctrl+Y) | Undo decided; redo proposed |
 | New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
@@ -132,7 +133,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic in the editor | Ctrl+B / Ctrl+I | Proposed (D-82) |
 | Paste as plain text in the editor | Ctrl+Shift+V | Proposed (D-82) |
 | Formatting context menu | Right-click | Decided |
-| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K inside a selection → link | Proposed (resolve Ctrl+K conflict: palette unless text is selected) |
+| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor) |
 
 ### Mouse
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.

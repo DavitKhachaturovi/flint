@@ -506,10 +506,12 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### NAV-01 — Ctrl+K command palette (v1)
 - Fuzzy search across **all lists** (task titles, bodies, notes) plus commands (create list, move task, open settings, open Flint folder, etc.). No theme switching in v1 (dark only).
 - Fully keyboard-driven.
+- **D-106 (0.8.4):** a centred card like the capture popup over a very light dim, opened with Ctrl+K anywhere or the header's "Search or run a command · Ctrl K" pill; results grouped Go to, Tasks, Notes, Commands (open tasks first, then completed ones); before typing, recent places, the selected task's actions and the most used commands; Trash and the archive through the last row, **Search Trash and Archive**; commands with choices as a second step (Move to ›, Priority ›). Every new feature with an action adds its palette command.
 
 ### NAV-02 — `?` keyboard cheat sheet (v1)
 - Pressing `?` (in navigate state) shows all shortcuts. Essential for a keyboard-first app.
 - **D-80:** it shows the same list as Settings' **Keyboard shortcuts** section (APP-11), from one source.
+- **D-106 (0.8.4):** a card in the palette's style, the shortcuts in two columns by group, a filter at the top; `?` or Esc closes it.
 
 ### NAV-03 — Main window layout (v1, Proposed)
 - A minimal, collapsible sidebar: Today and Inbox pinned at the top, then the user's lists. The content area shows the selected list.

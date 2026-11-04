@@ -29,6 +29,7 @@ Flint is a minimalist, keyboard-first quick-capture notes and task app for devel
 - **Data** (`docs/04`): plain markdown, task metadata as `[key:: value]` fields with a stable `id`, tolerant reader and canonical writer, atomic writes, never destroy content the parser doesn't understand. Round-trip and fuzz tests for the format are mandatory.
 - **Privacy:** no telemetry and **no network requests at all in v1** (no auto-update yet). Fonts (Onest, FiraGO for Georgian only, Geist Mono; D-60) are bundled locally, never loaded from Google Fonts.
 - **Visual design** (`docs/09`): use `docs/design/tokens.css` variables only, no raw hex values in components. Match `docs/design/screenshots/` and `docs/design/mockups/`. Dark mode only in v1. No emoji in the UI. Motion follows `docs/03` §5 (D-75: never delays input, interruptible, off under reduce-motion).
+- **Every action has a palette command (D-106):** a new feature with an action adds its Ctrl+K command (and its shortcut to `apps/desktop/src/shared/shortcuts.ts` if it has one) in the same change.
 - **Motion is part of done (D-89):** every UI change or action added comes with smooth, minimal motion for appearing, disappearing and changing state, following those rules. A feature isn't done without it; add it to the motion regression tests (`e2e/smoke.spec.ts`, the animation recorder) where practical.
 
 ## Working conventions

@@ -716,3 +716,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | The built-in recognizers listed with a switch each | TASK-10, NOTE-07 · Done (0.8.3) | 02, 04, 09, D-105 |
 | 6 | Links everywhere text shows; link chips in the composer and the capture popup; pasted URLs short in the editors at once | NOTE-07, TASK-10, CAP-04 · Done (0.8.3) | 02, 03, D-105 |
 
+## AN. M8 step 2: the palette and the cheat sheet (5 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Ctrl+K palette: a centred card like the capture popup, the header's pill | NAV-01 · Done (0.8.4) | 02, 03, 09, D-106 |
+| 2 | Search across lists, notes, groups, tasks (open, then completed), note lines; fuzzy | NAV-01 · Done (0.8.4) | 02, D-106 |
+| 3 | Trash and the archive through "Search Trash and Archive" | NAV-01, DATA-02 · Done (0.8.4) | D-106 |
+| 4 | Commands, the selected task's actions, second steps (Move to ›, Priority ›) | NAV-01 · Done (0.8.4) | 02, D-106 |
+| 5 | Before typing: recent places, the task's actions, most used commands | NAV-01 · Done (0.8.4) | D-106 |
+| 6 | `?` cheat sheet from the shared shortcuts list, with a filter | NAV-02 · Done (0.8.4) | 02, 03, D-80, D-106 |
+| 7 | Ctrl+K with text selected in an editor makes a link | NOTE-01 · Done (0.8.4) | 03, D-106 |
+| 8 | Quit Flint from the palette | APP-03 · Done (0.8.4) | 02, D-106 |
+
