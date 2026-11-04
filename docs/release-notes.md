@@ -2,6 +2,14 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.4.33 (4 Nov 2026)
+
+- **Quick notes**: Quick note under Inbox, or Ctrl+Shift+J anywhere, opens a fresh note ready to type, no name needed. They wait under Quick notes; add a title when you want to keep one as a normal note. Empty ones disappear by themselves.
+- **Rename in place**: double-click a list or note in the sidebar (or click the open one again) to rename it; double-click a group to rename it.
+- **Compare with a snapshot**: in Snapshots, click a changed list to see which tasks were added, deleted or changed, and bring back just the ones you want; a note shows what changed line by line.
+- The tray menu is back to the essentials; Snapshots and Export are linked from Trash until Settings arrives.
+- Fixed: reminder cards' hover shadow, the selection jumping when a new list is made in a group, a gap under Trash in the sidebar, and "Restore to edit" not showing on deleted lists.
+
 ## 0.4.32 (4 Nov 2026)
 
 - **Snapshots**: Flint keeps a copy of your Flint folder every hour something changes (for two days), then once a day (for a month), on this computer. From the tray (Restore from a snapshot…) or Trash, bring back one list or note as it was, or everything. Ctrl+Z undoes a restore.
