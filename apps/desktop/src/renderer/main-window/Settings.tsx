@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import type { SettingChange, SettingsView } from '../../shared/ipc.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
 
@@ -67,14 +76,16 @@ function Choice<T extends string | number | boolean | null>(props: {
 }
 
 /** One setting: its name, what it does, its control; hidden while the filter doesn't match. */
-function Row(props: {
+interface RowProps {
   readonly name: string;
   readonly note?: ReactNode;
   readonly filter: string;
   /** More words the filter finds it by. */
   readonly words?: string;
   readonly children?: ReactNode;
-}): ReactElement | null {
+}
+
+function Row(props: RowProps): ReactElement | null {
   const { name, note, filter, words = '', children } = props;
   const haystack = `${name} ${typeof note === 'string' ? note : ''} ${words}`.toLowerCase();
   if (filter !== '' && !haystack.includes(filter)) return null;
@@ -97,23 +108,17 @@ function Section(props: {
   readonly children: ReactNode;
 }): ReactElement | null {
   const name = SETTINGS_SECTIONS.find((section) => section.id === props.id)?.name ?? '';
-  const rows = (Array.isArray(props.children) ? props.children : [props.children]).flat();
+  const rows = Children.toArray(props.children).filter(
+    (child): child is ReactElement<RowProps> =>
+      isValidElement<RowProps>(child) && child.type === Row,
+  );
   // While filtering, a section shows only if a row of it (or its name) matches.
   const any =
     props.filter === '' ||
     props.matches === true ||
     name.toLowerCase().includes(props.filter) ||
     rows.some((row) => {
-      if (!row || typeof row !== 'object' || !('props' in row)) return false;
-      const {
-        name: rowName = '',
-        note = '',
-        words = '',
-      } = row.props as {
-        name?: string;
-        note?: unknown;
-        words?: string;
-      };
+      const { name: rowName, note, words = '' } = row.props;
       return `${rowName} ${typeof note === 'string' ? note : ''} ${words}`
         .toLowerCase()
         .includes(props.filter);
@@ -131,12 +136,8 @@ function Section(props: {
 
 /** A section found by its own name shows all its rows. */
 function withFilter(children: ReactNode, filter: string): ReactNode {
-  return (Array.isArray(children) ? children : [children]).map((child, index) =>
-    child && typeof child === 'object' && 'props' in child && child.type === Row ? (
-      <Row key={index} {...(child.props as Parameters<typeof Row>[0])} filter={filter} />
-    ) : (
-      child
-    ),
+  return Children.map(children, (child) =>
+    isValidElement<RowProps>(child) && child.type === Row ? cloneElement(child, { filter }) : child,
   );
 }
 
