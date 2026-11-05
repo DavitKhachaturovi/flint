@@ -12,6 +12,7 @@ import {
   ipcMain,
   nativeImage,
   Notification,
+  powerMonitor,
   protocol as schemes,
   screen,
   session,
@@ -641,8 +642,8 @@ async function start(): Promise<void> {
         });
   // DATA-02, MEDIA-04, D-97: the trash's 30 days, and (at start-up only) orphaned attachments.
   let started = false;
-  const unpin = (): void => {
-    workspace
+  const unpin = (): Promise<unknown> => {
+    const unpinned = workspace
       .unpinDone(new Date())
       .catch((error: unknown) => log(`unpin failed: ${String(error)}`));
     void archive();
@@ -662,6 +663,7 @@ async function start(): Promise<void> {
         if (removed.length > 0) log(`removed unused attachments: ${removed.join(', ')}`);
       })
       .catch((error: unknown) => log(`trash expiry failed: ${String(error)}`));
+    return unpinned;
   };
   ipcMain.handle(Channels.mainAutoArchive, (event) => (owns(event.sender) ? archiveDays : null));
   // DATA-04, D-97: snapshots of the Flint folder in app data, taken every hour when something
@@ -950,14 +952,32 @@ async function start(): Promise<void> {
     await settingsFile.update({ autoArchiveDays: days });
     return archive();
   });
+  /**
+   * D-107: the day change, at midnight itself (and checked every minute and on waking from sleep,
+   * should the clock jump): done pins lose their pin, then the window reads every view again, so
+   * Today shows the new day's rollover card and reminders at once, not up to two minutes later.
+   */
   let pinDay = new Date().toDateString();
-  unpin();
-  setInterval(() => {
+  void unpin();
+  const newDay = (): void => {
     const day = new Date().toDateString();
     if (day === pinDay) return;
     pinDay = day;
-    unpin();
-  }, 60_000).unref();
+    void unpin().finally(() => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
+    });
+  };
+  setInterval(newDay, 60_000).unref();
+  const atMidnight = (): void => {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 200);
+    setTimeout(() => {
+      newDay();
+      atMidnight();
+    }, next.getTime() - now.getTime()).unref();
+  };
+  atMidnight();
+  powerMonitor.on('resume', newDay);
 
   const drafts = new DraftFile(join(app.getPath('userData'), 'drafts.json'));
   await drafts.load();
