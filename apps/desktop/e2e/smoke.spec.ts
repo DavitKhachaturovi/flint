@@ -33,6 +33,13 @@ import {
  */
 const ALLOWED_ENDPOINTS: readonly string[] = [];
 
+/**
+ * D-107: the suite runs on a fixed clock, Tuesday 10 March 2026 from 10:00 local, so nothing it sees
+ * depends on when it runs. Flint gets the offset from the real time; `appNow()` is Flint's time.
+ */
+const CLOCK_OFFSET = new Date(2026, 2, 10, 10, 0).getTime() - Date.now();
+const appNow = (): Date => new Date(Date.now() + CLOCK_OFFSET);
+
 const appDirectory = join(import.meta.dirname, '..');
 const electronPath = execFileSync(process.execPath, ['-p', "require('electron')"], {
   cwd: appDirectory,
@@ -150,7 +157,12 @@ test.beforeAll(async () => {
       // Loopback through the proxy too: nothing may skip the recorder.
       '--proxy-bypass-list=<-loopback>',
     ],
-    env: { ...env, FLINT_E2E: '1', FLINT_DATA_DIR: dataDirectory },
+    env: {
+      ...env,
+      FLINT_E2E: '1',
+      FLINT_DATA_DIR: dataDirectory,
+      FLINT_E2E_CLOCK_OFFSET: String(CLOCK_OFFSET),
+    },
   });
   const mainPid = app.process().pid ?? 0;
   let pids = flintPids(mainPid, dataDirectory);
@@ -197,6 +209,16 @@ test('starts with the main window and the pre-warmed capture popup, hidden', asy
       BrowserWindow.getAllWindows().filter((window) => window.isVisible()).length,
   );
   expect(visible).toBe(0);
+});
+
+test("runs on the suite's fixed clock: Tuesday 10 March 2026, from 10:00 (D-107)", async () => {
+  const at = new Date(await app.evaluate(() => Date.now()));
+  expect([at.getFullYear(), at.getMonth(), at.getDate(), at.getHours()]).toEqual([2026, 2, 10, 10]);
+  expect(Math.abs(at.getTime() - appNow().getTime())).toBeLessThan(2000);
+  for (const page of app.windows())
+    expect(Math.abs((await page.evaluate(() => Date.now())) - appNow().getTime())).toBeLessThan(
+      2000,
+    );
 });
 
 test('creates the Flint folder with Inbox', async () => {
@@ -674,13 +696,19 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'None',
   ]);
   // D-79: a diagonal move across the next items to the submenu keeps it open (menu aim).
-  const priorityBox = await menu.getByText('Priority', { exact: true }).boundingBox();
-  const lowBox = await main.locator('.fl-submenu').getByText('Low').boundingBox();
-  if (!priorityBox || !lowBox) throw new Error('no menu boxes');
-  await main.mouse.move(priorityBox.x + 20, priorityBox.y + priorityBox.height / 2);
-  // (Few steps: on a slow machine six took longer than the aim's grace.)
-  await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 3 });
-  await expect(main.locator('.fl-submenu .fl-menu-item.active')).toHaveText(/Low/);
+  // (Few steps: on a slow machine six took longer than the aim's grace. D-107: a machine busy
+  // enough to stall the moves past the 300 ms grace gets another try; a broken aim fails them all.)
+  await expect(async () => {
+    await menu.getByText('Priority', { exact: true }).hover();
+    const priorityBox = await menu.getByText('Priority', { exact: true }).boundingBox();
+    const lowBox = await main.locator('.fl-submenu').getByText('Low').boundingBox();
+    if (!priorityBox || !lowBox) throw new Error('no menu boxes');
+    await main.mouse.move(priorityBox.x + 20, priorityBox.y + priorityBox.height / 2);
+    await main.mouse.move(lowBox.x + 30, lowBox.y + lowBox.height / 2, { steps: 3 });
+    await expect(main.locator('.fl-submenu .fl-menu-item.active')).toHaveText(/Low/, {
+      timeout: 1500,
+    });
+  }).toPass({ timeout: 20_000 });
   await menu.getByText('Move to…').click();
   await expect(main.locator('.fl-picker .fl-picker-search')).toBeFocused();
   await main.keyboard.type('Garden');
@@ -819,7 +847,7 @@ test('reminders fire once, missed ones say so; Done and Snooze change the task (
   const pad = (value: number): string => String(value).padStart(2, '0');
   const stamp = (date: Date): string =>
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  const now = new Date();
+  const now = appNow();
   const hourAgo = new Date(now.getTime() - 60 * 60_000);
   await writeFile(
     file,
@@ -863,9 +891,9 @@ test('an overdue reminder, and the bell that turns it off and on (REM-11, REM-12
   const file = join(dataDirectory, 'Flint', 'Calls.md');
   const pad = (value: number): string => String(value).padStart(2, '0');
   // Up to an hour ago, but still today (just after midnight: midnight).
-  const today = new Date();
+  const today = appNow();
   today.setHours(0, 0, 0, 0);
-  const hourAgo = new Date(Math.max(today.getTime(), Date.now() - 60 * 60_000));
+  const hourAgo = new Date(Math.max(today.getTime(), appNow().getTime() - 60 * 60_000));
   const stamp = `${hourAgo.getFullYear()}-${pad(hourAgo.getMonth() + 1)}-${pad(hourAgo.getDate())}T${pad(hourAgo.getHours())}:${pad(hourAgo.getMinutes())}`;
   await writeFile(
     file,
@@ -1640,7 +1668,7 @@ test('wide windows and the interface size (UI-12, D-81, D-82)', async () => {
 test('the context panel: Up next, pins, the selected task, back, a note outline, Ctrl+\\ and its button (NAV-07, TODAY-01, TASK-17, D-83, D-85)', async () => {
   const flint = join(dataDirectory, 'Flint');
   const two = (n: number): string => String(n).padStart(2, '0');
-  const now = new Date();
+  const now = appNow();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0);
   const stamp = `${tomorrow.getFullYear()}-${two(tomorrow.getMonth() + 1)}-${two(tomorrow.getDate())}T10:00`;
   await writeFile(
@@ -1904,7 +1932,7 @@ test('M4 step 9: smart link titles, temporary sorts, find in lists, multi-line p
   const flint = join(dataDirectory, 'Flint');
   const two = (n: number): string => String(n).padStart(2, '0');
   const at = (days: number): string => {
-    const day = new Date(Date.now() - days * 86_400_000);
+    const day = new Date(appNow().getTime() - days * 86_400_000);
     return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}T09:00`;
   };
   const done = Array.from(
@@ -2340,7 +2368,7 @@ test('fixes after 0.4.24: a reminder opens its task, scroll memory, code from Wi
 test('Today: pinned tasks of every list, its order, its composer, reminder cards (TODAY-01, TODAY-03, M6, D-90)', async () => {
   const flint = join(dataDirectory, 'Flint');
   const two = (n: number): string => String(n).padStart(2, '0');
-  const now = new Date();
+  const now = appNow();
   const soon = new Date(now.getTime() + 60 * 60_000);
   const today = soon.getDate() === now.getDate();
   const at = `${soon.getFullYear()}-${two(soon.getMonth() + 1)}-${two(soon.getDate())}T${two(soon.getHours())}:${two(soon.getMinutes())}`;
@@ -2415,7 +2443,7 @@ test('Today redesign: high priority not pinned, progress, the column and its sec
   const main = app.windows().find((page) => page.url().includes('main-window'));
   if (!main) throw new Error('main window page not found');
   const two = (n: number): string => String(n).padStart(2, '0');
-  const now = new Date();
+  const now = appNow();
   const soon = new Date(now.getTime() + 90 * 60_000);
   const today = soon.getDate() === now.getDate();
   const at = `${soon.getFullYear()}-${two(soon.getMonth() + 1)}-${two(soon.getDate())}T${two(soon.getHours())}:${two(soon.getMinutes())}`;
@@ -2538,7 +2566,7 @@ test('fixes after 0.4.26: a reminder opens and flashes at once, the column follo
   const two = (n: number): string => String(n).padStart(2, '0');
   const stamp = (d: Date): string =>
     `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`;
-  const now = new Date();
+  const now = appNow();
   const soon = new Date(now.getTime() + 2 * 3600_000);
   const today = soon.getDate() === now.getDate() && now.getHours() >= 1;
   const tasks = Array.from({ length: 50 }, (_, i) => `- [ ] Flash filler ${i + 1} [id:: ff${i}]`);
@@ -2704,8 +2732,8 @@ test('the rest of M6: the Overdue card, Snooze, the missed toast, R, the chime (
     if (found) found.reminderSound = true;
   });
   const chimesBefore = (await hooks()).chimes;
-  const yesterday = new Date(Date.now() - 24 * 3600_000);
-  const earlier = new Date(Date.now() - 2 * 3600_000);
+  const yesterday = new Date(appNow().getTime() - 24 * 3600_000);
+  const earlier = new Date(appNow().getTime() - 2 * 3600_000);
   const file = join(flint, 'Overdue.md');
   await writeFile(
     file,

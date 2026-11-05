@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
+import { applyTestClock } from './test-clock.js';
 import {
   Channels,
   type AttachFileOutcome,
@@ -328,4 +329,5 @@ const main = {
 
 export type MainBridge = typeof main;
 
+applyTestClock();
 contextBridge.exposeInMainWorld('flintMain', main);

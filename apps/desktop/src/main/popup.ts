@@ -20,6 +20,7 @@ import {
   isKeyDown,
   VirtualKey,
 } from './win32.js';
+import { testWindowArguments } from './shell.js';
 
 /**
  * The capture popup (CAP-01, CAP-09, CAP-10): created once at startup, kept rendered while hidden,
@@ -118,6 +119,7 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
       // Keep the hidden popup's renderer awake so its first frame after show() isn't delayed (05 §4).
       backgroundThrottling: false,
       spellcheck: false,
+      additionalArguments: testWindowArguments(),
     },
   });
   // Above full-screen apps such as a full-screen Teams call (CAP-01).

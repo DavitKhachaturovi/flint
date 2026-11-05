@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { applyTestClock } from './test-clock.js';
 import {
   Channels,
   type AttachmentChip,
@@ -75,4 +76,5 @@ const popup = {
 
 export type PopupBridge = typeof popup;
 
+applyTestClock();
 contextBridge.exposeInMainWorld('flintPopup', popup);

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import net from 'node:net';
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
+import { CLOCK_ARGUMENT, installTestClock } from '../shared/test-clock.js';
 import { writeFileAtomic } from './storage/atomic.js';
 import {
   monitorSetupKey,
@@ -129,6 +130,24 @@ export function guardNodeNetworkForTests(): void {
     return Promise.reject(new Error('DNS disabled in Flint (APP-09)'));
   };
 }
+
+let clockArguments: string[] = [];
+
+/**
+ * D-107: test mode runs on the clock the end-to-end test chose (`FLINT_E2E_CLOCK_OFFSET`, ms from the
+ * real time), here and, through `testWindowArguments`, in every window. Call before anything else.
+ */
+export function fixClockForTests(): void {
+  const value = process.env.FLINT_E2E_CLOCK_OFFSET;
+  if (!e2eHooks() || !value) return;
+  const offset = Number(value);
+  if (!Number.isFinite(offset)) return;
+  installTestClock(offset);
+  clockArguments = [`${CLOCK_ARGUMENT}${offset}`];
+}
+
+/** D-107: what a window is started with so its pages share the test clock (nothing otherwise). */
+export const testWindowArguments = (): string[] => clockArguments;
 
 /** Launched by Windows at login (APP-01): start in the tray without showing a window. */
 export const STARTED_AT_LOGIN = process.argv.includes('--hidden');

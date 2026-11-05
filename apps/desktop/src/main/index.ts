@@ -86,11 +86,13 @@ import {
   configureAppPaths,
   createTray,
   e2eHooks,
+  fixClockForTests,
   guardNodeNetworkForTests,
   recoverFromCrashes,
   rememberWindowState,
   STARTED_AT_LOGIN,
   testDataDirectory,
+  testWindowArguments,
 } from './shell.js';
 import {
   findActivation,
@@ -160,6 +162,7 @@ const pageUrl = (page: string, host?: typeof MAIN_WINDOW_HOST): string =>
 
 configureAppPaths(IDENTITY.name);
 guardNodeNetworkForTests();
+fixClockForTests();
 // Before the app is ready: a standard, secure origin for the renderers, inside Flint only.
 schemes.registerSchemesAsPrivileged([
   // D-84: `stream` lets videos seek (range requests).
@@ -308,6 +311,7 @@ async function start(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments: testWindowArguments(),
     },
   });
   // D-81: its own origin, so its zoom (UI-12) never reaches the capture popup.
