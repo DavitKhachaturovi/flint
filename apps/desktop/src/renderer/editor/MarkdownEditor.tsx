@@ -36,6 +36,8 @@ export function MarkdownEditor(props: {
   readonly onChange?: (text: string) => void;
   /** Leaving the editor (focus elsewhere). */
   readonly onBlur?: (text: string) => void;
+  /** D-107: the editor took the focus (a caret asked for has arrived). */
+  readonly onFocus?: () => void;
   /** Esc (a body's field saves and closes). */
   readonly onEscape?: (text: string) => void;
   /** NOTE-06, D-84: a note's Monospace toggle, in its menu (and Ctrl+Shift+M). */
@@ -106,6 +108,7 @@ export function MarkdownEditor(props: {
             }
             if (update.focusChanged && !update.view.hasFocus)
               latest.current.onBlur?.(update.state.doc.toString());
+            if (update.focusChanged && update.view.hasFocus) latest.current.onFocus?.();
           }),
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
           // MEDIA-01, D-84: files dragged in (from Explorer) go where they are dropped.

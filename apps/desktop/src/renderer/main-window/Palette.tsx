@@ -9,16 +9,18 @@ import {
   type ReactNode,
 } from 'react';
 import { fuzzyMatch } from '../../shared/fuzzy.js';
-import { SearchIcon } from './icons.js';
+import { BackIcon, SearchIcon } from './icons.js';
 import type { SearchHit } from '../../shared/ipc.js';
 
 /**
  * NAV-01, D-106: the Ctrl+K palette: a solid floating card like the capture popup, centred near
  * the top over a very light dim. One field searches every list and note, the places to go and the
- * commands; ↑/↓ and Enter, Esc closes. A command with choices (Move to…, Priority) is a second step
- * inside the palette, with a breadcrumb; Backspace in an empty field goes back. Before anything is
- * typed: recent places, the selected task's actions and the most used commands. With a query, the
- * last row searches Trash and the archive instead.
+ * commands; ↑/↓ and Enter. A command with choices (Move to…, Priority) is a second step inside the
+ * palette, with a breadcrumb. Before anything is typed: recent places, the selected task's actions
+ * and the most used commands. With a query, the last row searches Trash and the archive instead.
+ * D-107: results always in one order (Go to, the task's actions, Commands, Tasks, Lists and notes,
+ * lines in notes last); a step (or Trash and Archive) has a back arrow, and Esc or Backspace in the
+ * empty field goes back one step; Esc closes only from the top; a footer shows the keys.
  */
 
 export interface PaletteItem {
@@ -48,7 +50,10 @@ export interface PaletteSources {
   readonly recent: readonly PaletteItem[];
   /** The selected task's actions, when one is selected. */
   readonly task: readonly PaletteItem[];
+  /** Fixed places: Today, Settings and its sections, Trash, Snapshots. */
   readonly places: readonly PaletteItem[];
+  /** Lists, notes and groups by name. */
+  readonly lists: readonly PaletteItem[];
   readonly commands: readonly PaletteItem[];
 }
 
@@ -183,18 +188,20 @@ export function Palette(props: {
     const tasks = hits.filter((hit) => hit.kind === 'task');
     const open = tasks.filter((hit) => !hit.done);
     const done = tasks.filter((hit) => hit.done);
+    // D-107: always this order; what is inside notes comes last.
     const found: Group[] = [
       { name: 'Go to', items: matching(sources.places, text, 6) },
       { name: 'This task', items: matching(sources.task, text, 4) },
+      { name: 'Commands', items: matching(sources.commands, text, 8) },
       { name: 'Tasks', items: [...open.slice(0, 8), ...done.slice(0, 4)].map(hitItem) },
+      { name: 'Lists and notes', items: matching(sources.lists, text, 8) },
       {
-        name: 'Notes',
+        name: 'In notes',
         items: hits
           .filter((hit) => hit.kind === 'line')
           .slice(0, 5)
           .map(hitItem),
       },
-      { name: 'Commands', items: matching(sources.commands, text, 8) },
     ].filter((group) => group.items.length > 0);
     return [
       ...found,
@@ -223,6 +230,17 @@ export function Palette(props: {
       ?.scrollIntoView({ block: 'nearest' });
   }, [safe, groups]);
 
+  /** D-107: one step back (Trash and Archive, then the steps); false at the top. */
+  const back = (): boolean => {
+    if (scope === 'trash') setScope('live');
+    else if (steps.length > 0) setSteps(steps.slice(0, -1));
+    else return false;
+    setQuery('');
+    setSelected(0);
+    field.current?.focus();
+    return true;
+  };
+  const deep = scope === 'trash' || steps.length > 0;
   const close = (then?: () => void): void => {
     pending.current = then ?? null;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
@@ -263,6 +281,18 @@ export function Palette(props: {
     >
       <div className="palette" role="dialog" aria-label="Search or run a command">
         <div className="palette-head">
+          {deep && (
+            <button
+              type="button"
+              className="palette-back"
+              aria-label="Back"
+              title="Back (Esc)"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => back()}
+            >
+              <BackIcon size={14} />
+            </button>
+          )}
           {steps.map((each) => (
             <span key={each.title} className="palette-crumb">
               {each.title} ›
@@ -291,20 +321,12 @@ export function Palette(props: {
               } else if (event.key === 'Escape') {
                 event.preventDefault();
                 event.stopPropagation();
-                close();
+                if (!back()) close();
               } else if (event.key === 'Backspace' && query === '') {
-                if (scope === 'trash') {
-                  event.preventDefault();
-                  setScope('live');
-                } else if (steps.length > 0) {
-                  event.preventDefault();
-                  setSteps(steps.slice(0, -1));
-                }
-                setSelected(0);
+                if (back()) event.preventDefault();
               }
             }}
           />
-          <span className="keycap">Esc</span>
         </div>
         <div ref={list} className="palette-results" role="listbox" aria-label="Results">
           {flat.length === 0 && (
@@ -345,24 +367,38 @@ export function Palette(props: {
             </div>
           ))}
         </div>
+        {/* D-107: the keys, and Ctrl+K for whoever came by mouse. */}
+        <div className="palette-foot" aria-hidden="true">
+          <span>
+            <span className="keycap">↑↓</span> navigate
+          </span>
+          <span>
+            <span className="keycap">Enter</span> open
+          </span>
+          <span>
+            <span className="keycap">Esc</span> {deep ? 'back' : 'close'}
+          </span>
+          <span className="palette-foot-open">
+            <span className="keycap">Ctrl K</span> opens this anywhere
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-/** NAV-01, D-106: the header's "Search or run a command · Ctrl K" (mockup 01). */
-export function PalettePill(props: { readonly onOpen: () => void }): ReactElement {
+/** NAV-01, D-107: the sidebar header's search button (next to the Flint mark). */
+export function PaletteButton(props: { readonly onOpen: () => void }): ReactElement {
   return (
     <button
       type="button"
-      className="palette-pill"
+      className="palette-button"
+      aria-label="Search or run a command"
       title="Search or run a command (Ctrl+K)"
       onMouseDown={(event) => event.preventDefault()}
       onClick={props.onOpen}
     >
-      <SearchIcon />
-      <span className="palette-pill-label">Search or run a command</span>
-      <span className="keycap">Ctrl K</span>
+      <SearchIcon size={15} />
     </button>
   );
 }

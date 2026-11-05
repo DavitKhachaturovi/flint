@@ -100,7 +100,8 @@ import {
 import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
 import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js';
-import { Palette, PalettePill, type PaletteItem, type PaletteSources } from './Palette.js';
+import { tipDue } from './tips.js';
+import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
@@ -691,19 +692,35 @@ export function App(): ReactElement {
 
   /** D-86: a note just made by Convert to note: its editor takes the cursor when it opens. */
   const [focusNote, setFocusNote] = useState<string | null>(null);
+  // D-107: a caret asked for a note that was left before it arrived is forgotten.
+  useEffect(() => {
+    if (focusNote !== null && focusNote !== listId) setFocusNote(null);
+  }, [listId, focusNote]);
   const listsRef = useRef(lists);
   listsRef.current = lists;
   const sidebarRef = useRef(sidebarView);
   sidebarRef.current = sidebarView;
+  /**
+   * D-107: reads overlap (a file written outside Flint, a change, the minute's refresh); one that
+   * comes back after a newer one is dropped. Applied last, its older lists made a list that had just
+   * appeared look deleted, and the window went back to the place before (D-86).
+   */
+  const refreshSeq = useRef(0);
+  const refreshThens = useRef<(() => void)[]>([]);
   /** Reads the lists again; `then` runs in the same render (a name field giving way to its row). */
   const refresh = useCallback(
     async (then?: () => void): Promise<void> => {
+      const seq = ++refreshSeq.current;
+      if (then) refreshThens.current.push(then);
       const [nextLists, nextView, nextSidebar, nextTrash] = await Promise.all([
         window.flintMain.lists(),
         window.flintMain.view(listId),
         window.flintMain.sidebar(),
         window.flintMain.trash(),
       ]);
+      if (seq !== refreshSeq.current) return;
+      const thens = refreshThens.current;
+      refreshThens.current = [];
       setTrash(nextTrash);
       // D-85: only a sidebar that changes moves its rows. A refresh that brings what is already on
       // screen (the echo of a fold, the minute's refresh) must not measure rows mid-animation and
@@ -715,7 +732,7 @@ export function App(): ReactElement {
       setLists(nextLists);
       setView(nextView);
       setSidebarView(nextSidebar);
-      then?.();
+      for (const each of thens) each();
     },
     [listId, motion],
   );
@@ -798,6 +815,12 @@ export function App(): ReactElement {
    * is shown again (back, or its sidebar row).
    */
   const scrollMemory = useRef(new Map<string, number>());
+  /** D-107: a note's line to open at (from the palette). */
+  const [lineTarget, setLineTarget] = useState<{
+    readonly list: string;
+    readonly line: number;
+    readonly at: number;
+  } | null>(null);
   const show = useCallback((place: Place, select: string | null = null, back = false): void => {
     const root = scroller.current;
     if (root)
@@ -1800,13 +1823,17 @@ export function App(): ReactElement {
   const newQuickNoteRef = useRef(newQuickNote);
   newQuickNoteRef.current = newQuickNote;
   // NOTE-08, D-99: a quick note left empty goes (main checks it is still empty a moment later).
+  // D-107: the first three times, a toast says why it went.
   const lastPlace = useRef(listId);
   useEffect(() => {
     const before = lastPlace.current;
     lastPlace.current = listId;
     if (before !== listId && lists.find((list) => list.id === before)?.quick)
-      void window.flintMain.discardQuickNote(before);
-  }, [listId, lists]);
+      void window.flintMain.discardQuickNote(before).then((removed) => {
+        if (removed && tipDue('emptyQuickNote', 3))
+          showToast('Empty quick notes are removed when you leave them', false);
+      });
+  }, [listId, lists, showToast]);
   /** NOTE-08, D-99: a quick note's right-click menu: a title, keep it, a group, delete. */
   const quickMenu = useCallback(
     (list: ListSummary, at: Point): void => {
@@ -2281,47 +2308,64 @@ export function App(): ReactElement {
     [sidebarChange, showToast, setNaming, sidebarView, toggleGroup],
   );
 
+  const namingBusy = useRef(false);
+  /**
+   * The sidebar's name field: Enter saves, and (D-107) so does leaving it, like a task's title; only
+   * Esc cancels. Left empty or unchanged, it just closes; a name that can't be used, when it is left,
+   * closes it with the reason as a toast (on Enter the reason shows under the field).
+   */
   const submitName = useCallback(
-    async (name: string): Promise<void> => {
-      if (!naming) return;
-      if (naming.kind === 'newGroup' || naming.kind === 'renameGroup') {
-        const outcome = await window.flintMain.sidebarAction(
-          naming.kind === 'newGroup'
-            ? { kind: 'newGroup', name }
-            : { kind: 'renameGroup', id: naming.id, name },
-        );
-        if (!outcome) return;
-        if (!outcome.ok) {
-          setNamingProblem(outcome.problem);
+    async (name: string, left = false): Promise<void> => {
+      if (!naming || namingBusy.current) return;
+      const close = (): void => {
+        setNaming(null);
+        setNamingProblem(null);
+      };
+      const unchanged =
+        (naming.kind === 'rename' || naming.kind === 'renameGroup') &&
+        name.trim() === naming.name.trim();
+      if (left && (name.trim() === '' || unchanged)) return close();
+      const refuse = (problem: string): void => {
+        if (!left) return setNamingProblem(problem);
+        close();
+        showToast(problem, false);
+      };
+      namingBusy.current = true;
+      try {
+        if (naming.kind === 'newGroup' || naming.kind === 'renameGroup') {
+          const outcome = await window.flintMain.sidebarAction(
+            naming.kind === 'newGroup'
+              ? { kind: 'newGroup', name }
+              : { kind: 'renameGroup', id: naming.id, name },
+          );
+          if (!outcome) return;
+          if (!outcome.ok) return refuse(outcome.problem);
+          // D-80: the field gives way to the group in one step, in its place.
+          await refresh(() => {
+            setNamingState(null);
+            setNamingProblem(null);
+          });
+          if (naming.kind === 'newGroup' && naming.list && outcome.id)
+            await sidebarChange({
+              kind: 'move',
+              id: naming.list,
+              to: { group: outcome.id, index: 0 },
+            });
           return;
         }
-        // D-80: the field gives way to the group in one step, in its place.
-        await refresh(() => {
-          setNamingState(null);
-          setNamingProblem(null);
-        });
-        if (naming.kind === 'newGroup' && naming.list && outcome.id)
-          await sidebarChange({
-            kind: 'move',
-            id: naming.list,
-            to: { group: outcome.id, index: 0 },
-          });
-        return;
+        const outcome = await window.flintMain.listAction(
+          naming.kind === 'new'
+            ? { kind: 'new', name, mode: naming.mode, ...(naming.group && { group: naming.group }) }
+            : { kind: 'rename', id: naming.id, name },
+        );
+        if (!outcome) return;
+        if (!outcome.ok) return refuse(outcome.problem);
+        close();
+        if (naming.kind === 'new') openList(outcome.listId);
+        if (outcome.label) showToast(outcome.label, true);
+      } finally {
+        namingBusy.current = false;
       }
-      const outcome = await window.flintMain.listAction(
-        naming.kind === 'new'
-          ? { kind: 'new', name, mode: naming.mode, ...(naming.group && { group: naming.group }) }
-          : { kind: 'rename', id: naming.id, name },
-      );
-      if (!outcome) return;
-      if (!outcome.ok) {
-        setNamingProblem(outcome.problem);
-        return;
-      }
-      setNaming(null);
-      setNamingProblem(null);
-      if (naming.kind === 'new') openList(outcome.listId);
-      if (outcome.label) showToast(outcome.label, true);
     },
     [naming, openList, showToast, sidebarChange, refresh, setNaming],
   );
@@ -2886,6 +2930,7 @@ export function App(): ReactElement {
         icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
         problem={namingProblem}
         onSubmit={(name) => void submitName(name)}
+        onLeave={(name) => void submitName(name, true)}
         onCancel={() => setNaming(null)}
       />
     ) : (
@@ -2920,6 +2965,7 @@ export function App(): ReactElement {
       group
       problem={namingProblem}
       onSubmit={(name) => void submitName(name)}
+      onLeave={(name) => void submitName(name, true)}
       onCancel={() => setNaming(null)}
     />
   );
@@ -3528,6 +3574,30 @@ export function App(): ReactElement {
     root.scrollTo({ top: scrollMemory.current.get(key) ?? 0, behavior: 'instant' });
   }, [view, listId, page]);
 
+  // D-107: a note's line chosen in the palette: the note opens scrolled to it, the line flashed.
+  useEffect(() => {
+    const target = lineTarget;
+    if (!target || view?.id !== target.list || view.mode !== 'note' || page) return;
+    const root = scroller.current;
+    const cm = root ? noteEditorView(root) : null;
+    if (!root || !cm) return;
+    setLineTarget(null);
+    const from = cm.state.doc.line(Math.min(target.line + 1, cm.state.doc.lines)).from;
+    // The editor scrolls it there itself: it measures the lines (an estimate fell short).
+    cm.dispatch({
+      effects: CodeEditorView.scrollIntoView(from, {
+        y: 'start',
+        yMargin: Math.round(root.clientHeight / 3),
+      }),
+    });
+    // Once the editor has drawn the lines scrolled to.
+    window.setTimeout(() => {
+      const at = cm.domAtPos(from).node;
+      const line = (at instanceof Element ? at : at.parentElement)?.closest('.cm-line');
+      if (line) flash(line);
+    }, 60);
+  }, [view, page, lineTarget]);
+
   /**
    * TASK-09 (D-88, Proposed): text pasted into a task list (not into a field): each non-empty line
    * becomes a task, below the selected task or at the top, as one undo step, with "Keep as one" in
@@ -3746,8 +3816,7 @@ export function App(): ReactElement {
     const groups = (sidebarView?.items ?? []).filter(
       (item): item is Extract<SidebarItem, { kind: 'group' }> => item.kind === 'group',
     );
-    const places: PaletteItem[] = [
-      { id: 'go:today', label: 'Today', hint: undefined, run: go(TODAY_ID) },
+    const named: PaletteItem[] = [
       ...lists.map((list) => ({
         id: `go:${list.id}`,
         label: list.name,
@@ -3764,6 +3833,10 @@ export function App(): ReactElement {
           if (first) openList(first);
         },
       })),
+    ];
+    // D-107: "Go to" is the fixed places; lists, notes and groups come after the tasks.
+    const places: PaletteItem[] = [
+      { id: 'go:today', label: 'Today', hint: undefined, run: go(TODAY_ID) },
       { id: 'go:settings', label: 'Settings', run: () => openSettings() },
       ...SETTINGS_SECTIONS.map((section) => ({
         id: `go:settings:${section.id}`,
@@ -3886,7 +3959,7 @@ export function App(): ReactElement {
         run: () => window.flintMain.quit(),
       },
     ];
-    return { recent, task, places, commands };
+    return { recent, task, places, lists: named, commands };
   };
   /** D-106: the lists and notes searched in the main process. */
   const paletteSearch = useCallback(
@@ -3913,7 +3986,10 @@ export function App(): ReactElement {
           label: hit.text,
           detail: hit.listName,
           indices: hit.indices,
-          run: () => openList(hit.listId),
+          run: () => {
+            setLineTarget({ list: hit.listId, line: hit.line ?? 0, at: Date.now() });
+            openList(hit.listId);
+          },
         };
       if (hit.kind === 'deleted')
         return {
@@ -4198,6 +4274,8 @@ export function App(): ReactElement {
         <div className="brand">
           <img src={flintIcon} alt="" />
           <span>Flint</span>
+          {/* NAV-01, D-107: the palette from the mouse (Ctrl+K from the keyboard). */}
+          <PaletteButton onOpen={() => setPalette(true)} />
         </div>
         {/* TODAY-01 (M6, D-89): Today first, with its open pinned tasks. */}
         <NavItem
@@ -4252,6 +4330,7 @@ export function App(): ReactElement {
                   icon={<NoteIcon />}
                   problem={namingProblem}
                   onSubmit={(name) => void submitName(name)}
+                  onLeave={(name) => void submitName(name, true)}
                   onCancel={() => setNaming(null)}
                 />
               ) : (
@@ -4343,6 +4422,7 @@ export function App(): ReactElement {
                   icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
                   problem={namingProblem}
                   onSubmit={(name) => void submitName(name)}
+                  onLeave={(name) => void submitName(name, true)}
                   onCancel={() => setNaming(null)}
                 />
               )}
@@ -4358,6 +4438,7 @@ export function App(): ReactElement {
             icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
             problem={namingProblem}
             onSubmit={(name) => void submitName(name)}
+            onLeave={(name) => void submitName(name, true)}
             onCancel={() => setNaming(null)}
           />
         )}
@@ -4520,7 +4601,6 @@ export function App(): ReactElement {
                     setLinkPatterns(patterns);
                     setPatternsLoaded((count) => count + 1);
                   }}
-                  onPalette={() => setPalette(true)}
                   onBuiltInLinksOff={(off) => {
                     setBuiltInLinksOff(off);
                     setPatternsLoaded((count) => count + 1);
@@ -4588,14 +4668,11 @@ export function App(): ReactElement {
                   prompt and today's reminders, above the composer and Focus. */}
               {view && !pageTask && view.id === TODAY_ID && (
                 <>
-                  <div className="list-header-top today-top">
-                    <TodayGreeting
-                      open={view.open}
-                      reminders={view.today?.reminders ?? []}
-                      progress={view.today?.progress}
-                    />
-                    <PalettePill onOpen={() => setPalette(true)} />
-                  </div>
+                  <TodayGreeting
+                    open={view.open}
+                    reminders={view.today?.reminders ?? []}
+                    progress={view.today?.progress}
+                  />
                   <RolloverCard
                     tasks={view.today?.rollover ?? []}
                     onAnswer={(clear) =>
@@ -4621,13 +4698,10 @@ export function App(): ReactElement {
               )}
               {view && !pageTask && view.mode === 'tasks' && view.id !== TODAY_ID && (
                 <header className="list-header">
-                  <div className="list-header-top">
-                    <h1>
-                      {view.name}
-                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                    </h1>
-                    <PalettePill onOpen={() => setPalette(true)} />
-                  </div>
+                  <h1>
+                    {view.name}
+                    {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                  </h1>
                   {lists.find((list) => list.id === view.id)?.inbox && (
                     <span className="subtitle">{INBOX_SUBTITLE}</span>
                   )}
@@ -5802,8 +5876,8 @@ function CodePreview(props: {
 }
 
 /**
- * A list's name typed in the sidebar (LIST-01): Enter saves, Esc or leaving the field cancels; a
- * problem (a name Windows can't use, one already taken) shows under it.
+ * A list's name typed in the sidebar (LIST-01): Enter and (D-107) leaving the field save, Esc
+ * cancels; a problem (a name Windows can't use, one already taken) shows under it.
  */
 function NameField(props: {
   readonly initial: string;
@@ -5815,10 +5889,24 @@ function NameField(props: {
   readonly flip?: string;
   readonly problem: string | null;
   readonly onSubmit: (name: string) => void;
+  /** Clicking or tabbing away. */
+  readonly onLeave: (name: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const { initial, placeholder, icon, group = false, flip, problem, onSubmit, onCancel } = props;
+  const {
+    initial,
+    placeholder,
+    icon,
+    group = false,
+    flip,
+    problem,
+    onSubmit,
+    onLeave,
+    onCancel,
+  } = props;
   const [name, setName] = useState(initial);
+  // Saved with Enter: the blur Chromium fires as the field goes away isn't a second save.
+  const sent = useRef(false);
   return (
     <div className={group ? 'name-field group' : 'name-field'} {...(flip && { 'data-flip': flip })}>
       <div className="nav on">
@@ -5830,12 +5918,21 @@ function NameField(props: {
           placeholder={placeholder}
           spellCheck={false}
           maxLength={group ? 60 : undefined}
-          onFocus={(event) => event.currentTarget.select()}
-          onChange={(event) => setName(event.target.value)}
-          onBlur={onCancel}
+          onFocus={(event) => {
+            sent.current = false;
+            event.currentTarget.select();
+          }}
+          onChange={(event) => {
+            sent.current = false;
+            setName(event.target.value);
+          }}
+          onBlur={() => {
+            if (!sent.current) onLeave(name);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault();
+              sent.current = true;
               onSubmit(name);
             } else if (event.key === 'Escape') {
               event.preventDefault();

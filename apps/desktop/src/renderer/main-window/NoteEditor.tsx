@@ -21,12 +21,13 @@ export function NoteEditor(props: {
   readonly mono: boolean;
   /** D-86: just made by Convert to note: the cursor goes to the end of the text, ready to type. */
   readonly focus?: boolean;
+  /**
+   * D-107: the caret has arrived. The request stands until then, so an editor made again as the
+   * view settles (or a render over it) still takes it.
+   */
   readonly onFocused?: () => void;
 }): ReactElement {
   const { id, text, readOnly, onId, onImage, mono, focus, onFocused } = props;
-  useEffect(() => {
-    if (focus) onFocused?.();
-  }, [focus, onFocused]);
   const latest = useRef({ id, value: text, dirty: false });
   const timer = useRef<number | undefined>(undefined);
 
@@ -72,6 +73,9 @@ export function NoteEditor(props: {
         timer.current = window.setTimeout(() => saveRef.current(), SAVE_AFTER_MS);
       }}
       onBlur={() => save()}
+      onFocus={() => {
+        if (focus) onFocused?.();
+      }}
     />
   );
 }

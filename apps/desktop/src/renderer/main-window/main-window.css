@@ -5772,58 +5772,72 @@ a.auto-link {
   color: var(--fl-text-muted);
 }
 
-/* The header's "Search or run a command · Ctrl K" (mockup 01). */
-.list-header-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.list-header-top > h1,
-.list-header-top > :first-child {
-  min-width: 0;
-}
-
-.palette-pill {
+/* D-107: the palette's back arrow (a step, or Trash and Archive), and its footer of keys. */
+.palette-back {
   flex: 0 0 auto;
-  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  margin-left: -4px;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  height: 38px;
-  padding: 0 7px 0 13px;
-  border-radius: 12px;
-  background: var(--fl-ground-card);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-card),
-    var(--fl-shadow-card-close);
-  font-size: 13px;
-  color: var(--fl-text-secondary);
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--fl-text-muted);
+  animation: panel-crossfade var(--fl-dur-state) ease;
   transition:
     background-color var(--fl-dur-fast) ease,
-    box-shadow var(--fl-dur-fast) ease;
+    color var(--fl-dur-fast) ease;
 }
 
-.palette-pill:hover {
+.palette-back:hover {
   background: var(--fl-ground-hover);
-  box-shadow:
-    0 0 0 1px var(--fl-edge-float),
-    var(--fl-shadow-card-close);
+  color: var(--fl-text-primary);
 }
 
-.palette-pill:active {
-  transform: scale(0.98);
+.palette-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--fl-edge-divider);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
 }
 
-.palette-pill .keycap {
-  height: 24px;
+.palette-foot .keycap {
+  height: 18px;
+  margin-right: 4px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  color: var(--fl-text-secondary);
 }
 
-/* On a narrow column the pill keeps its icon and key. */
-@media (max-width: 1020px) {
-  .palette-pill-label {
-    display: none;
-  }
+.palette-foot-open {
+  margin-left: auto;
+}
+
+/* D-107: the sidebar header's search button, at the end of the Flint mark's row. */
+.palette-button {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.palette-button:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.palette-button:active {
+  transform: scale(0.94);
 }
 
 .cheat-sheet {

@@ -3562,9 +3562,12 @@ test('M8 step 2: the Ctrl+K palette and the ? cheat sheet (NAV-01, NAV-02, D-106
   await expect(main.locator('.sidebar-foot .nav.on')).toHaveText('Trash');
   await main.keyboard.press('Escape');
 
-  // The header's pill; Esc closes.
+  // D-107: the sidebar header's search button (the header pill is gone); Esc closes.
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
-  await main.locator('.palette-pill').first().click();
+  await expect(main.locator('.palette-pill')).toHaveCount(0);
+  const button = main.locator('.brand .palette-button');
+  await expect(button).toHaveAttribute('title', 'Search or run a command (Ctrl+K)');
+  await button.click();
   await expect(field).toBeFocused();
   await main.keyboard.press('Escape');
   await expect(palette).toHaveCount(0);
@@ -3592,6 +3595,116 @@ test('M8 step 2: the Ctrl+K palette and the ? cheat sheet (NAV-01, NAV-02, D-106
     .poll(() => main.locator('.note-editor .cm-content').innerText())
     .toContain('[runbook]()');
   await main.keyboard.press('Delete');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+});
+
+test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palette's steps, order, footer and note lines (NOTE-08, LIST-01, NAV-01, D-107)", async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const flint = join(dataDirectory, 'Flint');
+  const palette = main.locator('.palette[aria-label="Search or run a command"]');
+  const field = palette.locator('.palette-field');
+  const menu = main.locator('.fl-menu');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+
+  // 1. An empty quick note removed on leaving says why, the first three times only (one is left
+  // here).
+  await main.evaluate(() => localStorage.setItem('flint.tips', '{"emptyQuickNote":2}'));
+  const tip = main.locator('.toast', {
+    hasText: 'Empty quick notes are removed when you leave them',
+  });
+  await main.keyboard.press('Control+Shift+J');
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await expect(tip).toBeVisible({ timeout: 6000 });
+  // The fourth time: none (once this one has gone).
+  await expect(tip).toHaveCount(0, { timeout: 15_000 });
+  await main.keyboard.press('Control+Shift+J');
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
+  const quickBefore = (await readdir(flint)).length;
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await expect
+    .poll(async () => (await readdir(flint)).length, { timeout: 6000 })
+    .toBe(quickBefore - 1);
+  await main.waitForTimeout(800);
+  expect(await tip.count()).toBe(0);
+
+  // 2. A list renamed in place keeps the new name when the field is left; only Esc cancels.
+  await writeFile(join(flint, 'Leave me.md'), '---\nflint: 1\nid: lvm1\nmode: tasks\n---\n');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Leave me' }).click({ button: 'right' });
+  await menu.getByText('Rename').click();
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('Left behind');
+  await main.locator('h1').click();
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })).toBeVisible();
+  await expect
+    .poll(() => readFile(join(flint, 'Left behind.md'), 'utf8').catch(() => ''))
+    .toContain('id: lvm1');
+  await main
+    .locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })
+    .click({ button: 'right' });
+  await menu.getByText('Rename').click();
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('Not this');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })).toBeVisible();
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Not this' })).toHaveCount(0);
+
+  // 3. A step has a back arrow; Esc goes back one step, and closes only from the top. 5. The
+  // footer shows the keys and Ctrl+K.
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await main.keyboard.press('Control+k');
+  await expect(palette.locator('.palette-foot')).toContainText('Esc close');
+  await expect(palette.locator('.palette-foot')).toContainText('Ctrl K opens this anywhere');
+  await expect(palette.locator('.palette-back')).toHaveCount(0);
+  await main.keyboard.type('interface size');
+  await main.keyboard.press('Enter');
+  await expect(palette.locator('.palette-crumb')).toHaveText('Interface size ›');
+  await expect(palette.locator('.palette-foot')).toContainText('Esc back');
+  await main.keyboard.press('Escape');
+  await expect(palette).toBeVisible();
+  await expect(palette.locator('.palette-crumb')).toHaveCount(0);
+  await main.keyboard.type('interface size');
+  await main.keyboard.press('Enter');
+  await palette.locator('.palette-back').click();
+  await expect(palette.locator('.palette-crumb')).toHaveCount(0);
+  await expect(field).toBeFocused();
+  await main.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+
+  // 4. One order: Go to, Commands, Tasks, Lists and notes, lines in notes last.
+  const lines = Array.from({ length: 90 }, (_, i) => `Filler line ${i + 1}`);
+  lines[75] = 'The quick brown needle is here';
+  await writeFile(
+    join(flint, 'Quick reference.md'),
+    `---\nflint: 1\nid: qref\nmode: note\n---\n${lines.join('\n')}\n`,
+  );
+  await writeFile(
+    join(flint, 'Quick tasks.md'),
+    '---\nflint: 1\nid: qtsk\nmode: tasks\n---\n- [ ] A quick errand [id:: qe1]\n',
+  );
+  await main.locator('.sidebar > .nav[data-key="@today"]').click();
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Quick reference' })).toBeVisible();
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('quick');
+  await expect(palette.locator('.palette-label', { hasText: 'In notes' })).toBeVisible();
+  const shown = (await palette.locator('.palette-label').allInnerTexts()).map((label) =>
+    label.toUpperCase(),
+  );
+  const expected = ['GO TO', 'THIS TASK', 'COMMANDS', 'TASKS', 'LISTS AND NOTES', 'IN NOTES'];
+  expect(shown).toEqual(expected.filter((label) => shown.includes(label)));
+  expect(shown).toContain('COMMANDS');
+  expect(shown).toContain('LISTS AND NOTES');
+
+  // 6. A line in a note opens the note there, the line flashed.
+  await main.keyboard.press('Control+a');
+  await main.keyboard.type('brown needle');
+  await palette.locator('.palette-item', { hasText: 'The quick brown needle is here' }).click();
+  const needle = main.locator('.note-editor .cm-line', {
+    hasText: 'The quick brown needle is here',
+  });
+  await expect(needle).toBeInViewport();
+  await expect(needle).toHaveClass(/fl-flash/);
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 
