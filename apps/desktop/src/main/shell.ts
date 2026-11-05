@@ -75,6 +75,12 @@ export interface E2EHooks {
   /** D-97: the tray's Restore from a snapshot…, and Export without its save dialog. */
   showSnapshots?: () => void;
   exportTo?: (path: string) => Promise<number>;
+  /** MINI-01, D-109: mini mode shown (off-screen, without the focus, in tests), hidden, visible. */
+  showMini?: () => void;
+  hideMini?: () => void;
+  miniVisible?: () => boolean;
+  /** D-109: the reminders whose toast mini mode's card took back. */
+  closedToasts?: string[];
   /** DATA-07, D-104: the folder the picker returns (no dialog), and where Flint would restart. */
   pickFolder?: string;
   relaunched?: string;
@@ -161,6 +167,8 @@ export function applyStartWithWindows(enabled: boolean): void {
 export interface TrayActions {
   readonly open: () => void;
   readonly capture: () => void;
+  /** MINI-01, D-109: show or hide mini mode. */
+  readonly mini: () => void;
   /** APP-11, D-100: the main window on Settings (D-102: on a section, e.g. a taken hotkey's). */
   readonly settings: (section?: string) => void;
   readonly quit: () => void;
@@ -200,7 +208,8 @@ export function createTray(actions: TrayActions): TrayHandle {
         : []),
       { label: 'Open Flint', click: actions.open },
       { label: 'Quick capture', click: actions.capture },
-      { label: 'Mini mode', enabled: false },
+      // MINI-01, D-109: shows mini mode, or hides it.
+      { label: 'Mini mode', click: actions.mini },
       // D-99, D-102: Open, Quick capture, Mini mode, Settings, Quit; the hotkeys, snapshots and
       // export are in Settings.
       { label: 'Settings', click: () => actions.settings() },
@@ -256,22 +265,32 @@ function displays(): DisplayInfo[] {
  * that way. Read synchronously (a small file, before the window is first shown), so the first show
  * already knows.
  */
+/** D-109: one copy of `window-state.json` for every remembered window, so none writes over another's. */
+let windowStates: WindowStates | null = null;
+
 export function rememberWindowState(
   window: BrowserWindow,
   name: string,
   fallback: Rect,
+  /** D-109: where a window with nothing saved for this monitor setup first goes (else centred). */
+  firstPlace?: (active: DisplayInfo) => Rect,
 ): { readonly show: (focus?: boolean) => void } {
   const file = join(app.getPath('userData'), 'window-state.json');
-  let states: WindowStates = {};
-  try {
-    states = JSON.parse(readFileSync(file, 'utf8')) as WindowStates;
-  } catch {
-    states = {};
+  if (windowStates === null) {
+    try {
+      windowStates = JSON.parse(readFileSync(file, 'utf8')) as WindowStates;
+    } catch {
+      windowStates = {};
+    }
   }
+  let states: WindowStates = windowStates;
   const setup = (): string => monitorSetupKey(displays());
   const active = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const saved = states[name]?.[setup()];
-  const bounds = restoreBounds(saved, displays(), { ...active }, fallback);
+  const bounds =
+    !saved && firstPlace
+      ? firstPlace({ ...active })
+      : restoreBounds(saved, displays(), { ...active }, fallback);
   window.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
   let maximized = saved?.maximized === true;
 
@@ -282,7 +301,8 @@ export function rememberWindowState(
       // Hidden or minimized, it keeps what it had (hiding a window never unmaximizes it).
       if (window.isDestroyed() || window.isMinimized() || !window.isVisible()) return;
       const normal = maximized ? window.getNormalBounds() : window.getBounds();
-      states = rememberBounds(states, name, setup(), { ...normal, maximized });
+      states = rememberBounds(windowStates ?? states, name, setup(), { ...normal, maximized });
+      windowStates = states;
       void writeFileAtomic(file, `${JSON.stringify(states, null, 2)}\n`, {
         tempDirectory: join(app.getPath('userData'), 'tmp'),
       }).catch(() => undefined);

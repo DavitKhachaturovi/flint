@@ -20,6 +20,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Ctrl+Shift+Space', action: 'Quick capture (changeable)' },
       { keys: 'Ctrl+Shift+X', action: 'Capture the selected text (changeable)' },
+      { keys: 'Ctrl+Alt+Space', action: 'Show or hide mini mode (changeable)' },
     ],
   },
   {
@@ -74,6 +75,20 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Ctrl+B / Ctrl+I', action: 'Bold / italic' },
       { keys: 'Ctrl+Shift+V', action: 'Paste as plain text' },
       { keys: 'Ctrl+Shift+M', action: 'Monospace for this note' },
+    ],
+  },
+  {
+    // MINI-01, D-109 (Q7): letters only while no text field has the caret.
+    name: 'Mini mode',
+    shortcuts: [
+      { keys: 'Ctrl+1 / 2 / 3', action: 'Today / Inbox / Note' },
+      { keys: '↑ / ↓', action: 'Move the selection' },
+      { keys: 'Space', action: 'Complete or reopen' },
+      { keys: 'P', action: 'Pin to Today, or unpin' },
+      { keys: 'Enter', action: 'Open the task in the main window' },
+      { keys: 'N', action: 'Add a task (the composer)' },
+      { keys: 'D / S / O', action: 'A reminder card: Done / Snooze 10m / Open' },
+      { keys: 'Esc', action: 'Clear the selection, or leave the field' },
     ],
   },
 ];

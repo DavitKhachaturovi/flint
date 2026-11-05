@@ -70,6 +70,7 @@ import {
   SortIcon,
   SunIcon,
   TrashIcon,
+  MiniIcon,
 } from './icons.js';
 import { OverdueCard, ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
 import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
@@ -100,7 +101,6 @@ import {
 import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
 import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js';
-import { tipDue } from './tips.js';
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
@@ -764,7 +764,11 @@ export function App(): ReactElement {
     window.flintMain.onChanged(() => void refreshRef.current());
     // A reminder's Open (D-91): its list, the task scrolled into view, selected and flashed once
     // the rows are there; the panel shows it on wide screens, the body stays closed.
-    window.flintMain.onReveal(({ listId: id, key }) => revealRef.current(id, key));
+    // D-109: from mini mode a note (no task) opens as a place.
+    window.flintMain.onReveal(({ listId: id, key }) => {
+      if (key) revealRef.current(id, key);
+      else goRef.current({ list: id, page: null });
+    });
     // APP-11, D-100: the tray's Settings; D-67: the animation speed, now and when it changes.
     window.flintMain.onShowSettings((section) => {
       goRef.current({ list: SETTINGS_ID, page: null });
@@ -1831,8 +1835,8 @@ export function App(): ReactElement {
     const before = lastPlace.current;
     lastPlace.current = listId;
     if (before !== listId && lists.find((list) => list.id === before)?.quick)
-      void window.flintMain.discardQuickNote(before).then((removed) => {
-        if (removed && tipDue('emptyQuickNote', 3))
+      void window.flintMain.discardQuickNote(before).then(async (removed) => {
+        if (removed && (await window.flintMain.tipDue('emptyQuickNote', 3)))
           showToast('Empty quick notes are removed when you leave them', false);
       });
   }, [listId, lists, showToast]);
@@ -3957,6 +3961,13 @@ export function App(): ReactElement {
         run: go(SNAPSHOTS_ID),
       },
       {
+        id: 'app:mini',
+        label: 'Mini mode',
+        keywords: 'small window always on top call sticky note',
+        hint: 'Ctrl+Alt+Space',
+        run: () => window.flintMain.toggleMini(),
+      },
+      {
         id: 'app:shortcuts',
         label: 'Keyboard shortcuts',
         hint: '?',
@@ -4479,6 +4490,17 @@ export function App(): ReactElement {
       <main className="main">
         <div className="titlebar">
           {/* NAV-07, D-85: shows or hides the panel whenever the window can fit it. */}
+          {/* MINI-01, D-109: mini mode, beside the main window (left of the panel toggle). */}
+          <button
+            type="button"
+            className="mini-toggle"
+            aria-label="Mini mode"
+            title="Mini mode (Ctrl+Alt+Space)"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => window.flintMain.toggleMini()}
+          >
+            <MiniIcon />
+          </button>
           {wide && view && (
             <button
               type="button"

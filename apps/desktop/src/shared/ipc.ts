@@ -46,6 +46,34 @@ export const Channels = {
   mainChange: 'main:change',
   mainReserveId: 'main:reserve-id',
   mainChanged: 'main:changed',
+  /** MINI-01, D-109: the main window, the palette or the hotkey: show mini mode, or hide it. */
+  miniToggle: 'mini:toggle',
+  /** Mini → main: hide it (×), to the tray. */
+  miniHide: 'mini:hide',
+  /** Mini ↔ main: its tab and note, remembered; on top (its pin). */
+  miniState: 'mini:state',
+  miniSetState: 'mini:set-state',
+  miniSetOnTop: 'mini:set-on-top',
+  /** Main → mini: it was shown (`focus`: Davit opened it, so it takes the keyboard). */
+  miniShown: 'mini:shown',
+  /** Main → mini: it is being hidden (a quick note is left). */
+  miniHiding: 'mini:hiding',
+  /** Mini → main: a place in the main window (Open, double-click, Enter), mini stays. */
+  miniOpen: 'mini:open',
+  /** REM-06, D-109: the reminder cards waiting in mini (main → mini), and acting on one. */
+  miniAlerts: 'mini:alerts',
+  miniGetAlerts: 'mini:get-alerts',
+  miniAlertAction: 'mini:alert-action',
+  /** D-109: one window edits a note at a time (claim, hand over, the owner's live text). */
+  noteClaim: 'note:claim',
+  noteRelease: 'note:release',
+  noteReleased: 'note:released',
+  noteLive: 'note:live',
+  noteLeave: 'note:leave',
+  noteEditor: 'note:editor',
+  noteEditorOf: 'note:editor-of',
+  /** D-107, D-109: a first-few-times tip, counted in app data (shared by both windows). */
+  tipDue: 'tip:due',
   /** Main → main window: show this task (a reminder's Open, REM-05). */
   mainReveal: 'main:reveal',
   /** REM-07, D-94: the missed-reminders toast's Open: Today, its Overdue card open. */
@@ -221,7 +249,7 @@ export interface HotkeyView {
   readonly registered: boolean;
 }
 
-export type HotkeyName = 'capture' | 'selection';
+export type HotkeyName = 'capture' | 'selection' | 'mini';
 
 export type HotkeysView = Readonly<Record<HotkeyName, HotkeyView>>;
 
@@ -414,6 +442,11 @@ export interface SettingsView {
   readonly flintFolder: string;
   readonly captureHotkey: string;
   readonly captureSelectionHotkey: string;
+  /** D-109: mini mode (Settings → Mini mode) and the popup's sharing switch. */
+  readonly miniHotkey: string;
+  readonly miniHideFromSharing: boolean;
+  readonly popupHideFromSharing: boolean;
+  readonly miniReminders: 'when-open' | 'always';
   readonly version: string;
 }
 
@@ -429,7 +462,12 @@ export type SettingChange =
       readonly key: 'snapshotEveryMinutes' | 'keepHourlyHours' | 'keepDailyDays';
       readonly value: number;
     }
-  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' };
+  | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' }
+  | {
+      readonly key: 'miniHideFromSharing' | 'popupHideFromSharing';
+      readonly value: boolean;
+    }
+  | { readonly key: 'miniReminders'; readonly value: 'when-open' | 'always' };
 
 /** D-67, D-100: how the main window looks (sent when it changes). */
 export interface Appearance {
@@ -726,4 +764,30 @@ export interface SearchHit {
   readonly score: number;
   /** The letters of `text` that matched, to highlight. */
   readonly indices: readonly number[];
+}
+
+/** MINI-01, D-109: mini mode's tabs. */
+export type MiniTab = 'today' | 'inbox' | 'note';
+
+/** What mini mode remembers (app data): its tab, the quick note shown, on top. */
+export interface MiniState {
+  readonly tab: MiniTab;
+  readonly noteId: string | null;
+  readonly onTop: boolean;
+}
+
+/** REM-06, D-109: a reminder waiting in mini mode's card (the toast fired too). */
+export interface MiniAlert {
+  readonly id: string;
+  readonly title: string;
+  /** `Reminder · 15:00`. */
+  readonly label: string;
+}
+
+export type MiniAlertAction = 'done' | 'snooze' | 'open';
+
+/** D-109: which window edits a note now (null: neither), and what it last had. */
+export interface NoteEditorState {
+  readonly noteId: string;
+  readonly editor: 'main' | 'mini' | null;
 }

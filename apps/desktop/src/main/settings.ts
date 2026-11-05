@@ -46,7 +46,22 @@ export interface Settings {
   readonly keepDailyDays: number;
   /** D-67, D-100: all motion slower, as it is, or quicker. */
   readonly animationSpeed: AnimationSpeed;
+  /**
+   * MINI-01, D-109: show or hide mini mode, anywhere. Ctrl+Alt+Space by default: a deliberate
+   * exception to D-44's no-Alt rule (it pairs with the capture hotkey).
+   */
+  readonly miniHotkey: string;
+  /** D-109: mini mode left out of screen shares and recordings (on by default). */
+  readonly miniHideFromSharing: boolean;
+  /** D-109: the capture popup too (on by default). */
+  readonly popupHideFromSharing: boolean;
+  /** REM-06, D-109: Flint's reminder card in mini mode when it is open, or always (opening it). */
+  readonly miniReminders: MiniReminders;
+  /** D-109: mini mode always on top (its header's pin). */
+  readonly miniOnTop: boolean;
 }
+
+export type MiniReminders = 'when-open' | 'always';
 
 export type AnimationSpeed = 'relaxed' | 'normal' | 'quick';
 
@@ -73,6 +88,11 @@ export function defaultSettings(development = false): Settings {
     keepHourlyHours: 48,
     keepDailyDays: 30,
     animationSpeed: 'normal',
+    miniHotkey: 'Control+Alt+Space',
+    miniHideFromSharing: true,
+    popupHideFromSharing: true,
+    miniReminders: 'when-open',
+    miniOnTop: true,
   };
 }
 
@@ -140,6 +160,26 @@ export function readSettings(stored: Stored, development = false): Settings {
         value === 'relaxed' || value === 'normal' || value === 'quick',
       defaults.animationSpeed,
     ),
+    miniHotkey: pick(stored, 'miniHotkey', isString, defaults.miniHotkey),
+    miniHideFromSharing: pick(
+      stored,
+      'miniHideFromSharing',
+      isBoolean,
+      defaults.miniHideFromSharing,
+    ),
+    popupHideFromSharing: pick(
+      stored,
+      'popupHideFromSharing',
+      isBoolean,
+      defaults.popupHideFromSharing,
+    ),
+    miniReminders: pick(
+      stored,
+      'miniReminders',
+      (value): value is MiniReminders => value === 'when-open' || value === 'always',
+      defaults.miniReminders,
+    ),
+    miniOnTop: pick(stored, 'miniOnTop', isBoolean, defaults.miniOnTop),
   };
 }
 

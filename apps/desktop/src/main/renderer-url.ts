@@ -45,12 +45,13 @@ export function contentType(file: string): string {
  * the capture popup. Same files, same scheme.
  */
 export const MAIN_WINDOW_HOST = 'main';
-const RENDERER_HOSTS = ['flint', MAIN_WINDOW_HOST] as const;
+/** MINI-01, D-109: mini mode too: its own zoom and storage. */
+export const MINI_HOST = 'mini';
+const RENDERER_HOSTS = ['flint', MAIN_WINDOW_HOST, MINI_HOST] as const;
 
-export function rendererPageUrl(
-  page: string,
-  host: (typeof RENDERER_HOSTS)[number] = 'flint',
-): string {
+export type RendererHost = (typeof RENDERER_HOSTS)[number];
+
+export function rendererPageUrl(page: string, host: RendererHost = 'flint'): string {
   return `${APP_SCHEME}://${host}/${page}/index.html`;
 }
 

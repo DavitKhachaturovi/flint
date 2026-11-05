@@ -134,6 +134,13 @@ export const PanelIcon = ({ size = 14 }: IconProps): ReactElement =>
     <path key="b" d="M15 4v16" />,
   ]);
 
+/** MINI-01, D-109: mini mode (a small window in a screen's corner). */
+export const MiniIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,
+    <rect key="b" x="12" y="7" width="6" height="5" rx="1.5" />,
+  ]);
+
 /** TODAY-01, D-85: a pinned task (row indicator, menu). */
 export const PinIcon = ({ size = 12 }: IconProps): ReactElement =>
   svg(size, [

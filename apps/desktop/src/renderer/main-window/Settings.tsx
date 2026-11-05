@@ -42,6 +42,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'general', name: 'General' },
   { id: 'capture', name: 'Capture & hotkeys' },
   { id: 'reminders', name: 'Reminders' },
+  { id: 'mini', name: 'Mini mode' },
   { id: 'today', name: 'Today & lists' },
   { id: 'links', name: 'Links' },
   { id: 'data', name: 'Data' },
@@ -168,6 +169,14 @@ const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 const DOES: Record<HotkeyName, string> = {
   capture: 'opens the capture popup',
   selection: 'captures the selected text',
+  mini: 'shows or hides mini mode',
+};
+
+/** D-109: each global hotkey's row. */
+const HOTKEY_ROWS: Readonly<Record<HotkeyName, string>> = {
+  capture: 'Quick capture',
+  selection: 'Capture the selected text',
+  mini: 'Show or hide mini mode',
 };
 
 function explain(outcome: RebindOutcome, name: HotkeyName, accelerator: string): string {
@@ -180,7 +189,7 @@ function explain(outcome: RebindOutcome, name: HotkeyName, accelerator: string):
     case 'needs-modifier':
       return 'Use Ctrl, Alt or Win together with a key.';
     case 'same-as-other':
-      return 'That is already the other Flint hotkey.';
+      return 'That is already another Flint hotkey.';
     case 'invalid':
       return 'Flint cannot use that key. Try another.';
   }
@@ -388,10 +397,10 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="capture" filter={filter}>
-        {(['capture', 'selection'] as const).map((name) => (
+        {(['capture', 'selection', 'mini'] as const).map((name) => (
           <Row
             key={name}
-            name={name === 'capture' ? 'Quick capture' : 'Capture the selected text'}
+            name={HOTKEY_ROWS[name]}
             note={(() => {
               const taken = hotkeys !== null && !hotkeys[name].registered;
               const text =
@@ -412,7 +421,7 @@ export function SettingsScreen(props: {
               );
             })()}
             filter={filter}
-            words="hotkey shortcut rebind popup selection"
+            words="hotkey shortcut rebind popup selection mini"
           >
             <HotkeyButton
               name={name}
@@ -424,6 +433,49 @@ export function SettingsScreen(props: {
             />
           </Row>
         ))}
+        <Row
+          name="Hide the capture popup from screen sharing"
+          note="You still see it; a shared screen or a recording doesn't (Windows 10 2004 or later)."
+          filter={filter}
+          words="screen share teams recording privacy capture popup"
+        >
+          <Switch
+            on={view.popupHideFromSharing}
+            label="Hide the capture popup from screen sharing"
+            onChange={(on) => set({ key: 'popupHideFromSharing', value: on })}
+          />
+        </Row>
+      </Section>
+
+      <Section id="mini" filter={filter}>
+        <Row
+          name="Hide from screen sharing"
+          note="Mini mode stays on your screen but isn't in a shared screen or a recording (Windows 10 2004 or later)."
+          filter={filter}
+          words="mini mode screen share teams recording privacy"
+        >
+          <Switch
+            on={view.miniHideFromSharing}
+            label="Hide mini mode from screen sharing"
+            onChange={(on) => set({ key: 'miniHideFromSharing', value: on })}
+          />
+        </Row>
+        <Row
+          name="Show reminders in Flint"
+          note="Besides the Windows notification: a card with Done, Snooze and Open in mini mode."
+          filter={filter}
+          words="mini mode reminders alert card notification"
+        >
+          <Choice
+            label="Show reminders in Flint"
+            value={view.miniReminders}
+            options={[
+              { value: 'when-open', label: "In mini mode when it's open" },
+              { value: 'always', label: 'Always, opening mini mode' },
+            ]}
+            onChange={(value) => set({ key: 'miniReminders', value })}
+          />
+        </Row>
       </Section>
 
       <Section id="reminders" filter={filter}>

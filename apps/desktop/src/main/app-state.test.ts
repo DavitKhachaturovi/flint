@@ -60,6 +60,23 @@ describe('settings (APP-11)', () => {
     ).toMatchObject({ snapshotEveryMinutes: 60, keepDailyDays: 30, animationSpeed: 'normal' });
   });
 
+  it('D-109: mini mode: Ctrl+Alt+Space, hidden from sharing, reminders when open, on top', () => {
+    expect(readSettings({})).toMatchObject({
+      miniHotkey: 'Control+Alt+Space',
+      miniHideFromSharing: true,
+      popupHideFromSharing: true,
+      miniReminders: 'when-open',
+      miniOnTop: true,
+    });
+    expect(
+      readSettings({ miniHideFromSharing: false, miniReminders: 'always', miniOnTop: false }),
+    ).toMatchObject({ miniHideFromSharing: false, miniReminders: 'always', miniOnTop: false });
+    expect(readSettings({ miniReminders: 'never', miniHotkey: '' })).toMatchObject({
+      miniReminders: 'when-open',
+      miniHotkey: 'Control+Alt+Space',
+    });
+  });
+
   it("REM-06, D-94: Flint's own reminder sound is off unless turned on", () => {
     expect(readSettings({}).reminderSound).toBe(false);
     expect(readSettings({ reminderSound: true }).reminderSound).toBe(true);

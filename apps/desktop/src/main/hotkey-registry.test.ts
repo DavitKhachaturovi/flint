@@ -25,8 +25,8 @@ beforeEach(() => {
 
 const create = () =>
   new HotkeyRegistry(
-    { capture: 'Control+Shift+Space', selection: 'Control+Shift+X' },
-    { capture: () => undefined, selection: () => undefined },
+    { capture: 'Control+Shift+Space', selection: 'Control+Shift+X', mini: 'Control+Alt+Space' },
+    { capture: () => undefined, selection: () => undefined, mini: () => undefined },
   );
 
 describe('rebindable hotkeys with conflict detection (APP-08)', () => {
@@ -48,13 +48,21 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
       accelerator: 'Control+Shift+Space',
       registered: true,
     });
-    expect([...registered.keys()].sort()).toEqual(['Control+Shift+Space', 'Control+Shift+X']);
+    expect([...registered.keys()].sort()).toEqual([
+      'Control+Alt+Space',
+      'Control+Shift+Space',
+      'Control+Shift+X',
+    ]);
   });
 
   it('switches to a free one and lets the old one go', () => {
     const hotkeys = create();
     expect(hotkeys.rebind('capture', 'Control+Shift+K')).toEqual({ kind: 'saved' });
-    expect([...registered.keys()].sort()).toEqual(['Control+Shift+K', 'Control+Shift+X']);
+    expect([...registered.keys()].sort()).toEqual([
+      'Control+Alt+Space',
+      'Control+Shift+K',
+      'Control+Shift+X',
+    ]);
   });
 
   it('refuses Shift-only, unknown keys and the other hotkey', () => {
@@ -63,6 +71,15 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     expect(hotkeys.rebind('capture', 'Control+Shift+X')).toEqual({ kind: 'same-as-other' });
     expect(hotkeys.rebind('capture', 'Control+MediaPlayPause')).toEqual({ kind: 'invalid' });
     expect(hotkeys.get('capture').accelerator).toBe('Control+Shift+Space');
+  });
+
+  it("D-109: mini mode's hotkey, Ctrl+Alt+Space by default, differs from both others", () => {
+    const hotkeys = create();
+    expect(hotkeys.get('mini')).toEqual({ accelerator: 'Control+Alt+Space', registered: true });
+    expect(hotkeys.rebind('mini', 'Control+Shift+Space')).toEqual({ kind: 'same-as-other' });
+    expect(hotkeys.rebind('mini', 'Control+Shift+X')).toEqual({ kind: 'same-as-other' });
+    expect(hotkeys.rebind('capture', 'Control+Alt+Space')).toEqual({ kind: 'same-as-other' });
+    expect(hotkeys.rebind('mini', 'Control+Alt+M')).toEqual({ kind: 'saved' });
   });
 
   it('while recording, nothing fires, yet a taken combination is still found', () => {
@@ -74,6 +91,10 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     expect(hotkeys.rebind('selection', 'Control+Alt+J')).toEqual({ kind: 'saved' });
     expect(registered.size).toBe(0);
     hotkeys.resume();
-    expect([...registered.keys()].sort()).toEqual(['Control+Alt+J', 'Control+Shift+Space']);
+    expect([...registered.keys()].sort()).toEqual([
+      'Control+Alt+J',
+      'Control+Alt+Space',
+      'Control+Shift+Space',
+    ]);
   });
 });

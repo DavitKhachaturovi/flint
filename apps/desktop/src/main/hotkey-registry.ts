@@ -3,12 +3,15 @@ import { hotkeyProblem, type HotkeyProblem } from '../shared/accelerator.js';
 import { acceleratorKeys } from './hotkeys.js';
 
 /**
- * The two global hotkeys (CAP-01, CAP-07) and rebinding them with conflict detection (APP-08):
+ * The global hotkeys (CAP-01, CAP-07; D-109: mini mode's) and rebinding them with conflict
+ * detection (APP-08):
  * Windows refuses a combination another app has registered, and Flint then keeps the old one and
  * says so. App-internal shortcuts of other apps (e.g. VS Code's) can't be detected this way.
  */
 
-export type HotkeyName = 'capture' | 'selection';
+export type HotkeyName = 'capture' | 'selection' | 'mini';
+
+export const HOTKEY_NAMES: readonly HotkeyName[] = ['capture', 'selection', 'mini'];
 
 export type RebindResult =
   | { readonly kind: 'saved' }
@@ -32,8 +35,9 @@ export class HotkeyRegistry {
     this.states = {
       capture: { accelerator: accelerators.capture, registered: false },
       selection: { accelerator: accelerators.selection, registered: false },
+      mini: { accelerator: accelerators.mini, registered: false },
     };
-    for (const name of ['capture', 'selection'] as const) this.register(name);
+    for (const name of HOTKEY_NAMES) this.register(name);
   }
 
   private register(name: HotkeyName): boolean {
@@ -57,8 +61,11 @@ export class HotkeyRegistry {
   /** Tries the new combination; on any problem the old one stays (APP-08). */
   rebind(name: HotkeyName, accelerator: string): RebindResult {
     if (acceleratorKeys(accelerator) === null) return { kind: 'invalid' };
-    const other = this.states[name === 'capture' ? 'selection' : 'capture'].accelerator;
-    const problem = hotkeyProblem(accelerator, other);
+    // Each must differ from the others.
+    const problem =
+      HOTKEY_NAMES.filter((other) => other !== name)
+        .map((other) => hotkeyProblem(accelerator, this.states[other].accelerator))
+        .find((found) => found !== null) ?? null;
     if (problem) return { kind: problem };
     const previous = this.states[name].accelerator;
     this.unregister(name);
@@ -77,12 +84,12 @@ export class HotkeyRegistry {
   pause(): void {
     if (this.paused) return;
     this.paused = true;
-    for (const name of ['capture', 'selection'] as const) this.unregister(name);
+    for (const name of HOTKEY_NAMES) this.unregister(name);
   }
 
   resume(): void {
     if (!this.paused) return;
     this.paused = false;
-    for (const name of ['capture', 'selection'] as const) this.register(name);
+    for (const name of HOTKEY_NAMES) this.register(name);
   }
 }

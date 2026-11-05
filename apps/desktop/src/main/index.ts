@@ -30,12 +30,16 @@ import {
   type PopupSubmit,
   type ToastKind,
   type SettingChange,
+  type MiniAlert,
   type SettingsView,
 } from '../shared/ipc.js';
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
-import { showMissedSummary, showReminderToast } from './notifications.js';
+import { closeReminderToast, showMissedSummary, showReminderToast } from './notifications.js';
+import { createMini } from './mini.js';
+import { NoteEditors, type EditorWindow } from './note-editors.js';
+import { TipsFile } from './tips.js';
 import { DraftFile } from './capture/drafts.js';
 import { captureSelection, restoreClipboard, saveClipboard } from './capture/selection.js';
 import { SnapshotStore } from './storage/snapshots.js';
@@ -60,7 +64,9 @@ import {
   APP_SCHEME,
   contentType,
   MAIN_WINDOW_HOST,
+  MINI_HOST,
   rendererPageUrl,
+  type RendererHost,
   isVideoFile,
   resolveLinkedFile,
   resolveMediaFile,
@@ -158,7 +164,7 @@ const PICKED_TYPES: Readonly<Record<string, string>> = {
   '.webp': 'image/webp',
 };
 /** Where a page loads from: the dev server while developing, otherwise `app://flint` (D-34). */
-const pageUrl = (page: string, host?: typeof MAIN_WINDOW_HOST): string =>
+const pageUrl = (page: string, host?: RendererHost): string =>
   devServerUrl ? `${devServerUrl}/${page}/index.html` : rendererPageUrl(page, host);
 
 configureAppPaths(IDENTITY.name);
@@ -347,8 +353,67 @@ async function start(): Promise<void> {
   watchListFolder(folder.folder, (path) => {
     workspace.fileChanged(path).catch((error: unknown) => log(`reload failed: ${String(error)}`));
   });
-  // M4: the main window's lists, read from and changed through the workspace.
-  const owns = (sender: Electron.WebContents): boolean => sender === mainWindow.webContents;
+  // MINI-01, D-109: mini mode, beside the main window and in sync with it (made on first use).
+  const mini = createMini({
+    url: pageUrl('mini', MINI_HOST),
+    onTop: () => settingsFile.current.miniOnTop,
+    hideFromSharing: () => settingsFile.current.miniHideFromSharing,
+    onHidden: () => noteEditors.leaveAll('mini'),
+    log,
+  });
+  /** D-109: which of Flint's two list windows sent something (null: neither). */
+  const windowOf = (sender: Electron.WebContents): EditorWindow | null =>
+    sender === mainWindow.webContents ? 'main' : mini.owns(sender) ? 'mini' : null;
+  // M4: the main window's lists, read from and changed through the workspace; D-109: mini mode
+  // reaches the same handlers (its preload exposes only the part it needs).
+  const owns = (sender: Electron.WebContents): boolean => windowOf(sender) !== null;
+  /** D-109: to both list windows. */
+  const toWindows = (channel: string, ...args: unknown[]): void => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(channel, ...args);
+    mini.send(channel, ...args);
+  };
+  const toWindow = (which: EditorWindow, channel: string, ...args: unknown[]): void => {
+    if (which === 'mini') mini.send(channel, ...args);
+    else if (!mainWindow.isDestroyed()) mainWindow.webContents.send(channel, ...args);
+  };
+  // D-109: one window edits a note at a time.
+  const noteEditors = new NoteEditors({
+    release: (to, noteId) => toWindow(to, Channels.noteRelease, noteId),
+    live: (to, noteId, text) => toWindow(to, Channels.noteLive, noteId, text),
+    editor: (noteId, editor) => toWindows(Channels.noteEditor, { noteId, editor }),
+  });
+  ipcMain.handle(Channels.noteClaim, (event, noteId: unknown) => {
+    const which = windowOf(event.sender);
+    return which && typeof noteId === 'string' ? noteEditors.claim(noteId, which) : false;
+  });
+  ipcMain.on(Channels.noteReleased, (event, noteId: unknown, text: unknown) => {
+    const which = windowOf(event.sender);
+    if (which && typeof noteId === 'string' && typeof text === 'string')
+      noteEditors.released(noteId, which, text);
+  });
+  ipcMain.on(Channels.noteLive, (event, noteId: unknown, text: unknown) => {
+    const which = windowOf(event.sender);
+    if (which && typeof noteId === 'string' && typeof text === 'string')
+      noteEditors.live(noteId, which, text);
+  });
+  ipcMain.handle(Channels.noteEditorOf, (event, noteId: unknown) =>
+    owns(event.sender) && typeof noteId === 'string' ? noteEditors.owner(noteId) : null,
+  );
+  ipcMain.on(Channels.noteLeave, (event, noteId: unknown) => {
+    const which = windowOf(event.sender);
+    if (which && typeof noteId === 'string') noteEditors.leave(noteId, which);
+  });
+  mainWindow.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) noteEditors.leaveAll('main');
+  });
+  // D-107, D-109: the first-few-times tips, counted in app data for both windows.
+  const tips = new TipsFile(join(app.getPath('userData'), 'tips.json'));
+  await tips.load();
+  ipcMain.handle(Channels.tipDue, (event, name: unknown, times: unknown) =>
+    owns(event.sender) && typeof name === 'string' && typeof times === 'number'
+      ? tips.due(name, times)
+      : false,
+  );
   ipcMain.handle(Channels.mainLists, (event) =>
     owns(event.sender) ? workspace.summaries(new Date()) : [],
   );
@@ -627,9 +692,7 @@ async function start(): Promise<void> {
         })
       : null,
   );
-  workspace.onChange(() => {
-    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
-  });
+  workspace.onChange(() => toWindows(Channels.mainChanged));
   // TODAY-01, D-85: completed pinned tasks lose their pin once their day is over. TASK-06, D-88:
   // with auto-archive on, old completed tasks go to the archive at the same moments.
   let archiveDays = settings.autoArchiveDays;
@@ -746,6 +809,10 @@ async function start(): Promise<void> {
       flintFolder: folder.folder,
       captureHotkey: current.captureHotkey,
       captureSelectionHotkey: current.captureSelectionHotkey,
+      miniHotkey: current.miniHotkey,
+      miniHideFromSharing: current.miniHideFromSharing,
+      popupHideFromSharing: current.popupHideFromSharing,
+      miniReminders: current.miniReminders,
       version: app.getVersion(),
     };
   };
@@ -773,6 +840,9 @@ async function start(): Promise<void> {
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
     }
     if (key === 'snapshotEveryMinutes') reschedule();
+    // D-109: left out of screen shares, or not, at once.
+    if (key === 'miniHideFromSharing') mini.setHideFromSharing(after.miniHideFromSharing);
+    if (key === 'popupHideFromSharing') hideFromSharing(after.popupHideFromSharing);
     if (key === 'keepHourlyHours' || key === 'keepDailyDays') snapshot();
     if (key === 'animationSpeed' && !mainWindow.isDestroyed())
       mainWindow.webContents.send(Channels.mainAppearance, {
@@ -963,9 +1033,7 @@ async function start(): Promise<void> {
     const day = new Date().toDateString();
     if (day === pinDay) return;
     pinDay = day;
-    void unpin().finally(() => {
-      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
-    });
+    void unpin().finally(() => toWindows(Channels.mainChanged));
   };
   setInterval(newDay, 60_000).unref();
   const atMidnight = (): void => {
@@ -1103,6 +1171,9 @@ async function start(): Promise<void> {
   }
 
   recoverFromCrashes(popup.window, 'capture popup', log);
+  // D-109: the capture popup is left out of screen shares too (on by default).
+  const hideFromSharing = (hidden: boolean): void => popup.window.setContentProtection(hidden);
+  hideFromSharing(settingsFile.current.popupHideFromSharing);
 
   // D-41: the capture hotkey opens the popup, brings the cursor back to one that stayed open, and
   // closes one that has it (the draft is kept, like Esc).
@@ -1148,10 +1219,14 @@ async function start(): Promise<void> {
       });
   };
 
-  // APP-08: both hotkeys, rebindable with conflict detection.
+  // APP-08: the hotkeys, rebindable with conflict detection; D-109: mini mode's third.
   const hotkeys = new HotkeyRegistry(
-    { capture: settings.captureHotkey, selection: settings.captureSelectionHotkey },
-    { capture: onCaptureHotkey, selection: onSelectionHotkey },
+    {
+      capture: settings.captureHotkey,
+      selection: settings.captureSelectionHotkey,
+      mini: settings.miniHotkey,
+    },
+    { capture: onCaptureHotkey, selection: onSelectionHotkey, mini: () => mini.toggle() },
   );
   /** A hotkey another app owns must never fail silently: the tray says so (APP-08). */
   const hotkeyWarning = (): string | null => {
@@ -1161,9 +1236,12 @@ async function start(): Promise<void> {
       return `${displayAccelerator(capture.accelerator)} is taken: change the capture hotkey…`;
     if (!selection.registered)
       return `${displayAccelerator(selection.accelerator)} is taken: change the selection hotkey…`;
+    const miniKey = hotkeys.get('mini');
+    if (!miniKey.registered)
+      return `${displayAccelerator(miniKey.accelerator)} is taken: change the mini mode hotkey…`;
     return null;
   };
-  for (const name of ['capture', 'selection'] as const) {
+  for (const name of ['capture', 'selection', 'mini'] as const) {
     const state = hotkeys.get(name);
     log(
       state.registered
@@ -1175,6 +1253,7 @@ async function start(): Promise<void> {
   const tray = createTray({
     open: showMain,
     capture: () => popup.show(epochNow()),
+    mini: () => mini.toggle(),
     settings: (section) => {
       showMain();
       const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings, section);
@@ -1187,7 +1266,11 @@ async function start(): Promise<void> {
   // new combination at once; one another app owns is refused and the old one stays.
   ipcMain.handle(Channels.mainHotkeys, (event) =>
     owns(event.sender)
-      ? { capture: hotkeys.get('capture'), selection: hotkeys.get('selection') }
+      ? {
+          capture: hotkeys.get('capture'),
+          selection: hotkeys.get('selection'),
+          mini: hotkeys.get('mini'),
+        }
       : null,
   );
   ipcMain.on(Channels.mainHotkeysRecording, (event, active: unknown) => {
@@ -1200,7 +1283,10 @@ async function start(): Promise<void> {
   mainWindow.on('blur', () => hotkeys.resume());
   ipcMain.handle(Channels.mainHotkeysRebind, (event, name: unknown, accelerator: unknown) => {
     if (!owns(event.sender)) return null;
-    if ((name !== 'capture' && name !== 'selection') || typeof accelerator !== 'string')
+    if (
+      (name !== 'capture' && name !== 'selection' && name !== 'mini') ||
+      typeof accelerator !== 'string'
+    )
       return null;
     const result = hotkeys.rebind(name, accelerator);
     if (result.kind === 'saved') {
@@ -1210,7 +1296,9 @@ async function start(): Promise<void> {
         .update(
           name === 'capture'
             ? { captureHotkey: accelerator }
-            : { captureSelectionHotkey: accelerator },
+            : name === 'selection'
+              ? { captureSelectionHotkey: accelerator }
+              : { miniHotkey: accelerator },
         )
         .catch((error: unknown) => log(`hotkey not saved: ${String(error)}`));
     }
@@ -1228,6 +1316,34 @@ async function start(): Promise<void> {
           silent: settingsFile.current.reminderSound,
         }
       : null;
+  /** REM-06, D-109: the reminders waiting in mini mode's card, oldest first. */
+  let alerts: MiniAlert[] = [];
+  const dropAlert = (id: string): void => {
+    if (!alerts.some((alert) => alert.id === id)) return;
+    alerts = alerts.filter((alert) => alert.id !== id);
+    mini.send(Channels.miniAlerts, alerts);
+  };
+  // A card whose task was done, snoozed or deleted elsewhere goes too.
+  workspace.onChange(() => {
+    if (alerts.length === 0) return;
+    const now = new Date();
+    const due = new Set(
+      workspace
+        .reminderTasks()
+        .filter(
+          (task) =>
+            !task.done &&
+            !task.muted &&
+            new Date(task.at.year, task.at.month - 1, task.at.day, task.at.hour, task.at.minute) <=
+              now,
+        )
+        .map((task) => task.id),
+    );
+    const kept = alerts.filter((alert) => due.has(alert.id));
+    if (kept.length === alerts.length) return;
+    alerts = kept;
+    mini.send(Channels.miniAlerts, alerts);
+  });
   const showReminders = (plan: ToastPlan): void => {
     // APP-11, D-100: notifications off: no toast, no chime (the Overdue card still has them).
     if (!settingsFile.current.notifications && !hooks) return;
@@ -1243,6 +1359,16 @@ async function start(): Promise<void> {
     for (const toast of plan.separate) {
       if (hooks) hooks.toasts.push(`${toast.label} | ${toast.title}`);
       else if (options) showReminderToast({ ...toast, kind: 'reminder' }, options, log);
+    }
+    // REM-06, D-109: mini mode's card too, an additional place to act (the toast fires anyway).
+    if (plan.separate.length > 0) {
+      const fired = new Set(plan.separate.map((toast) => toast.id));
+      alerts = [
+        ...alerts.filter((alert) => !fired.has(alert.id)),
+        ...plan.separate.map((toast) => ({ id: toast.id, title: toast.title, label: toast.label })),
+      ];
+      mini.send(Channels.miniAlerts, alerts);
+      if (settingsFile.current.miniReminders === 'always' && !mini.visible()) mini.show(false);
     }
     if (plan.summary) {
       if (hooks) hooks.toasts.push(`${plan.summary.count} reminders you missed`);
@@ -1272,15 +1398,61 @@ async function start(): Promise<void> {
     if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
     else send();
   };
+  // MINI-01, D-109: mini mode's own calls.
+  ipcMain.on(Channels.miniToggle, (event) => {
+    if (owns(event.sender)) mini.toggle();
+  });
+  ipcMain.on(Channels.miniHide, (event) => {
+    if (mini.owns(event.sender)) mini.hide();
+  });
+  ipcMain.handle(Channels.miniState, (event) => (mini.owns(event.sender) ? mini.state() : null));
+  ipcMain.on(Channels.miniSetState, (event, state: unknown) => {
+    if (!mini.owns(event.sender) || typeof state !== 'object' || state === null) return;
+    const { tab, noteId } = state as { tab?: unknown; noteId?: unknown };
+    mini.setState({
+      ...((tab === 'today' || tab === 'inbox' || tab === 'note') && { tab: tab }),
+      ...((typeof noteId === 'string' || noteId === null) && { noteId }),
+    });
+  });
+  ipcMain.handle(Channels.miniSetOnTop, async (event, onTop: unknown) => {
+    if (!mini.owns(event.sender) || typeof onTop !== 'boolean')
+      return settingsFile.current.miniOnTop;
+    await settingsFile.update({ miniOnTop: onTop });
+    mini.setOnTop(onTop);
+    return onTop;
+  });
+  // Open, double-click or Enter in mini: the main window at that place; mini stays.
+  ipcMain.on(Channels.miniOpen, (event, place: unknown) => {
+    if (!mini.owns(event.sender) || typeof place !== 'object' || place === null) return;
+    const { listId, key } = place as { listId?: unknown; key?: unknown };
+    if (typeof listId !== 'string') return;
+    showMain();
+    const target = { listId, key: typeof key === 'string' ? key : '' };
+    const send = (): void => mainWindow.webContents.send(Channels.mainReveal, target);
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  });
+  ipcMain.handle(Channels.miniGetAlerts, (event) => (mini.owns(event.sender) ? alerts : []));
+  if (hooks) {
+    hooks.showMini = () => mini.show(true);
+    hooks.hideMini = () => mini.hide();
+    hooks.miniVisible = () => mini.visible();
+    hooks.closedToasts = [];
+  }
   /** REM-07, D-94: "N reminders you missed": Today, its Overdue card open, in view. */
   const showOverdue = (): void => {
     const send = (): void => mainWindow.webContents.send(Channels.mainOverdue);
     if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
     else send();
   };
-  const handleActivation = (activation: ReminderActivation | null): void => {
+  const handleActivation = (activation: ReminderActivation | null, from = 'toast'): void => {
     if (!activation) return;
-    log(`toast action "${activation.action}" for task ${activation.id}`);
+    log(`${from} action "${activation.action}" for task ${activation.id}`);
+    // D-109: acting in either place clears the other: the card in mini, the toast (Action Center).
+    dropAlert(activation.id);
+    if (from !== 'toast' && closeReminderToast(activation.id))
+      log(`toast for ${activation.id} closed`);
+    if (from !== 'toast') hooks?.closedToasts?.push(activation.id);
     const now = new Date();
     if (activation.action === 'open') {
       showMain();
@@ -1297,6 +1469,11 @@ async function start(): Promise<void> {
       .catch((error: unknown) => log(`reminder ${activation.action} failed: ${String(error)}`));
   };
   if (hooks) hooks.activate = (url: string) => handleActivation(activationOf([url]));
+  ipcMain.on(Channels.miniAlertAction, (event, id: unknown, action: unknown) => {
+    if (!mini.owns(event.sender) || typeof id !== 'string') return;
+    if (action !== 'done' && action !== 'snooze' && action !== 'open') return;
+    handleActivation({ id, action: action }, 'mini');
+  });
   /** The R-3 test toast (`flint-dev://dev/toast`, FLINT_TEST_TOAST). Development builds only. */
   const sendTestToast = (kind: ToastKind, id = 'k3f9'): void => {
     if (BUILD !== 'development' || !protocol) return;

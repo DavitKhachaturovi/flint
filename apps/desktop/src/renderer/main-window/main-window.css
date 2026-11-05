@@ -3103,6 +3103,45 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
+/* MINI-01, D-109: mini mode's button in the title-bar strip, left of the panel toggle. */
+.mini-toggle {
+  position: fixed;
+  top: 6px;
+  left: calc(env(titlebar-area-x, 0px) + env(titlebar-area-width, calc(100vw - 138px)) - 70px);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--fl-text-faint);
+  -webkit-app-region: no-drag;
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.mini-toggle:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.mini-toggle:active {
+  transform: scale(0.94);
+}
+
+/* D-109: the other window edits this note: a quiet line, the editor read-only meanwhile. */
+.note-elsewhere {
+  margin: 0 0 8px;
+  font-size: var(--fl-size-label);
+  color: var(--fl-text-faint);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.md-editor.locked .cm-content {
+  caret-color: transparent;
+}
+
 .panel-back {
   margin-left: -6px;
   margin-right: -4px;

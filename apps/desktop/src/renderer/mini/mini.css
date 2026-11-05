@@ -1,0 +1,576 @@
+@import '../../../../../docs/design/tokens.css';
+@import '../fonts.css';
+@import '../selection.css';
+@import '../menu/menu.css';
+@import '../editor/editor.css';
+@import '../highlight/highlight.css';
+
+/* MINI-01, D-109: mini mode, after docs/design/mockups/05-mini-mode.html; tokens only (docs/09).
+   The window is the floating card itself (09's level 2): its ground, Windows' rounded corners. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--fl-ground-float);
+  color: var(--fl-text-primary);
+  font-family: var(--fl-font-ui);
+  font-size: var(--fl-size-body);
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--fl-accent);
+}
+
+.mini {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 14px;
+}
+
+/* The header: the tabs, then the drag strip, the pin and ×. Dragged by its blank parts. */
+.mini-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: drag;
+}
+
+.mini-head button,
+.mini-tabs {
+  -webkit-app-region: no-drag;
+}
+
+.mini-drag {
+  flex: 1 1 auto;
+  align-self: stretch;
+}
+
+.mini-tabs {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--fl-ground-window);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.mini-tab {
+  position: relative;
+  z-index: 1;
+  padding: 6px 14px;
+  border-radius: var(--fl-radius-button);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fl-text-muted);
+  transition: color var(--fl-dur-fast) ease;
+}
+
+.mini-tab:hover {
+  color: var(--fl-text-secondary);
+}
+
+.mini-tab.on {
+  color: var(--fl-text-primary);
+}
+
+/* The chosen tab's ground glides between the tabs (D-89). */
+.mini-tab-glide {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: var(--fl-radius-button);
+  background: var(--fl-ground-hover);
+  box-shadow: var(--fl-shadow-selected);
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.mini-tool {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.mini-tool:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
+.mini-tool.on {
+  color: var(--fl-text-secondary);
+}
+
+.mini-tool:active {
+  transform: scale(0.94);
+}
+
+.mini-more {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* REM-06, D-109: the reminder card on top of every tab (mockup 05). */
+.mini-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-card);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-card-close);
+  animation: mini-alert-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+@keyframes mini-alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.mini-alert-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mini-alert-tile {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-tile);
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-strong-tile);
+}
+
+.mini-alert-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mini-alert-label {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.mini-alert-title {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-alert-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mini-alert-button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--fl-radius-button);
+  background: var(--fl-ground-hover);
+  font-size: 13.5px;
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    transform var(--fl-dur-fast) ease;
+}
+
+.mini-alert-button.strong {
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-primary-button);
+}
+
+.mini-alert-button:active {
+  transform: scale(0.97);
+}
+
+.mini-alert-button .keycap {
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+}
+
+.mini-alert-button.strong .keycap {
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.55;
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  white-space: nowrap;
+  color: var(--fl-text-secondary);
+}
+
+/* A tab's content crossfades in as it is chosen (D-89). */
+.mini-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+  animation: mini-body-in var(--fl-dur-state) ease;
+}
+
+@keyframes mini-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.mini-empty {
+  margin: 0;
+  padding: 18px 12px;
+  color: var(--fl-text-muted);
+}
+
+.mini-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mini-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 10px 8px 16px;
+  border-radius: var(--fl-radius-row);
+  transition: background-color var(--fl-dur-fast);
+  animation: mini-row-in var(--fl-dur-base) ease-out;
+}
+
+@keyframes mini-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+.mini-row:hover {
+  background: var(--fl-ground-hover);
+}
+
+.mini-row.sel {
+  background: var(--fl-ground-hover);
+  box-shadow: var(--fl-shadow-selected);
+}
+
+/* Completed (D-67): the check fills, the row fades and folds away. */
+.mini-row.leaving {
+  pointer-events: none;
+  animation: mini-row-out var(--fl-dur-complete) ease forwards;
+}
+
+@keyframes mini-row-out {
+  0% {
+    opacity: 1;
+    max-height: 60px;
+  }
+  45% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: 0;
+  }
+}
+
+.stripe {
+  position: absolute;
+  left: 3px;
+  top: 11px;
+  bottom: 11px;
+  border-radius: 3px;
+}
+
+.p-high {
+  width: var(--fl-pri-high-width);
+  background: var(--fl-pri-high-color);
+}
+
+.p-medium {
+  width: var(--fl-pri-med-width);
+  background: var(--fl-pri-med-color);
+}
+
+.p-low {
+  width: var(--fl-pri-low-width);
+  background: var(--fl-pri-low-color);
+}
+
+.check {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: var(--fl-radius-check);
+  border: 1.5px solid var(--fl-checkbox-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fl-strong-fg);
+  transition:
+    background-color var(--fl-dur-fast),
+    border-color var(--fl-dur-fast),
+    transform var(--fl-dur-base) var(--fl-ease-press);
+}
+
+.check:hover {
+  border-color: var(--fl-accent);
+}
+
+.check:active {
+  transform: scale(0.86);
+}
+
+.check.on {
+  background: var(--fl-accent);
+  border-color: var(--fl-accent);
+  animation: mini-check-pop var(--fl-dur-base) var(--fl-ease-press);
+}
+
+@keyframes mini-check-pop {
+  from {
+    transform: scale(0.8);
+  }
+}
+
+.mini-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-title a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--fl-text-faint);
+}
+
+.mini-title code {
+  font-family: var(--fl-font-mono);
+  font-size: 0.92em;
+}
+
+.mini-row.reminder .mini-title {
+  color: var(--fl-text-secondary);
+}
+
+.mini-when,
+.mini-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+/* The composer (mockup 05): "Add to Today…", Enter or the arrow adds. */
+.mini-composer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 16px;
+  background: var(--fl-ground-window);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  transition: box-shadow var(--fl-dur-fast) ease;
+}
+
+.mini-composer:focus-within {
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+
+.mini-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fl-text-primary);
+  font: inherit;
+  font-size: 14.5px;
+  user-select: text;
+}
+
+.mini-composer-input::placeholder {
+  color: var(--fl-text-faint);
+}
+
+.mini-add {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.mini-add:hover {
+  color: var(--fl-text-primary);
+}
+
+/* D-109, Q5: the Note tab, a sticky note. */
+.mini-note {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.mini-note-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 0 6px 4px;
+}
+
+.mini-note-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fl-text-primary);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  user-select: text;
+}
+
+.mini-note-title::placeholder {
+  color: var(--fl-text-faint);
+  font-weight: 500;
+}
+
+.mini-kept,
+.note-elsewhere {
+  margin: 0 0 6px 4px;
+  font-size: var(--fl-size-label);
+  color: var(--fl-text-faint);
+  animation: mini-body-in var(--fl-dur-state) ease;
+}
+
+.mini-editor {
+  flex: 1 1 auto;
+  user-select: text;
+}
+
+.mini-editor .cm-content {
+  padding: 2px 4px 24px;
+  font-size: var(--fl-size-body);
+}
+
+.md-editor.locked .cm-content {
+  caret-color: transparent;
+}
+
+/* A short message, at the bottom (D-89: it rises in). */
+.mini-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 28px);
+  padding: 9px 14px;
+  border-radius: var(--fl-radius-button);
+  background: var(--fl-ground-card);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  font-size: 13px;
+  transform: translateX(-50%);
+  animation: mini-toast-in var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.mini-toast button {
+  color: var(--fl-text-primary);
+  font-weight: 600;
+}
+
+@keyframes mini-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
-import { EditorState } from '@codemirror/state';
+import { Annotation, Compartment, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
 import { insertBlock } from './commands.js';
@@ -38,6 +38,11 @@ export function MarkdownEditor(props: {
   readonly onBlur?: (text: string) => void;
   /** D-107: the editor took the focus (a caret asked for has arrived). */
   readonly onFocus?: () => void;
+  /**
+   * D-109: shown read-only for now (another window edits the note), yet still focusable, so a click
+   * into it can take the editing over.
+   */
+  readonly locked?: boolean;
   /** Esc (a body's field saves and closes). */
   readonly onEscape?: (text: string) => void;
   /** NOTE-06, D-84: a note's Monospace toggle, in its menu (and Ctrl+Shift+M). */
@@ -51,7 +56,9 @@ export function MarkdownEditor(props: {
     placeholder,
     autoFocus,
     caretAtEnd,
+    locked = false,
   } = props;
+  const lock = useRef(new Compartment());
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const latest = useRef(props);
@@ -102,7 +109,8 @@ export function MarkdownEditor(props: {
             }),
           }),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
+            const outside = update.transactions.some((tr) => tr.annotation(fromOutside));
+            if (update.docChanged && !outside) {
               pending.current = true;
               latest.current.onChange?.(update.state.doc.toString());
             }
@@ -111,11 +119,12 @@ export function MarkdownEditor(props: {
             if (update.focusChanged && update.view.hasFocus) latest.current.onFocus?.();
           }),
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
+          lock.current.of(locked ? EditorState.readOnly.of(true) : []),
           // MEDIA-01, D-84: files dragged in (from Explorer) go where they are dropped.
           EditorView.domEventHandlers({
             drop: (event, target) => {
               const files = [...(event.dataTransfer?.files ?? [])];
-              if (files.length === 0 || readOnly) return false;
+              if (files.length === 0 || readOnly || latest.current.locked) return false;
               event.preventDefault();
               const at = target.posAtCoords({ x: event.clientX, y: event.clientY });
               if (at !== null) target.dispatch({ selection: { anchor: at } });
@@ -160,13 +169,36 @@ export function MarkdownEditor(props: {
       pending.current = false;
       return;
     }
-    if (pending.current && editor.hasFocus) return;
+    if (pending.current && editor.hasFocus && !latest.current.locked) return;
     pending.current = false;
-    editor.dispatch({ changes: { from: 0, to: current.length, insert: text } });
-    pending.current = false;
+    editor.dispatch({ changes: difference(current, text), annotations: fromOutside.of(true) });
   }, [text]);
 
+  // D-109: locked while another window edits the note, unlocked once this one may type.
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: lock.current.reconfigure(locked ? EditorState.readOnly.of(true) : []),
+    });
+  }, [locked]);
+
   return <div ref={host} className={`md-editor ${className}`} />;
+}
+
+/** D-109: a change that came from outside (a save, another window's typing): not typing here. */
+const fromOutside = Annotation.define<boolean>();
+
+/** The smallest change from `from` to `to` (the same start and end kept), so the caret stays. */
+function difference(from: string, to: string): { from: number; to: number; insert: string } {
+  let start = 0;
+  while (start < from.length && start < to.length && from[start] === to[start]) start++;
+  let end = 0;
+  while (
+    end < from.length - start &&
+    end < to.length - start &&
+    from[from.length - 1 - end] === to[to.length - 1 - end]
+  )
+    end++;
+  return { from: start, to: from.length - end, insert: to.slice(start, to.length - end) };
 }
 
 /** Paste as plain text (NOTE-02): the next paste skips CAP-06's fencing. */
