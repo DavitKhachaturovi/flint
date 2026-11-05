@@ -6,7 +6,8 @@
 @import '../editor/editor.css';
 @import '../highlight/highlight.css';
 
-/* The main window (M4), after docs/design/mockups/01-main-inbox.html; tokens only (docs/09). */
+/* Flint's stylesheet, shared by the main window (M4, mockup 01) and mini mode (D-110, mockup 05):
+   the same rows, composer, toasts, scrollbars and motion in both; tokens only (docs/09). */
 
 * {
   box-sizing: border-box;

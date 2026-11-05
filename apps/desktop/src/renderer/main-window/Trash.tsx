@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState, type ReactElement } from 'react';
 import type { ArchivedList, TrashItem, TrashPreview, TrashView } from '../../shared/ipc.js';
 import { BodyBlock } from './Body.js';
 import { BackIcon, CheckIcon, CloseIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
-import { usePresence } from './Today.js';
+import { usePresence } from '../ui/presence.js';
 
 /**
  * The Trash view (DATA-02, TASK-06, D-97): what was deleted, by day, newest first, with Restore

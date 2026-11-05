@@ -20,7 +20,7 @@ import { titleHtml } from '../../shared/inline-markdown.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 import { NoteEditor } from '../main-window/NoteEditor.js';
-import { usePresence } from '../main-window/Today.js';
+import { usePresence } from '../ui/presence.js';
 import { BellIcon, CheckIcon, CloseIcon, PinIcon, PlusIcon } from '../main-window/icons.js';
 
 /**

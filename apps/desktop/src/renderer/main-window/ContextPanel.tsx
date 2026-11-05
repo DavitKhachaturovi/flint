@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { useScrollsWhenTaller } from './scrolls.js';
+import { useScrollsWhenTaller } from '../ui/scrolls.js';
 import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { mediaUrl } from '../../shared/body-markdown.js';

@@ -8,28 +8,17 @@ import {
   type CSSProperties,
   type ReactElement,
   type ReactNode,
-  type RefObject,
 } from 'react';
 import {
   blockFor,
   classifyPaste,
   escapeInert,
   fencedBlock,
-  listToken,
-  listTokenAt,
   parseCapture,
-  suggestLists,
   type ListInfo,
-  type TokenKind,
 } from '@flint/core/shorthand';
 import { parseLocalDateTime, type LocalDateTime } from '@flint/core/time';
-import { listShorthand, PRIORITY_TOKENS, timeShorthand } from '../../shared/tokens.js';
-import {
-  openListPicker,
-  openPriorityPicker,
-  openTimePicker,
-  type PickerHost,
-} from '../pickers/pickers.js';
+import { openListPicker, openPriorityPicker, openTimePicker } from '../pickers/pickers.js';
 import flintIcon from '../../../../../assets/icon/flint-icon-512.svg';
 import type {
   ChangeOutcome,
@@ -50,22 +39,13 @@ import type {
 } from '../../shared/ipc.js';
 import {
   BackIcon,
-  BellIcon,
-  BodyIcon,
   CloseIcon,
-  CheckIcon,
   ChevronIcon,
-  FlagIcon,
-  ImageIcon,
-  HashIcon,
-  LinkIcon,
   InboxIcon,
   ListIcon,
   NoteIcon,
   PanelIcon,
-  PinIcon,
   PlusIcon,
-  ReminderBellIcon,
   SettingsIcon,
   SortIcon,
   SunIcon,
@@ -73,7 +53,7 @@ import {
   MiniIcon,
 } from './icons.js';
 import { OverdueCard, ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
-import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
+import { titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
@@ -104,16 +84,30 @@ import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js'
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
-import { foldAway, unfold, watchDrag, type DragUnit } from './drag.js';
-import { bodyImages, mediaUrl } from '../../shared/body-markdown.js';
-import { codeLanguage } from '../../shared/code-language.js';
-import { knownLinks, setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
-import { imageMenuItems, relink, showInViewer, type LinkedNotice } from '../media/media.js';
-import { highlightLines } from '../highlight/highlight.js';
-import { enableAutoPair } from '../auto-pair.js';
+import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
+import { bodyImages } from '../../shared/body-markdown.js';
+import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
+import { relink, type LinkedNotice } from '../media/media.js';
 import { useInertText } from './inert-text.js';
 import { sidebarMotion } from './sidebar-motion.js';
-import { useScrollsWhenTaller } from './scrolls.js';
+import { useScrollsWhenTaller } from '../ui/scrolls.js';
+import { durationMs, reducedMotion } from '../ui/motion.js';
+import {
+  EditField,
+  hasBody,
+  MorphText,
+  Row,
+  type Editing,
+  type Leave,
+  type Point,
+  type RowHandlers,
+} from '../ui/Row.js';
+import { departed, ghostRows, withSubtasks, type Ghost } from '../ui/ghosts.js';
+import { rowDragUnits } from '../ui/row-drag.js';
+import { Composer, listInfos } from '../ui/Composer.js';
+import { QuickTitle } from '../ui/QuickTitle.js';
+import { Glide } from '../ui/Glide.js';
+import { ToastView, useToast } from '../ui/Toast.js';
 
 /**
  * The main window (M4, D-48 daily-use slice): the sidebar with the lists, a list's tasks with the
@@ -139,11 +133,6 @@ const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
   '3': 'high',
   '0': null,
 };
-const PRIORITY_NAMES = { high: 'High', medium: 'Medium', low: 'Low' } as const;
-interface Point {
-  readonly x: number;
-  readonly y: number;
-}
 
 /** A list's name being typed in the sidebar (LIST-01). */
 type Naming =
@@ -163,52 +152,7 @@ const SORT_LABELS: Readonly<Record<SidebarSort, string>> = {
   created: 'Created',
 };
 
-/** The lists as the shorthand and the pickers see them, most recently used ranked (D-25). */
-function listInfos(lists: readonly ListSummary[]): ListInfo[] {
-  return lists.map((list): ListInfo => ({
-    id: list.id,
-    name: list.name,
-    mode: list.mode,
-    ...(list.recentRank === undefined ? {} : { recentRank: list.recentRank }),
-  }));
-}
-
 let seq = 0;
-
-interface Toast {
-  readonly text: string;
-  readonly undo: boolean;
-  readonly id: number;
-  /** TASK-09, D-88: another way out ("Keep as one"), next to Undo. */
-  readonly action?: { readonly label: string; readonly run: () => void };
-  /** D-77: playing its way out. */
-  readonly leaving?: boolean;
-}
-
-/**
- * Edit state (docs/03 §2): a task's title, or a new row below a task (Edit-state Enter). `level`:
- * Tab and Shift+Tab on an empty new row nest it under the task above or lift it out. `seq` starts
- * a fresh text field each time.
- *
- * A new row stays one text field while Enter adds task after task: `added` are the tasks it has
- * added so far, newest last, and the row sits below the newest one already shown. Nothing typed
- * while a save is in flight is lost, and the field is never moved (moving it would drop focus).
- */
-type Editing =
-  | {
-      readonly kind: 'task';
-      readonly key: string;
-      readonly seq: number;
-      /** D-71: where the caret starts, in the raw title; the end when not given. */
-      readonly caret?: number;
-    }
-  | {
-      readonly kind: 'new';
-      readonly after: string;
-      readonly added: readonly string[];
-      readonly level: 'same' | 'in' | 'out';
-      readonly seq: number;
-    };
 
 type NewEditing = Extract<Editing, { kind: 'new' }>;
 
@@ -237,89 +181,6 @@ const newRow = (after: string): NewEditing => ({
   level: 'same',
   seq: ++seq,
 });
-
-/** How a text field was left. */
-/** How a text field was left; `notes` is Shift+Enter, which goes on into the task's body (D-78). */
-type Leave = 'enter' | 'escape' | 'blur' | 'indent' | 'outdent' | 'notes';
-
-/** A duration token in ms (09 §9), so JS timings follow the motion tokens (and the M8 speed). */
-function durationMs(token: string, fallback: number): number {
-  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token));
-  return Number.isFinite(value) ? value : fallback;
-}
-
-const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/**
- * D-75, D-77: a copy of a row that has just been completed, reopened or removed (deleted, moved to
- * another list, an undone duplicate), playing its animation where the row was, while the task is
- * already in its new place, or gone. Not interactive.
- */
-interface Ghost {
-  readonly id: number;
-  readonly task: TaskRow;
-  readonly subtask: boolean;
-  readonly direction: 'complete' | 'reopen' | 'remove';
-  /** The open tasks, or Completed. */
-  readonly section: 'open' | 'done';
-  /** The row it follows in its section (the open tasks, or Completed); null: the first. */
-  readonly after: string | null;
-  /** D-80: it was expanded: its body closes first, then the row plays out. */
-  readonly expanded?: boolean;
-}
-
-let ghostSeq = 0;
-
-const withSubtasks = (tasks: readonly TaskRow[]): TaskRow[] =>
-  tasks.flatMap((task) => [task, ...task.subtasks]);
-
-/**
- * The rows that changed sides, or went away, between two views of a list, by any cause (Space,
- * Delete, undo, redo, a reminder's Done): a ghost where each was, and the keys that now ease in at
- * their new place.
- */
-function departed(before: ListView, after: ListView): { ghosts: Ghost[]; moved: string[] } {
-  const openTasks = (view: ListView): TaskRow[] =>
-    view.items.flatMap((item) => (item.kind === 'task' ? [item.task] : []));
-  const nowOpen = new Set(withSubtasks(openTasks(after)).map((row) => row.key));
-  const nowDone = new Set(withSubtasks(after.completed).map((row) => row.key));
-  const ghosts: Ghost[] = [];
-  const moved: string[] = [];
-  for (const [tasks, direction, section, there, here] of [
-    [openTasks(before), 'complete', 'open', nowDone, nowOpen],
-    [before.completed, 'reopen', 'done', nowOpen, nowDone],
-  ] as const) {
-    const rows = withSubtasks(tasks);
-    const gone = (key: string): boolean => !here.has(key) && !there.has(key);
-    for (const task of tasks) {
-      // The task (its subtasks go with it), or a subtask that moved or went on its own.
-      const went: [TaskRow, Ghost['direction']][] =
-        there.has(task.key) || gone(task.key)
-          ? [[task, there.has(task.key) ? direction : 'remove']]
-          : task.subtasks
-              .filter((sub) => there.has(sub.key) || gone(sub.key))
-              .map((sub) => [sub, there.has(sub.key) ? direction : 'remove']);
-      for (const [row, how] of went) {
-        const index = rows.indexOf(row);
-        const previous = rows
-          .slice(0, index)
-          .reverse()
-          .find((other) => here.has(other.key));
-        ghosts.push({
-          id: ++ghostSeq,
-          task: row,
-          subtask: row !== task,
-          direction: how,
-          section,
-          after: previous?.key ?? null,
-        });
-        if (how !== 'remove')
-          moved.push(row.key, ...(row === task ? task.subtasks.map((sub) => sub.key) : []));
-      }
-    }
-  }
-  return { ghosts, moved };
-}
 
 /** NAV-04: where the main window is: a list, or one of its tasks as a page (TASK-05). */
 interface Place {
@@ -465,8 +326,6 @@ function findRow(view: ListView, key: string): TaskRow | null {
   return withSubtasks(tasks).find((row) => row.key === key) ?? null;
 }
 
-const hasBody = (task: TaskRow): boolean => task.body.trim() !== '';
-
 /** The rows the keyboard moves through, top to bottom (Navigate state, docs/03 §2). */
 /** TASK-08, D-72, D-88: a temporary sort of a list's open tasks; the file's order stays. */
 type TempSort = 'priority' | 'reminder' | 'added';
@@ -608,7 +467,7 @@ export function App(): ReactElement {
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const { toast, showToast, hideToast } = useToast(TOAST_MS);
   /**
    * MEDIA-03, D-84: large files linked where they are: one notice each, kept until acted on or
    * dismissed (it never fades and never takes focus).
@@ -680,7 +539,6 @@ export function App(): ReactElement {
   const showImage: ShowImage = (images, start) => {
     if (images.length > 0) setLightbox({ images, start });
   };
-  const toastTimer = useRef<number | undefined>(undefined);
   const composer = useRef<HTMLInputElement>(null);
 
   /** A list's name being typed in the sidebar: a new list or note, or a rename (LIST-01). */
@@ -1172,23 +1030,6 @@ export function App(): ReactElement {
     window.addEventListener('mouseup', onButton);
     return () => window.removeEventListener('mouseup', onButton);
   }, [travel]);
-
-  /** D-77: the toast plays its way out, then goes. */
-  const hideToast = useCallback((): void => {
-    setToast((current) => current && { ...current, leaving: true });
-    window.setTimeout(
-      () => setToast((current) => (current?.leaving ? null : current)),
-      durationMs('--fl-dur-base', 200),
-    );
-  }, []);
-  const showToast = useCallback(
-    (text: string, undo: boolean, action?: Toast['action']): void => {
-      window.clearTimeout(toastTimer.current);
-      setToast({ text, undo, id: Date.now(), ...(action && { action }) });
-      toastTimer.current = window.setTimeout(hideToast, TOAST_MS);
-    },
-    [hideToast],
-  );
 
   // D-87: pictures shown in the viewer from places without a handler of their own (a chip's menu).
   useEffect(() => {
@@ -5128,31 +4969,13 @@ export function App(): ReactElement {
       )}
 
       {toast && (
-        <div
-          className={['toast', marked.size > 1 ? 'above-bar' : '', toast.leaving ? 'leaving' : '']
-            .filter(Boolean)
-            .join(' ')}
-          role="status"
+        <ToastView
           key={toast.id}
-        >
-          <span>{toast.text}</span>
-          {toast.action && (
-            <button
-              type="button"
-              onClick={() => {
-                toast.action?.run();
-                hideToast();
-              }}
-            >
-              {toast.action.label}
-            </button>
-          )}
-          {toast.undo && (
-            <button type="button" onClick={() => void undo().then(hideToast)}>
-              Undo
-            </button>
-          )}
-        </div>
+          toast={toast}
+          className={marked.size > 1 ? 'above-bar' : ''}
+          onHide={hideToast}
+          onUndo={() => void undo().then(hideToast)}
+        />
       )}
     </div>
   );
@@ -5223,55 +5046,6 @@ function NavGroup(props: {
       </div>
     </div>
   );
-}
-
-/**
- * TASK-01, D-54: the units a row drags among: the top-level tasks of the card (each with its
- * subtasks' rows), or a subtask's siblings. Headings and paragraphs between tasks stay put.
- */
-function rowDragUnits(
-  card: HTMLElement,
-  row: HTMLElement,
-): { unit: DragUnit; peers: DragUnit[] } | null {
-  const own = row.parentElement?.classList.contains('row-group') ? row.parentElement : row;
-  const keyOf = (element: HTMLElement): string | undefined =>
-    (element.matches('.row') ? element : element.querySelector<HTMLElement>(':scope > .row'))
-      ?.dataset['key'];
-  const isTask = (element: Element): element is HTMLElement =>
-    element.matches('.row[data-key], .row-group') && !element.matches('.leaving');
-  // Top-level units, each with the subtask rows that follow it.
-  const tops: { key: string; elements: HTMLElement[]; subtasks: HTMLElement[] }[] = [];
-  let current: (typeof tops)[number] | null = null;
-  for (const element of card.children) {
-    if (!isTask(element)) {
-      if (!element.matches('.leaving')) current = null;
-      continue;
-    }
-    const key = keyOf(element);
-    if (!key) continue;
-    if (element.classList.contains('subtask')) {
-      if (current) {
-        current.elements.push(element);
-        current.subtasks.push(element);
-      }
-      continue;
-    }
-    current = { key, elements: [element], subtasks: [] };
-    tops.push(current);
-  }
-  if (!own.classList.contains('subtask')) {
-    const peers = tops.map(({ key, elements }) => ({ key, elements }));
-    const unit = peers.find((peer) => peer.elements[0] === own);
-    return unit ? { unit, peers } : null;
-  }
-  const parent = tops.find((top) => top.subtasks.includes(own));
-  if (!parent) return null;
-  const peers = parent.subtasks.flatMap((element) => {
-    const key = keyOf(element);
-    return key ? [{ key, elements: [element] }] : [];
-  });
-  const unit = peers.find((peer) => peer.elements[0] === own);
-  return unit ? { unit, peers } : null;
 }
 
 function NavItem(props: {
@@ -5369,546 +5143,6 @@ function FootButton(props: {
 }
 
 /**
- * The composer (mockup 01, TASK-02): adds to the top of this list with the capture shorthand;
- * `##list` sends the task elsewhere (D-25). Chips show what the shorthand will do.
- */
-function Composer(props: {
-  readonly listId: string;
-  readonly lists: readonly ListSummary[];
-  readonly inputRef: RefObject<HTMLInputElement | null>;
-  /** `chooseNewList`: the close-match card was flipped to a new list (Tab, D-25). */
-  readonly onAdd: (text: string, chooseNewList: boolean) => Promise<void>;
-  /** D-92: Today's "Add a task to today…". */
-  readonly placeholder?: string;
-}): ReactElement {
-  const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…' } = props;
-  const text = useInertText('', false);
-  /** D-78: notes under the title (Shift+Enter, as in the capture popup): the new task's body. */
-  const [notes, setNotes] = useState<string | null>(null);
-  const notesRef = useRef<HTMLTextAreaElement>(null);
-  const focusNotes = useRef(false);
-  useEffect(() => {
-    if (notes === null || !focusNotes.current) return;
-    focusNotes.current = false;
-    notesRef.current?.focus();
-  }, [notes]);
-  /**
-   * D-80 (CAP-06 in the composer, as in the popup's selection area): pasted code, JSON or a stack
-   * trace is a code card, a pasted image a thumbnail chip (the file is saved to attachments/ at
-   * once); on Enter the body is the notes, then the code fenced, then the image links. Pasted
-   * markdown and other text is typed as usual (D-79).
-   */
-  const [pasted, setPasted] = useState<readonly ComposerPaste[]>([]);
-  const pasteRules = (event: React.ClipboardEvent): boolean => {
-    const image = [...event.clipboardData.items]
-      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
-      ?.getAsFile();
-    if (image) {
-      event.preventDefault();
-      void image
-        .arrayBuffer()
-        .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
-        .then((link) => {
-          if (link) setPasted((current) => [...current, { kind: 'image', link, id: ++seq }]);
-        });
-      return true;
-    }
-    const clipboard = event.clipboardData.getData('text/plain');
-    const kind = classifyPaste(clipboard);
-    if (kind === 'text') return false;
-    event.preventDefault();
-    const block = blockFor(clipboard);
-    setPasted((current) => [
-      ...current,
-      { kind: 'code', text: block.text, lang: kind === 'json' ? 'json' : '', id: ++seq },
-    ]);
-    return true;
-  };
-  const submit = (): void => {
-    const typed = text.escaped();
-    if (typed.trim() === '') return;
-    const parts = [
-      ...(notes?.trim() ? [notes.replace(/\s+$/, '')] : []),
-      ...pasted.flatMap((item) =>
-        item.kind === 'code' ? [fencedBlock(item.text, item.lang)] : [],
-      ),
-      ...pasted.flatMap((item) => (item.kind === 'image' ? [`![](${item.link})`] : [])),
-    ];
-    const body = parts.length > 0 ? `\n${parts.join('\n\n')}` : '';
-    const newList = parsed?.target.kind === 'new' && chooseNewFor !== null;
-    text.reset('', false);
-    setNotes(null);
-    setPasted([]);
-    setChooseNewFor(null);
-    setCardAcceptedFor(null);
-    setMenuAcceptedFor(null);
-    inputRef.current?.focus();
-    void onAdd(typed + body, newList);
-  };
-  // UI-09: auto-closing brackets and quotes in the composer.
-  useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
-  const infos = useMemo(() => listInfos(lists), [lists]);
-  const { escaped, value } = text;
-  /**
-   * CAP-05, D-25, D-51, D-87: the popup's `##` menu (search and recent lists) and close-match card,
-   * here too. Tab on the card flips between the close match and a new list.
-   */
-  const [caret, setCaret] = useState(0);
-  const [highlight, setHighlight] = useState(-1);
-  const [menuAcceptedFor, setMenuAcceptedFor] = useState<string | null>(null);
-  const [chooseNewFor, setChooseNewFor] = useState<string | null>(null);
-  const [cardAcceptedFor, setCardAcceptedFor] = useState<string | null>(null);
-  const { parsed, flippedFrom } = useMemo(() => {
-    if (value.trim() === '') return { parsed: null, flippedFrom: null };
-    const now = new Date();
-    const first = parseCapture(escaped(), { now, lists: infos });
-    if (chooseNewFor && first.target.kind === 'close-match' && first.target.name === chooseNewFor)
-      return {
-        parsed: parseCapture(escaped(), { now, lists: infos, chooseNewList: true }),
-        flippedFrom: first.target.list,
-      };
-    return { parsed: first, flippedFrom: null };
-  }, [value, escaped, infos, chooseNewFor]);
-  const token = useMemo(() => {
-    const at = listTokenAt(value, caret);
-    // A pasted `##` is text (D-45): no menu for it.
-    if (!at || escaped().includes(`\\${value.slice(at.start, at.end)}`)) return null;
-    return { ...at, text: value.slice(at.start, at.end) };
-  }, [value, caret, escaped]);
-  const suggestions = useMemo(
-    () =>
-      // D-89: every matching list; the menu scrolls past five.
-      token && token.text !== menuAcceptedFor ? suggestLists(token.typed, infos) : [],
-    [token, menuAcceptedFor, infos],
-  );
-  useEffect(() => setHighlight(-1), [suggestions.map((list) => list.id).join()]);
-  // D-89: the highlighted list stays in view as ↑/↓ go past the menu's five visible rows.
-  const suggestionsBox = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    suggestionsBox.current
-      ?.querySelector('[aria-selected="true"]')
-      ?.scrollIntoView({ block: 'nearest' });
-  }, [highlight]);
-  const cardTarget =
-    parsed &&
-    (parsed.target.kind === 'close-match' || parsed.target.kind === 'new') &&
-    parsed.target.name !== cardAcceptedFor
-      ? parsed.target
-      : null;
-  /** Replaces a stretch of the title with the list's own spelling, the caret after it. */
-  const spell = (start: number, end: number, list: ListInfo): string => {
-    const spelled = `##${listToken(list.name)}`;
-    const next = value.slice(0, start) + spelled + value.slice(end);
-    text.change(next);
-    const at = start + spelled.length;
-    setCaret(at);
-    window.requestAnimationFrame(() => inputRef.current?.setSelectionRange(at, at));
-    return spelled;
-  };
-  const acceptSuggestion = (list: ListInfo | undefined): void => {
-    if (!list || !token) return;
-    setMenuAcceptedFor(spell(token.start, token.end, list));
-  };
-  const acceptCard = (): void => {
-    if (!parsed || !cardTarget) return;
-    const winner = parsed.tokens.find((item) => item.kind === 'list' && item.role === 'winner');
-    if (cardTarget.kind === 'close-match' && winner) {
-      const { toOriginal } = text.mapped();
-      setMenuAcceptedFor(spell(toOriginal(winner.start), toOriginal(winner.end), cardTarget.list));
-    } else setCardAcceptedFor(cardTarget.name);
-  };
-  const chips: string[] = [];
-  if (parsed?.priority) chips.push(PRIORITY_NAMES[parsed.priority]);
-  const target = parsed?.target;
-  if ((target?.kind === 'existing' || target?.kind === 'close-match') && target.list.id !== listId)
-    chips.push(`→ ${target.list.name}`);
-  if (target?.kind === 'new') chips.push(`New list ${target.name}`);
-  // D-105: the links the task will show, while it is typed (a pasted URL as its short form).
-  const links = parsed ? knownLinks(parsed.title) : [];
-
-  /**
-   * CAP-11, D-57: a picker's choice becomes the same shorthand typing would give. The token of
-   * that kind already in the text is replaced (never left behind as text, D-25); null removes it.
-   */
-  const replaceToken = (kind: TokenKind, token: string | null): void => {
-    for (let guard = 0; guard < 10; guard++) {
-      const { text: parsedText, toOriginal } = text.mapped();
-      const found = parseCapture(parsedText, { now: new Date(), lists: infos }).tokens.find(
-        (item) => item.kind === kind,
-      );
-      if (!found) break;
-      const current = text.current();
-      let start = toOriginal(found.start);
-      let end = toOriginal(found.end);
-      if (current[end] === ' ') end++;
-      else if (start > 0 && current[start - 1] === ' ') start--;
-      text.change(current.slice(0, start) + current.slice(end));
-    }
-    if (token) text.insertLive(token);
-    inputRef.current?.focus();
-  };
-  const host = (button: HTMLElement): PickerHost => ({
-    anchor: button.getBoundingClientRect(),
-    returnFocus: inputRef.current,
-    trigger: button,
-  });
-
-  return (
-    <section
-      className="card composer"
-      aria-label="Add a task"
-      // UI-01, D-65: the whole card is the text box's target (one cursor, no flicker around it).
-      onMouseDown={(event) => {
-        const target = event.target as HTMLElement;
-        if (target === inputRef.current || target.closest('button')) return;
-        event.preventDefault();
-        inputRef.current?.focus();
-      }}
-    >
-      <input
-        ref={inputRef}
-        className="composer-input"
-        placeholder={placeholder}
-        value={value}
-        spellCheck={false}
-        aria-controls="composer-suggestions"
-        onChange={(event) => {
-          text.change(event.target.value);
-          setCaret(event.target.selectionStart ?? event.target.value.length);
-        }}
-        onSelect={(event) =>
-          setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
-        }
-        onPaste={(event) => {
-          if (!pasteRules(event)) text.paste();
-        }}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === 'Enter' && event.shiftKey) {
-            event.preventDefault();
-            focusNotes.current = true;
-            if (notes === null) setNotes('');
-            else notesRef.current?.focus();
-          } else if (event.key === 'Enter') {
-            event.preventDefault();
-            // D-40: with the menu or the card showing, Enter first accepts it; the next saves.
-            if (suggestions.length > 0) acceptSuggestion(suggestions[Math.max(0, highlight)]);
-            else if (cardTarget) acceptCard();
-            else submit();
-          } else if (
-            (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
-            suggestions.length > 0
-          ) {
-            event.preventDefault();
-            const step = event.key === 'ArrowDown' ? 1 : -1;
-            setHighlight((at) => (at + step + suggestions.length) % suggestions.length);
-          } else if (event.key === 'Tab' && !event.shiftKey && parsed) {
-            // D-25: Tab flips the card between the close match and a new list.
-            if (parsed.target.kind === 'close-match') {
-              event.preventDefault();
-              setChooseNewFor(parsed.target.name);
-              setCardAcceptedFor(null);
-            } else if (parsed.target.kind === 'new' && chooseNewFor) {
-              event.preventDefault();
-              setChooseNewFor(null);
-              setCardAcceptedFor(null);
-            }
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-        }}
-      />
-      {suggestions.length > 0 && (
-        <ul
-          ref={suggestionsBox}
-          id="composer-suggestions"
-          className="composer-suggestions"
-          role="listbox"
-          aria-label="Lists"
-        >
-          {suggestions.map((list, index) => (
-            <li
-              key={list.id}
-              className="composer-suggestion"
-              role="option"
-              aria-selected={index === highlight}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                acceptSuggestion(list);
-                inputRef.current?.focus();
-              }}
-            >
-              <span className="composer-suggestion-tile">
-                <HashIcon size={13} />
-              </span>
-              <span>{list.name}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {suggestions.length === 0 && cardTarget && (
-        <div className="composer-choice" aria-live="polite">
-          {cardTarget.kind === 'new' && flippedFrom ? (
-            <>
-              <span className="composer-option selected">
-                New list &quot;{cardTarget.name}&quot; <span className="composer-key">Enter</span>
-              </span>
-              <span className="composer-option">
-                {flippedFrom.name} <span className="composer-key">Tab</span>
-              </span>
-            </>
-          ) : cardTarget.kind === 'close-match' ? (
-            <>
-              <span className="composer-option selected">
-                {cardTarget.list.name} <span className="composer-key">Enter</span>
-              </span>
-              <span className="composer-option">
-                New list &quot;{cardTarget.name}&quot; <span className="composer-key">Tab</span>
-              </span>
-            </>
-          ) : (
-            <span className="composer-option selected">
-              New list &quot;{cardTarget.name}&quot; <span className="composer-key">Enter</span>
-            </span>
-          )}
-        </div>
-      )}
-      {notes !== null && (
-        <textarea
-          ref={notesRef}
-          className="composer-notes"
-          aria-label="Notes"
-          placeholder="Notes, code, links…"
-          value={notes}
-          spellCheck={false}
-          onChange={(event) => setNotes(event.target.value)}
-          onPaste={(event) => void pasteRules(event)}
-          onKeyDown={(event) => {
-            const field = event.currentTarget;
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              submit();
-            } else if (event.key === 'Backspace' && field.value === '') {
-              event.preventDefault();
-              setNotes(null);
-              inputRef.current?.focus();
-            } else if (
-              (event.key === 'ArrowUp' && field.selectionStart === 0) ||
-              (event.key === 'Tab' && event.shiftKey)
-            ) {
-              event.preventDefault();
-              inputRef.current?.focus();
-            } else if (event.key === 'Escape') {
-              event.preventDefault();
-              field.blur();
-            }
-          }}
-        />
-      )}
-      {pasted.length > 0 && (
-        <ComposerPastes
-          items={pasted}
-          onRemove={(id) => setPasted((current) => current.filter((item) => item.id !== id))}
-        />
-      )}
-      <div className="composer-bar">
-        <div className="tools">
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Set priority"
-            onClick={(event) =>
-              openPriorityPicker(host(event.currentTarget), parsed?.priority ?? null, (priority) =>
-                replaceToken('priority', priority ? PRIORITY_TOKENS[priority] : null),
-              )
-            }
-          >
-            <FlagIcon />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Choose list"
-            onClick={(event) =>
-              openListPicker(
-                host(event.currentTarget),
-                infos,
-                { placeholder: 'Add to list…' },
-                (pick) =>
-                  replaceToken(
-                    'list',
-                    'newList' in pick
-                      ? listShorthand(pick.newList)
-                      : // The list the composer is in needs no token.
-                        pick.list.id === listId
-                        ? null
-                        : listShorthand(pick.list.name),
-                  ),
-              )
-            }
-          >
-            <HashIcon />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Set reminder"
-            onClick={(event) =>
-              openTimePicker(
-                host(event.currentTarget),
-                new Date(),
-                parsed?.reminder ?? null,
-                (at) => replaceToken('reminder', timeShorthand(at)),
-              )
-            }
-          >
-            <BellIcon size={15} />
-          </button>
-        </div>
-        {chips.length > 0 || parsed?.reminderLabel || links.length > 0 ? (
-          <span className="composer-chips">
-            {chips.map((chip) => (
-              <span key={chip} className="chip">
-                {chip}
-              </span>
-            ))}
-            {links.map((link) => (
-              <span key={`link:${link.label}`} className="chip link-chip" title={link.href}>
-                <LinkIcon />
-                {link.label}
-              </span>
-            ))}
-            {parsed?.reminderLabel && (
-              <span className="chip">
-                <BellIcon />
-                {parsed.reminderLabel}
-              </span>
-            )}
-          </span>
-        ) : (
-          <span className="hint">
-            or type <span className="chip">!h ##list @15:00</span> · Shift+Enter for notes
-          </span>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/** D-80: what was pasted into the composer, shown under it until Enter. */
-type ComposerPaste =
-  | {
-      readonly kind: 'code';
-      readonly text: string;
-      /** The fence's language (json), or none. */
-      readonly lang: string;
-      readonly id: number;
-    }
-  | { readonly kind: 'image'; readonly link: string; readonly id: number };
-
-/** Lines a folded code card shows (as in the popup, D-38). */
-const PREVIEW_LINES = 4;
-
-/**
- * D-80: pasted code as a card (language, background, the first lines with a chevron to see all, ×
- * to remove; a preview, not edited here) and pasted images as thumbnail chips, as in the capture
- * popup's selection area (CAP-06, D-38). Removing an image keeps its file (MEDIA-04).
- */
-function ComposerPastes(props: {
-  readonly items: readonly ComposerPaste[];
-  readonly onRemove: (id: number) => void;
-}): ReactElement {
-  const { items, onRemove } = props;
-  const images = items.filter((item) => item.kind === 'image');
-  return (
-    <div className="composer-pastes">
-      {items.map((item) =>
-        item.kind === 'code' ? (
-          <CodePreview key={item.id} item={item} onRemove={() => onRemove(item.id)} />
-        ) : null,
-      )}
-      {images.length > 0 && (
-        <div className="composer-images">
-          {images.map((item) => (
-            <span
-              key={item.id}
-              className="chip image-chip"
-              // MEDIA-02, D-87: the picture's menu.
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                const url = mediaUrl(item.link) ?? '';
-                openMenu(
-                  imageMenuItems(item.link, () => showInViewer([url], 0)),
-                  { x: event.clientX, y: event.clientY },
-                );
-              }}
-            >
-              <img className="thumb" src={mediaUrl(item.link) ?? ''} alt="" />
-              <span>{item.link.split('/').pop()}</span>
-              <button
-                type="button"
-                className="chip-x"
-                aria-label="Remove image"
-                onClick={() => onRemove(item.id)}
-              >
-                <CloseIcon size={10} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CodePreview(props: {
-  readonly item: Extract<ComposerPaste, { kind: 'code' }>;
-  readonly onRemove: () => void;
-}): ReactElement {
-  const { item, onRemove } = props;
-  const [open, setOpen] = useState(false);
-  const code = useRef<HTMLPreElement>(null);
-  const lines = useMemo(() => item.text.split(/\r\n|\r|\n/), [item.text]);
-  useLayoutEffect(() => {
-    const kind = item.lang === 'json' ? 'json' : blockFor(item.text).kind;
-    code.current?.replaceChildren(
-      ...highlightLines(kind, open ? lines : lines.slice(0, PREVIEW_LINES)),
-    );
-  }, [item, lines, open]);
-  return (
-    <section className="composer-code">
-      <header className="composer-code-head">
-        <span className="code-kind">
-          {codeLanguage(item.text, item.lang)} · {lines.length}{' '}
-          {lines.length === 1 ? 'line' : 'lines'}
-        </span>
-        {lines.length > PREVIEW_LINES && (
-          <button
-            type="button"
-            className={open ? 'code-toggle open' : 'code-toggle'}
-            aria-expanded={open}
-            aria-label={open ? 'Show less' : 'Show all'}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setOpen(!open)}
-          >
-            <ChevronIcon size={12} />
-          </button>
-        )}
-        <button type="button" className="chip-x" aria-label="Remove code" onClick={onRemove}>
-          <CloseIcon size={10} />
-        </button>
-      </header>
-      <pre ref={code} className={open ? 'composer-code-lines open' : 'composer-code-lines'} />
-    </section>
-  );
-}
-
-/**
  * A list's name typed in the sidebar (LIST-01): Enter and (D-107) leaving the field save, Esc
  * cancels; a problem (a name Windows can't use, one already taken) shows under it.
  */
@@ -5998,41 +5232,6 @@ function NameField(props: {
       {problem && <p className="name-problem">{problem}</p>}
     </div>
   );
-}
-
-interface RowHandlers {
-  readonly selected: string | null;
-  readonly editing: Editing | null;
-  /** A row picked with the mouse; Ctrl/Shift+click mark rows for bulk actions (TASK-07). */
-  readonly onSelect: (
-    key: string,
-    how?: { readonly ctrl: boolean; readonly shift: boolean },
-  ) => void;
-  /** TASK-07, D-59: the tasks marked for a bulk action. */
-  readonly marked: ReadonlySet<string>;
-  /** D-77: whether a marked row joins the marked row above and below into one highlight. */
-  readonly markJoins: ReadonlyMap<string, { readonly up: boolean; readonly down: boolean }>;
-  readonly onToggle: (key: string) => void;
-  /** Edit state, with the caret at `caret` in the raw title (D-71) or at the end. */
-  readonly onEdit: (key: string, caret?: number) => void;
-  readonly onLeaveTask: (key: string, text: string, how: Leave) => void;
-  readonly onTab: (how: 'indent' | 'outdent') => void;
-  /** UI-08: the row's right-click menu. */
-  readonly onMenu: (task: TaskRow, at: Point) => void;
-
-  /** REM-12: the bell turns the reminder off or on. */
-  readonly onMute: (key: string, muted: boolean) => void;
-  /** TODAY-01, D-86: the row's pin unpins. */
-  readonly onPin: (task: TaskRow, pinned: boolean) => void;
-  /** REM-01, D-68: the time opens the date/time picker for the task. */
-  readonly onReminder: (task: TaskRow, anchor: DOMRect) => void;
-  /** TASK-05, D-53: bodies shown inline, and the body indicator (inline or the task's page). */
-  readonly expanded: ReadonlySet<string>;
-  readonly onBody: (task: TaskRow) => void;
-  /** D-79: the image indicator opens the lightbox on the task's images. */
-  readonly onImages: (task: TaskRow) => void;
-  /** D-93: Today's list chip opens the task's own list, the task selected there. */
-  readonly onHome: (task: TaskRow) => void;
 }
 
 /**
@@ -6168,541 +5367,6 @@ function TaskPage(props: {
   );
 }
 
-/** The ghosts of a section that follow row `after` (null: the section's first rows), D-75. */
-function ghostRows(
-  ghosts: readonly Ghost[],
-  section: Ghost['section'],
-  after: string | null,
-  handlers: RowHandlers,
-): ReactElement[] {
-  return ghosts
-    .filter((ghost) => ghost.section === section && ghost.after === after)
-    .flatMap((ghost) => [
-      ghost.expanded ? (
-        // D-80: an expanded task leaves as its card: the body closes, then the row plays out.
-        <div
-          key={`ghost-${ghost.id}`}
-          className={ghost.subtask ? 'row-group subtask leaving-group' : 'row-group leaving-group'}
-          aria-hidden="true"
-        >
-          <Row task={ghost.task} subtask={ghost.subtask} ghost={ghost.direction} {...handlers} />
-          <div className={ghost.subtask ? 'row-body subtask closing' : 'row-body closing'}>
-            <BodyBlock
-              body={ghost.task.body}
-              inline
-              editing={false}
-              editable={false}
-              onEdit={() => undefined}
-              onDone={() => undefined}
-            />
-          </div>
-        </div>
-      ) : (
-        <Row
-          key={`ghost-${ghost.id}`}
-          task={ghost.task}
-          subtask={ghost.subtask}
-          ghost={ghost.direction}
-          {...handlers}
-        />
-      ),
-      ...(ghost.subtask ? [] : ghost.task.subtasks).map((sub) => (
-        <Row
-          key={`ghost-${ghost.id}-${sub.key}`}
-          task={sub}
-          subtask
-          ghost={ghost.direction}
-          {...handlers}
-        />
-      )),
-    ]);
-}
-
-function Row(
-  props: RowHandlers & {
-    readonly task: TaskRow;
-    readonly subtask?: boolean;
-    /** Just appeared in the list being looked at, or reopened: it eases in (UI-04, D-76). */
-    readonly fresh?: 'new' | 'return' | undefined;
-    /** D-75: a ghost playing the completion animation where the task was. */
-    readonly ghost?: Ghost['direction'];
-  },
-): ReactElement {
-  const {
-    task,
-    subtask = false,
-    selected,
-    editing,
-    onSelect,
-    onToggle,
-    onEdit,
-    onLeaveTask,
-    onTab,
-    fresh,
-    ghost,
-  } = props;
-  const isEditing = !ghost && editing?.kind === 'task' && editing.key === task.key;
-  const classes = ['row'];
-  if (!ghost && task.key === selected && editing?.kind !== 'new') classes.push('sel');
-  if (subtask) classes.push('subtask');
-  if (task.done) classes.push('done');
-  if (isEditing) classes.push('editing');
-  if (fresh) classes.push('enter', fresh);
-  /** D-76: a second single click on an already-selected row edits it, like renaming in Explorer. */
-  const wasSelected = useRef(false);
-  if (ghost) classes.push('leaving', ghost);
-  else if (props.marked.size > 1 && props.marked.has(task.key)) {
-    classes.push('marked');
-    const joins = props.markJoins.get(task.key);
-    if (joins?.up) classes.push('mark-up');
-    if (joins?.down) classes.push('mark-down');
-  }
-  const checked = ghost === 'complete' || (task.done && ghost !== 'reopen');
-  // D-80: the body icon for any body (images only too), the image icon as well when it has images.
-  const hasImages = useMemo(() => bodyImages(task.body).length > 0, [task.body]);
-  const hasText = hasBody(task);
-  return (
-    <div
-      data-key={ghost ? undefined : task.key}
-      aria-hidden={ghost ? true : undefined}
-      className={classes.join(' ')}
-      onMouseDown={(event) => {
-        // D-86: a right-click doesn't select by itself: its menu keeps a multi-selection it lands
-        // in, or selects just this row (Windows Explorer).
-        if (event.button !== 0) return;
-        // D-89: Ctrl+click on a title's link opens it (on click) and marks nothing.
-        if (event.ctrlKey && titleLink(event.target)) {
-          event.preventDefault();
-          return;
-        }
-        // Shift+click marks a range of rows (TASK-07), never a text selection across them; an
-        // edit in progress ends (leaving the field saves it).
-        if (event.shiftKey) {
-          event.preventDefault();
-          if (isTextField(document.activeElement)) document.activeElement.blur();
-        }
-        wasSelected.current =
-          task.key === selected && !isEditing && !event.ctrlKey && !event.shiftKey;
-        onSelect(task.key, { ctrl: event.ctrlKey, shift: event.shiftKey });
-      }}
-      onClick={(event) => {
-        // D-89: a single click only selects, the title's text and links too. A link opens with
-        // Ctrl+click, or with a click on an already-selected row.
-        const link = titleLink(event.target);
-        if (link) {
-          event.preventDefault();
-          if (event.ctrlKey || (wasSelected.current && event.detail === 1))
-            window.flintMain.openLink(link.href);
-          return;
-        }
-        if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;
-        if ((event.target as Element).closest('button, a, input, textarea')) return;
-        // D-76, D-89: a second single click on a selected row edits, the caret where it landed.
-        onEdit(task.key, titleCaret(task, event));
-      }}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        // D-86: the menu selects this row unless it is inside a multi-selection (taskMenu).
-        props.onMenu(task, { x: event.clientX, y: event.clientY });
-      }}
-      // D-71, D-89: double-click anywhere edits (the caret where it landed on the title); inside
-      // the field it is the field's own (word selection); never on a link.
-      onDoubleClick={(event) => {
-        if (task.done || isEditing || titleLink(event.target)) return;
-        onEdit(task.key, titleCaret(task, event));
-      }}
-    >
-      {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}
-      <button
-        type="button"
-        className={checked ? 'check on' : 'check'}
-        aria-label={task.done ? 'Reopen task' : 'Complete task'}
-        onClick={() => !ghost && onToggle(task.key)}
-      >
-        {checked && <CheckIcon />}
-      </button>
-      {isEditing ? (
-        <EditField
-          key={editing.seq}
-          initial={task.title}
-          {...(editing.caret !== undefined && { caret: editing.caret })}
-          inert
-          onLeave={(text, _empty, how) => onLeaveTask(task.key, text, how)}
-          onTab={onTab}
-        />
-      ) : task.code ? (
-        <span className="title code-row" onClick={() => props.onBody(task)}>
-          <span className="code-kind">
-            {task.code.kind} · {task.code.lines} {task.code.lines === 1 ? 'line' : 'lines'}
-          </span>
-          {task.code.peek && <span className="code-peek">{task.code.peek}</span>}
-        </span>
-      ) : (
-        <Title task={task} />
-      )}
-      <span className="ind">
-        {task.pinned && !(task.home && task.done) && (
-          // D-86: the pin unpins.
-          <button
-            type="button"
-            className="pin-ind"
-            title="Unpin (P)"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onPin(task, false);
-            }}
-          >
-            <PinIcon />
-          </button>
-        )}
-        {task.reminder && !task.done && (
-          // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the
-          // overdue dot, and the time next to it opens the date/time picker (REM-01).
-          <span className={`reminder ${task.reminderState ?? 'on'}`}>
-            <button
-              type="button"
-              className="reminder-bell"
-              title={
-                task.reminderState === 'muted' ? 'Turn the reminder on' : 'Turn the reminder off'
-              }
-              aria-pressed={task.reminderState === 'muted'}
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onMute(task.key, task.reminderState !== 'muted');
-              }}
-            >
-              <ReminderBellIcon />
-              <span className="overdue-dot" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="reminder-time"
-              title="Change the reminder"
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onReminder(task, event.currentTarget.getBoundingClientRect());
-              }}
-            >
-              <MorphText text={task.reminder} />
-            </button>
-          </span>
-        )}
-        {task.done && task.completed && <span>{task.completed}</span>}
-        {!task.code && hasImages && (
-          <button
-            type="button"
-            className="body-toggle image-toggle"
-            title="Show the images"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onImages(task);
-            }}
-          >
-            <ImageIcon />
-          </button>
-        )}
-        {!task.code && hasText && (
-          <button
-            type="button"
-            className={props.expanded.has(task.key) ? 'body-toggle open' : 'body-toggle'}
-            title={props.expanded.has(task.key) ? 'Hide the body (←)' : 'Show the body (→)'}
-            aria-expanded={props.expanded.has(task.key)}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onBody(task);
-            }}
-          >
-            <BodyIcon />
-          </button>
-        )}
-        {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
-        {task.home && !task.done && (
-          <button
-            type="button"
-            className="chip home-list"
-            title={`Open ${task.home.listName}`}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onHome(task);
-            }}
-          >
-            {task.home.listName}
-          </button>
-        )}
-      </span>
-    </div>
-  );
-}
-
-/**
- * The selection highlight (UI-04, D-56): one element per card that moves to the selected row with
- * the spring curve, instead of the highlight jumping from row to row. Off with reduce-motion, like
- * all motion (the move is then instant).
- */
-function Glide(props: {
-  readonly card: RefObject<HTMLElement | null>;
-  readonly target: string | null;
-  /** Re-measure when the rows change. */
-  readonly version: unknown;
-  /** `sel-glide` for rows, `nav-glide` for the sidebar (D-65). */
-  readonly className?: string;
-  /** D-76: the target is being edited: the highlight is the dark editing field. */
-  readonly editing?: boolean;
-}): ReactElement | null {
-  const { card, target, version, className = 'sel-glide', editing = false } = props;
-  const [box, setBox] = useState<{
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    /** D-78: the same target, moved by the layout (a body folding above it): follow at once. */
-    follow: boolean;
-  } | null>(null);
-  const measured = useRef<{ target: string | null; at: number }>({ target: null, at: 0 });
-  const node = useRef<HTMLDivElement>(null);
-  // D-76: editing that starts on another row appears there (fading in) instead of gliding over;
-  // from one editing row to the next it glides.
-  const jump = useRef(false);
-  const last = useRef({ target, editing });
-  if (last.current.target !== target || last.current.editing !== editing) {
-    if (editing && !last.current.editing && target !== last.current.target) jump.current = true;
-    last.current = { target, editing };
-  }
-  useLayoutEffect(() => {
-    const element = node.current;
-    if (!element || !jump.current) return;
-    jump.current = false;
-    element.style.transition = 'none';
-    void element.offsetWidth;
-    element.style.transition = '';
-    // D-77: a fuller, still subtle, arrival: it fades in and settles from a slightly smaller size.
-    if (!reducedMotion()) {
-      const at = element.style.transform;
-      element.animate(
-        [
-          { opacity: 0, transform: `${at} scale(0.97)` },
-          { opacity: 1, transform: at },
-        ],
-        { duration: durationMs('--fl-dur-state', 260), easing: 'cubic-bezier(.2, .9, .3, 1)' },
-      );
-    }
-  }, [box]);
-  useLayoutEffect(() => {
-    // D-99: while the row (or the group card around it) slides in a FLIP or an easing, the
-    // highlight follows where it is on screen, frame by frame, instead of jumping to where it ends
-    // (it flashed over the row's neighbours, as when a name field opened in a group).
-    let frame = 0;
-    // Anything in the card that moves rows: a FLIP, a group card easing its height, a fold.
-    const sliding = (): boolean =>
-      (card.current?.getAnimations({ subtree: true }) ?? []).some(
-        (animation) =>
-          animation.playState === 'running' &&
-          animation.effect instanceof KeyframeEffect &&
-          animation.effect.target !== node.current &&
-          !(
-            animation instanceof CSSTransition &&
-            !['transform', 'height', 'top', 'grid-template-rows'].includes(
-              animation.transitionProperty,
-            )
-          ),
-      );
-    const track = (row: HTMLElement): void => {
-      frame = 0;
-      const element = card.current;
-      if (!element || !row.isConnected) return;
-      if (!sliding()) {
-        measure(false);
-        return;
-      }
-      const outer = element.getBoundingClientRect();
-      const inner = row.getBoundingClientRect();
-      const at = {
-        x: inner.left - outer.left - element.clientLeft + element.scrollLeft,
-        y: inner.top - outer.top - element.clientTop + element.scrollTop,
-        w: inner.width,
-        h: inner.height,
-        follow: true,
-      };
-      // Written at once (this frame), and to the state (which renders a frame later).
-      const glide = node.current;
-      if (glide) {
-        // As React writes it while following (so it takes this back over when it renders).
-        glide.style.transition =
-          'background-color var(--fl-dur-state) ease, box-shadow var(--fl-dur-state) ease';
-        glide.style.transform = `translate(${at.x}px, ${at.y}px)`;
-        glide.style.width = `${at.w}px`;
-        glide.style.height = `${at.h}px`;
-      }
-      setBox(at);
-      frame = requestAnimationFrame(() => track(row));
-    };
-    const measure = (watch = true): void => {
-      const found = target
-        ? card.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(target)}"]`)
-        : null;
-      // D-77: an expanded task is one card with its body; the highlight covers all of it.
-      const grouped = found?.parentElement?.classList.contains('row-group')
-        ? found.parentElement
-        : found;
-      // LIST-05: a list in a folded group has no highlight.
-      const row = grouped?.closest('.group-lists:not(.open)') ? null : grouped;
-      // D-79: following the layout at once must never cut short a glide to a new target (that
-      // made list switching lose its motion): within a glide's time, keep gliding.
-      const now = performance.now();
-      const settled = now - measured.current.at > durationMs('--fl-dur-base', 200);
-      const follow = measured.current.target === target && settled;
-      if (measured.current.target !== target) measured.current = { target, at: now };
-      // D-80: a list inside a group card is placed within the card: offsets add up to ours.
-      let x = 0;
-      let y = 0;
-      for (
-        let node: HTMLElement | null = row ?? null;
-        node && node !== card.current;
-        node = node.offsetParent as HTMLElement | null
-      ) {
-        x += node.offsetLeft;
-        y += node.offsetTop;
-      }
-      setBox(
-        row
-          ? {
-              x,
-              y,
-              w: row.offsetWidth,
-              h: row.offsetHeight,
-              follow,
-            }
-          : null,
-      );
-      // The same row moved by the layout: if it slides there (the animations start after this
-      // render), the highlight goes with it.
-      // Checked before the frame is painted: the animations start later in this same commit.
-      if (watch && row && follow && frame === 0)
-        queueMicrotask(() => {
-          if (frame === 0 && sliding()) track(row);
-        });
-    };
-    measure();
-    const onResize = (): void => measure();
-    window.addEventListener('resize', onResize);
-    // Rows collapsing or easing in (D-67) move the selected row: follow it.
-    const observer = new ResizeObserver(() => measure());
-    if (card.current) observer.observe(card.current);
-    // LIST-05: and sidebar groups folding above it.
-    for (const group of card.current?.querySelectorAll('.group-inner') ?? [])
-      observer.observe(group);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [card, target, version]);
-  if (!box) return null;
-  return (
-    <div
-      ref={node}
-      className={editing ? `${className} editing` : className}
-      aria-hidden="true"
-      style={{
-        transform: `translate(${box.x}px, ${box.y}px)`,
-        width: box.w,
-        height: box.h,
-        // Following the layout: no lag in place or size; the look (editing ↔ selected) still eases.
-        ...(box.follow && {
-          transition:
-            'background-color var(--fl-dur-state) ease, box-shadow var(--fl-dur-state) ease',
-        }),
-      }}
-    />
-  );
-}
-
-/**
- * Text that changes in place, like a reminder time (D-69, 09 §9): the old text fades out over the
- * new one while the box's width eases from the old width to the new, in --fl-dur-state. Instant
- * with reduce-motion.
- */
-function MorphText(props: { readonly text: string }): ReactElement {
-  const { text } = props;
-  const box = useRef<HTMLSpanElement>(null);
-  const last = useRef({ text, width: 0 });
-  const [old, setOld] = useState<string | null>(null);
-  useLayoutEffect(() => {
-    const element = box.current;
-    if (!element) return;
-    const width = element.getBoundingClientRect().width;
-    const before = last.current;
-    last.current = { text, width };
-    if (before.text === text || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-      return;
-    setOld(before.text);
-    const duration = parseFloat(
-      getComputedStyle(element).getPropertyValue('--fl-dur-state') || '260',
-    );
-    element.animate([{ width: `${before.width}px` }, { width: `${width}px` }], {
-      duration,
-      easing: 'ease',
-    });
-  }, [text]);
-  return (
-    <span className="morph" ref={box}>
-      {old !== null && (
-        <span className="morph-old" aria-hidden="true" onAnimationEnd={() => setOld(null)}>
-          {old}
-        </span>
-      )}
-      <span key={text} className={old !== null ? 'morph-new in' : 'morph-new'}>
-        {text}
-      </span>
-    </span>
-  );
-}
-
-/**
- * A task's title with its inline markdown rendered (LIST-02, D-52); the raw text shows while it is
- * edited. markdown-it escapes everything that isn't markdown, so the HTML is safe. Clicks are the
- * row's (D-89): a single click selects, wherever it lands; links open with Ctrl+click or a click on
- * an already-selected row.
- */
-function Title(props: { readonly task: TaskRow }): ReactElement {
-  const { task } = props;
-  if (task.title === '') return <span className="title">{task.label}</span>;
-  return <span className="title md" dangerouslySetInnerHTML={{ __html: titleHtml(task.title) }} />;
-}
-
-/** D-89: the link in a row's rendered title under a click, if any. */
-function titleLink(target: EventTarget | null): HTMLAnchorElement | null {
-  return target instanceof Element ? target.closest<HTMLAnchorElement>('.title.md a') : null;
-}
-
-/**
- * D-71, D-89: where the caret goes when a click starts editing: the matching place in the raw
- * title when the click is on its text, else the end (undefined).
- */
-function titleCaret(task: TaskRow, event: React.MouseEvent): number | undefined {
-  const span = (event.target as Element).closest<HTMLElement>('.title.md');
-  if (!span) return undefined;
-  const at = textOffsetAt(span, event.clientX, event.clientY);
-  return at === null ? undefined : rawOffset(task.title, span.textContent ?? '', at);
-}
-
-/** D-71: the offset in `element`'s text under a point, or null when the point is beside the text. */
-function textOffsetAt(element: HTMLElement, x: number, y: number): number | null {
-  const text = document.createRange();
-  text.selectNodeContents(element);
-  const onText = [...text.getClientRects()].some(
-    (rect) => x >= rect.left && x <= rect.right + 2 && y >= rect.top && y <= rect.bottom,
-  );
-  const position = onText ? document.caretPositionFromPoint(x, y) : null;
-  if (!position || !element.contains(position.offsetNode)) return null;
-  const before = document.createRange();
-  before.setStart(element, 0);
-  before.setEnd(position.offsetNode, position.offset);
-  return before.toString().length;
-}
-
 /**
  * Edit-state Enter: a new row below the task (docs/03 §2). Enter adds what was typed and keeps the
  * field for the next task; its ID is fetched ahead, so the next one can go below it at once.
@@ -6733,126 +5397,6 @@ function NewRow(props: {
         repeat
         onLeave={leave}
         onTab={onTab}
-      />
-    </div>
-  );
-}
-
-/**
- * The text cursor of Edit state. Enter, Esc and leaving the field all keep what was typed; the
- * existing title is inert, so only typed shorthand applies (D-45). With `repeat` (a new row),
- * Enter hands the text over and the field stays, empty, for the next task.
- */
-function EditField(props: {
-  readonly initial: string;
-  /** D-71: the caret's starting place; the end when not given. */
-  readonly caret?: number;
-  readonly inert: boolean;
-  readonly placeholder?: string;
-  readonly repeat?: boolean;
-  readonly onLeave: (text: string, empty: boolean, how: Leave) => void;
-  readonly onTab: (how: 'indent' | 'outdent') => void;
-}): ReactElement {
-  const { initial, inert, placeholder, repeat = false, onLeave, onTab } = props;
-  const text = useInertText(initial, inert);
-  const left = useRef(false);
-  const field = useRef<HTMLInputElement>(null);
-  // UI-09: auto-closing brackets and quotes while editing a task.
-  useEffect(() => (field.current ? enableAutoPair(field.current) : undefined), []);
-  useEffect(() => {
-    if (props.caret !== undefined) field.current?.setSelectionRange(props.caret, props.caret);
-    // Only where editing starts.
-  }, []);
-  const leave = (how: Leave): void => {
-    if (left.current) return;
-    const empty = text.value.trim() === '';
-    if (repeat && how === 'enter' && !empty) {
-      onLeave(text.escaped(), false, how);
-      text.reset('', false);
-      return;
-    }
-    left.current = true;
-    onLeave(text.escaped(), empty, how);
-  };
-  return (
-    <input
-      ref={field}
-      className="title-input"
-      autoFocus
-      value={text.value}
-      placeholder={placeholder}
-      spellCheck={false}
-      onChange={(event) => text.change(event.target.value)}
-      onPaste={text.paste}
-      onMouseDown={(event) => event.stopPropagation()}
-      onBlur={() => leave('blur')}
-      onKeyDown={(event) => {
-        if (event.nativeEvent.isComposing) return;
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          // D-78: Shift+Enter goes on into the task's notes (its body).
-          leave(event.shiftKey ? 'notes' : 'enter');
-        } else if (event.key === 'Escape') {
-          event.preventDefault();
-          leave('escape');
-        } else if (event.key === 'Tab') {
-          event.preventDefault();
-          onTab(event.shiftKey ? 'outdent' : 'indent');
-        }
-      }}
-    />
-  );
-}
-
-/**
- * NOTE-08, D-99: a quick note's title row: when it was made (its label), and "Add a title", which
- * on Enter makes it a normal note with that name.
- */
-function QuickTitle(props: {
-  /** When it was made. */
-  readonly at: number;
-  /** D-102: its title, once it has one (it stays a quick note until kept or the next day). */
-  readonly title: string;
-  readonly onTitle: (title: string) => void;
-}): ReactElement {
-  const { at, title, onTitle } = props;
-  const [text, setText] = useState(title);
-  // D-102: saved on Enter and when the field is left (as everything in Flint), when it changed.
-  const save = (): void => {
-    const next = text.trim();
-    if (next !== '' && next !== title) onTitle(next);
-  };
-  const made = new Date(at);
-  const two = (value: number): string => String(value).padStart(2, '0');
-  const clock = `${two(made.getHours())}:${two(made.getMinutes())}`;
-  const day =
-    made.toDateString() === new Date().toDateString()
-      ? ''
-      : `${made.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} `;
-  return (
-    <div className="quick-title">
-      <span className="subtitle">
-        Quick note · {day}
-        {clock}
-      </span>
-      <input
-        className="quick-title-input"
-        value={text}
-        placeholder="Add a title"
-        aria-label="Title"
-        spellCheck={false}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={save}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-          if (event.key === 'Escape') {
-            setText(title);
-            event.currentTarget.blur();
-          }
-        }}
       />
     </div>
   );
