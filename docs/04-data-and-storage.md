@@ -39,6 +39,7 @@ App data (not in the Flint folder):
   window-state.json             ← window sizes/positions per monitor setup, and whether maximized (APP-05, D-96)
   ui-state.json                 ← collapsed sections and sidebar groups, the sidebar sort (LIST-06), last opened list, guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
   (the window's local storage)  ← how often each palette command is used, for "most used" (D-106; a convenience, safe to lose)
+  (the window's local storage)  ← how often each first-few-times tip was shown (`flint.tips`, D-107; safe to lose: a tip shows again)
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)

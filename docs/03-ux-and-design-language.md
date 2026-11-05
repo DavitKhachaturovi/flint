@@ -108,7 +108,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Everywhere in the main window
 | Action | Key | Status |
 |---|---|---|
-| Command palette / fuzzy search | Ctrl+K, or the header's pill (D-106) | Decided |
+| Command palette / fuzzy search | Ctrl+K, or the sidebar header's search button (D-107; D-106's header pill removed); in a step, Esc or Backspace in the empty field goes back one step, Esc closes from the top | Decided |
 | Keyboard cheat sheet | `?` in Navigate state (D-106) | Decided |
 | Keyboard cheat sheet | ? (Navigate state) | Decided |
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z (and Ctrl+Y) | Undo decided; redo proposed |

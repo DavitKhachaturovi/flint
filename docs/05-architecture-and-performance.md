@@ -150,6 +150,7 @@ flint/
 - Reminders due while the PC slept or Flint wasn't running → missed-reminder flow (REM-07).
 - **Built in M4 (D-64):** `apps/desktop/src/main/reminder-service.ts` re-checks at the next due time but at least every 30 s, on resume (`powerMonitor`) and 200 ms after any list change; the pure rules (due, missed after 2 minutes, one summary for more than 3 missed) are in `reminders.ts`. What was shown is kept per task and reminder value in `reminders-state.json`, so a reminder shows once, also across restarts, and again only when its time changes (snooze, an edit).
 - **Focus Assist** suppresses toasts silently; offer Flint's own sound and an in-app alert (REM-06).
+- **The day change (D-107):** acted on at local midnight (a timer to the next midnight, re-armed), with a once-a-minute check and `powerMonitor` resume as fallbacks: done pins lose their pin (D-85), then the main window reads every view again (Today's rollover card and reminders).
 
 ### Clipboard and paste (CAP-06, TASK-09)
 - Images from the clipboard → saved to `attachments/` → relative link.
@@ -176,7 +177,7 @@ flint/
 - **Distribution (v1):** internal tool; the `.exe` is handed to coworkers manually (D-19).
 - **Code signing: not in v1 (D-19).** Azure Artifact Signing (formerly Trusted Signing) only issues public-trust certificates to organizations in a fixed list of regions that does not include Georgia, so the alternative is an OV certificate from a commercial CA: organization validation by the CA (documents and verification, typically days), a private key that must live on a hardware token or cloud HSM, and a yearly fee. Even signed, a new certificate has to build SmartScreen reputation. For an internal tool this is not worth it yet.
 - **What unsigned means for users:** on first run of a downloaded installer, Windows SmartScreen shows "Windows protected your PC"; the user clicks **More info → Run anyway**. Mention this in the hand-out message. Toast notifications still work unsigned (they depend on the AppUserModelID and the Start Menu shortcut the installer creates, not on a signature).
-- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → npm audit and release-age check (D-30) → embedded-Node check → lint → typecheck → unit tests → build → e2e smoke test (app starts, capture reaches the main process, zero network requests: D-31) → publish the installer as a pipeline artifact. Signing and an update feed slot in later.
+- **CI/CD:** Azure DevOps pipeline on a Windows agent: install → npm audit and release-age check (D-30) → embedded-Node check → lint → typecheck → unit tests → build → e2e smoke test (app starts, capture reaches the main process, zero network requests: D-31) → publish the installer as a pipeline artifact. **D-107:** the end-to-end tests run on a fixed clock (`FLINT_E2E_CLOCK_OFFSET`, test mode only: the main process and every window read a `Date` shifted to the test's moment, still running), so they never depend on when CI runs; `day-change.spec.ts` crosses midnight on purpose. Signing and an update feed slot in later.
 - **Logs** stay local (`%LOCALAPPDATA%\Flint\logs`); nothing is uploaded (APP-09).
 
 ---

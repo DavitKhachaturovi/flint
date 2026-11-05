@@ -729,3 +729,20 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Ctrl+K with text selected in an editor makes a link | NOTE-01 · Done (0.8.4) | 03, D-106 |
 | 8 | Quit Flint from the palette | APP-03 · Done (0.8.4) | 02, D-106 |
 
+## AO. Fixes after 0.8.3–0.8.5, the test clock, the day change (5 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The empty quick note's tip toast, the first three times | NOTE-08 · Done (0.8.6) | 02, D-107 |
+| 2 | Renaming (and naming) in the sidebar saved when the field is left; only Esc cancels | LIST-01, LIST-05 · Done (0.8.6) | 02, D-107 |
+| 3 | The palette's back arrow; Esc goes back one step, closes from the top | NAV-01 · Done (0.8.6) | 02, 03, D-107 |
+| 4 | One result order: Go to, Commands, Tasks, Lists and notes, lines in notes last | NAV-01 · Done (0.8.6) | 02, D-107 |
+| 5 | No header pill; the sidebar header's search button; the palette's footer of keys | NAV-01 · Done (0.8.6) | 02, 03, 09, D-107 |
+| 6 | A note's line opens the note scrolled to it, flashed | NAV-01 · Done (0.8.6) | 02, D-107 |
+| 7 | Onboarding: Ctrl+K in the walkthrough; the mouse-opener's one-time Ctrl+K tip | APP-13, APP-14 · Planned (M8 step 4) | D-107 |
+| 8 | docs/06 §0's handoff brought up to date | — · Done | 06 |
+| 9 | End-to-end tests on a fixed clock | — · Done (0.8.6) | 05, D-107 |
+| 10 | Day-change tests across midnight; the day change acted on at midnight (bug fixed) | TODAY-01, TODAY-02, TODAY-03, REM-07 · Done (0.8.6) | 02, 05, D-107 |
+| 11 | Overlapping reads: an older one dropped (a new list no longer bounces back) | NAV-03 · Done (0.8.6) | D-107 |
+| 12 | A new note's caret request stands until the caret arrives | NOTE-08 · Done (0.8.6) | D-107 |
+

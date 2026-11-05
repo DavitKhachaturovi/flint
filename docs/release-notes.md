@@ -2,6 +2,16 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.6 (5 Nov 2026)
+
+- **Search** moved to a small button next to the Flint logo (Ctrl+K still opens it anywhere); the big box at the top of lists and Today is gone. The palette shows its keys at the bottom.
+- In the palette, **Esc goes back** from Move to…, Priority and the like (there's a back arrow too), and closes only from the top. Results always come in the same order: places, commands, tasks, lists and notes, then lines inside notes. Choosing a line opens the note right at it.
+- **Renaming** a list, note or group keeps the new name when you click away; only Esc cancels.
+- An empty quick note that disappears when you leave it now says why (the first few times).
+- Fixed: at midnight, Today showed the new date with yesterday's tasks for a minute or two; the rollover card, tomorrow's reminders and done pins now update right at midnight.
+- Fixed: clicking a list just as it appeared (or right after renaming another) could jump back to where you were.
+- Fixed: a new quick note could still, rarely, open without the cursor.
+
 ## 0.8.5 (5 Nov 2026)
 
 - Fixed: a new quick note (Ctrl+Shift+J) sometimes opened without the cursor in it.
