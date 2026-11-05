@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.7 (5 Nov 2026)
+
+- Renaming a list, note or group and clicking away now looks just like pressing Enter (no disappearing and coming back), and clicking another list saves the name too.
+- The search button next to the logo always lights up under the mouse.
+- A line opened from Ctrl+K stands out a little more, a little longer.
+- It's "Good evening" until 4 in the morning.
+
 ## 0.8.6 (5 Nov 2026)
 
 - **Search** moved to a small button next to the Flint logo (Ctrl+K still opens it anywhere); the big box at the top of lists and Today is gone. The palette shows its keys at the bottom.

@@ -746,3 +746,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 11 | Overlapping reads: an older one dropped (a new list no longer bounces back) | NAV-03 · Done (0.8.6) | D-107 |
 | 12 | A new note's caret request stands until the caret arrives | NOTE-08 · Done (0.8.6) | D-107 |
 
+## AP. Fixes after 0.8.6; mini mode's first decisions (5 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A rename saved on leaving looks like Enter (no leave and arrive); a click on another list saves it | LIST-01, LIST-05 · Done (0.8.7) | 02, D-108 |
+| 2 | The search button's hover reliable (out of the drag strip) | NAV-01 · Done (0.8.7) | 09, D-108 |
+| 3 | A stronger, longer flash for a note's line from the palette | NAV-01 · Done (0.8.7) | 09, D-108 |
+| 4 | "Good evening" until 04:00 | TODAY-01 · Done (0.8.7) | D-108 |
+| 5 | Mini mode beside the main window, in sync; Open brings the main window forward | MINI-01 · Decided (M8 step 3) | 02, D-109 |
+| 6 | Mini mode's Note tab: one quick note as a sticky note | MINI-01, NOTE-08 · Decided (M8 step 3) | 02, 03, D-109 |
+

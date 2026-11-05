@@ -206,6 +206,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 ### Mini mode look
 - Small, always-on-top, minimal chrome. Shows Today or Inbox with a toggle; compact rows.
+- **D-109:** a third tab, Note: one quick note as a sticky note, in a compact editor (mockup 05 has Today and Inbox; the Note tab joins them).
 
 ---
 
