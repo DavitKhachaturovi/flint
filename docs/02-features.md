@@ -590,7 +590,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - A small **always-on-top floating window** showing just **Today or Inbox** (toggle between them), for calls.
 - **Proposed:** supports adding a task, completing, and seeing reminders; everything else opens the main window.
 - Created on first use, then hidden (never destroyed) when closed (APP-02). Remembers size/position (APP-05).
-- **D-109 (grill in progress):** mini mode and the main window can be open at once and stay in sync; Open in mini brings the main window forward at that place, mini stays; × hides mini to the tray. A third tab, **Note**, shows one quick note (NOTE-08) as a sticky note: the most recent one or a new one, a small menu to switch or start another, a title and Keep as a note, a compact editor with the live preview.
+- **Built (0.8.8, D-109):** Today (pinned, then today's later reminders), Inbox and Note tabs; a click selects, double-click or Enter opens in the main window; Space, P, N, Ctrl+1/2/3, Ctrl+Z; the reminder card beside the toast (each clearing the other); Ctrl+Alt+Space, the tray, the Ctrl+K command and the title-bar button; on top with its pin; corner snapping; hidden from screen sharing.
+- **D-109:** mini mode and the main window can be open at once and stay in sync; Open in mini brings the main window forward at that place, mini stays; × hides mini to the tray. A third tab, **Note**, shows one quick note (NOTE-08) as a sticky note: the most recent one or a new one, a small menu to switch or start another, a title and Keep as a note, a compact editor with the live preview.
 
 ---
 

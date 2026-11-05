@@ -77,7 +77,7 @@ flint/
 - **Renderer windows:**
   - **Main window** — created at startup (hidden if Flint was started at login).
   - **Capture popup** — created at startup, kept rendered and hidden (pre-warmed).
-  - **Mini mode** — created on first use only (keeps idle RAM down), then hidden, never destroyed.
+  - **Mini mode** — created on first use only (keeps idle RAM down), then hidden, never destroyed. **D-109 (0.8.8):** `main/mini.ts`; its page `renderer/mini/` on its own host (`app://mini`); its preload exposes a typed subset of the main window's Platform (the lists, the quick notes, the editor's needs) plus its own window calls; content protection (`setContentProtection`, `WDA_EXCLUDEFROMCAPTURE`) on it and on the capture popup by default. One window edits a note at a time (`main/note-editors.ts`); the reminder card beside the toast closes the toast with `Notification.close()` (Action Center too, in the same session).
 - **Hide, never destroy** (APP-02). Closing hides. Quit only from the tray/palette (APP-03).
 - **Single instance** via Electron's single-instance lock (APP-04); a second launch (or a toast protocol activation) is routed to the running instance.
 - **Autostart** at login via Electron's login-item settings (APP-01), default on.

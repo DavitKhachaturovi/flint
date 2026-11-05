@@ -36,10 +36,11 @@ App data (not in the Flint folder):
 ```
 %APPDATA%\Flint\
   settings.json                 ← all settings (APP-11), incl. Flint folder path and hotkeys; `reminderSound` (Flint's own chime, off by default, D-94); `rolloverPrompt`, `snapshotEveryMinutes`, `keepHourlyHours`, `keepDailyDays`, `animationSpeed` (D-100); `linkPatterns` (each with its `examples`, D-105) and `builtInLinksOff` (the built-in recognizers turned off, by id: `ado-work-item`, `ado-pull-request`, `github-issue`, `github-pull-request`, `jira-issue`; D-105)
-  window-state.json             ← window sizes/positions per monitor setup, and whether maximized (APP-05, D-96)
+  window-state.json             ← window sizes/positions per monitor setup, and whether maximized (APP-05, D-96; D-109: mini mode's too, one copy for all windows)
   ui-state.json                 ← collapsed sections and sidebar groups, the sidebar sort (LIST-06), last opened list, guidance state: walkthrough done, tips shown, last version seen (APP-10, APP-14, APP-15)
   (the window's local storage)  ← how often each palette command is used, for "most used" (D-106; a convenience, safe to lose)
-  (the window's local storage)  ← how often each first-few-times tip was shown (`flint.tips`, D-107; safe to lose: a tip shows again)
+  tips.json                     ← how often each first-few-times tip was shown (D-107, D-109: shared by both windows; safe to lose: a tip shows again)
+  mini-state.json               ← mini mode's tab, the quick note it shows, and per monitor setup the corner it is anchored to (D-109)
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)

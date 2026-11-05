@@ -2,6 +2,15 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.8 (5 Nov 2026)
+
+- **Mini mode**: a small window that stays on top, for calls. Ctrl+Alt+Space opens and hides it (also from the tray, Ctrl+K or the button at the top right of Flint).
+  - **Today** shows your pinned tasks and the reminders still to come today; **Inbox** shows what you captured; **Note** is a sticky note (a quick note).
+  - Click a task to select it, double-click or Enter to open it in Flint; Space completes it, P pins it.
+  - When a reminder fires, mini mode shows it too, with Done, Snooze and Open. Acting on either the card or the Windows notification clears the other.
+  - A note is edited in one window at a time; the other shows it changing live.
+  - Drag it near a screen corner and it snaps there. It doesn't show up when you share your screen (and neither does the capture popup); both can be changed in Settings.
+
 ## 0.8.7 (5 Nov 2026)
 
 - Renaming a list, note or group and clicking away now looks just like pressing Enter (no disappearing and coming back), and clicking another list saves the name too.

@@ -757,3 +757,18 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Mini mode beside the main window, in sync; Open brings the main window forward | MINI-01 · Decided (M8 step 3) | 02, D-109 |
 | 6 | Mini mode's Note tab: one quick note as a sticky note | MINI-01, NOTE-08 · Decided (M8 step 3) | 02, 03, D-109 |
 
+## AQ. M8 step 3: mini mode with the reminder alert (5 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Mini mode beside the main window, in sync; Open brings the main window forward | MINI-01 · Done (0.8.8) | 02, D-109 |
+| 2 | Today (pinned, then later reminders today), Inbox, Note tabs | MINI-01 · Done (0.8.8) | 02, D-109 |
+| 3 | A click selects, double-click / Enter opens in the main window; right-click menu; completion with Undo | MINI-01 · Done (0.8.8) | D-109 |
+| 4 | The Note tab: one quick note, made on the first keystroke, title, ⋯ menu, Keep as a note | MINI-01, NOTE-08 · Done (0.8.8) | 02, D-109 |
+| 5 | One window edits a note at a time ("Editing in mini mode") | MINI-01, NOTE-08 · Done (0.8.8) | D-109 |
+| 6 | The reminder card beside the toast; each clears the other; "1 of 3"; Show reminders in Flint | REM-06 · Done (0.8.8) | 02, D-109 |
+| 7 | Ctrl+Alt+Space (rebindable), the tray, the Ctrl+K command, the title-bar button | MINI-01, APP-08, NAV-01 · Done (0.8.8) | 03, D-109 |
+| 8 | On top with its pin; corner snapping; its place per monitor setup; no taskbar button | MINI-01, APP-05 · Done (0.8.8) | D-109 |
+| 9 | Mini mode and the capture popup hidden from screen sharing (switches in Settings) | MINI-01, CAP-01 · Done (0.8.8); a real Teams share to verify | D-109 |
+| 10 | Mini mode's keys, letters only outside text fields; Esc never hides it | MINI-01 · Done (0.8.8) | 03, D-109 |
+
