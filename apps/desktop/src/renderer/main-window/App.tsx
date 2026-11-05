@@ -420,11 +420,13 @@ function placeKey(list: string, page: string | null): string {
   return page === null ? list : `${list}/${page}`;
 }
 
-function flash(element: Element): void {
-  element.classList.remove('fl-flash');
+function flash(element: Element, strong = false): void {
+  // D-107: the strong one (a note's line from the palette) is brighter and lasts longer.
+  const name = strong ? 'fl-flash-strong' : 'fl-flash';
+  element.classList.remove(name);
   void (element as HTMLElement).offsetWidth;
-  element.classList.add('fl-flash');
-  window.setTimeout(() => element.classList.remove('fl-flash'), 900);
+  element.classList.add(name);
+  window.setTimeout(() => element.classList.remove(name), strong ? 1600 : 900);
 }
 
 /** D-86, D-87: a copy of the hidden panel, which slides and fades out from where it was. */
@@ -2360,7 +2362,14 @@ export function App(): ReactElement {
         );
         if (!outcome) return;
         if (!outcome.ok) return refuse(outcome.problem);
-        close();
+        // D-107: a rename gives way to its row in place, in the render that brings the new name
+        // (closing first showed the old name, then the row "arriving" again).
+        if (naming.kind === 'rename')
+          await refresh(() => {
+            setNamingState(null);
+            setNamingProblem(null);
+          });
+        else close();
         if (naming.kind === 'new') openList(outcome.listId);
         if (outcome.label) showToast(outcome.label, true);
       } finally {
@@ -2926,6 +2935,7 @@ export function App(): ReactElement {
     naming?.kind === 'rename' && naming.id === list.id ? (
       <NameField
         key={list.id}
+        flip={`list:${list.id}`}
         initial={list.name}
         icon={list.mode === 'note' ? <NoteIcon /> : <ListIcon />}
         problem={namingProblem}
@@ -3594,7 +3604,7 @@ export function App(): ReactElement {
     window.setTimeout(() => {
       const at = cm.domAtPos(from).node;
       const line = (at instanceof Element ? at : at.parentElement)?.closest('.cm-line');
-      if (line) flash(line);
+      if (line) flash(line, true);
     }, 60);
   }, [view, page, lineTarget]);
 
@@ -4325,6 +4335,7 @@ export function App(): ReactElement {
               naming?.kind === 'rename' && naming.id === list.id ? (
                 <NameField
                   key={list.id}
+                  flip={`list:${list.id}`}
                   initial=""
                   placeholder="Title"
                   icon={<NoteIcon />}
@@ -5907,8 +5918,31 @@ function NameField(props: {
   const [name, setName] = useState(initial);
   // Saved with Enter: the blur Chromium fires as the field goes away isn't a second save.
   const sent = useRef(false);
+  const box = useRef<HTMLDivElement>(null);
+  const leave = useRef(() => {});
+  leave.current = () => {
+    if (sent.current) return;
+    sent.current = true;
+    onLeave(name);
+  };
+  // D-107: a press anywhere else leaves it too, also where the focus stays put (a sidebar row
+  // keeps the focus on mouse down, so the field never blurs).
+  useEffect(() => {
+    const down = (event: PointerEvent): void => {
+      const target = event.target as Element;
+      // The field's own right-click menu (Cut, Copy, Paste) isn't leaving it.
+      if (target.closest?.('.fl-menu')) return;
+      if (box.current && !box.current.contains(target)) leave.current();
+    };
+    document.addEventListener('pointerdown', down, true);
+    return () => document.removeEventListener('pointerdown', down, true);
+  }, []);
   return (
-    <div className={group ? 'name-field group' : 'name-field'} {...(flip && { 'data-flip': flip })}>
+    <div
+      ref={box}
+      className={group ? 'name-field group' : 'name-field'}
+      {...(flip && { 'data-flip': flip })}
+    >
       <div className="nav on">
         <span className="tile">{icon}</span>
         <input
@@ -5926,9 +5960,7 @@ function NameField(props: {
             sent.current = false;
             setName(event.target.value);
           }}
-          onBlur={() => {
-            if (!sent.current) onLeave(name);
-          }}
+          onBlur={() => leave.current()}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault();

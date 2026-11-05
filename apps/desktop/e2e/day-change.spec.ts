@@ -119,7 +119,8 @@ test('after midnight: Wednesday, the rollover card, the pin gone, the reminder t
   await expect.poll(appNow, { timeout: 40_000, intervals: [250] }).toBeGreaterThan(MIDNIGHT);
   const soon = { timeout: 6000 };
   await expect.soft(main.locator('.today-date')).toContainText('Wednesday, 11 March', soon);
-  await expect.soft(main.locator('.today-greeting')).toContainText('Good morning', soon);
+  // D-107: still the evening until 04:00.
+  await expect.soft(main.locator('.today-greeting')).toContainText('Good evening', soon);
   // TODAY-02: yesterday's unfinished pin is asked about.
   await expect.soft(main.locator('.card.rollover')).toContainText('Write the report', soon);
   // D-85: the pin of a task done yesterday is gone, in the file too.

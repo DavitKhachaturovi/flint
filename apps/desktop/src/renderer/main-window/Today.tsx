@@ -11,6 +11,7 @@ import {
 import type { TodayEntry, TodayExtras, TodayReminder } from '../../shared/ipc.js';
 import { BellIcon, CheckIcon, ChevronIcon, CloseIcon, HashIcon } from './icons.js';
 import { useScrollsWhenTaller } from './scrolls.js';
+import { dayPart } from './greeting.js';
 
 /**
  * The Today view's own parts (TODAY-01, TODAY-02, TODAY-03; M6, D-89, D-92; mockups 03 and 12):
@@ -155,7 +156,7 @@ export function TodayGreeting(props: {
   const { open, reminders, progress } = props;
   const now = useNow(15_000);
   const hour = now.getHours();
-  const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const part = dayPart(hour);
   const count = NUMBERS[open] ?? String(open);
   const key = open === 0 ? 'Nothing' : open === 1 ? 'One task' : `${count} tasks`;
   const rest = open === 0 ? ' is in focus yet.' : open === 1 ? ' is in focus.' : ' are in focus.';

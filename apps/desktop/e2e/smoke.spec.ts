@@ -3567,6 +3567,12 @@ test('M8 step 2: the Ctrl+K palette and the ? cheat sheet (NAV-01, NAV-02, D-106
   await expect(main.locator('.palette-pill')).toHaveCount(0);
   const button = main.locator('.brand .palette-button');
   await expect(button).toHaveAttribute('title', 'Search or run a command (Ctrl+K)');
+  // In the window's drag strip, where Windows would take the pointer (and its hover) without this.
+  expect(
+    await button.evaluate((element) =>
+      getComputedStyle(element).getPropertyValue('-webkit-app-region'),
+    ),
+  ).toBe('no-drag');
   await button.click();
   await expect(field).toBeFocused();
   await main.keyboard.press('Escape');
@@ -3635,19 +3641,51 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
   await menu.getByText('Rename').click();
   await main.keyboard.press('Control+a');
   await main.keyboard.type('Left behind');
+  // D-107 (after 0.8.6): saved on leaving looks like Enter: the row stays in place, nothing in
+  // the sidebar leaves or arrives (it showed the old name, then the row "arriving" again).
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { sidebarMotion: string[] }).sidebarMotion = seen;
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- put back as it was, and called with its element
+    const original = Element.prototype.animate;
+    (window as unknown as { restoreAnimate: () => void }).restoreAnimate = () => {
+      Element.prototype.animate = original;
+    };
+    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+      if (this.closest('.sidebar') && !this.matches('.nav-glide'))
+        seen.push(this.textContent ?? '');
+      return original.apply(this, args);
+    };
+  });
   await main.locator('h1').click();
   await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })).toBeVisible();
   await expect
     .poll(() => readFile(join(flint, 'Left behind.md'), 'utf8').catch(() => ''))
     .toContain('id: lvm1');
+  await main.waitForTimeout(400);
+  expect(
+    await main.evaluate(() => (window as unknown as { sidebarMotion: string[] }).sidebarMotion),
+  ).toEqual([]);
+  await main.evaluate(() => (window as unknown as { restoreAnimate: () => void }).restoreAnimate());
+  // A click on another list in the sidebar saves it too (the row keeps the focus, so no blur).
   await main
     .locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })
     .click({ button: 'right' });
   await menu.getByText('Rename').click();
   await main.keyboard.press('Control+a');
+  await main.keyboard.type('Left again');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('h1')).toContainText('Inbox');
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left again' })).toBeVisible();
+  await expect
+    .poll(() => readFile(join(flint, 'Left again.md'), 'utf8').catch(() => ''))
+    .toContain('id: lvm1');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Left again' }).click({ button: 'right' });
+  await menu.getByText('Rename').click();
+  await main.keyboard.press('Control+a');
   await main.keyboard.type('Not this');
   await main.keyboard.press('Escape');
-  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left behind' })).toBeVisible();
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Left again' })).toBeVisible();
   await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Not this' })).toHaveCount(0);
 
   // 3. A step has a back arrow; Esc goes back one step, and closes only from the top. 5. The
@@ -3704,7 +3742,7 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
     hasText: 'The quick brown needle is here',
   });
   await expect(needle).toBeInViewport();
-  await expect(needle).toHaveClass(/fl-flash/);
+  await expect(needle).toHaveClass(/fl-flash-strong/);
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 
