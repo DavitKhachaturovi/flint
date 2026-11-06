@@ -58,6 +58,7 @@ import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/me
 
 import { NoteEditor } from './NoteEditor.js';
 import { NoteTitle } from './NoteTitle.js';
+import { Triage } from './Triage.js';
 import {
   ContextPanel,
   type FactKind,
@@ -698,6 +699,14 @@ export function App(): ReactElement {
   }, [go, travel, listId, page]);
 
   const openList = useCallback((id: string): void => go({ list: id, page: null }), [go]);
+  /** TASK-14, D-113: Inbox opened in triage. */
+  const startTriage = useCallback(
+    (inboxId: string): void => {
+      if (listIdRef.current !== inboxId) openList(inboxId);
+      setTriage(inboxId);
+    },
+    [openList],
+  );
   /**
    * NAV-07, D-85: a task reached from the context panel (Up next, a pin, a capture) is a place of
    * its own, also in the same list, so back (the panel's arrow, Alt+←) returns to what was before.
@@ -1096,6 +1105,10 @@ export function App(): ReactElement {
 
   /** NAV-01, NAV-02, D-106: the Ctrl+K palette and the `?` cheat sheet. */
   const [palette, setPalette] = useState(false);
+  /** TASK-14, D-113: Inbox triage, open on this list (Inbox's ID); null when not triaging. */
+  const [triage, setTriage] = useState<string | null>(null);
+  const triageRef = useRef<string | null>(null);
+  triageRef.current = triage && triage === listId ? triage : null;
   const [cheatSheet, setCheatSheet] = useState(false);
   /** D-106: Trash's tab asked for (an archived task found with Ctrl+K). */
   const [trashTab, setTrashTab] = useState<{
@@ -2500,6 +2513,22 @@ export function App(): ReactElement {
         setCheatSheet(true);
         return;
       }
+      // TASK-14, D-113: triage has the keys while it is open.
+      if (triageRef.current) return;
+      // TASK-14, D-113: T in Inbox starts triage.
+      if (
+        key === 't' &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !page &&
+        view?.mode === 'tasks' &&
+        lists.find((list) => list.id === view.id)?.inbox
+      ) {
+        event.preventDefault();
+        setTriage(view.id);
+        return;
+      }
       // D-100: Ctrl+F in Settings finds a setting.
       if (key === 'f' && event.ctrlKey && !event.altKey && listIdRef.current === SETTINGS_ID) {
         event.preventDefault();
@@ -3790,6 +3819,13 @@ export function App(): ReactElement {
         run: go(SNAPSHOTS_ID),
       },
       {
+        id: 'app:triage',
+        label: 'Triage Inbox',
+        keywords: 'sort inbox one at a time',
+        hint: 'T',
+        run: () => startTriage(lists.find((list) => list.inbox)?.id ?? 'inbox'),
+      },
+      {
         id: 'app:mini',
         label: 'Mini mode',
         keywords: 'small window always on top call sticky note',
@@ -4558,22 +4594,53 @@ export function App(): ReactElement {
                   />
                 </>
               )}
-              {view && !pageTask && view.mode === 'tasks' && view.id !== TODAY_ID && (
-                <header className="list-header">
-                  <h1>
-                    {view.name}
-                    {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                  </h1>
-                  {lists.find((list) => list.id === view.id)?.inbox && (
-                    <span className="subtitle">{INBOX_SUBTITLE}</span>
-                  )}
-                  {view.readOnly && (
-                    <span className="subtitle">
-                      Read-only: Flint can&apos;t change this file ({view.readOnly}).
-                    </span>
-                  )}
-                </header>
+              {view && triage === view.id && !pageTask && (
+                <Triage
+                  key={view.id}
+                  view={view}
+                  lists={lists}
+                  change={change}
+                  undo={undo}
+                  onImage={showImage}
+                  onExit={() => setTriage(null)}
+                />
               )}
+              {view &&
+                triage !== view.id &&
+                !pageTask &&
+                view.mode === 'tasks' &&
+                view.id !== TODAY_ID && (
+                  <header className="list-header">
+                    <h1>
+                      {view.name}
+                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                    </h1>
+                    {lists.find((list) => list.id === view.id)?.inbox && (
+                      <span className="subtitle">
+                        {INBOX_SUBTITLE}
+                        {view.open > 0 && (
+                          <>
+                            {' · '}
+                            {/* TASK-14, D-113: one task at a time, by keyboard. */}
+                            <button
+                              type="button"
+                              className="subtitle-link"
+                              title="Sort Inbox one task at a time (T)"
+                              onClick={() => setTriage(view.id)}
+                            >
+                              Triage · {view.open}
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    )}
+                    {view.readOnly && (
+                      <span className="subtitle">
+                        Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                      </span>
+                    )}
+                  </header>
+                )}
 
               {view?.mode === 'note' && (
                 // NOTE-01, D-85: the note's title and text on a card, so it is clear where to type.
@@ -4633,7 +4700,7 @@ export function App(): ReactElement {
                 </div>
               )}
 
-              {view?.mode === 'tasks' && !pageTask && (
+              {view?.mode === 'tasks' && !pageTask && triage !== view.id && (
                 <>
                   {!view.readOnly && (
                     <Composer
@@ -4703,7 +4770,7 @@ export function App(): ReactElement {
                       stacked
                       onOpen={openFromToday}
                       onMoveReminder={moveReminder}
-                      onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
+                      onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
                     />
                   )}
 
@@ -4836,7 +4903,7 @@ export function App(): ReactElement {
                 stacked={false}
                 onOpen={openFromToday}
                 onMoveReminder={moveReminder}
-                onSortInbox={() => openList(view.today?.inbox.id ?? 'inbox')}
+                onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
               />
             )}
           </div>

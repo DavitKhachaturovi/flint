@@ -55,6 +55,24 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Delete', action: 'Delete (to Trash, with Undo)' },
       { keys: 'Shift+F10', action: 'The task’s menu' },
       { keys: 'Esc', action: 'Clear the selection' },
+      { keys: 'T', action: 'Triage Inbox (in Inbox)' },
+    ],
+  },
+  {
+    // TASK-14, D-113: one task at a time.
+    name: 'Inbox triage',
+    shortcuts: [
+      { keys: 'M', action: 'Move to a list (next task)' },
+      { keys: 'Space', action: 'Done (next task)' },
+      { keys: 'Delete', action: 'Delete (next task)' },
+      { keys: '3 / 2 / 1 / 0', action: 'Priority high, medium, low, none' },
+      { keys: 'P', action: 'Pin to Today, or unpin' },
+      { keys: 'R', action: 'Set the reminder' },
+      { keys: 'E', action: 'Edit the title' },
+      { keys: '→ / Enter', action: 'Keep in Inbox (next task)' },
+      { keys: '←', action: 'Back to the previous task' },
+      { keys: 'Ctrl+Z', action: 'Undo the last one' },
+      { keys: 'Esc', action: 'Leave triage' },
     ],
   },
   {

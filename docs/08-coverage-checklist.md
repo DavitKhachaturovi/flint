@@ -814,7 +814,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Inbox triage, a card at a time, by keyboard, oldest first, with a summary | TASK-14 · v1 (moved from Later) · M8 step 4a | 02, D-113 |
+| 1 | Inbox triage, a card at a time, by keyboard, oldest first, with a summary | TASK-14 · Done (0.8.12) | 02, 03, 09, D-113 |
 | 2 | The 8-step walkthrough, each step advancing when it is done | APP-10, APP-13 · Decided · M8 step 4b | 02, D-113 |
 | 3 | Existing installs get What's new, fresh ones the walkthrough | APP-10, APP-15 · Decided · M8 step 4b | D-113 |
 | 4 | What's new as one card with the notes since last seen | APP-15 · Decided · M8 step 4b | 02, D-113 |

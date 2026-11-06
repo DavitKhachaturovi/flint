@@ -96,6 +96,19 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Temporary sort by priority | via Ctrl+K / list menu | Proposed |
 | Back to Navigate / clear selection | Esc | Proposed |
 
+### Inbox triage (TASK-14, D-113)
+| Action | Key | Status |
+|---|---|---|
+| Start triage | T in Inbox (nothing typed), Inbox's "Triage · N", Today's "Sort Inbox · N", Ctrl+K "Triage Inbox" | Decided |
+| Move to a list (next task) | M, then the list picker (type, Enter) | Decided |
+| Done / Delete (next task) | Space / Delete | Decided |
+| Priority high, medium, low, none (the card stays) | 3 / 2 / 1 / 0 | Decided |
+| Pin / reminder (the card stays) | P / R | Decided |
+| Keep in Inbox (next task) / back | → or Enter / ← | Decided |
+| Edit the title | E, or a click on it | Proposed |
+| Undo the last one (its card comes back) | Ctrl+Z | Decided |
+| Leave | Esc (at the summary, Enter or Esc) | Decided |
+
 ### Task list — Edit state
 | Action | Key | Status |
 |---|---|---|

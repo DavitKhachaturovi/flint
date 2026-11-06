@@ -304,6 +304,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Steps through Inbox tasks one at a time: pick a list, priority, pin (TODAY-01), or delete, all by keyboard.
 - Turns "sorted later, or never" into a 2-minute ritual.
 - **D-113 (decided):** a mode in the main column, one large card at a time (the task, its notes, when it was captured), "3 of 18" and a progress line; started from Inbox's "Triage · N" button, Today's "Sort Inbox · N", the palette and T in Inbox. Oldest first. M move, Space done, Delete delete advance; 3/2/1/0 priority, P pin, R reminder stay on the card; → or Enter keep and go on, ← back, Ctrl+Z undo, Esc leave. A summary at the end. Not in mini mode in v1. Milestone M8 (step 4a).
+- **Built (0.8.12):** as decided; the Proposed details of D-113 as built (top-level tasks, oldest by when Flint first saw it then from the bottom of the file, E edits the title, the slide between cards); the summary counts each task once, by what happened to it last.
 
 ---
 

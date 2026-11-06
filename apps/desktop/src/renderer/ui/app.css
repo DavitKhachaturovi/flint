@@ -6236,3 +6236,301 @@ a.auto-link {
   pointer-events: none;
   animation: row-remove var(--fl-dur-complete) ease-in-out forwards;
 }
+
+/* TASK-14, D-113: Inbox triage, one task at a time: the card in the list's column, its actions
+   with their keys below, "3 of 18" and a progress line above. The card slides out to the left as
+   the next one comes in from the right (back: the other way); the summary rises in. */
+.triage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: view-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.triage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.triage-back {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.triage-back:hover {
+  background: var(--fl-ground-float);
+}
+
+.triage-title-soft {
+  color: var(--fl-text-heading-soft);
+  font-weight: 600;
+}
+
+.triage-count {
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.triage-progress {
+  height: 3px;
+  margin: 0 4px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-ground-tile);
+  overflow: hidden;
+}
+
+.triage-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fl-strong-bg);
+  transform-origin: left;
+  transition: transform var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* The leaving card and the arriving one share one place. */
+.triage-stage {
+  display: grid;
+}
+
+.triage-stage > * {
+  grid-area: 1 / 1;
+}
+
+.triage-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  padding: 22px 24px 22px 28px;
+}
+
+.triage-card .stripe {
+  left: 6px;
+  top: 22px;
+  bottom: 22px;
+}
+
+.triage-card.arriving.next {
+  animation: triage-from-right var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.triage-card.arriving.back {
+  animation: triage-from-left var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.triage-card.leaving {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.triage-card.leaving.next {
+  animation: triage-to-left var(--fl-dur-base) ease-in forwards;
+}
+
+.triage-card.leaving.back {
+  animation: triage-to-right var(--fl-dur-base) ease-in forwards;
+}
+
+@keyframes triage-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+@keyframes triage-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+
+@keyframes triage-to-left {
+  to {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.98);
+  }
+}
+
+@keyframes triage-to-right {
+  to {
+    opacity: 0;
+    transform: translateX(28px) scale(0.98);
+  }
+}
+
+.triage-card-title {
+  display: flex;
+  min-height: 32px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.triage-title {
+  min-width: 0;
+  cursor: text;
+}
+
+.triage-title .title {
+  white-space: normal;
+  color: inherit;
+}
+
+.triage-card-title .title-input {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.triage-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-faint);
+}
+
+.triage-meta .chip {
+  gap: 5px;
+  height: 22px;
+  color: var(--fl-text-secondary);
+}
+
+.triage-body {
+  color: var(--fl-text-secondary);
+  font-size: 13.5px;
+}
+
+.triage-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.triage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.triage-actions .secondary-button,
+.triage-actions .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+}
+
+.triage-actions .secondary-button.on {
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+
+.triage-actions .keycap {
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+  color: inherit;
+  opacity: 0.5;
+}
+
+.triage-actions-space {
+  flex: 1;
+}
+
+.triage-priorities {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--fl-ground-sidebar);
+  box-shadow: 0 0 0 1px var(--fl-edge-divider);
+}
+
+.triage-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 9px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.triage-priority:hover {
+  color: var(--fl-text-primary);
+}
+
+.triage-priority.on {
+  background: var(--fl-ground-float);
+  box-shadow: 0 0 0 1px var(--fl-edge-float);
+  color: var(--fl-text-primary);
+}
+
+.triage-priority .keycap {
+  box-shadow: none;
+  opacity: 0.8;
+}
+
+/* A short stripe in the priority's own look (lightness and thickness, never hue). */
+.triage-swatch {
+  height: 14px;
+  border-radius: 3px;
+}
+
+.triage-swatch.p-none {
+  width: 4px;
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+
+.triage-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 26px 28px;
+  animation: rise-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.triage-summary h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.triage-summary-counts {
+  margin: 0 0 6px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.triage:focus {
+  outline: none;
+}
