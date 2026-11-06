@@ -2,6 +2,10 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.12 (6 Nov 2026)
+
+- **Inbox triage:** sort your Inbox one task at a time, oldest first, without leaving the keyboard. Press T in Inbox (or "Triage" under its title, or "Sort Inbox" on Today): M moves it to a list, Space marks it done, Delete deletes it, 3 / 2 / 1 / 0 set its priority, P pins it, R sets a reminder, → keeps it in Inbox. Ctrl+Z brings the last one back; at the end you see what you sorted.
+
 ## 0.8.11 (6 Nov 2026)
 
 - Subtasks in the side panel now slide in and fade away like tasks in the list.
