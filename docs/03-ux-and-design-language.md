@@ -117,6 +117,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | New list or note (LIST-01) | Ctrl+Shift+N | Decided (D-52) |
 | Quick note (NOTE-08) | Ctrl+Shift+J, anywhere in the window | Decided (D-99) |
 | Rename a list or note in the sidebar | Double-click, or a slow second click on the open one; Enter saves, Esc cancels (a group: double-click) | Decided (D-99) |
+| Rename a note from its page | Click its title (the open note: the slow second click); Enter or leaving saves, Esc cancels | Decided (D-111) |
 | Back / forward (NAV-04) | Alt+← / Alt+→, the mouse's side buttons | Decided (D-53) |
 | Find in page (NAV-06) | Ctrl+F; Enter / Shift+Enter next / previous match; Esc closes | Decided (D-72) |
 | Reorder the selected list, note or group in the sidebar (LIST-06) | Alt+↑ / Alt+↓ with the focus in the sidebar, Manual sort only; with the focus in the task list it moves the selected task; nothing selected, nothing moves | Decided (D-73, D-79) |
@@ -209,6 +210,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Mini mode look
 - Small, always-on-top, minimal chrome. Shows Today or Inbox with a toggle; compact rows.
 - **D-109:** a third tab, Note: one quick note as a sticky note, in a compact editor (mockup 05 has Today and Inbox; the Note tab joins them).
+- **D-111:** one size (a width and a height limit) for every tab; Today and Inbox fit their content up to it, Note takes it all; Reset size when it differs from the default; a slow second click on a selected row opens it; the bell turns a reminder off and on. Mini and the capture popup fade in and out (never delaying typing or the focus).
 - **D-110:** built from the main window's own parts in a compact size, never copies: the same rows, selection glide, completion, drag, composer, toast, tabs, scrollbars and motion, so it never feels like another app. The card floats on a transparent window (mockup 05's corners and shadow), hangs from its snapped corner and fits its content up to a height limit; resized from its handles. The reminder card shows Today's next reminder and turns into the alert when one fires.
 
 ---

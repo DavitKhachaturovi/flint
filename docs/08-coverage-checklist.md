@@ -785,3 +785,19 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Note tab: title before text; a removed empty note never leaves it dead; New quick note off while empty | MINI-01, NOTE-08 · Done (0.8.9) | D-110 |
 | 8 | The animation-speed setting reaches mini mode | APP-11 · Done (0.8.9) | D-110 |
 
+## AS. Fixes after 0.8.9 (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Link patterns guarded by an e2e check; two changing parts inferred, fixed text between them counts | NOTE-07 · Done (0.8.10) | D-111 |
+| 2 | A note's selection covers only the characters | NOTE-01, UI-11 · Done (0.8.10) | D-111 |
+| 3 | The composer's notes field takes a click | CAP-03, TASK-05 · Done (0.8.10) | D-111 |
+| 4 | Composer drafts kept per list for the session | CAP-03 · Done (0.8.10) | D-111 |
+| 5 | An empty new row left plays the remove animation (list and task page) | TASK-02, TASK-05 · Done (0.8.10) | D-111 |
+| 6 | A note renamed from its title | NOTE-01, LIST-01 · Done (0.8.10) | 03, D-111 |
+| 7 | Typed shorthand shown live on the row being edited | TASK-02, CAP-04 · Done (0.8.10) | 09, D-111 |
+| 8 | Mini: one size for every tab, Note at full height, Reset size, resized from every side | MINI-01 · Done (0.8.10) | 02, 09, D-111 |
+| 9 | Mini: slow second click opens; the bell mutes and unmutes; D/S/O with the focus | MINI-01, REM-12, REM-06 · Done (0.8.10) | D-111 |
+| 10 | Mini and the capture popup fade in and out; focus returned at once | MINI-01, CAP-01 · Done (0.8.10) | 03, 05, D-111 |
+| 11 | Mini's softer shadow below; nothing above a top-corner card takes the mouse | MINI-01 · Done (0.8.10); a Teams share still to check | 09, D-111 |
+
