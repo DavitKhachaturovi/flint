@@ -42,17 +42,27 @@ describe('mini mode placement (MINI-01, D-109, D-110)', () => {
   it('the window is the largest card from the hang point, with the shadow around it', () => {
     const hang = hangInCorner('bottom-right', area);
     const stage = stageFor(hang);
-    // 520 × 760 at most, 72 px at the sides, 36 above, 108 below.
-    expect(stage).toEqual({ x: 1896 - 520 - 72, y: 1016 - 760 - 36, width: 664, height: 904 });
-    expect(insetIn(hang, stage)).toEqual({ corner: 'bottom-right', horizontal: 72, vertical: 108 });
+    // 520 × 760 at most, 220 more on the hang side (resized from there, D-111), the shadow's room
+    // (32 px at the sides, 16 above, 48 below).
+    expect(stage).toEqual({ x: 1896 - 520 - 32, y: 1016 - 760 - 16, width: 804, height: 824 });
+    expect(insetIn(hang, stage)).toEqual({
+      corner: 'bottom-right',
+      horizontal: 220 + 32,
+      vertical: 48,
+    });
     const topLeft = hangInCorner('top-left', area);
     expect(insetIn(topLeft, stageFor(topLeft))).toEqual({
       corner: 'top-left',
-      horizontal: 72,
-      vertical: 36,
+      horizontal: 220 + 32,
+      vertical: 16,
     });
     // At 125 % the card can be larger, so the window is.
-    expect(stageFor(topLeft, 1.25)).toEqual({ x: -48, y: -12, width: 794, height: 1094 });
+    expect(stageFor(topLeft, 1.25)).toEqual({
+      x: 24 - 275 - 32,
+      y: 24 - 16,
+      width: 650 + 275 + 64,
+      height: 950 + 64,
+    });
   });
 
   it('snaps within 48 px of a corner, and not farther', () => {

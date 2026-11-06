@@ -43,9 +43,17 @@ import { knownLinks } from '../../shared/link-patterns.js';
 import { imageMenuItems, showInViewer } from '../media/media.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
-import { useInertText } from '../main-window/inert-text.js';
+import { useInertText, type InertText } from '../main-window/inert-text.js';
 
 let seq = 0;
+
+/** D-111: the composers' unsent drafts, per list, for this window's session. */
+interface Draft {
+  readonly text: ReturnType<InertText['snapshot']>;
+  readonly notes: string | null;
+  readonly pasted: readonly ComposerPaste[];
+}
+const drafts = new Map<string, Draft>();
 
 const PRIORITY_NAMES = { high: 'High', medium: 'Medium', low: 'Low' } as const;
 
@@ -79,9 +87,12 @@ export function Composer(props: {
   readonly compact?: boolean;
 }): ReactElement {
   const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…', compact = false } = props;
+  // D-111: what was typed here and not sent waits for this list, for the session (as the popup's
+  // drafts do): the title (its pasted stretches still inert), the notes and the pastes.
+  const draft = useRef(drafts.get(listId));
   const text = useInertText('', false);
   /** D-78: notes under the title (Shift+Enter, as in the capture popup): the new task's body. */
-  const [notes, setNotes] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string | null>(draft.current?.notes ?? null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const focusNotes = useRef(false);
   useEffect(() => {
@@ -95,7 +106,15 @@ export function Composer(props: {
    * once); on Enter the body is the notes, then the code fenced, then the image links. Pasted
    * markdown and other text is typed as usual (D-79).
    */
-  const [pasted, setPasted] = useState<readonly ComposerPaste[]>([]);
+  const [pasted, setPasted] = useState<readonly ComposerPaste[]>(draft.current?.pasted ?? []);
+  useLayoutEffect(() => {
+    if (draft.current) text.restore(draft.current.text);
+  }, []);
+  useEffect(() => {
+    const kept = text.snapshot();
+    if (kept.value === '' && (notes ?? '') === '' && pasted.length === 0) drafts.delete(listId);
+    else drafts.set(listId, { text: kept, notes, pasted });
+  }, [text.value, notes, pasted, listId]);
   const pasteRules = (event: React.ClipboardEvent): boolean => {
     const image = [...event.clipboardData.items]
       .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
@@ -318,7 +337,8 @@ export function Composer(props: {
       // UI-01, D-65: the whole card is the text box's target (one cursor, no flicker around it).
       onMouseDown={(event) => {
         const target = event.target as HTMLElement;
-        if (target === inputRef.current || target.closest('button')) return;
+        // D-111: the notes field (and anything else that takes text or a click) keeps its own.
+        if (target.closest('button, input, textarea, a, [contenteditable="true"]')) return;
         event.preventDefault();
         inputRef.current?.focus();
       }}

@@ -15,7 +15,6 @@ import {
   EditorView,
   ViewPlugin,
   WidgetType,
-  drawSelection,
   keymap,
   placeholder as placeholderText,
   type DecorationSet,
@@ -667,7 +666,8 @@ export interface EditorOptions {
 export function editorExtensions(options: EditorOptions): Extension[] {
   return [
     history(),
-    drawSelection(),
+    // D-111: the browser's own selection (styled by selection.css, UI-11), which covers only the
+    // characters, as in text fields; CodeMirror's drawn one fills whole lines.
     EditorView.lineWrapping,
     closeBrackets(),
     // D-84: every language CodeMirror's language data knows, each loaded when a block uses it.

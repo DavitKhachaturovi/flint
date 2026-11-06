@@ -11,6 +11,8 @@ import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from '../main-window/inert-text.js';
 import { BodyIcon, CheckIcon, ImageIcon, PinIcon, ReminderBellIcon } from '../main-window/icons.js';
 import type { Ghost } from './ghosts.js';
+import { parseCapture, type ListInfo } from '@flint/core/shorthand';
+import { usePresence } from './presence.js';
 
 export interface Point {
   readonly x: number;
@@ -81,6 +83,40 @@ export interface RowHandlers {
   readonly onImages: (task: TaskRow) => void;
   /** D-93: Today's list chip opens the task's own list, the task selected there. */
   readonly onHome: (task: TaskRow) => void;
+  /**
+   * D-111: the lists the shorthand knows, and the list the rows are in, so the row being edited
+   * shows its typed `!h`, `@15:00` and `##list` at once (the stripe, the time, a list chip).
+   */
+  readonly lists?: readonly ListInfo[];
+  readonly listId?: string;
+}
+
+/** D-111: what the shorthand typed into a row being edited will do, shown on the row. */
+interface LiveShorthand {
+  readonly priority: TaskRow['priority'] | undefined;
+  readonly reminder: string | null;
+  readonly list: string | null;
+}
+
+function liveShorthand(
+  text: string,
+  lists: readonly ListInfo[],
+  listId: string | undefined,
+): LiveShorthand {
+  if (text.trim() === '') return { priority: undefined, reminder: null, list: null };
+  const parsed = parseCapture(text, { now: new Date(), lists });
+  const target = parsed.target;
+  const list =
+    (target.kind === 'existing' || target.kind === 'close-match') && target.list.id !== listId
+      ? `→ ${target.list.name}`
+      : target.kind === 'new'
+        ? `New list ${target.name}`
+        : null;
+  return {
+    priority: parsed.counts.priority > 0 ? parsed.priority : undefined,
+    reminder: parsed.reminderLabel,
+    list,
+  };
 }
 
 export function Row(
@@ -118,12 +154,33 @@ export function Row(
   } = props;
   const isEditing = !ghost && editing?.kind === 'task' && editing.key === task.key;
   const compact = props.variant === 'compact';
+  // D-111: the shorthand typed while editing, shown on the row as it is typed.
+  const [typed, setTyped] = useState('');
+  useEffect(() => {
+    if (!isEditing) setTyped('');
+  }, [isEditing]);
+  const live = useMemo(
+    () => (isEditing ? liveShorthand(typed, props.lists ?? [], props.listId) : null),
+    [isEditing, typed, props.lists, props.listId],
+  );
+  const priority = live?.priority !== undefined ? live.priority : task.priority;
+  const reminder = live?.reminder ?? task.reminder;
+  // One chip: it arrives and leaves once; its text changes in place as the name is typed.
+  const chips = usePresence(live?.list ? [live.list] : [], () => 'list');
   const classes = ['row'];
   if (!ghost && task.key === selected && editing?.kind !== 'new') classes.push('sel');
   if (subtask) classes.push('subtask');
   if (task.done) classes.push('done');
   if (isEditing) classes.push('editing');
   if (fresh) classes.push('enter', fresh);
+  // D-111: opened once for a double-click on an already-selected row (its first click opens).
+  const activated = useRef(0);
+  const activate = (): void => {
+    const now = performance.now();
+    if (now - activated.current < 500) return;
+    activated.current = now;
+    props.onActivate?.(task);
+  };
   /** D-76: a second single click on an already-selected row edits it, like renaming in Explorer. */
   const wasSelected = useRef(false);
   if (ghost) classes.push('leaving', ghost);
@@ -172,8 +229,9 @@ export function Row(
           return;
         }
         if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;
-        if (props.onActivate) return;
         if ((event.target as Element).closest('button, a, input, textarea')) return;
+        // D-111: with no editing here (mini), a second click on a selected row opens it.
+        if (props.onActivate) return activate();
         // D-76, D-89: a second single click on a selected row edits, the caret where it landed.
         onEdit(task.key, titleCaret(task, event));
       }}
@@ -188,13 +246,13 @@ export function Row(
       onDoubleClick={(event) => {
         if (task.done || isEditing || titleLink(event.target)) return;
         if (props.onActivate) {
-          if (!ghost && !(event.target as Element).closest('button')) props.onActivate(task);
+          if (!ghost && !(event.target as Element).closest('button')) activate();
           return;
         }
         onEdit(task.key, titleCaret(task, event));
       }}
     >
-      {!task.done && <div className={`stripe p-${task.priority ?? 'none'}`} />}
+      {!task.done && <div className={`stripe p-${priority ?? 'none'}`} />}
       <button
         type="button"
         className={checked ? 'check on' : 'check'}
@@ -209,6 +267,7 @@ export function Row(
           initial={task.title}
           {...(editing.caret !== undefined && { caret: editing.caret })}
           inert
+          onText={setTyped}
           onLeave={(text, _empty, how) => onLeaveTask(task.key, text, how)}
           onTab={onTab}
         />
@@ -223,6 +282,18 @@ export function Row(
         <Title task={task} />
       )}
       <span className="ind">
+        {chips.entries.map(({ item: name, key, leaving }) => (
+          // D-111: `##list` typed while editing: where the task goes on save.
+          <span
+            key={key}
+            className={leaving ? 'chip live-list leaving' : 'chip live-list'}
+            onAnimationEnd={(event) => {
+              if (leaving && event.target === event.currentTarget) chips.gone(key);
+            }}
+          >
+            <MorphText text={name} />
+          </span>
+        ))}
         {task.pinned && !(task.home && task.done) && (
           // D-86: the pin unpins.
           <button
@@ -237,23 +308,35 @@ export function Row(
             <PinIcon />
           </button>
         )}
-        {task.reminder && !task.done && compact && (
-          // D-110: in mini the bell and time are shown, not buttons (D-109: those edits stay in
-          // the main window).
-          <span className={`reminder ${task.reminderState ?? 'on'}`}>
-            <span className="reminder-bell">
+        {reminder && !task.done && compact && (
+          // D-110, D-111: in mini the bell turns the reminder off and on, struck as in the main
+          // window; the time is shown, not a button (D-109: the picker stays in the main window).
+          <span className={`reminder ${task.reminder ? (task.reminderState ?? 'on') : 'on live'}`}>
+            <button
+              type="button"
+              className="reminder-bell"
+              title={
+                task.reminderState === 'muted' ? 'Turn the reminder on' : 'Turn the reminder off'
+              }
+              aria-pressed={task.reminderState === 'muted'}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onMute(task.key, task.reminderState !== 'muted');
+              }}
+            >
               <ReminderBellIcon />
               <span className="overdue-dot" aria-hidden="true" />
-            </span>
+            </button>
             <span className="reminder-time">
-              <MorphText text={task.reminder} />
+              <MorphText text={reminder} />
             </span>
           </span>
         )}
-        {task.reminder && !task.done && !compact && (
+        {reminder && !task.done && !compact && (
           // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the
           // overdue dot, and the time next to it opens the date/time picker (REM-01).
-          <span className={`reminder ${task.reminderState ?? 'on'}`}>
+          <span className={`reminder ${task.reminder ? (task.reminderState ?? 'on') : 'on live'}`}>
             <button
               type="button"
               className="reminder-bell"
@@ -278,7 +361,7 @@ export function Row(
                 props.onReminder(task, event.currentTarget.getBoundingClientRect());
               }}
             >
-              <MorphText text={task.reminder} />
+              <MorphText text={reminder} />
             </button>
           </span>
         )}
@@ -428,8 +511,10 @@ export function EditField(props: {
   readonly repeat?: boolean;
   readonly onLeave: (text: string, empty: boolean, how: Leave) => void;
   readonly onTab: (how: 'indent' | 'outdent') => void;
+  /** D-111: the text as typed (inert stretches escaped), for the row to show its shorthand. */
+  readonly onText?: (escaped: string) => void;
 }): ReactElement {
-  const { initial, inert, placeholder, repeat = false, onLeave, onTab } = props;
+  const { initial, inert, placeholder, repeat = false, onLeave, onTab, onText } = props;
   const text = useInertText(initial, inert);
   const left = useRef(false);
   const field = useRef<HTMLInputElement>(null);
@@ -458,7 +543,10 @@ export function EditField(props: {
       value={text.value}
       placeholder={placeholder}
       spellCheck={false}
-      onChange={(event) => text.change(event.target.value)}
+      onChange={(event) => {
+        text.change(event.target.value);
+        onText?.(text.escaped());
+      }}
       onPaste={text.paste}
       onMouseDown={(event) => event.stopPropagation()}
       onBlur={() => leave('blur')}

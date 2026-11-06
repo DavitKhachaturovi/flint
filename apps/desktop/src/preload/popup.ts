@@ -18,6 +18,13 @@ const popup = {
   onShown(listener: (shown: PopupShown) => void): void {
     ipcRenderer.on(Channels.popupShown, (_event, shown: PopupShown) => listener(shown));
   },
+  /** D-111: the card fades out; hidden, it waits ready to appear. */
+  onHiding(listener: () => void): void {
+    ipcRenderer.on(Channels.popupHiding, () => listener());
+  },
+  onHidden(listener: () => void): void {
+    ipcRenderer.on(Channels.popupHidden, () => listener());
+  },
   reportFocused(sample: PopupFocused): void {
     ipcRenderer.send(Channels.popupFocused, sample);
   },

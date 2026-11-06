@@ -155,6 +155,15 @@ export const PinIcon = ({ size = 12 }: IconProps): ReactElement =>
 export const SendIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [<path key="a" d="M12 19V5" />, <path key="b" d="m5 12 7-7 7 7" />], 2.2);
 
+/** D-111: mini mode's "Reset size": two corners drawn in toward each other. */
+export const ResetSizeIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M4 14h6v6" />,
+    <path key="b" d="M20 10h-6V4" />,
+    <path key="c" d="m14 10 7-7" />,
+    <path key="d" d="m3 21 7-7" />,
+  ]);
+
 /** DATA-02, D-97: the Trash row in the sidebar. */
 export const TrashIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [

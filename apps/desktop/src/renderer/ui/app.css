@@ -6143,3 +6143,85 @@ a.auto-link {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* NOTE-01, D-111: a note's title on its page renames in place: the field is the editing row's
+   dark field (09 §8), in the title's own type, easing in. */
+.note-title.renames {
+  margin: -4px -10px;
+  padding: 4px 10px;
+  border-radius: var(--fl-radius-row);
+  cursor: text;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.note-title.renames:hover {
+  background: var(--fl-ground-hover);
+}
+
+.note-title-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-title-input {
+  margin: -4px -10px;
+  padding: 4px 10px;
+  border: 0;
+  outline: none;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  font: inherit;
+  font-size: var(--fl-size-title);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--fl-text-primary);
+  caret-color: var(--fl-accent);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.note-title-problem {
+  margin: 4px 0 0;
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-secondary);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+/* D-111: the priority stripe eases in and out as it changes (1/2/3/0, `!h` typed while editing). */
+.stripe {
+  transition:
+    width var(--fl-dur-state) var(--fl-ease-spring),
+    background-color var(--fl-dur-state) ease;
+}
+
+/* D-111: what typed shorthand will do, on the row being edited: a list chip first in the
+   indicators, and the time where a reminder sits; they fade in and out as the text changes. */
+.chip.live-list {
+  height: 22px;
+  color: var(--fl-text-secondary);
+  animation: live-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.chip.live-list.leaving {
+  animation: live-out var(--fl-dur-base) ease-in forwards;
+}
+
+.reminder.live {
+  pointer-events: none;
+  animation: live-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+@keyframes live-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes live-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}

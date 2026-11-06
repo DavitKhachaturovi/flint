@@ -15,6 +15,9 @@ export const Channels = {
   /** Any window → main: Cut / Copy / Paste / Select all from a text field's menu (UI-08). */
   editCommand: 'edit:command',
   popupShown: 'popup:shown',
+  /** D-111: main → popup: the card fades out (the focus is already back), then it is hidden. */
+  popupHiding: 'popup:hiding',
+  popupHidden: 'popup:hidden',
   popupFocused: 'popup:focused',
   popupSubmit: 'popup:submit',
   popupDismiss: 'popup:dismiss',
@@ -58,6 +61,8 @@ export const Channels = {
   miniShown: 'mini:shown',
   /** Main → mini: it is being hidden (a quick note is left). */
   miniHiding: 'mini:hiding',
+  /** D-111: main → mini: hidden now (after its fade): the card waits, ready to rise in. */
+  miniHidden: 'mini:hidden',
   /** Mini → main: a place in the main window (Open, double-click, Enter), mini stays. */
   miniOpen: 'mini:open',
   /** REM-06, D-109: the reminder cards waiting in mini (main → mini), and acting on one. */
@@ -508,6 +513,11 @@ export interface TodayExtras {
    * show the ones still to come, the timeline all of them, as the clock moves.
    */
   readonly reminders: readonly TodayReminder[];
+  /**
+   * D-111: today's open tasks whose reminder is turned off (REM-12), so mini mode keeps them in
+   * its Today, the bell struck, to turn back on. Nothing else shows them.
+   */
+  readonly muted?: readonly TodayReminder[];
   /** TODAY-02, Q-04: unfinished tasks pinned before today, until the prompt is answered today. */
   readonly rollover: readonly { readonly key: string; readonly title: string }[];
   /**
@@ -814,6 +824,14 @@ export interface MiniLayout {
   readonly limit: number;
   /** Snapping into another corner: hide the card, say `miniLayoutReady` with this, then settle in. */
   readonly moving?: number;
+}
+
+/** D-111: a resize let go: the size (every tab's), and where the hang-side edge now is. */
+export interface MiniResize {
+  readonly width: number;
+  readonly limit: number;
+  /** The `horizontal` of `MiniLayout` after the resize (moved when resized from the hang side). */
+  readonly horizontal: number;
 }
 
 /** D-110: what mini mode's page tells main about its card (page pixels, window coordinates). */

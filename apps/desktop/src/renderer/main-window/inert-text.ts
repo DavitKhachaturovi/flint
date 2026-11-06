@@ -21,6 +21,12 @@ export interface InertText {
   /** The text right now, also between renders. */
   readonly current: () => string;
   readonly reset: (value: string, inert: boolean) => void;
+  /** D-111: the text and its inert stretches, to keep as a draft and bring back as it was. */
+  readonly snapshot: () => { readonly value: string; readonly ranges: readonly TextRange[] };
+  readonly restore: (draft: {
+    readonly value: string;
+    readonly ranges: readonly TextRange[];
+  }) => void;
 }
 
 /** The stretch of `after` that replaced something in `before` (one contiguous edit). */
@@ -82,5 +88,15 @@ export function useInertText(initial: string, inert: boolean): InertText {
       pasting.current = false;
       setValue(next);
     }, []),
+    snapshot: useCallback(() => ({ value: current.current, ranges: [...ranges.current] }), []),
+    restore: useCallback(
+      (draft: { readonly value: string; readonly ranges: readonly TextRange[] }) => {
+        ranges.current = [...draft.ranges];
+        current.current = draft.value;
+        pasting.current = false;
+        setValue(draft.value);
+      },
+      [],
+    ),
   };
 }

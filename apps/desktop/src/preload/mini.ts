@@ -4,6 +4,7 @@ import {
   type MiniAlert,
   type MiniAlertAction,
   type MiniLayout,
+  type MiniResize,
   type MiniState,
   type MiniSurface,
 } from '../shared/ipc.js';
@@ -81,9 +82,13 @@ const mini = {
   onShown(listener: (shown: { readonly focus: boolean }) => void): void {
     ipcRenderer.on(Channels.miniShown, (_event, shown: { focus: boolean }) => listener(shown));
   },
-  /** About to be hidden: a quick note being left. */
+  /** About to be hidden: a quick note being left; the card fades out (D-111). */
   onHiding(listener: () => void): void {
     ipcRenderer.on(Channels.miniHiding, () => listener());
+  },
+  /** D-111: hidden now: the card waits, ready to rise in when shown. */
+  onHidden(listener: () => void): void {
+    ipcRenderer.on(Channels.miniHidden, () => listener());
   },
   /** Open, double-click or Enter: the main window at this place (mini stays). */
   open(place: { readonly listId: string; readonly key?: string }): void {
@@ -120,7 +125,7 @@ const mini = {
     ipcRenderer.send(Channels.miniSurface, surface);
   },
   /** A resize let go: its width and height limit, remembered. */
-  resized(size: { readonly width: number; readonly limit: number }): void {
+  resized(size: MiniResize): void {
     ipcRenderer.send(Channels.miniResized, size);
   },
 };

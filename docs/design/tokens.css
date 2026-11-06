@@ -75,6 +75,13 @@
     inset 0 1px 0 rgba(255, 255, 255, .07),
     0 2px 4px rgba(0, 0, 0, .4),
     0 34px 80px -18px rgba(0, 0, 0, .85);
+  /* D-111: a card floating over other apps all day (mini mode): the float ring and highlight, a
+     tighter, lighter drop below, so it stays soft on a white desktop as on a dark one. */
+  --fl-shadow-desktop:
+    0 0 0 1px var(--fl-edge-float),
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 1px 3px rgba(0, 0, 0, .3),
+    0 12px 30px -10px rgba(0, 0, 0, .5);
   --fl-shadow-selected:
     0 0 0 1px var(--fl-edge-float),
     inset 0 1px 0 rgba(255, 255, 255, .05),

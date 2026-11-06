@@ -1,3 +1,4 @@
+import { MINI_LIMIT, MINI_SHADOW, MINI_WIDTH } from '../shared/mini-size.js';
 import type { Rect } from './window-state.js';
 
 /**
@@ -13,10 +14,15 @@ import type { Rect } from './window-state.js';
 export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 /** Mockup 05: the card is 364 px wide; its height fits its content up to a limit (D-110). */
-export const CARD_WIDTH = { min: 300, initial: 364, max: 520 } as const;
-export const CARD_LIMIT = { min: 180, initial: 460, max: 760 } as const;
-/** The floating shadow's room around the card (`--fl-shadow-float`, as the popup's, 09 §8). */
-export const SHADOW = { top: 36, side: 72, bottom: 108 } as const;
+export const CARD_WIDTH = MINI_WIDTH;
+export const CARD_LIMIT = MINI_LIMIT;
+/** The floating shadow's room around the card (`--fl-shadow-desktop`, D-111). */
+export const SHADOW = MINI_SHADOW;
+/**
+ * D-111: how far the card's edge on its hang side can move out when it is resized from that side
+ * (from the smallest card to the largest), so both sides resize without the window moving.
+ */
+const REACH_OUT = CARD_WIDTH.max - CARD_WIDTH.min;
 /** The gap to the screen's edges in a corner. */
 export const MINI_MARGIN = 24;
 /** How near a corner a drag must end to snap. */
@@ -43,17 +49,20 @@ export function cardBox(hang: Hang, size: { width: number; height: number }): Re
 }
 
 /**
- * The window: the largest card hanging from `hang` (at the page's zoom), with the shadow's margin.
- * A function of the hang alone, so a window dragged by its card is still its stage.
+ * The window: the largest card hanging from `hang` (at the page's zoom), plus room for its hang-side
+ * edge to move out (D-111: resized from either side), with the shadow's margin. A function of the
+ * hang alone, so a window dragged by its card is still its stage.
  */
 export function stageFor(hang: Hang, zoom = 1): Rect {
   const width = Math.round(CARD_WIDTH.max * zoom);
+  const out = Math.round(REACH_OUT * zoom);
   const height = Math.round(CARD_LIMIT.max * zoom);
   const frame = cardBox(hang, { width, height });
+  const left = isLeft(hang.corner);
   return {
-    x: frame.x - SHADOW.side,
+    x: (left ? frame.x - out : frame.x) - SHADOW.side,
     y: frame.y - SHADOW.top,
-    width: width + 2 * SHADOW.side,
+    width: width + out + 2 * SHADOW.side,
     height: height + SHADOW.top + SHADOW.bottom,
   };
 }

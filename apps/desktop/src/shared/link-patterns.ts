@@ -334,6 +334,9 @@ export function inferLinkPattern(
   // name) between fixed text in both the short form and the link.
   const between = second ? inferBetween(first, second) : null;
   if (between) return { pattern: between, ambiguous: false };
+  // D-111: or two parts that change, with fixed text between them (`{name}-PR-{id}`).
+  const two = second ? inferTwoParts(first, second) : null;
+  if (two) return { pattern: two, ambiguous: false };
   return { pattern, ambiguous: true, problem: 'The examples don’t follow one pattern.' };
 }
 
@@ -406,15 +409,87 @@ function inferBetween(first: LinkExample, second: LinkExample): LinkPattern | nu
 }
 
 /**
+ * D-111: two examples whose short forms differ in two places with fixed text between them, each
+ * changing part also in the link: `unicorn-api-PR-45` and `platform-PR-12` from their pull
+ * request links give `{name}-PR-{id}` for `…/_git/{name}/pullrequest/{id}`. Null when they don't.
+ */
+function inferTwoParts(first: LinkExample, second: LinkExample): LinkPattern | null {
+  const one = first.short.trim();
+  const two = second.short.trim();
+  const start = commonStart(one, two);
+  const end = commonEnd(one, two, start);
+  const head = one.slice(0, start);
+  const tail = one.slice(one.length - end);
+  const a = one.slice(start, one.length - end);
+  const b = two.slice(start, two.length - end);
+  // The longest fixed text inside both, with a changing part on each side of it.
+  let middle: { text: string; at: number; atOther: number } | null = null;
+  for (let size = Math.min(a.length, b.length) - 2; size >= 2 && !middle; size--)
+    for (let at = 1; at + size < a.length; at++) {
+      const text = a.slice(at, at + size);
+      if (text.trim().length < 2) continue;
+      const atOther = b.indexOf(text, 1);
+      if (atOther > 0 && atOther + size < b.length) {
+        middle = { text, at, atOther };
+        break;
+      }
+    }
+  if (!middle) return null;
+  const parts = [
+    [a.slice(0, middle.at), b.slice(0, middle.atOther)],
+    [a.slice(middle.at + middle.text.length), b.slice(middle.atOther + middle.text.length)],
+  ] as const;
+  const kinds = parts.map(([x, y]) => (/^\d+$/.test(x) && /^\d+$/.test(y) ? 'digits' : 'word'));
+  if (
+    parts.some(([x, y], index) => {
+      const whole = new RegExp(`^${KIND_SOURCE[kinds[index] ?? 'word']}$`);
+      return !whole.test(x) || !whole.test(y);
+    })
+  )
+    return null;
+  const names =
+    kinds[0] === kinds[1]
+      ? kinds[0] === 'digits'
+        ? ['id', 'id2']
+        : ['name', 'name2']
+      : kinds.map((kind) => (kind === 'digits' ? 'id' : 'name'));
+  /** The link with the two parts named: the second's last place, then the first's before it. */
+  const template = (url: string, firstPart: string, secondPart: string): string | null => {
+    const second = url.lastIndexOf(secondPart);
+    if (second < 0) return null;
+    const first = url.lastIndexOf(firstPart, second - 1);
+    if (first < 0 || first + firstPart.length > second) return null;
+    return (
+      url.slice(0, first) +
+      `{${names[0]}}` +
+      url.slice(first + firstPart.length, second) +
+      `{${names[1]}}` +
+      url.slice(second + secondPart.length)
+    );
+  };
+  const url = template(first.url.trim(), parts[0][0], parts[1][0]);
+  if (!url || url !== template(second.url.trim(), parts[0][1], parts[1][1])) return null;
+  const pattern: LinkPattern = {
+    short: `${head}{${names[0]}}${middle.text}{${names[1]}}${tail}`,
+    url,
+    kinds: { [names[0] ?? 'name']: kinds[0] ?? 'word', [names[1] ?? 'id']: kinds[1] ?? 'word' },
+  };
+  const compiled = compileLinkPatterns([pattern]);
+  return [first, second].every(
+    (example) => shortFormOf(example.url, compiled) === example.short.trim(),
+  )
+    ? pattern
+    : null;
+}
+
+/**
  * NOTE-07, D-105: a short form needs fixed text before or after what changes (`AB#`, `-repo`,
  * `dx:`), or ordinary words in lists and notes would become links. The problem, or null.
  */
 export function fixedPartProblem(pattern: LinkPattern): string | null {
-  const first = pattern.short.search(PLACEHOLDER);
-  const head = first < 0 ? pattern.short : pattern.short.slice(0, first);
-  const tail = pattern.short.slice(pattern.short.lastIndexOf('}') + 1);
+  // D-111: fixed text before, between (two changing parts) or after the changing parts.
   const fixed = (text: string): boolean => text.trim().length >= 2;
-  return fixed(head) || fixed(tail)
+  return pattern.short.split(PLACEHOLDER).some((text, index) => index % 2 === 0 && fixed(text))
     ? null
     : 'The short form needs fixed text before or after the part that changes, or ordinary words would become links.';
 }

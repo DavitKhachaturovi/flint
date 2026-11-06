@@ -21,6 +21,7 @@ import {
   type Hang,
 } from './mini-place.js';
 import { e2eHooks, recoverFromCrashes, testWindowArguments } from './shell.js';
+import { bringToForeground, forceForeground, foregroundWindow, handleValue } from './win32.js';
 import { writeFileAtomic } from './storage/atomic.js';
 import { monitorSetupKey, type DisplayInfo, type Rect } from './window-state.js';
 
@@ -83,6 +84,8 @@ const NEAR_MS = 16;
 const FAR_MS = 120;
 /** How near counts as near (DIP around the window). */
 const NEAR = 48;
+/** D-111: the card's fade out before the window hides (`--fl-dur-base`, a little more). */
+const HIDE_MS = 230;
 
 export interface Mini {
   readonly visible: () => boolean;
@@ -318,14 +321,21 @@ export function createMini(options: {
         sendLayout(layoutFor(place, stageNow));
         return;
       }
-      if (next.hang.corner === current.hang.corner) {
+      const placeNow = insetIn(moved, { ...bounds, width: stage.width, height: stage.height });
+      const placeThen = insetIn(next.hang, stage);
+      if (
+        next.hang.corner === current.hang.corner &&
+        placeNow.horizontal === placeThen.horizontal &&
+        placeNow.vertical === placeThen.vertical
+      ) {
         // The same corner: the card keeps its place in the window, which moves into the corner.
         stageNow = stage;
         setStage(made, stage);
         sendLayout(layoutFor(place, stage));
         return;
       }
-      // Another corner: the card's place in the window changes as the window moves. The page hides
+      // Another corner (or a hang side resized before): the card's place in the window changes as
+      // the window moves. The page hides
       // the card first, so it never shows a frame in the wrong place, then it settles in.
       const id = ++moving;
       let done = false;
@@ -381,7 +391,19 @@ export function createMini(options: {
     if (typeof value !== 'object' || value === null) return;
     const size = clampSize(value);
     const current = currentPlace();
-    stored.places[setupKey()] = { ...current, ...size };
+    // D-111: resized from its hang side, the card's hang point moved (the window didn't).
+    const horizontal = (value as { horizontal?: unknown }).horizontal;
+    let hang = current.hang;
+    if (typeof horizontal === 'number' && Number.isFinite(horizontal) && stageNow) {
+      const at = horizontal * zoom();
+      hang = {
+        ...hang,
+        x: Math.round(
+          hang.corner.endsWith('left') ? stageNow.x + at : stageNow.x + stageNow.width - at,
+        ),
+      };
+    }
+    stored.places[setupKey()] = { ...current, ...size, hang };
     save();
   });
   ipcMain.handle(Channels.miniGetLayout, (event) =>
@@ -399,14 +421,29 @@ export function createMini(options: {
     else go();
   };
 
+  // D-111: hiding plays the card's fade out: the focus goes back at once, clicks pass through, and
+  // the window hides when the fade is over (shown again meanwhile, it simply stays).
+  let hiding: NodeJS.Timeout | undefined;
+  /** The window in front before mini took the focus (it gets it back when mini hides). */
+  let previous = 0n;
+  const handle = (): bigint => (window ? handleValue(window.getNativeWindowHandle()) : 0n);
   const show = (focus: boolean): void => {
     window ??= make();
     const target = window;
     const reveal = (): void => {
+      if (hiding) {
+        clearTimeout(hiding);
+        hiding = undefined;
+      }
       // Tests never take the focus (Davit's machine runs them).
       if (focus && !hooks) {
+        const current = foregroundWindow();
+        if (current !== handle()) previous = current;
         target.show();
         target.focus();
+        // D-111 (as the popup, CAP-01): Windows sometimes refuses to hand over the foreground (its
+        // foreground lock); mini would then show without the keyboard. Take it explicitly.
+        if (foregroundWindow() !== handle()) forceForeground(handle());
       } else target.showInactive();
       send(Channels.miniShown, { focus });
     };
@@ -415,21 +452,32 @@ export function createMini(options: {
   };
 
   const hide = (): void => {
-    if (!window || !window.isVisible()) return;
+    if (!window || !window.isVisible() || hiding) return;
+    const target = window;
+    const hadFocus = target.isFocused();
     send(Channels.miniHiding);
-    window.hide();
     clearTimeout(watching);
     watching = undefined;
     setInteractive(false);
+    if (hadFocus && !hooks) {
+      if (previous !== 0n && previous !== handle()) bringToForeground(previous);
+      else target.blur();
+    }
     options.onHidden();
+    hiding = setTimeout(() => {
+      hiding = undefined;
+      target.hide();
+      send(Channels.miniHidden);
+    }, HIDE_MS);
   };
 
   return {
-    visible: () => window !== null && !window.isDestroyed() && window.isVisible(),
+    visible: () =>
+      window !== null && !window.isDestroyed() && window.isVisible() && hiding === undefined,
     show,
     hide,
     toggle: () => {
-      if (window?.isVisible()) hide();
+      if (window?.isVisible() && !hiding) hide();
       else show(true);
     },
     state: () => ({ tab: stored.tab, noteId: stored.noteId, onTop: options.onTop() }),

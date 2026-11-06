@@ -27,6 +27,7 @@ export function MiniList(props: {
   readonly onSelect: (key: string) => void;
   readonly onToggle: (key: string) => void;
   readonly onPin: (task: TaskRow, pinned: boolean) => void;
+  readonly onMute: (key: string, muted: boolean) => void;
   readonly onMenu: (task: TaskRow, at: Point) => void;
   readonly onOpen: (task: TaskRow) => void;
   /** A drop: the task before or after another one. */
@@ -49,7 +50,7 @@ export function MiniList(props: {
     onLeaveTask: nothing,
     onTab: nothing,
     onMenu: props.onMenu,
-    onMute: nothing,
+    onMute: props.onMute,
     onPin: props.onPin,
     onReminder: nothing,
     expanded: NONE,

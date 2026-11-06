@@ -205,6 +205,42 @@ describe('D-105: inference, the fixed part, built-ins', () => {
     ).toMatchObject({ short: 'DEV-{id}', url: 'https://tracker.example/t/DEV-{id}' });
   });
 
+  it('D-111: two parts that change, fixed text between them: {name}-PR-{id}', async () => {
+    const { compileLinkPatterns, inferLinkPattern, shortFormOf, findShortForms, fixedPartProblem } =
+      await import('./link-patterns.js');
+    const inference = inferLinkPattern([
+      {
+        url: 'https://dev.azure.com/acme/web/_git/unicorn-api/pullrequest/45',
+        short: 'unicorn-api-PR-45',
+      },
+      {
+        url: 'https://dev.azure.com/acme/web/_git/platform/pullrequest/12',
+        short: 'platform-PR-12',
+      },
+    ]);
+    expect(inference.problem).toBeUndefined();
+    expect(inference.ambiguous).toBe(false);
+    expect(inference.pattern).toMatchObject({
+      short: '{name}-PR-{id}',
+      url: 'https://dev.azure.com/acme/web/_git/{name}/pullrequest/{id}',
+      kinds: { name: 'word', id: 'digits' },
+    });
+    const pattern = inference.pattern;
+    if (!pattern) throw new Error('no pattern');
+    // The fixed text between the parts counts as the fixed part.
+    expect(fixedPartProblem(pattern)).toBeNull();
+    const compiled = compileLinkPatterns([pattern]);
+    // Every repository, both ways.
+    expect(
+      shortFormOf('https://dev.azure.com/acme/web/_git/web-shell/pullrequest/7', compiled),
+    ).toBe('web-shell-PR-7');
+    expect(findShortForms('review web-shell-PR-7 today', compiled)[0]?.href).toBe(
+      'https://dev.azure.com/acme/web/_git/web-shell/pullrequest/7',
+    );
+    // Short forms that don't fit stay text.
+    expect(findShortForms('a PR-7 or web-shell-PR- here', compiled)).toEqual([]);
+  });
+
   it('a short form with no fixed part is refused, with a suggestion', async () => {
     const { fixedPartProblem, suggestShortForm } = await import('./link-patterns.js');
     expect(

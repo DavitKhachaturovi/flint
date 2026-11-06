@@ -438,7 +438,50 @@ function blockKey(event: KeyboardEvent, index: number, field: HTMLTextAreaElemen
   }
 }
 
+/**
+ * D-111: the card appears with a quick fade and fades out when it hides. Typing works from the
+ * first frame: hidden, the card waits only slightly faded (so the first frame shows it, the cursor
+ * in the field), then it eases to full. The fade out plays after the focus has gone back (main);
+ * nothing waits for it. None with reduce-motion.
+ */
+const popupCard = required<HTMLElement>('.card');
+const motionOff = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const motionMs = (token: string, fallback: number): number =>
+  parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token)) || fallback;
+let cardLeaving: Animation | null = null;
+popupCard.classList.add('waiting');
+window.flintPopup.onHiding(() => {
+  if (motionOff()) return;
+  cardLeaving = popupCard.animate(
+    [
+      { opacity: 1, transform: 'none' },
+      { opacity: 0, transform: 'translateY(-4px) scale(0.985)' },
+    ],
+    { duration: motionMs('--fl-dur-fast', 120), easing: 'ease-in', fill: 'forwards' },
+  );
+});
+window.flintPopup.onHidden(() => {
+  cardLeaving?.cancel();
+  cardLeaving = null;
+  popupCard.classList.add('waiting');
+});
+const cardArrives = (): void => {
+  cardLeaving?.cancel();
+  cardLeaving = null;
+  if (!popupCard.classList.contains('waiting')) return;
+  popupCard.classList.remove('waiting');
+  if (motionOff()) return;
+  popupCard.animate(
+    [
+      { opacity: 0.55, transform: 'translateY(4px) scale(0.985)' },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: motionMs('--fl-dur-base', 200), easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' },
+  );
+};
+
 window.flintPopup.onShown((shown) => {
+  cardArrives();
   // D-105: the link chips know the user's patterns and the built-ins left on.
   setLinkPatterns(shown.linkPatterns);
   setBuiltInLinksOff(shown.builtInLinksOff);

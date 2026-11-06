@@ -9,44 +9,61 @@ import {
   type RefObject,
 } from 'react';
 import type { MiniLayout } from '../../shared/ipc.js';
+import { MINI_LIMIT, MINI_SHADOW, MINI_SNAP, MINI_WIDTH } from '../../shared/mini-size.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
 
 /**
- * D-110: mini mode's card on its transparent stage (`main/mini-place.ts`). The window is the
- * largest card's area from the corner the card hangs from; the card is placed in it here, at its
- * width, and as tall as its content up to its height limit (then its body scrolls), easing as rows
- * come and go. It is resized from the edges facing away from that corner (the window never moves
- * for it). Main is told the card's size and where clicks must reach the page (the card with its
- * handles, open menus, anything held); elsewhere clicks pass through to the apps below.
+ * D-110, D-111: mini mode's card on its transparent stage (`main/mini-place.ts`). The window is
+ * the largest card's area from the corner the card hangs from, with room on its hang side; the card
+ * is placed in it here. One size for every tab: a width and a height limit; Today and Inbox are as
+ * tall as their content up to the limit (then the body scrolls), the Note tab always takes it. It
+ * is resized from its left and right edges and from the edge facing away from its corner (a top
+ * corner: the bottom edge; a bottom corner: a thin top edge), never moving the window; let go near
+ * the default size it snaps to it, and a reset button brings it back (eased). Main is told the
+ * card's size and where clicks must reach the page: the card, its handles, open menus, anything
+ * held; nothing above a card in a top corner. Elsewhere clicks pass through to the apps below.
  */
 
-/** The smallest card (main's CARD_WIDTH.min, CARD_LIMIT.min). */
-const MIN_WIDTH = 300;
-const MIN_LIMIT = 180;
-/** The handles' reach outside the card. */
+/** The handles' reach outside the card; the top one is thin (other windows' buttons sit there). */
 export const HANDLE = 8;
+const TOP_HANDLE = 3;
 
-type Edge = 'x' | 'y' | 'xy';
+/** A handle: which horizontal edge it moves (-1 left, 1 right) and whether it moves the height. */
+interface Handle {
+  readonly id: string;
+  readonly x: -1 | 0 | 1;
+  readonly y: boolean;
+  readonly className: string;
+}
 
 export interface Stage {
   readonly style: CSSProperties;
   readonly className: string;
-  /** The handles, on the edges facing away from the hang corner. */
-  readonly handles: readonly { readonly edge: Edge; readonly className: string }[];
-  readonly startResize: (edge: Edge, event: ReactPointerEvent<HTMLElement>) => void;
-  /** The corner the card hangs from (a bottom corner: menus and new rows grow it upward). */
+  readonly handles: readonly Handle[];
+  readonly startResize: (handle: Handle, event: ReactPointerEvent<HTMLElement>) => void;
+  /** The corner the card hangs from (a bottom corner: it grows upward). */
   readonly corner: MiniLayout['corner'];
+  /** D-111: the size differs from the default: the reset button shows. */
+  readonly resized: boolean;
+  readonly reset: () => void;
 }
+
+const DEFAULT = { width: MINI_WIDTH.initial, limit: MINI_LIMIT.initial };
 
 export function useStage(refs: {
   readonly card: RefObject<HTMLElement | null>;
   /** Changes when the content changes at once (another tab, another note): the height eases. */
   readonly version: unknown;
+  /** The Note tab: the card always takes its full height. */
+  readonly full: boolean;
 }): Stage {
-  const { card, version } = refs;
+  const { card, version, full } = refs;
   const [layout, setLayout] = useState<MiniLayout | null>(null);
-  const [size, setSize] = useState({ width: 364, limit: 460 });
+  const [size, setSize] = useState<{ width: number; limit: number }>(DEFAULT);
+  // Where the hang-side edge is (`MiniLayout.horizontal`); a resize from that side moves it.
+  const [horizontal, setHorizontal] = useState<number | null>(null);
   const [resizing, setResizing] = useState(false);
+  const [easing, setEasing] = useState(false);
   // Snapping into another corner: hidden until the window has moved, then it settles in.
   const [hidden, setHidden] = useState(false);
   const sizeRef = useRef(size);
@@ -55,14 +72,16 @@ export function useStage(refs: {
   layoutRef.current = layout;
 
   useEffect(() => {
-    void window.flintMini.layout().then((current) => {
-      if (!current || layoutRef.current) return;
-      setLayout(current);
-      setSize({ width: current.width, limit: current.limit });
-    });
-    window.flintMini.onLayout((next) => {
+    const take = (next: MiniLayout): void => {
       setLayout(next);
       setSize({ width: next.width, limit: next.limit });
+      setHorizontal(next.horizontal);
+    };
+    void window.flintMini.layout().then((current) => {
+      if (current && !layoutRef.current) take(current);
+    });
+    window.flintMini.onLayout((next) => {
+      take(next);
       if (next.moving !== undefined) {
         const id = next.moving;
         setHidden(true);
@@ -84,13 +103,13 @@ export function useStage(refs: {
     });
   }, [card]);
 
-  const room = layout?.room ?? { width: 520, height: 760 };
-  const width = Math.max(MIN_WIDTH, Math.min(size.width, room.width));
-  const limitMax = Math.min(size.limit, room.height);
+  const room = layout?.room ?? { width: MINI_WIDTH.max, height: MINI_LIMIT.max };
+  const width = Math.max(MINI_WIDTH.min, Math.min(size.width, room.width));
+  const limit = Math.max(MINI_LIMIT.min, Math.min(size.limit, room.height));
 
-  // The card is as tall as its content up to the limit (max-height; its body scrolls past it), so
-  // it follows rows easing in and out, the reminder card folding, as they animate. A sudden change
-  // (another tab, another note) eases from the old height to the new (09 §9's page switch).
+  // Today and Inbox are as tall as their content up to the limit (max-height; the body scrolls
+  // past it), following rows as they ease in and out. A sudden change (another tab, another note)
+  // eases from the old height to the new (09 §9's page switch).
   const lastHeight = useRef<number | null>(null);
   useLayoutEffect(() => {
     const element = card.current;
@@ -113,6 +132,10 @@ export function useStage(refs: {
     return () => observer.disconnect();
   }, [card]);
 
+  const corner = layout?.corner ?? 'top-right';
+  const left = corner.endsWith('left');
+  const top = corner.startsWith('top');
+
   // Where clicks must reach the page: the card and its handles, open menus. Told to main a frame
   // after anything moves (and while a button is held, wherever the pointer goes).
   const held = useRef(false);
@@ -123,12 +146,15 @@ export function useStage(refs: {
       const element = card.current;
       if (!element) return;
       const box = element.getBoundingClientRect();
+      const topCorner = (layoutRef.current?.corner ?? 'top-right').startsWith('top');
       const rects = [
         {
+          // The side handles and the one away from the corner; above a card in a top corner,
+          // nothing (D-111).
           x: box.x - HANDLE,
-          y: box.y - HANDLE,
+          y: topCorner ? box.y : box.y - TOP_HANDLE,
           width: box.width + 2 * HANDLE,
-          height: box.height + 2 * HANDLE,
+          height: box.height + (topCorner ? HANDLE : TOP_HANDLE),
         },
         ...[...document.querySelectorAll('.fl-menu')].map((menu) => {
           const rect = menu.getBoundingClientRect();
@@ -169,80 +195,156 @@ export function useStage(refs: {
       window.removeEventListener('blur', up);
     };
   }, [card, report]);
-  useEffect(report, [report, layout, width, size.limit]);
+  useEffect(report, [report, layout, width, limit, horizontal, full]);
 
-  const corner = layout?.corner ?? 'top-right';
-  const left = corner.endsWith('left');
-  const top = corner.startsWith('top');
-
-  const startResize = (edge: Edge, event: ReactPointerEvent<HTMLElement>): void => {
+  const startResize = (handle: Handle, event: ReactPointerEvent<HTMLElement>): void => {
     if (event.button !== 0) return;
     event.preventDefault();
-    const handle = event.currentTarget;
-    handle.setPointerCapture(event.pointerId);
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
     const start = { x: event.clientX, y: event.clientY };
-    const from = { width, height: card.current?.offsetHeight ?? limitMax };
+    const from = {
+      width,
+      height: card.current?.offsetHeight ?? limit,
+      horizontal: horizontal ?? layoutRef.current?.horizontal ?? 0,
+    };
     lastHeight.current = null;
     const roomNow = layoutRef.current?.room ?? room;
-    let next = { ...sizeRef.current };
+    // The hang-side edge: left for a left corner. Moving it moves the card's hang point.
+    const hangSide = handle.x !== 0 && handle.x === (left ? -1 : 1);
+    let next = { ...sizeRef.current, horizontal: from.horizontal };
     setResizing(true);
+    const snap = (value: number, to: number): number =>
+      Math.abs(value - to) <= MINI_SNAP ? to : value;
     const move = (moved: PointerEvent): void => {
       const dx = moved.clientX - start.x;
       const dy = moved.clientY - start.y;
-      if (edge !== 'y')
+      if (handle.x !== 0) {
+        let wanted = snap(from.width + handle.x * dx, DEFAULT.width);
+        // The card stays inside its window (the stage keeps room for this, D-111).
+        const most = hangSide
+          ? from.width + from.horizontal - MINI_SHADOW.side
+          : window.innerWidth - from.horizontal - MINI_SHADOW.side;
+        wanted = Math.max(MINI_WIDTH.min, Math.min(MINI_WIDTH.max, roomNow.width, most, wanted));
         next = {
           ...next,
-          width: Math.round(
-            Math.max(MIN_WIDTH, Math.min(roomNow.width, from.width + (left ? dx : -dx))),
-          ),
+          width: Math.round(wanted),
+          horizontal: hangSide
+            ? from.horizontal - (Math.round(wanted) - from.width)
+            : from.horizontal,
         };
-      if (edge !== 'x')
+      }
+      if (handle.y) {
+        const wanted = snap(from.height + (top ? dy : -dy), DEFAULT.limit);
         next = {
           ...next,
-          limit: Math.round(
-            Math.max(MIN_LIMIT, Math.min(roomNow.height, from.height + (top ? dy : -dy))),
-          ),
+          limit: Math.round(Math.max(MINI_LIMIT.min, Math.min(roomNow.height, wanted))),
         };
-      setSize(next);
+      }
+      setSize({ width: next.width, limit: next.limit });
+      setHorizontal(next.horizontal);
     };
     const end = (): void => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', end);
-      handle.removeEventListener('pointercancel', end);
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', end);
+      target.removeEventListener('pointercancel', end);
       setResizing(false);
       lastHeight.current = card.current?.offsetHeight ?? null;
       window.flintMini.resized(next);
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', end);
-    handle.addEventListener('pointercancel', end);
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', end);
+    target.addEventListener('pointercancel', end);
+  };
+
+  /** D-111: back to the default size, eased; the hang-side edge stays where it is. */
+  const reset = (): void => {
+    if (!reducedMotion()) {
+      setEasing(true);
+      window.setTimeout(() => setEasing(false), durationMs('--fl-dur-page', 320) + 40);
+    }
+    setSize(DEFAULT);
+    window.flintMini.resized({
+      ...DEFAULT,
+      horizontal: horizontal ?? layoutRef.current?.horizontal ?? 0,
+    });
   };
 
   const style: CSSProperties = {
     width,
-    maxHeight: Math.max(MIN_LIMIT, limitMax),
-    [left ? 'left' : 'right']: layout?.horizontal ?? 72,
-    [top ? 'top' : 'bottom']: layout?.vertical ?? 36,
+    // Today and Inbox fit their content up to the limit; the Note tab takes all of it.
+    ...(full ? { height: limit } : { maxHeight: limit }),
+    [left ? 'left' : 'right']: horizontal ?? layout?.horizontal ?? 0,
+    [top ? 'top' : 'bottom']: layout?.vertical ?? MINI_SHADOW.top,
     ...(hidden && { opacity: 0 }),
   };
-  const side = left ? 'right' : 'left';
-  const end = top ? 'bottom' : 'top';
+  const away = top ? 'bottom' : 'top';
   return {
     style,
     className: [
       'mini-card fl-compact',
       layout === null ? 'unplaced' : '',
       resizing ? 'resizing' : '',
+      easing ? 'easing' : '',
       hidden ? 'moving' : '',
     ]
       .filter(Boolean)
       .join(' '),
     handles: [
-      { edge: 'x', className: `mini-handle edge-${side}` },
-      { edge: 'y', className: `mini-handle edge-${end}` },
-      { edge: 'xy', className: `mini-handle corner-${end}-${side}` },
+      { id: 'left', x: -1, y: false, className: 'mini-handle edge-left' },
+      { id: 'right', x: 1, y: false, className: 'mini-handle edge-right' },
+      { id: away, x: 0, y: true, className: `mini-handle edge-${away}` },
+      { id: `${away}-left`, x: -1, y: true, className: `mini-handle corner-${away}-left` },
+      { id: `${away}-right`, x: 1, y: true, className: `mini-handle corner-${away}-right` },
     ],
     startResize,
     corner,
+    resized: size.width !== DEFAULT.width || size.limit !== DEFAULT.limit,
+    reset,
   };
+}
+
+/**
+ * D-111: the card rises in when mini is shown and fades out when it is hidden (main waits for the
+ * fade before hiding the window, the focus already given back). Between the two it waits, unseen,
+ * ready to rise in. Off with reduce-motion.
+ */
+export function useShowMotion(card: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const curve = 'cubic-bezier(0.2, 0.9, 0.3, 1)';
+    let out: Animation | null = null;
+    window.flintMini.onShown(() => {
+      const element = card.current;
+      out?.cancel();
+      out = null;
+      if (!element) return;
+      element.style.removeProperty('opacity');
+      if (reducedMotion()) return;
+      element.animate(
+        [
+          { opacity: 0, transform: 'translateY(6px) scale(0.97)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: durationMs('--fl-dur-base', 200), easing: curve },
+      );
+    });
+    window.flintMini.onHiding(() => {
+      const element = card.current;
+      if (!element || reducedMotion()) return;
+      out = element.animate(
+        [
+          { opacity: 1, transform: 'none' },
+          { opacity: 0, transform: 'translateY(4px) scale(0.975)' },
+        ],
+        { duration: durationMs('--fl-dur-base', 200) * 0.9, easing: 'ease-in', fill: 'forwards' },
+      );
+    });
+    window.flintMini.onHidden(() => {
+      const element = card.current;
+      out?.cancel();
+      out = null;
+      // Unseen until it rises in again.
+      element?.style.setProperty('opacity', '0');
+    });
+  }, [card]);
 }

@@ -536,3 +536,10 @@ input:not([readonly], [disabled], [type='checkbox'], [type='radio']),
 textarea:not([readonly], [disabled]) {
   cursor: text;
 }
+
+/* D-111: hidden, the card waits slightly faded, so the first frame after the hotkey already shows
+   it (with the cursor in the field) as it eases to full. */
+.card.waiting {
+  opacity: 0.55;
+  transform: translateY(4px) scale(0.985);
+}

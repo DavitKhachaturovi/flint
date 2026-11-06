@@ -34,6 +34,8 @@ import { testWindowArguments } from './shell.js';
  */
 const CARD_WIDTH = 680;
 const MARGIN = { top: 36, side: 72, bottom: 108 } as const;
+/** D-111: the card's fade out before the window hides (`--fl-dur-fast`, a little more). */
+const FADE_MS = 140;
 const WIDTH = CARD_WIDTH + 2 * MARGIN.side;
 const HEIGHT = 300;
 /**
@@ -172,16 +174,35 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   window.on('hide', stopWatching);
 
   /**
+   * D-111: the card fades out before the window hides; clicks pass through meanwhile, and the
+   * focus has already gone back, so nothing waits for the fade. Shown again meanwhile, it stays.
+   */
+  let fading: NodeJS.Timeout | undefined;
+  const fadeOut = (): void => {
+    if (fading || !window.isVisible()) return;
+    window.setIgnoreMouseEvents(true);
+    window.webContents.send(Channels.popupHiding);
+    fading = setTimeout(() => {
+      fading = undefined;
+      window.hide();
+      window.webContents.send(Channels.popupHidden);
+    }, FADE_MS);
+  };
+
+  /**
    * Hides the popup (CAP-01). With the focus, it goes back to the window in front right before
-   * the popup last got it; without the focus, no focus is moved at all (D-68).
+   * the popup last got it; without the focus, no focus is moved at all (D-68). D-111: the focus
+   * goes back at once and the card then fades out.
    */
   const hideAndReturn = (): number => {
+    if (fading) return epochNow();
     const hadFocus = window.isFocused();
-    window.hide();
-    if (!hadFocus) return epochNow();
-    if (previous !== 0n && previous !== windowHandle && foregroundWindow() !== previous) {
-      bringToForeground(previous);
+    if (hadFocus) {
+      if (previous !== 0n && previous !== windowHandle && foregroundWindow() !== previous)
+        bringToForeground(previous);
+      else if (foregroundWindow() === windowHandle) window.blur();
     }
+    fadeOut();
     return epochNow();
   };
 
@@ -279,13 +300,19 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   // D-41: clicking elsewhere hides an empty popup; one with content stays visible (without the
   // focus) so the user can copy from other apps or add more with Ctrl+Shift+X.
   window.on('blur', () => {
-    if (window.isVisible() && !events.keepOpen()) window.hide();
+    if (window.isVisible() && !fading && !events.keepOpen()) fadeOut();
   });
 
   return {
     window,
     windowHandle,
     show(hotkeyAt: number, extra = {}) {
+      // D-111: shown again while it fades out: it stays, the fade undone by the page.
+      if (fading) {
+        clearTimeout(fading);
+        fading = undefined;
+        clickThrough();
+      }
       const current = foregroundWindow();
       if (current !== windowHandle) previous = current;
       lastOther = 0n;

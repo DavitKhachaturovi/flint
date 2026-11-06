@@ -1415,6 +1415,7 @@ export class Workspace {
     const donePinned: { readonly row: TaskRow; readonly at: number }[] = [];
     const high: { readonly row: TaskRow; readonly rank: number }[] = [];
     const reminders: TodayReminder[] = [];
+    const muted: TodayReminder[] = [];
     const overdue: TodayReminder[] = [];
     const done: (TodayEntry & { readonly at: number })[] = [];
     const counted = new Map<string, boolean>();
@@ -1466,6 +1467,18 @@ export class Workspace {
             });
             counted.set(task.key, isDone);
           }
+        } else if (at && !isDone) {
+          // D-111: turned off: only mini mode shows it (struck), to turn it back on.
+          const when = toDate(at);
+          if (dayStamp(when) === today)
+            muted.push({
+              key: task.key,
+              ...home,
+              title,
+              time: clock(when),
+              at: formatLocalDateTime(at),
+              done: false,
+            });
         }
         const pinnedHere = task.line.fields.pinned && !parent?.line.fields.pinned;
         const highHere =
@@ -1529,6 +1542,7 @@ export class Workspace {
       noteText: null,
       today: {
         reminders,
+        muted,
         rollover,
         high: high.map(({ row }) => row.key),
         done: done

@@ -28,7 +28,7 @@ body {
   padding: 10px;
   border-radius: var(--fl-radius-popup);
   background: var(--fl-ground-card);
-  box-shadow: var(--fl-shadow-float);
+  box-shadow: var(--fl-shadow-desktop);
   pointer-events: auto;
   user-select: none;
 }
@@ -40,6 +40,37 @@ body {
 .mini-card.resizing,
 .mini-card.resizing * {
   transition: none;
+}
+
+/* D-111: Reset size eases the card back to the default. */
+.mini-card.easing {
+  transition:
+    width var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1),
+    height var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1),
+    max-height var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* D-111: the reset button, left of the pin, only while the size differs from the default; it
+   opens its place and fades in, and closes it again. */
+.mini-reset {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition:
+    width var(--fl-dur-state) var(--fl-ease-spring),
+    opacity var(--fl-dur-state) ease,
+    transform var(--fl-dur-state) var(--fl-ease-spring),
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.fl-compact .mini-reset.on {
+  width: 28px;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 /* D-110, like the popup's grip (09 §8): a small pill at the top that moves the window. */
@@ -256,12 +287,23 @@ body {
   opacity: 0.45;
 }
 
-/* The Note tab: the quick note's title, its ⋯ menu, the compact editor. */
-.mini-note {
+/* The Note tab: the quick note's title, its ⋯ menu, the compact editor; it takes the card's whole
+   height (D-111), the editor filling what is left. */
+.mini-view.note {
   display: flex;
   flex-direction: column;
-  min-height: 140px;
+  min-height: 100%;
+}
+
+.mini-note {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   padding: 0 4px;
+}
+
+.mini-note .note-editor {
+  flex: 1;
 }
 
 .mini-note-head {
@@ -306,8 +348,9 @@ body {
   padding: 2px 0 12px;
 }
 
-/* D-110: resized from the edges facing away from the corner it hangs from (main never moves the
-   window for it). */
+/* D-110, D-111: resized from its left and right edges and the edge facing away from its corner: a
+   card in a top corner from its bottom edge (nothing above it takes the mouse), a card in a bottom
+   corner from a thin top edge. The window never moves for it. */
 .mini-handle {
   position: absolute;
   z-index: 4;
@@ -333,43 +376,51 @@ body {
 .mini-handle.edge-bottom {
   left: 18px;
   right: 18px;
-  height: 10px;
   cursor: ns-resize;
-}
-
-.mini-handle.edge-top {
-  top: -8px;
 }
 
 .mini-handle.edge-bottom {
   bottom: -8px;
+  height: 10px;
+}
+
+.mini-handle.edge-top {
+  top: -3px;
+  height: 5px;
 }
 
 .mini-handle[class*='corner-'] {
   width: 22px;
+}
+
+.mini-handle.corner-bottom-left,
+.mini-handle.corner-bottom-right {
+  bottom: -8px;
   height: 22px;
 }
 
-.mini-handle.corner-top-left {
-  top: -8px;
+.mini-handle.corner-top-left,
+.mini-handle.corner-top-right {
+  top: -3px;
+  height: 17px;
+}
+
+.mini-handle.corner-bottom-left {
   left: -8px;
-  cursor: nwse-resize;
+  cursor: nesw-resize;
 }
 
 .mini-handle.corner-bottom-right {
-  bottom: -8px;
   right: -8px;
+  cursor: nwse-resize;
+}
+
+.mini-handle.corner-top-left {
+  left: -8px;
   cursor: nwse-resize;
 }
 
 .mini-handle.corner-top-right {
-  top: -8px;
   right: -8px;
-  cursor: nesw-resize;
-}
-
-.mini-handle.corner-bottom-left {
-  bottom: -8px;
-  left: -8px;
   cursor: nesw-resize;
 }

@@ -57,6 +57,7 @@ import { titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
+import { NoteTitle } from './NoteTitle.js';
 import {
   ContextPanel,
   type FactKind,
@@ -1282,11 +1283,29 @@ export function App(): ReactElement {
     [change],
   );
 
+  /**
+   * D-111: an empty new row that is left plays the remove animation where it was (in the list and
+   * on a task's page), instead of vanishing. `shownNewRow` is where the row was drawn last.
+   */
+  const shownNewRow = useRef<{ seq: number; anchor: string; nested: boolean } | null>(null);
+  const [newLeaving, setNewLeaving] = useState<{
+    seq: number;
+    anchor: string;
+    nested: boolean;
+  } | null>(null);
   const leaveNew = useCallback(
     (text: string, empty: boolean, how: Leave, id: string | null): void => {
       const current = editingRef.current;
       if (current?.kind !== 'new') return;
       if (empty) {
+        const shown = shownNewRow.current;
+        if (shown && shown.seq === current.seq && !reducedMotion()) {
+          setNewLeaving(shown);
+          window.setTimeout(
+            () => setNewLeaving((now) => (now?.seq === shown.seq ? null : now)),
+            durationMs('--fl-dur-complete', 360),
+          );
+        }
         // Back to Navigate on the last task the row added (or the one it started below).
         setEditing(null);
         setSelected(current.added.at(-1) ?? current.after);
@@ -3075,7 +3094,11 @@ export function App(): ReactElement {
     });
   const glideVersion = [rows, completedOpen];
 
+  // D-111: the shorthand typed into a row being edited shows on it (lists for `##`).
+  const shorthandLists = useMemo(() => listInfos(lists), [lists]);
   const rowProps: RowHandlers = {
+    lists: shorthandLists,
+    ...(listId && { listId }),
     selected,
     editing,
     onSelect: (key, how) => {
@@ -3163,10 +3186,13 @@ export function App(): ReactElement {
       ? [fresh.after, ...fresh.added].filter((key) => keys.includes(key)).at(-1)
       : undefined;
     const placeNew = (after: string): void => {
-      if (fresh && after === anchor)
+      if (fresh && after === anchor) {
+        shownNewRow.current = { seq: fresh.seq, anchor: after, nested: false };
         pageRows.push(
           <NewRow key={`new-${fresh.seq}`} subtask={false} onLeave={leaveNew} onTab={tab} />,
         );
+      } else if (!fresh && newLeaving?.anchor === after)
+        pageRows.push(<LeavingNewRow key={`new-gone-${newLeaving.seq}`} nested={false} />);
     };
     placeNew(pageTask.key);
     for (const sub of pageTask.subtasks) {
@@ -3191,8 +3217,15 @@ export function App(): ReactElement {
       ? [fresh.after, ...fresh.added].filter((key) => shown.has(key)).at(-1)
       : undefined;
     const placeNew = (after: string, subtask: boolean): void => {
+      if (!fresh && newLeaving?.anchor === after) {
+        cardRows.push(
+          <LeavingNewRow key={`new-gone-${newLeaving.seq}`} nested={newLeaving.nested} />,
+        );
+        return;
+      }
       if (!fresh || after !== anchor) return;
       const nested = fresh.level === 'in' || (subtask && fresh.level !== 'out');
+      shownNewRow.current = { seq: fresh.seq, anchor: after, nested };
       cardRows.push(
         <NewRow key={`new-${fresh.seq}`} subtask={nested} onLeave={leaveNew} onTab={tab} />,
       );
@@ -4561,7 +4594,24 @@ export function App(): ReactElement {
                         }
                       />
                     ) : (
-                      <h1>{view.name}</h1>
+                      <NoteTitle
+                        key={view.id}
+                        name={view.name}
+                        readOnly={view.readOnly !== null}
+                        onRename={async (name) => {
+                          const outcome = await window.flintMain.listAction({
+                            kind: 'rename',
+                            id: view.id,
+                            name,
+                          });
+                          if (outcome?.ok) {
+                            await refresh();
+                            if (outcome.label) showToast(outcome.label, true);
+                          }
+                          return outcome;
+                        }}
+                        onProblem={(problem) => showToast(problem, false)}
+                      />
                     )}
                     {view.readOnly && (
                       <span className="subtitle">
@@ -5319,6 +5369,19 @@ function TaskPage(props: {
         </button>
       )}
     </>
+  );
+}
+
+/** D-111: an empty new row that was left, playing the remove animation where it was. */
+function LeavingNewRow(props: { readonly nested: boolean }): ReactElement {
+  return (
+    <div
+      className={props.nested ? 'row leaving remove subtask' : 'row leaving remove'}
+      aria-hidden="true"
+    >
+      <span className="check" />
+      <span className="title" />
+    </div>
   );
 }
 

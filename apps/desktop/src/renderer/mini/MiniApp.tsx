@@ -11,15 +11,15 @@ import {
 } from '../../shared/ipc.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
-import { CloseIcon, PinIcon } from '../main-window/icons.js';
+import { CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
 import { Composer } from '../ui/Composer.js';
-import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
+import { applySpeed, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
 import { ToastView, useToast } from '../ui/Toast.js';
 import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
 import { NoteTab } from './NoteTab.js';
-import { useStage } from './stage.js';
+import { useShowMotion, useStage } from './stage.js';
 
 /**
  * MINI-01, D-109, D-110 (mockup 05): mini mode, a small always-on-top card beside the main window and
@@ -76,7 +76,9 @@ function todayRows(
       return todayTime(task);
     });
   const placed = new Set(pinned.map((row) => row.key));
-  const coming = view.today.reminders
+  // D-111: with today's reminders turned off too (struck), so the bell turns them back on.
+  const muted = new Set((view.today.muted ?? []).map((each) => each.key));
+  const coming = [...view.today.reminders, ...(view.today.muted ?? [])]
     .filter((each) => !each.done && !placed.has(each.key) && isLater(each.at, now))
     .sort((a, b) => a.at.localeCompare(b.at))
     .map((each): TaskRow => {
@@ -89,7 +91,7 @@ function todayRows(
         priority: null,
         reminder: each.time,
         reminderAt: each.at,
-        reminderState: 'on',
+        reminderState: muted.has(each.key) ? 'muted' : 'on',
         done: false,
         completed: null,
         body: '',
@@ -125,7 +127,6 @@ export function MiniApp(): ReactElement {
   // Notes made here (the lists may not have them yet), and notes removed (the lists may still).
   const made = useRef(new Set<string>());
   const removed = useRef(new Set<string>());
-  const [arrived, setArrived] = useState(0);
   const composer = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -182,7 +183,6 @@ export function MiniApp(): ReactElement {
     window.flintMain.onChanged(() => void refreshRef.current());
     window.flintMini.onAlerts(setAlerts);
     window.flintMini.onShown(({ focus }) => {
-      setArrived((count) => count + 1);
       void refreshRef.current();
       if (focus && tabRef.current === 'note')
         window.setTimeout(() => body.current?.querySelector<HTMLElement>('.cm-content')?.focus());
@@ -193,18 +193,6 @@ export function MiniApp(): ReactElement {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-
-  // D-89: shown, it rises in (never holding input; off under reduce-motion).
-  useEffect(() => {
-    if (arrived === 0 || reducedMotion()) return;
-    cardRef.current?.animate(
-      [
-        { opacity: 0, transform: 'translateY(6px) scale(0.985)' },
-        { opacity: 1, transform: 'none' },
-      ],
-      { duration: durationMs('--fl-dur-base', 200), easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' },
-    );
-  }, [arrived]);
 
   // The note shown: the remembered one while it is a quick note, else the most recent one, else a
   // new one (made on the first keystroke). Never one that was removed (D-110).
@@ -283,6 +271,15 @@ export function MiniApp(): ReactElement {
     if (safeSelected === key) setSelected(rows[index + 1]?.key ?? rows[index - 1]?.key ?? null);
     const label = await window.flintMain.toggle(routeOf(key).listId, key);
     if (label) showToast(label, true);
+  };
+  /** REM-12, D-111: the bell turns the reminder off and on. */
+  const mute = async (key: string, off: boolean): Promise<void> => {
+    const outcome = await window.flintMain.change(routeOf(key).listId, {
+      kind: 'mute',
+      key,
+      muted: off,
+    });
+    if (outcome?.label) showToast(outcome.label, true);
   };
   const pin = async (task: TaskRow, pinned: boolean): Promise<void> => {
     const outcome = await window.flintMain.change(routeOf(task.key).listId, {
@@ -434,7 +431,12 @@ export function MiniApp(): ReactElement {
   };
 
   const quick = lists.find((list) => list.id === noteId) ?? null;
-  const stage = useStage({ card: cardRef, version: `${tab}:${noteId ?? ''}` });
+  const stage = useStage({
+    card: cardRef,
+    version: `${tab}:${noteId ?? ''}`,
+    full: tab === 'note',
+  });
+  useShowMotion(cardRef);
   const selectReminder = (reminder: TodayReminder): void => setSelected(reminder.key);
 
   return (
@@ -459,6 +461,19 @@ export function MiniApp(): ReactElement {
             ))}
           </div>
           <span className="mini-head-space" />
+          {/* D-111: back to the default size, while the size differs from it. */}
+          <button
+            type="button"
+            className={stage.resized ? 'tool mini-reset on' : 'tool mini-reset'}
+            aria-label="Reset size"
+            title="Reset size"
+            tabIndex={stage.resized ? 0 : -1}
+            aria-hidden={!stage.resized}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={stage.reset}
+          >
+            <ResetSizeIcon size={13} />
+          </button>
           <button
             type="button"
             className={onTop ? 'tool mini-pin on' : 'tool mini-pin'}
@@ -494,7 +509,7 @@ export function MiniApp(): ReactElement {
         />
 
         <div className="mini-body" ref={body}>
-          <div className="mini-view" key={tab}>
+          <div className={tab === 'note' ? 'mini-view note' : 'mini-view'} key={tab}>
             {tab !== 'note' && rows.length === 0 && (
               <p className="empty">
                 {tab === 'today' ? 'Nothing pinned for today.' : 'Inbox is empty.'}
@@ -510,6 +525,7 @@ export function MiniApp(): ReactElement {
                 onSelect={setSelected}
                 onToggle={(key) => void complete(key)}
                 onPin={(task, pinned) => void pin(task, pinned)}
+                onMute={(key, off) => void mute(key, off)}
                 onMenu={rowMenu}
                 onOpen={(task) => open(task.key)}
                 onPlace={place}
@@ -568,10 +584,10 @@ export function MiniApp(): ReactElement {
 
         {stage.handles.map((handle) => (
           <span
-            key={handle.edge}
+            key={handle.id}
             className={handle.className}
             aria-hidden="true"
-            onPointerDown={(event) => stage.startResize(handle.edge, event)}
+            onPointerDown={(event) => stage.startResize(handle, event)}
           />
         ))}
       </div>

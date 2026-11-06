@@ -213,7 +213,7 @@ test("the card: mockup 05's look on a transparent window, the main window's part
         .find((each) => each.getTitle() === 'Flint mini')
         ?.getSize(),
     ),
-  ).toEqual([664, 904]);
+  ).toEqual([804, 824]);
   expect(await mini.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
@@ -255,10 +255,15 @@ test("the card: mockup 05's look on a transparent window, the main window's part
     'Inbox',
     'Note',
   ]);
-  // Resize handles on the edges facing away from its corner (it hangs from the top right).
-  await expect(mini.locator('.mini-handle')).toHaveCount(3);
+  // D-111: resize handles left, right and on the edge away from its corner (it hangs from the
+  // top right): nothing above it takes the mouse.
+  await expect(mini.locator('.mini-handle')).toHaveCount(5);
   await expect(mini.locator('.mini-handle.edge-left')).toHaveCount(1);
+  await expect(mini.locator('.mini-handle.edge-right')).toHaveCount(1);
   await expect(mini.locator('.mini-handle.edge-bottom')).toHaveCount(1);
+  await expect(mini.locator('.mini-handle[class*="top"]')).toHaveCount(0);
+  // The default size: no reset button.
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(0);
 });
 
 test("Today: pinned tasks, then today's later reminders; no high-priority group (D-109, Q4)", async () => {
@@ -530,9 +535,95 @@ test('the Note tab: a title before any text; a removed empty note never leaves t
   await mini.keyboard.press('Control+1');
 });
 
-test('× hides mini mode; the palette and the cheat sheet know it (D-109, D-106)', async () => {
+/** Drags a resize handle by (dx, dy). */
+const resize = async (handle: string, dx: number, dy: number): Promise<void> => {
+  const box = await mini.locator(`.mini-handle.${handle}`).boundingBox();
+  if (!box) throw new Error(`no ${handle}`);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await mini.mouse.move(x, y);
+  await mini.mouse.down();
+  await mini.mouse.move(x + dx / 2, y + dy / 2, { steps: 4 });
+  await mini.mouse.move(x + dx, y + dy, { steps: 4 });
+  await mini.mouse.up();
+};
+const cardBox = async (): Promise<{ x: number; width: number; height: number }> => {
+  const box = await mini.locator('.mini-card').boundingBox();
+  if (!box) throw new Error('no card');
+  return { x: Math.round(box.x), width: Math.round(box.width), height: Math.round(box.height) };
+};
+
+test('one size for every tab: Note takes the whole height; resized from either side, back near the default it snaps; Reset size (D-111)', async () => {
+  await mini.keyboard.press('Control+1');
+  // Settled (the last test's tab switch eases the height and folds the reminder card in).
+  await mini.waitForTimeout(800);
+  const today = await cardBox();
+  expect(today.width).toBe(364);
+  expect(today.height).toBeLessThan(460);
+  // The Note tab always takes the height limit; the width stays.
+  await mini.keyboard.press('Control+3');
+  await expect.poll(async () => (await cardBox()).height).toBe(460);
+  expect((await cardBox()).width).toBe(364);
+  await mini.keyboard.press('Control+1');
+  await expect.poll(async () => (await cardBox()).height).toBe(today.height);
+  // The right edge is its hang side (top right): it resizes too, the left edge staying.
+  await resize('edge-right', 40, 0);
+  await expect.poll(async () => (await cardBox()).width).toBe(404);
+  expect((await cardBox()).x).toBe(today.x);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(1);
+  // The same size on every tab.
+  await mini.keyboard.press('Control+2');
+  expect((await cardBox()).width).toBe(404);
+  await mini.keyboard.press('Control+1');
+  // Back near the default, it snaps to it and the reset button goes.
+  await resize('edge-left', 37, 0);
+  await expect.poll(async () => (await cardBox()).width).toBe(364);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(0);
+  // Larger again, then Reset size: back to the default, eased.
+  await resize('edge-left', -60, 0);
+  await resize('edge-bottom', 0, -60);
+  await expect.poll(async () => (await cardBox()).width).toBe(424);
+  await mini.locator('.mini-reset.on').click();
+  await expect.poll(async () => (await cardBox()).width).toBe(364);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(0);
+  expect(
+    await mini.locator('.mini-card').evaluate((card) => getComputedStyle(card).maxHeight),
+  ).toBe('460px');
+});
+
+test('a slow second click on a selected row opens it; the bell turns a reminder off and on, the row staying (D-111)', async () => {
+  await main.locator('.sidebar > .nav[data-key="@today"]').click();
+  await row('Call the vendor').click();
+  await mini.waitForTimeout(700);
+  await row('Call the vendor').click({ position: { x: 120, y: 10 } });
+  await expect(main.locator('h1')).toContainText('Work');
+  await expect(main.locator('.row.sel')).toContainText('Call the vendor');
+  // The bell: off (struck), the row stays in Today to turn it back on.
+  const file = join(flint, 'Work.md');
+  await row('Call the vendor').locator('.reminder-bell').click();
+  await expect.poll(() => readFile(file, 'utf8')).toMatch(/Call the vendor .*\[muted::/);
+  await expect(row('Call the vendor').locator('.reminder')).toHaveClass(/muted/);
+  await row('Call the vendor').locator('.reminder-bell').click();
+  await expect.poll(() => readFile(file, 'utf8')).not.toMatch(/Call the vendor .*\[muted::/);
+  await expect(row('Call the vendor').locator('.reminder')).not.toHaveClass(/muted/);
+});
+
+test('× hides mini mode (fading out first); the palette and the cheat sheet know it (D-109, D-106, D-111)', async () => {
   await mini.locator('.tool[aria-label="Hide mini mode"]').click();
   await expect.poll(() => hook('miniVisible')).toBe(false);
+  // D-111: the window hides once the card has faded out; hidden, the card waits unseen.
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((each) => each.getTitle() === 'Flint mini')
+          ?.isVisible(),
+      ),
+    )
+    .toBe(false);
+  await expect
+    .poll(() => mini.locator('.mini-card').evaluate((card) => card.style.opacity))
+    .toBe('0');
   await main.keyboard.press('Control+k');
   await main.keyboard.type('mini mode');
   // Go to → Settings: Mini mode comes first (D-107's order); the command is under Commands.
@@ -541,6 +632,10 @@ test('× hides mini mode; the palette and the cheat sheet know it (D-109, D-106)
     .locator('.palette-item', { hasText: /^Mini mode/ })
     .click();
   await expect.poll(() => hook('miniVisible')).toBe(true);
+  // Shown, it rises in.
+  await expect
+    .poll(() => mini.locator('.mini-card').evaluate((card) => card.style.opacity))
+    .toBe('');
   await main.keyboard.press('Shift+Slash');
   await expect(main.locator('.cheat-sheet .cheat-group[aria-label="Mini mode"]')).toHaveCount(1);
   await main.keyboard.press('Escape');
