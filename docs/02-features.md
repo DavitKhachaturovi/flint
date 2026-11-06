@@ -676,6 +676,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
+- **Decided (D-112):** Settings has **Replay walkthrough**; the walkthrough's first step says it can be skipped now and replayed any time from Settings.
 - **Decided (D-64):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.
 - Milestone M8.
 

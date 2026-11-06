@@ -801,3 +801,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 10 | Mini and the capture popup fade in and out; focus returned at once | MINI-01, CAP-01 · Done (0.8.10) | 03, 05, D-111 |
 | 11 | Mini's softer shadow below; nothing above a top-corner card takes the mouse | MINI-01 · Done (0.8.10); a Teams share still to check | 09, D-111 |
 
+## AT. Fixes after 0.8.10 (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The side panel's subtasks ease in and fold away like the list's rows | NAV-07, TASK-05 · Done (0.8.11) | D-112 |
+| 2 | Mini's Note tab a little lower under the tabs; no scrollbar while the height eases | MINI-01 · Done (0.8.11) | 09, D-112 |
+| 3 | The capture popup takes the softer desktop shadow | CAP-01 · Done (0.8.11) | 09, D-112 |
+| 4 | Replay walkthrough in Settings; the walkthrough says so | APP-10, APP-11 · Decided (M8 step 4) | 02, D-112 |
+
