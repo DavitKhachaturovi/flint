@@ -91,6 +91,16 @@ export function Row(
     readonly fresh?: 'new' | 'return' | undefined;
     /** D-75: a ghost playing the completion animation where the task was. */
     readonly ghost?: Ghost['direction'];
+    /**
+     * D-110: mini mode's compact size: smaller type and padding (`.fl-compact`), and only what mini
+     * acts on: the check, the pin, the bell and time shown (not buttons), no bodies or home list.
+     */
+    readonly variant?: 'compact';
+    /**
+     * D-109: a double-click (and Enter, the caller's) opens the task elsewhere instead of editing;
+     * a second click on a selected row then does nothing.
+     */
+    readonly onActivate?: (task: TaskRow) => void;
   },
 ): ReactElement {
   const {
@@ -107,6 +117,7 @@ export function Row(
     ghost,
   } = props;
   const isEditing = !ghost && editing?.kind === 'task' && editing.key === task.key;
+  const compact = props.variant === 'compact';
   const classes = ['row'];
   if (!ghost && task.key === selected && editing?.kind !== 'new') classes.push('sel');
   if (subtask) classes.push('subtask');
@@ -161,6 +172,7 @@ export function Row(
           return;
         }
         if (event.detail !== 1 || !wasSelected.current || task.done || ghost) return;
+        if (props.onActivate) return;
         if ((event.target as Element).closest('button, a, input, textarea')) return;
         // D-76, D-89: a second single click on a selected row edits, the caret where it landed.
         onEdit(task.key, titleCaret(task, event));
@@ -175,6 +187,10 @@ export function Row(
       // the field it is the field's own (word selection); never on a link.
       onDoubleClick={(event) => {
         if (task.done || isEditing || titleLink(event.target)) return;
+        if (props.onActivate) {
+          if (!ghost && !(event.target as Element).closest('button')) props.onActivate(task);
+          return;
+        }
         onEdit(task.key, titleCaret(task, event));
       }}
     >
@@ -221,7 +237,20 @@ export function Row(
             <PinIcon />
           </button>
         )}
-        {task.reminder && !task.done && (
+        {task.reminder && !task.done && compact && (
+          // D-110: in mini the bell and time are shown, not buttons (D-109: those edits stay in
+          // the main window).
+          <span className={`reminder ${task.reminderState ?? 'on'}`}>
+            <span className="reminder-bell">
+              <ReminderBellIcon />
+              <span className="overdue-dot" aria-hidden="true" />
+            </span>
+            <span className="reminder-time">
+              <MorphText text={task.reminder} />
+            </span>
+          </span>
+        )}
+        {task.reminder && !task.done && !compact && (
           // REM-11, REM-12, D-68: the bell never moves; it is the off/on toggle, carries the
           // overdue dot, and the time next to it opens the date/time picker (REM-01).
           <span className={`reminder ${task.reminderState ?? 'on'}`}>
@@ -254,7 +283,7 @@ export function Row(
           </span>
         )}
         {task.done && task.completed && <span>{task.completed}</span>}
-        {!task.code && hasImages && (
+        {!compact && !task.code && hasImages && (
           <button
             type="button"
             className="body-toggle image-toggle"
@@ -267,7 +296,7 @@ export function Row(
             <ImageIcon />
           </button>
         )}
-        {!task.code && hasText && (
+        {!compact && !task.code && hasText && (
           <button
             type="button"
             className={props.expanded.has(task.key) ? 'body-toggle open' : 'body-toggle'}
@@ -282,7 +311,7 @@ export function Row(
           </button>
         )}
         {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
-        {task.home && !task.done && (
+        {!compact && task.home && !task.done && (
           <button
             type="button"
             className="chip home-list"

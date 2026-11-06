@@ -151,6 +151,10 @@ export const PinIcon = ({ size = 12 }: IconProps): ReactElement =>
     />,
   ]);
 
+/** D-110: the composer's send arrow in mini mode (mockup 05). */
+export const SendIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [<path key="a" d="M12 19V5" />, <path key="b" d="m5 12 7-7 7 7" />], 2.2);
+
 /** DATA-02, D-97: the Trash row in the sidebar. */
 export const TrashIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [

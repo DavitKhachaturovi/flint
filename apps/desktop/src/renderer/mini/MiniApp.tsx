@@ -1,123 +1,41 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactElement,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   TODAY_ID,
   type ListSummary,
   type ListView,
   type MiniAlert,
+  type MiniAlertAction,
   type MiniTab,
   type TaskRow,
   type TodayReminder,
 } from '../../shared/ipc.js';
-import { titleHtml } from '../../shared/inline-markdown.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
-import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
-import { NoteEditor } from '../main-window/NoteEditor.js';
-import { usePresence } from '../ui/presence.js';
-import { BellIcon, CheckIcon, CloseIcon, PinIcon, PlusIcon } from '../main-window/icons.js';
+import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
+import { CloseIcon, PinIcon } from '../main-window/icons.js';
+import { Composer } from '../ui/Composer.js';
+import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
+import { parseAt } from '../ui/presence.js';
+import { ToastView, useToast } from '../ui/Toast.js';
+import { MiniList } from './MiniList.js';
+import { MiniReminder } from './MiniReminder.js';
+import { NoteTab } from './NoteTab.js';
+import { useStage } from './stage.js';
 
 /**
- * MINI-01, D-109 (mockup 05): mini mode, a small always-on-top window beside the main window and
- * in sync with it. Three tabs: **Today** (the open pinned tasks in Today's order, then the tasks
- * with a reminder later today that aren't pinned), **Inbox** (its open tasks) and **Note** (one
- * quick note, a sticky note). A click selects, a double-click or Enter opens the task in the main
- * window (mini stays); the checkbox completes; right-click: Complete, Pin, Open in Flint. The
- * reminder card (REM-06) sits on top of every tab while one waits: Done, Snooze 10m, Open.
- * Single-letter keys act only when no text field has the caret (the main window's rule).
+ * MINI-01, D-109, D-110 (mockup 05): mini mode, a small always-on-top card beside the main window and
+ * in sync with it, built from the main window's own parts (D-110): its task rows in their compact
+ * size, the gliding selection, the completion animation, the drag, the composer with the capture
+ * shorthand, the toast, the segmented tabs, the quick-note title and editor, the scrollbars.
+ * Three tabs: **Today** (the open pinned tasks in Today's order, then the tasks with a reminder later
+ * today that aren't pinned), **Inbox** (its open top-level tasks) and **Note** (one quick note, a
+ * sticky note). A click selects, a double-click or Enter opens the task in the main window (mini
+ * stays). The reminder card (REM-06): Today's next reminder, turning into the alert when one fires
+ * (on any tab). Single-letter keys act only when no text field has the caret (the main window's
+ * rule). The card sits on a transparent stage (`stage.ts`) and hangs from its corner.
  */
 
 const INBOX_ID = 'inbox';
-
-/** A row in mini: a task (Today's pinned, Inbox's), or a reminder later today (Today). */
-interface MiniRow {
-  readonly key: string;
-  /** The list a change goes through: Today's own, Inbox, or a reminder's home list. */
-  readonly listId: string;
-  /** Its home list (where Open goes). */
-  readonly homeId: string;
-  readonly title: string;
-  readonly label: string;
-  readonly priority: TaskRow['priority'];
-  readonly pinned: boolean;
-  /** `15:00` for a reminder today. */
-  readonly time: string | null;
-  readonly reminderRow: boolean;
-}
-
-const fromTask = (task: TaskRow, listId: string, homeId: string, time: string | null): MiniRow => ({
-  key: task.key,
-  listId,
-  homeId,
-  title: task.title,
-  label: task.label,
-  priority: task.priority,
-  pinned: task.pinned === true,
-  time,
-  reminderRow: false,
-});
-
-/** `YYYY-MM-DDTHH:MM` local, later than now. */
-const later = (at: string, now: Date): boolean => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(at);
-  if (!match) return false;
-  const when = new Date(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-    Number(match[4]),
-    Number(match[5]),
-  );
-  return when.getTime() > now.getTime();
-};
-
-/** D-109, Q4: Today's pinned (Today's order), then later reminders today that aren't pinned. */
-function todayRows(view: ListView | null, now: Date): MiniRow[] {
-  if (!view?.today) return [];
-  const high = new Set(view.today.high);
-  const reminders = new Map(view.today.reminders.map((each) => [each.key, each]));
-  const pinned = view.items
-    .flatMap((item) => (item.kind === 'task' ? [item.task] : []))
-    .filter((task) => !task.done && !high.has(task.key))
-    .map((task) =>
-      fromTask(
-        task,
-        TODAY_ID,
-        task.home?.listId ?? INBOX_ID,
-        reminders.get(task.key)?.time ?? null,
-      ),
-    );
-  const placed = new Set(pinned.map((row) => row.key));
-  const coming = view.today.reminders
-    .filter((each: TodayReminder) => !each.done && !placed.has(each.key) && later(each.at, now))
-    .sort((a, b) => a.at.localeCompare(b.at))
-    .map((each): MiniRow => ({
-      key: each.key,
-      listId: each.listId,
-      homeId: each.listId,
-      title: each.title,
-      label: each.title,
-      priority: null,
-      pinned: false,
-      time: each.time,
-      reminderRow: true,
-    }));
-  return [...pinned, ...coming];
-}
-
-function inboxRows(view: ListView | null): MiniRow[] {
-  if (!view) return [];
-  return view.items
-    .flatMap((item) => (item.kind === 'task' ? [item.task] : []))
-    .filter((task) => !task.done)
-    .map((task) => fromTask(task, INBOX_ID, INBOX_ID, null));
-}
+const TOAST_MS = 5000;
 
 const TABS: readonly { readonly id: MiniTab; readonly name: string }[] = [
   { id: 'today', name: 'Today' },
@@ -125,7 +43,70 @@ const TABS: readonly { readonly id: MiniTab; readonly name: string }[] = [
   { id: 'note', name: 'Note' },
 ];
 
-const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Where a row's changes go (Today's own view, Inbox, a reminder's home list) and its home. */
+interface Route {
+  readonly listId: string;
+  readonly homeId: string;
+}
+
+/** D-110: in mini every time is today's, so a row shows `15:00`, not `Today 15:00`. */
+const todayTime = (task: TaskRow): TaskRow =>
+  task.reminder?.startsWith('Today ') ? { ...task, reminder: task.reminder.slice(6) } : task;
+
+const openTasks = (view: ListView | null): TaskRow[] =>
+  (view?.items ?? []).flatMap((item) =>
+    item.kind === 'task' && !item.task.done ? [item.task] : [],
+  );
+
+/** `YYYY-MM-DDTHH:MM`, later than now. */
+const isLater = (at: string, now: Date): boolean => (parseAt(at)?.getTime() ?? 0) > now.getTime();
+
+/** D-109, Q4: Today's pinned (Today's order), then later reminders today that aren't pinned. */
+function todayRows(
+  view: ListView | null,
+  now: Date,
+): { rows: TaskRow[]; routes: Map<string, Route> } {
+  const routes = new Map<string, Route>();
+  if (!view?.today) return { rows: [], routes };
+  const high = new Set(view.today.high);
+  const pinned = openTasks(view)
+    .filter((task) => !high.has(task.key))
+    .map((task) => {
+      routes.set(task.key, { listId: TODAY_ID, homeId: task.home?.listId ?? INBOX_ID });
+      return todayTime(task);
+    });
+  const placed = new Set(pinned.map((row) => row.key));
+  const coming = view.today.reminders
+    .filter((each) => !each.done && !placed.has(each.key) && isLater(each.at, now))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .map((each): TaskRow => {
+      routes.set(each.key, { listId: each.listId, homeId: each.listId });
+      return {
+        key: each.key,
+        title: each.title,
+        label: each.title,
+        code: null,
+        priority: null,
+        reminder: each.time,
+        reminderAt: each.at,
+        reminderState: 'on',
+        done: false,
+        completed: null,
+        body: '',
+        subtasks: [],
+      };
+    });
+  return { rows: [...pinned, ...coming], routes };
+}
+
+function inboxRows(view: ListView | null): { rows: TaskRow[]; routes: Map<string, Route> } {
+  const routes = new Map<string, Route>();
+  const rows = openTasks(view).map((task) => {
+    routes.set(task.key, { listId: INBOX_ID, homeId: INBOX_ID });
+    return todayTime(task);
+  });
+  return { rows, routes };
+}
 
 export function MiniApp(): ReactElement {
   const [tab, setTabState] = useState<MiniTab>('today');
@@ -135,33 +116,24 @@ export function MiniApp(): ReactElement {
   const [inbox, setInbox] = useState<ListView | null>(null);
   const [alerts, setAlerts] = useState<readonly MiniAlert[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ text: string; undo: boolean; id: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
-  // The Note tab: the quick note shown ('' while none is made yet), its text, and "Kept in Lists".
+  const { toast, showToast, hideToast } = useToast(TOAST_MS);
+  // The Note tab: the note shown ('' a new one, not made yet; null: to be chosen), its view.
   const [noteId, setNoteId] = useState<string | null>(null);
   const [noteView, setNoteView] = useState<ListView | null>(null);
   const [kept, setKept] = useState(false);
-  // Notes made here (the list of lists may not have them yet), and "New quick note" asked for.
-  const created = useRef(new Set<string>());
-  const [wantNew, setWantNew] = useState(false);
+  // Notes made here (the lists may not have them yet), and notes removed (the lists may still).
+  const made = useRef(new Set<string>());
+  const removed = useRef(new Set<string>());
   const [arrived, setArrived] = useState(0);
   const composer = useRef<HTMLInputElement>(null);
-  const root = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
   const noteRef = useRef<string | null>(null);
   noteRef.current = noteId;
   const tabRef = useRef(tab);
   tabRef.current = tab;
-
-  const showToast = useCallback((text: string, undo: boolean): void => {
-    setToast({ text, undo, id: Date.now() });
-  }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   const refresh = useCallback(async (): Promise<void> => {
     const mine = ++seq.current;
@@ -177,8 +149,13 @@ export function MiniApp(): ReactElement {
     setLists(nextLists);
     setToday(nextToday);
     setInbox(nextInbox);
-    setNoteView(nextNote);
     setNow(new Date());
+    // D-110: a note that is gone (an empty one removed when it was left) is never shown again.
+    if (note && !nextNote && !made.current.has(note)) {
+      removed.current.add(note);
+      if (noteRef.current === note) setNoteId(null);
+    }
+    setNoteView(nextNote);
   }, []);
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -196,6 +173,11 @@ export function MiniApp(): ReactElement {
         setBuiltInLinksOff(off);
       },
     );
+    // APP-11, D-110: the animation speed, as in the main window.
+    void window.flintMain.settings().then((settings) => {
+      if (settings) applySpeed(settings.animationSpeed);
+    });
+    window.flintMain.onAppearance((appearance) => applySpeed(appearance.animationSpeed));
     void window.flintMini.alerts().then(setAlerts);
     window.flintMain.onChanged(() => void refreshRef.current());
     window.flintMini.onAlerts(setAlerts);
@@ -205,47 +187,43 @@ export function MiniApp(): ReactElement {
       if (focus && tabRef.current === 'note')
         window.setTimeout(() => body.current?.querySelector<HTMLElement>('.cm-content')?.focus());
     });
-    window.flintMini.onHiding(() => leaveNote());
+    window.flintMini.onHiding(() => leaveRef.current());
     void refreshRef.current();
     // The clock: reminders later today come and go.
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  // D-89: shown, it arrives (a quick rise and fade, never holding input; off under reduce-motion).
+  // D-89: shown, it rises in (never holding input; off under reduce-motion).
   useEffect(() => {
     if (arrived === 0 || reducedMotion()) return;
-    root.current?.animate(
+    cardRef.current?.animate(
       [
-        { opacity: 0, transform: 'translateY(4px) scale(0.985)' },
+        { opacity: 0, transform: 'translateY(6px) scale(0.985)' },
         { opacity: 1, transform: 'none' },
       ],
-      {
-        duration:
-          parseFloat(
-            getComputedStyle(document.documentElement).getPropertyValue('--fl-dur-base'),
-          ) || 200,
-        easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)',
-      },
+      { duration: durationMs('--fl-dur-base', 200), easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' },
     );
   }, [arrived]);
 
-  // The note shown follows the tab: the remembered one if it is still a quick note, else the
-  // most recent one, else none yet (made on the first keystroke).
+  // The note shown: the remembered one while it is a quick note, else the most recent one, else a
+  // new one (made on the first keystroke). Never one that was removed (D-110).
   const quickNotes = lists
-    .filter((list) => list.quick)
+    .filter((list) => list.quick && !removed.current.has(list.id))
     .sort((a, b) => (b.quick?.at ?? 0) - (a.quick?.at ?? 0));
   useEffect(() => {
     if (tab !== 'note' || lists.length === 0) return;
-    if (noteId === '' && wantNew) return;
-    if (noteId && (kept || created.current.has(noteId) || lists.some((list) => list.id === noteId)))
+    if (noteId === '') return;
+    if (
+      noteId &&
+      !removed.current.has(noteId) &&
+      (kept || made.current.has(noteId) || lists.some((list) => list.id === noteId))
+    )
       return;
     const next = quickNotes[0]?.id ?? '';
-    if (next !== noteId) {
-      setNoteId(next);
-      window.flintMini.setState({ noteId: next || null });
-    }
-  }, [tab, lists, noteId, kept, wantNew]);
+    setNoteId(next);
+    window.flintMini.setState({ noteId: next || null });
+  }, [tab, lists, noteId, kept]);
   useEffect(() => {
     if (noteId) void refreshRef.current();
     else setNoteView(null);
@@ -255,12 +233,13 @@ export function MiniApp(): ReactElement {
   const leaveNote = (): void => {
     const id = noteRef.current;
     setKept(false);
-    setWantNew(false);
     if (!id) return;
     const list = lists.find((each) => each.id === id);
     if (list && !list.quick) return;
-    void window.flintMain.discardQuickNote(id).then(async (removed) => {
-      if (!removed) return;
+    void window.flintMain.discardQuickNote(id).then(async (gone) => {
+      if (!gone) return;
+      removed.current.add(id);
+      made.current.delete(id);
       if (noteRef.current === id) setNoteId(null);
       if (await window.flintMain.tipDue('emptyQuickNote', 3))
         showToast('Empty quick notes are removed when you leave them', false);
@@ -277,46 +256,93 @@ export function MiniApp(): ReactElement {
     window.flintMini.setState({ tab: next });
   };
 
-  const rows = tab === 'today' ? todayRows(today, now) : tab === 'inbox' ? inboxRows(inbox) : [];
-  const shown = usePresence(rows, (row) => row.key);
+  const { rows, routes } =
+    tab === 'today'
+      ? todayRows(today, now)
+      : tab === 'inbox'
+        ? inboxRows(inbox)
+        : { rows: [], routes: new Map<string, Route>() };
   const safeSelected = rows.some((row) => row.key === selected) ? selected : null;
+  const routeOf = (key: string): Route =>
+    routes.get(key) ?? { listId: tab === 'today' ? TODAY_ID : INBOX_ID, homeId: INBOX_ID };
+  // Done: in Completed, or (Today's pinned, D-92) still among the items, faded.
+  const doneIn = (view: ListView | null): string[] => [
+    ...(view?.completed ?? []).map((task) => task.key),
+    ...(view?.items ?? []).flatMap((item) =>
+      item.kind === 'task' && item.task.done ? [item.task.key] : [],
+    ),
+  ];
+  const doneKeys = new Set([
+    ...doneIn(today),
+    ...doneIn(inbox),
+    ...(today?.today?.reminders ?? []).filter((each) => each.done).map((each) => each.key),
+  ]);
 
-  const complete = async (row: MiniRow): Promise<void> => {
-    const index = rows.findIndex((each) => each.key === row.key);
-    const next = rows[index + 1] ?? rows[index - 1];
-    if (safeSelected === row.key) setSelected(next?.key ?? null);
-    const label = await window.flintMain.toggle(row.listId, row.key);
+  const complete = async (key: string): Promise<void> => {
+    const index = rows.findIndex((each) => each.key === key);
+    if (safeSelected === key) setSelected(rows[index + 1]?.key ?? rows[index - 1]?.key ?? null);
+    const label = await window.flintMain.toggle(routeOf(key).listId, key);
     if (label) showToast(label, true);
   };
-  const pin = async (row: MiniRow): Promise<void> => {
-    const outcome = await window.flintMain.change(row.listId, {
+  const pin = async (task: TaskRow, pinned: boolean): Promise<void> => {
+    const outcome = await window.flintMain.change(routeOf(task.key).listId, {
       kind: 'pin',
-      key: row.key,
-      pinned: !row.pinned,
+      key: task.key,
+      pinned,
     });
     if (outcome?.label) showToast(outcome.label, true);
   };
-  const open = (row: MiniRow): void => window.flintMini.open({ listId: row.homeId, key: row.key });
+  const open = (key: string): void => window.flintMini.open({ listId: routeOf(key).homeId, key });
   const undo = async (which: 'undo' | 'redo'): Promise<void> => {
     const label = await (which === 'undo' ? window.flintMain.undo() : window.flintMain.redo());
     if (which === 'undo') showToast(label ? `Undid: ${label}` : 'Nothing to undo', false);
     else showToast(label ? `Redid: ${label}` : 'Nothing to redo', false);
   };
-  const rowMenu = (row: MiniRow, at: { x: number; y: number }): void => {
-    setSelected(row.key);
+  const rowMenu = (task: TaskRow, at: { x: number; y: number }): void => {
+    setSelected(task.key);
     const entries: MenuEntry[] = [
-      { label: 'Complete', hint: 'Space', action: () => void complete(row) },
-      { label: row.pinned ? 'Unpin' : 'Pin', hint: 'P', action: () => void pin(row) },
+      { label: 'Complete', hint: 'Space', action: () => void complete(task.key) },
+      {
+        label: task.pinned ? 'Unpin' : 'Pin',
+        hint: 'P',
+        action: () => void pin(task, !task.pinned),
+      },
       'divider',
-      { label: 'Open in Flint', hint: 'Enter', action: () => open(row) },
+      { label: 'Open in Flint', hint: 'Enter', action: () => open(task.key) },
     ];
     openMenu(entries, at);
   };
+  /** Today's pinned rows and Inbox's rows reorder; Today's reminders keep their time order. */
+  const movable = (key: string): boolean =>
+    tab === 'inbox' || (tab === 'today' && routeOf(key).listId === TODAY_ID);
+  const place = async (
+    key: string,
+    where: { readonly at: 'before' | 'after'; readonly key: string },
+  ): Promise<boolean> =>
+    (await window.flintMain.change(routeOf(key).listId, { kind: 'place', key, where })) !== null;
+  const move = (key: string, direction: 'up' | 'down'): void => {
+    if (!movable(key)) {
+      nudge(key, direction);
+      return;
+    }
+    void window.flintMain
+      .change(routeOf(key).listId, { kind: 'move', key, direction })
+      .then((outcome) => {
+        // D-87: Alt+↑ on the first task, Alt+↓ on the last: a nudge.
+        if (!outcome) nudge(key, direction);
+      });
+  };
 
   const alert = alerts[0] ?? null;
-  const act = (action: 'done' | 'snooze' | 'open'): void => {
+  const act = (action: MiniAlertAction): void => {
     if (alert) window.flintMini.alertAction(alert.id, action);
   };
+  const upcoming =
+    tab === 'today'
+      ? ((today?.today?.reminders ?? [])
+          .filter((each) => !each.done && isLater(each.at, now))
+          .sort((a, b) => a.at.localeCompare(b.at))[0] ?? null)
+      : null;
 
   // Q7: the keys. Single letters only when no text field has the caret.
   useEffect(() => {
@@ -339,8 +365,18 @@ export function MiniApp(): ReactElement {
         void undo(event.key === 'z' ? 'undo' : 'redo');
         return;
       }
-      if (event.ctrlKey || event.altKey || event.metaKey) return;
       const row = rows.find((each) => each.key === safeSelected) ?? null;
+      // TASK-02, D-110: Alt+↑/↓ moves the selected task, as in the main window.
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+      ) {
+        event.preventDefault();
+        if (row) move(row.key, event.key === 'ArrowDown' ? 'down' : 'up');
+        return;
+      }
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
       const at = row ? rows.indexOf(row) : -1;
       const key = event.key.toLowerCase();
       if (alert && (key === 'd' || key === 's' || key === 'o')) {
@@ -359,13 +395,13 @@ export function MiniApp(): ReactElement {
         setSelected(rows[next]?.key ?? null);
       } else if (event.key === ' ' && row) {
         event.preventDefault();
-        void complete(row);
+        void complete(row.key);
       } else if (key === 'p' && row) {
         event.preventDefault();
-        void pin(row);
+        void pin(row, !row.pinned);
       } else if (event.key === 'Enter' && row) {
         event.preventDefault();
-        open(row);
+        open(row.key);
       } else if (key === 'n' && tab !== 'note') {
         event.preventDefault();
         composer.current?.focus();
@@ -376,360 +412,169 @@ export function MiniApp(): ReactElement {
   });
 
   // The selected row stays in view.
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!safeSelected) return;
     body.current
-      ?.querySelector(`.mini-row[data-key="${CSS.escape(safeSelected)}"]`)
+      ?.querySelector(`.row[data-key="${CSS.escape(safeSelected)}"]`)
       ?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'instant' : 'smooth' });
   }, [safeSelected]);
 
-  const add = async (text: string): Promise<void> => {
-    const outcome = await window.flintMain.change(tab === 'today' ? TODAY_ID : INBOX_ID, {
+  const listId = tab === 'today' ? TODAY_ID : INBOX_ID;
+  const add = async (text: string, chooseNewList: boolean): Promise<void> => {
+    const outcome = await window.flintMain.change(listId, {
       kind: 'add',
       text,
       where: 'top',
+      ...(chooseNewList && { chooseNewList }),
     });
-    if (outcome?.label && outcome.listId !== (tab === 'today' ? TODAY_ID : INBOX_ID))
+    if (!outcome?.key) return;
+    // Today's tasks are made in Inbox, pinned: that is no other place to tell about.
+    if (outcome.listId !== listId && !(listId === TODAY_ID && outcome.listId === INBOX_ID))
       showToast(outcome.label, true);
   };
 
-  const quick = lists.find((list) => list.id === noteId);
+  const quick = lists.find((list) => list.id === noteId) ?? null;
+  const stage = useStage({ card: cardRef, version: `${tab}:${noteId ?? ''}` });
+  const selectReminder = (reminder: TodayReminder): void => setSelected(reminder.key);
+
   return (
-    <div className="mini" ref={root}>
-      <header className="mini-head">
-        <div className="mini-tabs" role="tablist" aria-label="Mini mode">
-          {TABS.map((each, index) => (
-            <button
-              key={each.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === each.id}
-              className={tab === each.id ? 'mini-tab on' : 'mini-tab'}
-              title={`${each.name} (Ctrl+${index + 1})`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => setTab(each.id)}
-            >
-              {each.name}
-            </button>
-          ))}
-          <span
-            className="mini-tab-glide"
-            aria-hidden="true"
-            style={{ transform: `translateX(${TABS.findIndex((each) => each.id === tab) * 100}%)` }}
-          />
-        </div>
-        <span className="mini-drag" />
-        <button
-          type="button"
-          className={onTop ? 'mini-tool on' : 'mini-tool'}
-          aria-label={onTop ? 'Always on top (on)' : 'Always on top (off)'}
-          aria-pressed={onTop}
-          title={onTop ? 'Always on top: on' : 'Always on top: off'}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => void window.flintMini.setOnTop(!onTop).then(setOnTop)}
-        >
-          <PinIcon size={14} />
-        </button>
-        <button
-          type="button"
-          className="mini-tool"
-          aria-label="Hide mini mode"
-          title="Hide (Ctrl+Alt+Space)"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => window.flintMini.hide()}
-        >
-          <CloseIcon size={14} />
-        </button>
-      </header>
-
-      {alert && (
-        <section className="mini-alert" key={alert.id} aria-label="Reminder" role="alert">
-          <div className="mini-alert-top">
-            <span className="mini-alert-tile">
-              <BellIcon size={14} />
-            </span>
-            <span className="mini-alert-text">
-              <span className="mini-alert-label">
-                {alert.label}
-                {alerts.length > 1 && ` · 1 of ${alerts.length}`}
-              </span>
-              <span className="mini-alert-title">{alert.title}</span>
-            </span>
+    <div className="mini-stage">
+      <div className={stage.className} ref={cardRef} style={stage.style} data-corner={stage.corner}>
+        <span className="mini-grip" aria-hidden="true" />
+        <header className="mini-head">
+          <div className="trash-tabs mini-tabs" role="tablist" aria-label="Mini mode">
+            {TABS.map((each, index) => (
+              <button
+                key={each.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === each.id}
+                className={tab === each.id ? 'trash-tab on' : 'trash-tab'}
+                title={`${each.name} (Ctrl+${index + 1})`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setTab(each.id)}
+              >
+                {each.name}
+              </button>
+            ))}
           </div>
-          <div className="mini-alert-actions">
-            <button type="button" className="mini-alert-button strong" onClick={() => act('done')}>
-              Done <span className="keycap">D</span>
-            </button>
-            <button type="button" className="mini-alert-button" onClick={() => act('snooze')}>
-              Snooze 10m <span className="keycap">S</span>
-            </button>
-            <button type="button" className="mini-alert-button" onClick={() => act('open')}>
-              Open <span className="keycap">O</span>
-            </button>
-          </div>
-        </section>
-      )}
+          <span className="mini-head-space" />
+          <button
+            type="button"
+            className={onTop ? 'tool mini-pin on' : 'tool mini-pin'}
+            aria-label={onTop ? 'Always on top (on)' : 'Always on top (off)'}
+            aria-pressed={onTop}
+            title={onTop ? 'Always on top: on' : 'Always on top: off'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void window.flintMini.setOnTop(!onTop).then(setOnTop)}
+          >
+            <PinIcon size={14} />
+          </button>
+          <button
+            type="button"
+            className="tool"
+            aria-label="Hide mini mode"
+            title="Hide (Ctrl+Alt+Space)"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => window.flintMini.hide()}
+          >
+            <CloseIcon size={13} />
+          </button>
+        </header>
 
-      <div className="mini-body" ref={body} key={tab}>
-        {tab !== 'note' && (
-          <>
-            {rows.length === 0 && shown.entries.length === 0 && (
-              <p className="mini-empty">
+        <MiniReminder
+          alert={alert}
+          waiting={alerts.length}
+          upcoming={upcoming}
+          onAct={act}
+          onSelect={selectReminder}
+          onOpen={(reminder) =>
+            window.flintMini.open({ listId: reminder.listId, key: reminder.key })
+          }
+        />
+
+        <div className="mini-body" ref={body}>
+          <div className="mini-view" key={tab}>
+            {tab !== 'note' && rows.length === 0 && (
+              <p className="empty">
                 {tab === 'today' ? 'Nothing pinned for today.' : 'Inbox is empty.'}
               </p>
             )}
-            <div className="mini-rows" role="list">
-              {shown.entries.map(({ item: row, key, leaving }) => (
-                <div
-                  key={key}
-                  role="listitem"
-                  data-key={key}
-                  className={[
-                    'mini-row',
-                    key === safeSelected ? 'sel' : '',
-                    leaving ? 'leaving' : '',
-                    row.reminderRow ? 'reminder' : '',
-                  ].join(' ')}
-                  onAnimationEnd={(event) => {
-                    if (leaving && event.target === event.currentTarget) shown.gone(key);
-                  }}
-                  onMouseDown={(event) => {
-                    if (event.button === 0) setSelected(row.key);
-                  }}
-                  onDoubleClick={() => open(row)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    rowMenu(row, { x: event.clientX, y: event.clientY });
-                  }}
-                >
-                  {row.priority && <span className={`stripe p-${row.priority}`} />}
-                  <button
-                    type="button"
-                    className={leaving ? 'check on' : 'check'}
-                    aria-label="Complete task"
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onClick={() => void complete(row)}
-                  >
-                    {leaving && <CheckIcon />}
-                  </button>
-                  {row.title === '' ? (
-                    <span className="mini-title">{row.label}</span>
-                  ) : (
-                    <span
-                      className="mini-title md"
-                      dangerouslySetInnerHTML={{ __html: titleHtml(row.title) }}
-                    />
-                  )}
-                  {row.time && (
-                    <span className="mini-when">
-                      <BellIcon size={11} />
-                      {row.time}
-                    </span>
-                  )}
-                  {row.pinned && tab === 'inbox' && (
-                    <span className="mini-pin" aria-label="Pinned">
-                      <PinIcon size={11} />
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        {tab === 'note' && (
-          <NoteTab
-            noteId={noteId}
-            view={noteView}
-            title={
-              quick?.quick
-                ? quick.quick.label === quick.name
-                  ? quick.name
-                  : ''
-                : (noteView?.name ?? '')
-            }
-            quickNotes={quickNotes}
-            kept={kept}
-            onId={(id) => {
-              created.current.add(id);
-              setWantNew(false);
-              setNoteId(id);
-              window.flintMini.setState({ noteId: id });
-            }}
-            onSwitch={(id) => {
-              leaveRef.current();
-              setWantNew(id === '');
-              setNoteId(id);
-              window.flintMini.setState({ noteId: id || null });
-            }}
-            onKeep={() => {
-              if (!noteId) return;
-              void window.flintMain.keepQuickNote(noteId).then(() => setKept(true));
-            }}
-          />
-        )}
-      </div>
-
-      {tab !== 'note' && (
-        <form
-          className="mini-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const field = composer.current;
-            const text = field?.value.trim() ?? '';
-            if (!field || text === '') return;
-            field.value = '';
-            void add(text);
-          }}
-        >
-          <input
-            ref={composer}
-            className="mini-composer-input"
-            placeholder={tab === 'today' ? 'Add to Today…' : 'Add to Inbox…'}
-            aria-label={tab === 'today' ? 'Add to Today' : 'Add to Inbox'}
-            spellCheck={false}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              textFieldMenu(event.currentTarget, (command) => window.flintMain.edit(command));
-            }}
-            onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
-              if (event.key === 'Escape') event.currentTarget.blur();
-            }}
-          />
-          <button type="submit" className="mini-add" aria-label="Add" title="Add (Enter)">
-            <PlusIcon size={13} />
-          </button>
-        </form>
-      )}
-
-      {toast && (
-        <div className="mini-toast" key={toast.id} role="status">
-          <span>{toast.text}</span>
-          {toast.undo && (
-            <button
-              type="button"
-              onClick={() => {
-                setToast(null);
-                void undo('undo');
-              }}
-            >
-              Undo
-            </button>
-          )}
+            {tab !== 'note' && (
+              <MiniList
+                rows={rows}
+                scope={`${tab}:${(tab === 'today' ? today : inbox) ? 'ready' : 'loading'}`}
+                selected={safeSelected}
+                draggable={movable}
+                isDone={(key) => doneKeys.has(key)}
+                onSelect={setSelected}
+                onToggle={(key) => void complete(key)}
+                onPin={(task, pinned) => void pin(task, pinned)}
+                onMenu={rowMenu}
+                onOpen={(task) => open(task.key)}
+                onPlace={place}
+              />
+            )}
+            {tab === 'note' && noteId !== null && (
+              <NoteTab
+                noteId={noteId}
+                view={noteView}
+                quick={quick}
+                quickNotes={quickNotes}
+                kept={kept}
+                onMade={(id) => {
+                  made.current.add(id);
+                  setNoteId(id);
+                  window.flintMini.setState({ noteId: id });
+                }}
+                onSwitch={(id) => {
+                  leaveRef.current();
+                  setNoteId(id);
+                  window.flintMini.setState({ noteId: id || null });
+                }}
+                onKeep={() => {
+                  if (!noteId) return;
+                  void window.flintMain.keepQuickNote(noteId).then(() => setKept(true));
+                }}
+                onToast={showToast}
+              />
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-/**
- * D-109, Q5: the Note tab: one quick note as a sticky note. Its title ("Add a title", saved on
- * Enter or when left), a ⋯ menu (the other quick notes, New quick note, Keep as a note, Open in
- * Flint) and the compact live-preview editor. With no quick note, an empty editor: the note is made
- * on the first keystroke.
- */
-function NoteTab(props: {
-  readonly noteId: string | null;
-  readonly view: ListView | null;
-  readonly title: string;
-  readonly quickNotes: readonly ListSummary[];
-  readonly kept: boolean;
-  readonly onId: (id: string) => void;
-  readonly onSwitch: (id: string) => void;
-  readonly onKeep: () => void;
-}): ReactElement {
-  const { noteId, view, quickNotes, kept, onId, onSwitch, onKeep } = props;
-  const [title, setTitle] = useState('');
-  // The editor stays the same one when its note is made on the first keystroke (a new one only
-  // for another note), so nothing typed meanwhile is lost.
-  const made = useRef(new Set<string>());
-  const [editorKey, setEditorKey] = useState(0);
-  const shownId = useRef(noteId);
-  useEffect(() => {
-    if (noteId !== shownId.current && !(noteId && made.current.has(noteId)))
-      setEditorKey((key) => key + 1);
-    shownId.current = noteId;
-  }, [noteId]);
-  useEffect(() => setTitle(props.title), [noteId, props.title]);
-  const saveTitle = (): void => {
-    const name = title.trim();
-    if (!noteId || name === '') return;
-    void window.flintMain.listAction({ kind: 'rename', id: noteId, name });
-  };
-  const menu = (at: { x: number; y: number }): void => {
-    const others = quickNotes.filter((list) => list.id !== noteId);
-    const entries: MenuEntry[] = [
-      ...others.map((list): MenuEntry => ({
-        label: list.quick?.label ?? list.name,
-        action: () => onSwitch(list.id),
-      })),
-      ...(others.length > 0 ? (['divider'] as const) : []),
-      { label: 'New quick note', action: () => onSwitch('') },
-      { label: 'Keep as a note', disabled: !noteId || kept, action: onKeep },
-      {
-        label: 'Open in Flint',
-        disabled: !noteId,
-        action: () => noteId && window.flintMini.open({ listId: noteId }),
-      },
-    ];
-    openMenu(entries, at);
-  };
-  const ready =
-    noteId === '' ||
-    (noteId !== null && (made.current.has(noteId) || (view !== null && view.id === noteId)));
-  return (
-    <div className="mini-note">
-      <div className="mini-note-head">
-        <input
-          className="mini-note-title"
-          value={title}
-          placeholder="Add a title"
-          aria-label="Title"
-          spellCheck={false}
-          disabled={!noteId}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={saveTitle}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              saveTitle();
-              event.currentTarget.blur();
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="mini-tool"
-          aria-label="Quick notes"
-          title="Quick notes"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={(event) => {
-            const box = event.currentTarget.getBoundingClientRect();
-            menu({ x: box.right - 4, y: box.bottom + 4 });
-          }}
-        >
-          <span className="mini-more" aria-hidden="true">
-            ⋯
-          </span>
-        </button>
+        {tab !== 'note' && (
+          <Composer
+            key={tab}
+            compact
+            listId={listId}
+            lists={lists}
+            inputRef={composer}
+            placeholder={tab === 'today' ? 'Add to Today…' : 'Add to Inbox…'}
+            onAdd={add}
+          />
+        )}
+
+        {toast && (
+          <ToastView
+            key={toast.id}
+            toast={toast}
+            onHide={hideToast}
+            onUndo={() => {
+              hideToast();
+              void undo('undo');
+            }}
+          />
+        )}
+
+        {stage.handles.map((handle) => (
+          <span
+            key={handle.edge}
+            className={handle.className}
+            aria-hidden="true"
+            onPointerDown={(event) => stage.startResize(handle.edge, event)}
+          />
+        ))}
       </div>
-      {kept && <p className="mini-kept">Kept in Lists</p>}
-      {ready && (
-        <NoteEditor
-          key={editorKey}
-          id={noteId ?? ''}
-          text={noteId && view?.id === noteId ? (view.noteText ?? '') : ''}
-          readOnly={false}
-          mono={null}
-          window="mini"
-          className="note-editor mini-editor"
-          onId={(id) => {
-            made.current.add(id);
-            onId(id);
-          }}
-          onImage={() => undefined}
-          create={() => window.flintMain.quickNote()}
-        />
-      )}
     </div>
   );
 }

@@ -34,6 +34,7 @@ import {
   FlagIcon,
   HashIcon,
   LinkIcon,
+  SendIcon,
 } from '../main-window/icons.js';
 import { openMenu } from '../menu/menu.js';
 import { mediaUrl } from '../../shared/body-markdown.js';
@@ -70,8 +71,14 @@ export function Composer(props: {
   readonly onAdd: (text: string, chooseNewList: boolean) => Promise<void>;
   /** D-92: Today's "Add a task to today…". */
   readonly placeholder?: string;
+  /**
+   * D-110: mini mode's compact size: no tool buttons (the shorthand does it), a send arrow beside
+   * the field, the `##` menu and list card above it, and the shorthand hint only while the field
+   * is focused and empty.
+   */
+  readonly compact?: boolean;
 }): ReactElement {
-  const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…' } = props;
+  const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…', compact = false } = props;
   const text = useInertText('', false);
   /** D-78: notes under the title (Shift+Enter, as in the capture popup): the new task's body. */
   const [notes, setNotes] = useState<string | null>(null);
@@ -243,9 +250,70 @@ export function Composer(props: {
     trigger: button,
   });
 
+  const field = (
+    <input
+      ref={inputRef}
+      className="composer-input"
+      placeholder={placeholder}
+      value={value}
+      spellCheck={false}
+      aria-controls="composer-suggestions"
+      onChange={(event) => {
+        text.change(event.target.value);
+        setCaret(event.target.selectionStart ?? event.target.value.length);
+      }}
+      onSelect={(event) =>
+        setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+      }
+      onPaste={(event) => {
+        if (!pasteRules(event)) text.paste();
+      }}
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === 'Enter' && event.shiftKey) {
+          event.preventDefault();
+          focusNotes.current = true;
+          if (notes === null) setNotes('');
+          else notesRef.current?.focus();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          // D-40: with the menu or the card showing, Enter first accepts it; the next saves.
+          if (suggestions.length > 0) acceptSuggestion(suggestions[Math.max(0, highlight)]);
+          else if (cardTarget) acceptCard();
+          else submit();
+        } else if (
+          (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+          suggestions.length > 0
+        ) {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          setHighlight((at) => (at + step + suggestions.length) % suggestions.length);
+        } else if (event.key === 'Tab' && !event.shiftKey && parsed) {
+          // D-25: Tab flips the card between the close match and a new list.
+          if (parsed.target.kind === 'close-match') {
+            event.preventDefault();
+            setChooseNewFor(parsed.target.name);
+            setCardAcceptedFor(null);
+          } else if (parsed.target.kind === 'new' && chooseNewFor) {
+            event.preventDefault();
+            setChooseNewFor(null);
+            setCardAcceptedFor(null);
+          }
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+
   return (
     <section
-      className="card composer"
+      className={
+        compact
+          ? `card composer compact${value === '' && notes === null ? ' empty' : ''}`
+          : 'card composer'
+      }
       aria-label="Add a task"
       // UI-01, D-65: the whole card is the text box's target (one cursor, no flicker around it).
       onMouseDown={(event) => {
@@ -255,60 +323,23 @@ export function Composer(props: {
         inputRef.current?.focus();
       }}
     >
-      <input
-        ref={inputRef}
-        className="composer-input"
-        placeholder={placeholder}
-        value={value}
-        spellCheck={false}
-        aria-controls="composer-suggestions"
-        onChange={(event) => {
-          text.change(event.target.value);
-          setCaret(event.target.selectionStart ?? event.target.value.length);
-        }}
-        onSelect={(event) =>
-          setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
-        }
-        onPaste={(event) => {
-          if (!pasteRules(event)) text.paste();
-        }}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === 'Enter' && event.shiftKey) {
-            event.preventDefault();
-            focusNotes.current = true;
-            if (notes === null) setNotes('');
-            else notesRef.current?.focus();
-          } else if (event.key === 'Enter') {
-            event.preventDefault();
-            // D-40: with the menu or the card showing, Enter first accepts it; the next saves.
-            if (suggestions.length > 0) acceptSuggestion(suggestions[Math.max(0, highlight)]);
-            else if (cardTarget) acceptCard();
-            else submit();
-          } else if (
-            (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
-            suggestions.length > 0
-          ) {
-            event.preventDefault();
-            const step = event.key === 'ArrowDown' ? 1 : -1;
-            setHighlight((at) => (at + step + suggestions.length) % suggestions.length);
-          } else if (event.key === 'Tab' && !event.shiftKey && parsed) {
-            // D-25: Tab flips the card between the close match and a new list.
-            if (parsed.target.kind === 'close-match') {
-              event.preventDefault();
-              setChooseNewFor(parsed.target.name);
-              setCardAcceptedFor(null);
-            } else if (parsed.target.kind === 'new' && chooseNewFor) {
-              event.preventDefault();
-              setChooseNewFor(null);
-              setCardAcceptedFor(null);
-            }
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-        }}
-      />
+      {compact ? (
+        <div className="composer-line">
+          {field}
+          <button
+            type="button"
+            className="composer-send"
+            aria-label="Add"
+            title="Add (Enter)"
+            disabled={value.trim() === ''}
+            onClick={submit}
+          >
+            <SendIcon />
+          </button>
+        </div>
+      ) : (
+        field
+      )}
       {suggestions.length > 0 && (
         <ul
           ref={suggestionsBox}
@@ -403,62 +434,67 @@ export function Composer(props: {
         />
       )}
       <div className="composer-bar">
-        <div className="tools">
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Set priority"
-            onClick={(event) =>
-              openPriorityPicker(host(event.currentTarget), parsed?.priority ?? null, (priority) =>
-                replaceToken('priority', priority ? PRIORITY_TOKENS[priority] : null),
-              )
-            }
-          >
-            <FlagIcon />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Choose list"
-            onClick={(event) =>
-              openListPicker(
-                host(event.currentTarget),
-                infos,
-                { placeholder: 'Add to list…' },
-                (pick) =>
-                  replaceToken(
-                    'list',
-                    'newList' in pick
-                      ? listShorthand(pick.newList)
-                      : // The list the composer is in needs no token.
-                        pick.list.id === listId
-                        ? null
-                        : listShorthand(pick.list.name),
-                  ),
-              )
-            }
-          >
-            <HashIcon />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            data-picker-trigger
-            aria-label="Set reminder"
-            onClick={(event) =>
-              openTimePicker(
-                host(event.currentTarget),
-                new Date(),
-                parsed?.reminder ?? null,
-                (at) => replaceToken('reminder', timeShorthand(at)),
-              )
-            }
-          >
-            <BellIcon size={15} />
-          </button>
-        </div>
+        {!compact && (
+          <div className="tools">
+            <button
+              type="button"
+              className="tool"
+              data-picker-trigger
+              aria-label="Set priority"
+              onClick={(event) =>
+                openPriorityPicker(
+                  host(event.currentTarget),
+                  parsed?.priority ?? null,
+                  (priority) =>
+                    replaceToken('priority', priority ? PRIORITY_TOKENS[priority] : null),
+                )
+              }
+            >
+              <FlagIcon />
+            </button>
+            <button
+              type="button"
+              className="tool"
+              data-picker-trigger
+              aria-label="Choose list"
+              onClick={(event) =>
+                openListPicker(
+                  host(event.currentTarget),
+                  infos,
+                  { placeholder: 'Add to list…' },
+                  (pick) =>
+                    replaceToken(
+                      'list',
+                      'newList' in pick
+                        ? listShorthand(pick.newList)
+                        : // The list the composer is in needs no token.
+                          pick.list.id === listId
+                          ? null
+                          : listShorthand(pick.list.name),
+                    ),
+                )
+              }
+            >
+              <HashIcon />
+            </button>
+            <button
+              type="button"
+              className="tool"
+              data-picker-trigger
+              aria-label="Set reminder"
+              onClick={(event) =>
+                openTimePicker(
+                  host(event.currentTarget),
+                  new Date(),
+                  parsed?.reminder ?? null,
+                  (at) => replaceToken('reminder', timeShorthand(at)),
+                )
+              }
+            >
+              <BellIcon size={15} />
+            </button>
+          </div>
+        )}
         {chips.length > 0 || parsed?.reminderLabel || links.length > 0 ? (
           <span className="composer-chips">
             {chips.map((chip) => (

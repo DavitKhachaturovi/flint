@@ -1,38 +1,88 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { app, BrowserWindow, screen } from 'electron';
-import { Channels, type MiniState, type MiniTab } from '../shared/ipc.js';
+import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import {
-  firstMiniBounds,
-  inCorner,
-  MINI_MAX,
-  MINI_MIN,
-  MINI_SIZE,
-  snapCorner,
+  Channels,
+  type MiniLayout,
+  type MiniState,
+  type MiniSurface,
+  type MiniTab,
+} from '../shared/ipc.js';
+import {
+  cardBox,
+  clampSize,
+  firstHang,
+  hangInCorner,
+  insetIn,
+  roomFor,
+  settle,
+  stageFor,
   type Corner,
+  type Hang,
 } from './mini-place.js';
-import { e2eHooks, recoverFromCrashes, rememberWindowState, testWindowArguments } from './shell.js';
+import { e2eHooks, recoverFromCrashes, testWindowArguments } from './shell.js';
 import { writeFileAtomic } from './storage/atomic.js';
-import { monitorSetupKey, type DisplayInfo } from './window-state.js';
+import { monitorSetupKey, type DisplayInfo, type Rect } from './window-state.js';
 
 /**
- * MINI-01, D-109: mini mode's window. Made on first use, then hidden, never destroyed (05 §3);
- * beside the main window, in sync with it. Frameless and always on top (also over a full-screen
- * Teams call, like the capture popup), left out of screen shares (content protection), no taskbar
- * button. It takes the keyboard only when Davit opens it, never when a reminder does. Its place is
- * remembered per monitor setup; let go near a screen corner, it snaps there and stays anchored.
+ * MINI-01, D-109, D-110: mini mode's window. Made on first use, then hidden, never destroyed (05 §3);
+ * beside the main window, in sync with it. Always on top (also over a full-screen Teams call, like
+ * the capture popup), left out of screen shares (content protection), no taskbar button. It takes
+ * the keyboard only when Davit opens it, never when a reminder does.
+ *
+ * D-110: like the capture popup (D-42), the window is transparent and only the card shows, with
+ * mockup 05's 22 px corners and floating shadow. The window is a stage: the largest card's area
+ * from the corner the card hangs from (`mini-place.ts`), so the card's resizing and its height
+ * fitting its content are the page's own (CSS) and the window never moves for them. Clicks reach
+ * the page only over the card, its resize handles and open menus; elsewhere they pass through to
+ * the apps below. Unlike the popup it doesn't forward mouse moves to find out (that watches every
+ * mouse move on the system and made the cursor flicker over text fields in Flint's other windows,
+ * D-69; mini stays open for hours): main checks the cursor itself while mini is shown, often near
+ * it and seldom elsewhere. The card's place, width and height limit are remembered per monitor
+ * setup; let go near a screen corner, it snaps there and hangs from it.
  */
 
-/** What mini mode remembers besides its bounds (`mini-state.json` in app data). */
+/** Where the card is on one monitor setup. */
+interface Place {
+  hang: Hang;
+  snapped: boolean;
+  width: number;
+  limit: number;
+}
+
+/** What mini mode remembers (`mini-state.json` in app data). */
 interface StoredMini {
   tab: MiniTab;
   noteId: string | null;
-  /** Per monitor setup: the corner it is anchored to, if any. */
-  corners: Record<string, Corner | null>;
+  /** Per monitor setup. */
+  places: Record<string, Place>;
 }
 
-/** The ground of its card (09's floating level, `--fl-ground-float`), shown before the page paints. */
-const GROUND = '#1B1D20';
+const CORNERS: readonly Corner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+const readPlace = (value: unknown): Place | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  const place = value as Partial<Record<keyof Place, unknown>>;
+  const hang = place.hang as Partial<Record<keyof Hang, unknown>> | undefined;
+  if (
+    !hang ||
+    !CORNERS.includes(hang.corner as Corner) ||
+    typeof hang.x !== 'number' ||
+    typeof hang.y !== 'number'
+  )
+    return null;
+  return {
+    hang: { corner: hang.corner as Corner, x: hang.x, y: hang.y },
+    snapped: place.snapped === true,
+    ...clampSize({ width: place.width, limit: place.limit }),
+  };
+};
+
+/** Checking the cursor: often while it is near mini, seldom elsewhere (ms). */
+const NEAR_MS = 16;
+const FAR_MS = 120;
+/** How near counts as near (DIP around the window). */
+const NEAR = 48;
 
 export interface Mini {
   readonly visible: () => boolean;
@@ -58,13 +108,19 @@ export function createMini(options: {
   readonly log: (message: string) => void;
 }): Mini {
   const file = join(app.getPath('userData'), 'mini-state.json');
-  let stored: StoredMini = { tab: 'today', noteId: null, corners: {} };
+  let stored: StoredMini = { tab: 'today', noteId: null, places: {} };
   try {
     const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<StoredMini>;
+    const places: Record<string, Place> = {};
+    if (typeof parsed.places === 'object' && parsed.places !== null)
+      for (const [key, value] of Object.entries(parsed.places)) {
+        const place = readPlace(value);
+        if (place) places[key] = place;
+      }
     stored = {
       tab: parsed.tab === 'inbox' || parsed.tab === 'note' ? parsed.tab : 'today',
       noteId: typeof parsed.noteId === 'string' ? parsed.noteId : null,
-      corners: typeof parsed.corners === 'object' && parsed.corners !== null ? parsed.corners : {},
+      places,
     };
   } catch {
     // First use: the defaults.
@@ -74,51 +130,144 @@ export function createMini(options: {
       tempDirectory: join(dirname(file), 'tmp'),
     }).catch(() => undefined);
   };
-  const setupKey = (): string =>
-    monitorSetupKey(
-      screen.getAllDisplays().map((display): DisplayInfo => ({
-        id: display.id,
-        bounds: display.bounds,
-        workArea: display.workArea,
-        scaleFactor: display.scaleFactor,
-      })),
-    );
+  const displays = (): DisplayInfo[] =>
+    screen.getAllDisplays().map((display): DisplayInfo => ({
+      id: display.id,
+      bounds: display.bounds,
+      workArea: display.workArea,
+      scaleFactor: display.scaleFactor,
+    }));
+  const setupKey = (): string => monitorSetupKey(displays());
+  const contains = (area: Rect, x: number, y: number): boolean =>
+    x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height;
 
   let window: BrowserWindow | null = null;
   let quitting = false;
   app.on('before-quit', () => {
     quitting = true;
   });
+  const hooks = e2eHooks();
+
+  /** The page's zoom: the card's pixels in DIP. */
+  const zoom = (): number =>
+    window && !window.isDestroyed() ? window.webContents.getZoomFactor() : 1;
+
+  /** This monitor setup's place: remembered (if its point is still on a screen), or the first. */
+  const currentPlace = (): Place => {
+    const key = setupKey();
+    const saved = stored.places[key];
+    const areas = screen.getAllDisplays().map((display) => display.workArea);
+    if (saved && areas.some((area) => contains(area, saved.hang.x, saved.hang.y))) return saved;
+    const active = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    const place: Place = {
+      hang: firstHang(active),
+      snapped: true,
+      ...clampSize({ width: saved?.width, limit: saved?.limit }),
+    };
+    stored.places[key] = place;
+    return place;
+  };
+  const areaOf = (hang: Hang): Rect => screen.getDisplayNearestPoint(hang).workArea;
+
+  /** The page's layout for a place (page pixels). */
+  const layoutFor = (place: Place, stage: Rect, moving?: number): MiniLayout => {
+    const factor = zoom();
+    const inset = insetIn(place.hang, stage);
+    const room = roomFor(place.hang, areaOf(place.hang));
+    return {
+      corner: inset.corner,
+      horizontal: inset.horizontal / factor,
+      vertical: inset.vertical / factor,
+      room,
+      width: place.width,
+      limit: place.limit,
+      ...(moving !== undefined && { moving }),
+    };
+  };
+
+  /** The layout the page has (it asks for it when it starts, in case it missed the message). */
+  let lastLayout: MiniLayout | null = null;
+  const sendLayout = (layout: MiniLayout): void => {
+    lastLayout = layout;
+    send(Channels.miniLayout, layout);
+  };
+
+  /** Bounds set by Flint (not a drag): `moved` ignores them. */
+  let placing = 0;
+  const setStage = (target: BrowserWindow, stage: Rect): void => {
+    placing++;
+    target.setBounds(hooks ? { ...stage, x: -6000, y: 0 } : stage);
+    setTimeout(() => placing--, 200);
+  };
+  /** The stage where the window is now (after a drag, it moved with the card). */
+  let stageNow: Rect | null = null;
+
+  /** Into its place (made, the screens changed): the window and the page together. */
+  const place = (): void => {
+    if (!window) return;
+    const current = currentPlace();
+    // A snapped card stays in its corner of the screen it is on (the taskbar may have moved).
+    if (current.snapped) current.hang = hangInCorner(current.hang.corner, areaOf(current.hang));
+    const stage = stageFor(current.hang, zoom());
+    stageNow = stage;
+    setStage(window, stage);
+    sendLayout(layoutFor(current, stage));
+  };
+  // What the page says about its card (page pixels): its size and the places that take clicks.
+  let surface: MiniSurface = { card: { width: 0, height: 0 }, rects: [], held: false };
+
+  // Click-through: the page takes the pointer only over its card (and handles, menus) or while a
+  // button is held in it.
+  let interactive: boolean | null = null;
+  let watching: NodeJS.Timeout | undefined;
+  const setInteractive = (next: boolean): void => {
+    if (!window || next === interactive) return;
+    interactive = next;
+    window.setIgnoreMouseEvents(!next);
+  };
+  const watch = (): void => {
+    clearTimeout(watching);
+    if (!window || window.isDestroyed() || !window.isVisible()) {
+      watching = undefined;
+      return;
+    }
+    const bounds = window.getBounds();
+    const at = screen.getCursorScreenPoint();
+    const factor = zoom();
+    const x = (at.x - bounds.x) / factor;
+    const y = (at.y - bounds.y) / factor;
+    const over = surface.rects.some(
+      (rect) => x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height,
+    );
+    setInteractive(over || surface.held);
+    const near =
+      at.x >= bounds.x - NEAR &&
+      at.x <= bounds.x + bounds.width + NEAR &&
+      at.y >= bounds.y - NEAR &&
+      at.y <= bounds.y + bounds.height + NEAR;
+    watching = setTimeout(watch, near ? NEAR_MS : FAR_MS);
+  };
 
   const applyOnTop = (target: BrowserWindow, onTop: boolean): void => {
     target.setAlwaysOnTop(onTop, 'screen-saver');
     target.setVisibleOnAllWorkspaces(onTop, { visibleOnFullScreen: onTop });
   };
 
-  /** Into its corner again (after a resize, or when the screens changed). */
-  const anchor = (): void => {
-    const corner = stored.corners[setupKey()];
-    if (!window || !corner) return;
-    const bounds = window.getBounds();
-    const area = screen.getDisplayMatching(bounds).workArea;
-    const target = inCorner(corner, area, bounds);
-    if (target.x !== bounds.x || target.y !== bounds.y || target.width !== bounds.width)
-      window.setBounds(target);
-  };
+  // Snapping into another corner: the page hides the card, the window moves, the card settles in.
+  let moving = 0;
+  const pending = new Map<number, () => void>();
 
   const make = (): BrowserWindow => {
+    const stage = stageFor(currentPlace().hang);
     const made = new BrowserWindow({
-      ...MINI_SIZE,
+      ...stage,
       show: false,
       frame: false,
-      // Opaque: a transparent window can't be resized reliably on Windows. Windows 11 draws the
-      // frameless window's rounded corners and shadow (Proposed, D-109).
-      backgroundColor: GROUND,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
       title: 'Flint mini',
-      minWidth: MINI_MIN.width,
-      minHeight: MINI_MIN.height,
-      maxWidth: MINI_MAX.width,
-      maxHeight: MINI_MAX.height,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
@@ -133,13 +282,8 @@ export function createMini(options: {
       },
     });
     made.setMenu(null);
-    const place = rememberWindowState(made, 'mini', { x: 0, y: 0, ...MINI_SIZE }, (active) =>
-      firstMiniBounds(active.workArea),
-    );
-    void place;
-    // D-109: the end-to-end tests keep it off-screen (like the main window there).
-    const hooks = e2eHooks();
-    if (hooks) made.setBounds({ x: -6000, y: 0, ...MINI_SIZE });
+    made.setIgnoreMouseEvents(true);
+    interactive = false;
     applyOnTop(made, options.onTop());
     made.setContentProtection(options.hideFromSharing());
     made.on('close', (event) => {
@@ -147,26 +291,106 @@ export function createMini(options: {
       event.preventDefault();
       hide();
     });
-    // Let go near a corner: into it, anchored; elsewhere: free.
+    made.on('show', watch);
+    // Dragged by its header or grip and let go: near a corner, into it; elsewhere it stays.
     made.on('moved', () => {
-      if (hooks) return;
+      if (hooks || placing > 0 || !stageNow) return;
       const bounds = made.getBounds();
-      const area = screen.getDisplayMatching(bounds).workArea;
-      const corner = snapCorner(bounds, area);
-      stored.corners[setupKey()] = corner;
+      const current = currentPlace();
+      const dx = bounds.x - stageNow.x;
+      const dy = bounds.y - stageNow.y;
+      const moved: Hang = { ...current.hang, x: current.hang.x + dx, y: current.hang.y + dy };
+      const factor = zoom();
+      const size = {
+        width: Math.round(surface.card.width * factor),
+        height: Math.round(surface.card.height * factor),
+      };
+      const box = cardBox(moved, size);
+      const area = screen.getDisplayMatching(box).workArea;
+      const next = settle(box, area, current.hang.corner);
+      const place: Place = { ...current, hang: next.hang, snapped: next.snapped };
+      stored.places[setupKey()] = place;
       save();
-      if (corner) made.setBounds(inCorner(corner, area, bounds));
-    });
-    made.on('resized', () => {
-      if (!hooks) anchor();
+      const stage = stageFor(place.hang, factor);
+      if (!next.snapped || (next.hang.x === moved.x && next.hang.y === moved.y)) {
+        // Where it was let go: the window already is its stage.
+        stageNow = { ...bounds, width: stage.width, height: stage.height };
+        sendLayout(layoutFor(place, stageNow));
+        return;
+      }
+      if (next.hang.corner === current.hang.corner) {
+        // The same corner: the card keeps its place in the window, which moves into the corner.
+        stageNow = stage;
+        setStage(made, stage);
+        sendLayout(layoutFor(place, stage));
+        return;
+      }
+      // Another corner: the card's place in the window changes as the window moves. The page hides
+      // the card first, so it never shows a frame in the wrong place, then it settles in.
+      const id = ++moving;
+      let done = false;
+      const go = (): void => {
+        if (done) return;
+        done = true;
+        pending.delete(id);
+        stageNow = stage;
+        setStage(made, stage);
+        send(Channels.miniSettled, id);
+      };
+      pending.set(id, go);
+      sendLayout(layoutFor(place, stage, id));
+      setTimeout(go, 160);
     });
     recoverFromCrashes(made, 'mini mode', options.log);
     void made.loadURL(options.url);
+    made.webContents.once('did-finish-load', place);
     return made;
   };
-  screen.on('display-metrics-changed', anchor);
-  screen.on('display-removed', anchor);
-  screen.on('display-added', anchor);
+  const replace = (): void => {
+    if (!window || hooks) return;
+    place();
+  };
+  screen.on('display-metrics-changed', replace);
+  screen.on('display-removed', replace);
+  screen.on('display-added', replace);
+
+  ipcMain.on(Channels.miniSurface, (event, value: unknown) => {
+    if (!window || event.sender !== window.webContents) return;
+    if (typeof value !== 'object' || value === null) return;
+    const next = value as { card?: unknown; rects?: unknown; held?: unknown };
+    const isRect = (rect: unknown): rect is MiniSurface['rects'][number] => {
+      if (typeof rect !== 'object' || rect === null) return false;
+      const box = rect as Record<string, unknown>;
+      return [box['x'], box['y'], box['width'], box['height']].every(
+        (n) => typeof n === 'number' && Number.isFinite(n),
+      );
+    };
+    const card = next.card as { width?: unknown; height?: unknown } | null | undefined;
+    surface = {
+      card:
+        card && typeof card.width === 'number' && typeof card.height === 'number'
+          ? { width: card.width, height: card.height }
+          : surface.card,
+      rects: Array.isArray(next.rects) ? next.rects.filter(isRect) : [],
+      held: next.held === true,
+    };
+    if (window.isVisible()) watch();
+  });
+  ipcMain.on(Channels.miniResized, (event, value: unknown) => {
+    if (!window || event.sender !== window.webContents) return;
+    if (typeof value !== 'object' || value === null) return;
+    const size = clampSize(value);
+    const current = currentPlace();
+    stored.places[setupKey()] = { ...current, ...size };
+    save();
+  });
+  ipcMain.handle(Channels.miniGetLayout, (event) =>
+    window && event.sender === window.webContents ? lastLayout : null,
+  );
+  ipcMain.on(Channels.miniLayoutReady, (event, id: unknown) => {
+    if (!window || event.sender !== window.webContents || typeof id !== 'number') return;
+    pending.get(id)?.();
+  });
 
   const send = (channel: string, ...args: unknown[]): void => {
     if (!window || window.isDestroyed()) return;
@@ -180,7 +404,7 @@ export function createMini(options: {
     const target = window;
     const reveal = (): void => {
       // Tests never take the focus (Davit's machine runs them).
-      if (focus && !e2eHooks()) {
+      if (focus && !hooks) {
         target.show();
         target.focus();
       } else target.showInactive();
@@ -194,6 +418,9 @@ export function createMini(options: {
     if (!window || !window.isVisible()) return;
     send(Channels.miniHiding);
     window.hide();
+    clearTimeout(watching);
+    watching = undefined;
+    setInteractive(false);
     options.onHidden();
   };
 

@@ -91,7 +91,7 @@ import { relink, type LinkedNotice } from '../media/media.js';
 import { useInertText } from './inert-text.js';
 import { sidebarMotion } from './sidebar-motion.js';
 import { useScrollsWhenTaller } from '../ui/scrolls.js';
-import { durationMs, reducedMotion } from '../ui/motion.js';
+import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import {
   EditField,
   hasBody,
@@ -205,28 +205,6 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 
 /** D-67, D-100: every duration token scaled by the animation speed (this window). */
-const SPEEDS = { relaxed: 1.35, normal: 1, quick: 0.7 } as const;
-const DURATIONS = [
-  '--fl-dur-fast',
-  '--fl-dur-base',
-  '--fl-dur-page',
-  '--fl-dur-state',
-  '--fl-dur-complete',
-];
-const baseDurations = new Map<string, number>();
-function applySpeed(speed: keyof typeof SPEEDS): void {
-  const root = document.documentElement;
-  for (const name of DURATIONS) {
-    if (!baseDurations.has(name)) {
-      root.style.removeProperty(name);
-      baseDurations.set(name, parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0);
-    }
-    const base = baseDurations.get(name) ?? 0;
-    if (speed === 'normal') root.style.removeProperty(name);
-    else root.style.setProperty(name, `${Math.round(base * SPEEDS[speed])}ms`);
-  }
-}
-
 /** D-99: a slow second click (renaming in the sidebar): longer than a double-click's gap. */
 const RENAME_DELAY_MS = 450;
 
@@ -250,29 +228,6 @@ function pageFactTargets(root: HTMLElement, kind: FactKind): HTMLElement[] {
 /** D-45, D-88: pasted text as typed text whose `!`, `##` and `@` stay text (inert). */
 function pastedText(text: string): string {
   return escapeInert(text, [{ start: 0, end: text.length }]).text;
-}
-
-/** D-87: a move that can't happen (the first task's indent, say): the row nudges that way. */
-function nudge(key: string, direction: 'left' | 'right' | 'up' | 'down'): void {
-  if (reducedMotion()) return;
-  const row = document.querySelector<HTMLElement>(`.row[data-key="${CSS.escape(key)}"]`);
-  if (!row) return;
-  const moves: Record<typeof direction, readonly [number, number]> = {
-    left: [-6, 0],
-    right: [6, 0],
-    up: [0, -4],
-    down: [0, 4],
-  };
-  const [x, y] = moves[direction];
-  row.animate(
-    [
-      { translate: '0 0' },
-      { translate: `${x}px ${y}px` },
-      { translate: `${-x / 3}px ${-y / 3}px` },
-      { translate: '0 0' },
-    ],
-    { duration: 260, easing: 'ease-out' },
-  );
 }
 
 /** D-86: the place a jump landed on lights up a moment. */

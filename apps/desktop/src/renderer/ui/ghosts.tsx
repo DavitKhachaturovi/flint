@@ -1,5 +1,6 @@
 /** TASK-06, D-75, D-77: completion and removal ghosts, shared by the main window and mini mode. */
-import type { ReactElement } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactElement } from 'react';
+import { durationMs, reducedMotion } from './motion.js';
 import type { ListView, TaskRow } from '../../shared/ipc.js';
 import { BodyBlock } from '../main-window/Body.js';
 import { Row, type RowHandlers } from './Row.js';
@@ -81,7 +82,10 @@ export function ghostRows(
   section: Ghost['section'],
   after: string | null,
   handlers: RowHandlers,
+  /** D-110: mini mode's compact rows. */
+  variant?: 'compact',
 ): ReactElement[] {
+  const size = variant ? { variant } : {};
   return ghosts
     .filter((ghost) => ghost.section === section && ghost.after === after)
     .flatMap((ghost) => [
@@ -92,7 +96,13 @@ export function ghostRows(
           className={ghost.subtask ? 'row-group subtask leaving-group' : 'row-group leaving-group'}
           aria-hidden="true"
         >
-          <Row task={ghost.task} subtask={ghost.subtask} ghost={ghost.direction} {...handlers} />
+          <Row
+            task={ghost.task}
+            subtask={ghost.subtask}
+            ghost={ghost.direction}
+            {...handlers}
+            {...size}
+          />
           <div className={ghost.subtask ? 'row-body subtask closing' : 'row-body closing'}>
             <BodyBlock
               body={ghost.task.body}
@@ -111,6 +121,7 @@ export function ghostRows(
           subtask={ghost.subtask}
           ghost={ghost.direction}
           {...handlers}
+          {...size}
         />
       ),
       ...(ghost.subtask ? [] : ghost.task.subtasks).map((sub) => (
@@ -120,7 +131,81 @@ export function ghostRows(
           subtask
           ghost={ghost.direction}
           {...handlers}
+          {...size}
         />
       )),
     ]);
+}
+
+/**
+ * D-110: the same ghosts for a plain run of rows made from views (mini mode's Today and Inbox): a
+ * row that left plays its completion (or, not done, its removal) where it was, and a row that
+ * arrived eases in (`return`: it was completed here a moment ago, so undo brings it back). A new
+ * `scope` (another tab) starts afresh. Nothing waits for the animations; none with reduce-motion.
+ */
+export function useRowGhosts(
+  rows: readonly TaskRow[],
+  scope: string,
+  isDone: (key: string) => boolean,
+): { readonly ghosts: readonly Ghost[]; readonly fresh: ReadonlyMap<string, 'new' | 'return'> } {
+  const [ghosts, setGhosts] = useState<readonly Ghost[]>([]);
+  const [fresh, setFresh] = useState<ReadonlyMap<string, 'new' | 'return'>>(new Map());
+  const last = useRef<{ scope: string; rows: readonly TaskRow[] } | null>(null);
+  const left = useRef(new Set<string>());
+  const done = useRef(isDone);
+  done.current = isDone;
+  const keys = rows.map((row) => row.key).join('\n');
+  useLayoutEffect(() => {
+    const before = last.current;
+    last.current = { scope, rows };
+    if (!before || before.scope !== scope) {
+      setGhosts([]);
+      setFresh(new Map());
+      left.current.clear();
+      return;
+    }
+    if (reducedMotion()) return;
+    const here = new Set(rows.map((row) => row.key));
+    const was = new Set(before.rows.map((row) => row.key));
+    const went: Ghost[] = [];
+    before.rows.forEach((row, index) => {
+      if (here.has(row.key)) return;
+      const previous = before.rows
+        .slice(0, index)
+        .reverse()
+        .find((other) => here.has(other.key));
+      const complete = done.current(row.key);
+      if (complete) left.current.add(row.key);
+      went.push({
+        id: ++ghostSeq,
+        task: row,
+        subtask: false,
+        direction: complete ? 'complete' : 'remove',
+        section: 'open',
+        after: previous?.key ?? null,
+      });
+    });
+    const arrived = new Map<string, 'new' | 'return'>();
+    for (const row of rows)
+      if (!was.has(row.key)) {
+        arrived.set(row.key, left.current.has(row.key) ? 'return' : 'new');
+        left.current.delete(row.key);
+      }
+    if (went.length > 0) {
+      setGhosts((current) => [...current, ...went]);
+      const ids = new Set(went.map((ghost) => ghost.id));
+      window.setTimeout(
+        () => setGhosts((current) => current.filter((ghost) => !ids.has(ghost.id))),
+        durationMs('--fl-dur-complete', 360),
+      );
+    }
+    if (arrived.size > 0) {
+      setFresh((current) => new Map([...current, ...arrived]));
+      window.setTimeout(
+        () => setFresh((current) => new Map([...current].filter(([key]) => !arrived.has(key)))),
+        durationMs('--fl-dur-complete', 360),
+      );
+    }
+  }, [keys, scope]);
+  return { ghosts, fresh };
 }

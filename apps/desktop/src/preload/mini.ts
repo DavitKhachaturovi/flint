@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { Channels, type MiniAlert, type MiniAlertAction, type MiniState } from '../shared/ipc.js';
+import {
+  Channels,
+  type MiniAlert,
+  type MiniAlertAction,
+  type MiniLayout,
+  type MiniState,
+  type MiniSurface,
+} from '../shared/ipc.js';
 import { main } from './main-bridge.js';
 import { applyTestClock } from './test-clock.js';
 
@@ -43,6 +50,8 @@ const MINI_PLATFORM = [
   'onNoteEditor',
   'noteEditorOf',
   'tipDue',
+  'settings',
+  'onAppearance',
 ] as const satisfies readonly (keyof typeof main)[];
 
 export type MiniPlatform = Pick<typeof main, (typeof MINI_PLATFORM)[number]>;
@@ -89,6 +98,30 @@ const mini = {
   },
   alertAction(id: string, action: MiniAlertAction): void {
     ipcRenderer.send(Channels.miniAlertAction, id, action);
+  },
+  /** D-110: where the card sits in the transparent window, and how big it may be. */
+  onLayout(listener: (layout: MiniLayout) => void): void {
+    ipcRenderer.on(Channels.miniLayout, (_event, layout: MiniLayout) => listener(layout));
+  },
+  /** The layout now (the page asks when it starts, in case it missed the message). */
+  layout(): Promise<MiniLayout | null> {
+    return ipcRenderer.invoke(Channels.miniGetLayout) as Promise<MiniLayout | null>;
+  },
+  /** Snapping into another corner: the card is hidden, the window may move. */
+  layoutReady(id: number): void {
+    ipcRenderer.send(Channels.miniLayoutReady, id);
+  },
+  /** The window has moved into the corner: the card settles in. */
+  onSettled(listener: (id: number) => void): void {
+    ipcRenderer.on(Channels.miniSettled, (_event, id: number) => listener(id));
+  },
+  /** The card's size and where clicks reach the page (elsewhere they pass through). */
+  surface(surface: MiniSurface): void {
+    ipcRenderer.send(Channels.miniSurface, surface);
+  },
+  /** A resize let go: its width and height limit, remembered. */
+  resized(size: { readonly width: number; readonly limit: number }): void {
+    ipcRenderer.send(Channels.miniResized, size);
   },
 };
 

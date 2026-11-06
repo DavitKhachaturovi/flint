@@ -844,10 +844,9 @@ async function start(): Promise<void> {
     if (key === 'miniHideFromSharing') mini.setHideFromSharing(after.miniHideFromSharing);
     if (key === 'popupHideFromSharing') hideFromSharing(after.popupHideFromSharing);
     if (key === 'keepHourlyHours' || key === 'keepDailyDays') snapshot();
-    if (key === 'animationSpeed' && !mainWindow.isDestroyed())
-      mainWindow.webContents.send(Channels.mainAppearance, {
-        animationSpeed: after.animationSpeed,
-      });
+    // D-110: both windows' motion follows it.
+    if (key === 'animationSpeed')
+      toWindows(Channels.mainAppearance, { animationSpeed: after.animationSpeed });
     log(`setting ${key} is now ${JSON.stringify(after[key])}`);
     return settingsView();
   });

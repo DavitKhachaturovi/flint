@@ -39,6 +39,8 @@ export function NoteEditor(props: {
   readonly create?: () => Promise<string | null>;
   readonly className?: string;
   readonly placeholder?: string;
+  /** D-110: what is typed, as it is typed (mini's Note tab knows when the note is empty). */
+  readonly onText?: (value: string) => void;
 }): ReactElement {
   const { id, text, readOnly, onId, onImage, mono, focus, onFocused } = props;
   const me = props.window ?? 'main';
@@ -131,6 +133,7 @@ export function NoteEditor(props: {
           openImage: (images, index) => onImage(images, index),
         }}
         onChange={(value) => {
+          props.onText?.(value);
           latest.current.value = value;
           latest.current.dirty = true;
           editing.typed(value);

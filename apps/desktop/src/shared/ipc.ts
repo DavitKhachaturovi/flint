@@ -64,6 +64,17 @@ export const Channels = {
   miniAlerts: 'mini:alerts',
   miniGetAlerts: 'mini:get-alerts',
   miniAlertAction: 'mini:alert-action',
+  /**
+   * D-110: mini mode's transparent stage. Main → mini: where the card sits in the window and how
+   * big it may be; mini → main: the card's size and the places that take the pointer, a resize's
+   * result, and (snapping into another corner) that the card is hidden, so the window can move.
+   */
+  miniLayout: 'mini:layout',
+  miniGetLayout: 'mini:get-layout',
+  miniLayoutReady: 'mini:layout-ready',
+  miniSettled: 'mini:settled',
+  miniSurface: 'mini:surface',
+  miniResized: 'mini:resized',
   /** D-109: one window edits a note at a time (claim, hand over, the owner's live text). */
   noteClaim: 'note:claim',
   noteRelease: 'note:release',
@@ -785,6 +796,39 @@ export interface MiniAlert {
 }
 
 export type MiniAlertAction = 'done' | 'snooze' | 'open';
+
+/** D-110: the corner mini mode's card hangs from (it grows away from it). */
+export type MiniCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+/** D-110: where the card sits in mini mode's transparent window, in the page's pixels. */
+export interface MiniLayout {
+  readonly corner: MiniCorner;
+  /** From the window's left edge (a left corner) or right edge (a right corner). */
+  readonly horizontal: number;
+  /** From the window's top edge (a top corner) or bottom edge (a bottom corner). */
+  readonly vertical: number;
+  /** The most the card may take on this screen. */
+  readonly room: { readonly width: number; readonly height: number };
+  /** Its width and height limit (remembered per monitor setup). */
+  readonly width: number;
+  readonly limit: number;
+  /** Snapping into another corner: hide the card, say `miniLayoutReady` with this, then settle in. */
+  readonly moving?: number;
+}
+
+/** D-110: what mini mode's page tells main about its card (page pixels, window coordinates). */
+export interface MiniSurface {
+  readonly card: { readonly width: number; readonly height: number };
+  /** The card with its resize handles, and open menus: where clicks reach the page. */
+  readonly rects: readonly {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  }[];
+  /** A button is held in the page (a drag, a resize): it keeps the pointer wherever it goes. */
+  readonly held: boolean;
+}
 
 /** D-109: which window edits a note now (null: neither), and what it last had. */
 export interface NoteEditorState {
