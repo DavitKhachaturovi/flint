@@ -689,6 +689,7 @@ Without sync, the local disk is the only copy, so this matters more.
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
 - **D-115 (decided):** while a step's spotlight is up, only the ringed target is live; the keys taught work everywhere; the dim lifts while the popup or mini is open; Esc ends it ("Replay it any time from Settings"); the card never takes the keyboard.
+- **D-117 (decided):** Remove what I created during the tour takes only what was made during it (by ID, the step-2 capture too); edits to what was there stay.
 - **D-116 (decided):** each step's ring and what moves it on: (1) welcome and the folder, a centred card, Next; (2) capture, no ring, a capture saved from the popup; (3) shorthand, Inbox's composer, a task added with typed `!h`, `@time` or `##list`; (4) the sidebar's + and the Quick note row, a list, note or quick note made; (5) the first task's pin (Today when Inbox is empty), a task pinned; (6) the composer's reminder button, a reminder set; (7) the sidebar's palette button, the palette opened; (8) the title bar's mini-mode button, mini opened. Then **You're set** with Done and **Remove what I created during the tour** (one undoable step to Trash; otherwise all stays as real data).
 - **D-113 (decided):** 8 steps, each advancing by itself when you do the thing (otherwise Next): welcome and the Flint folder; capture from anywhere; shorthand while writing; task lists, notes and quick notes; Today and pins; reminders; Ctrl+K and `?`; mini mode. A fresh install gets it; an existing one gets What's new. Steps in D-113.
 - **Decided (D-112):** Settings has **Replay walkthrough**; the walkthrough's first step says it can be skipped now and replayed any time from Settings.
@@ -737,9 +738,10 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Milestone M8.
 
 ### APP-15 — What's new (v1, D-61)
-- After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the tray ("What's new").
+- After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the palette and Settings → About (D-117: no tray item).
 - **D-113 (decided):** one floating card (the spotlight's card, no dim) with the notes of every version since the last one seen, scrolling when long; Close. Also from the tray and the palette (the latest notes).
 - **Every version bump comes with short release notes**, which are what this shows. **D-64:** versioning starts with the next build: **0.4.x during M4** (the minor number is the milestone), bumped for every build handed out, each with a short entry in [`docs/release-notes.md`](release-notes.md), which the app bundles for What's new.
+- **D-117 (decided):** a fresh install (no `settings.json`) gets the walkthrough; an existing one gets What's new once on the first start of a new version (in the main window, the next time it opens), every version since `lastSeenVersion`, newest first. It shows **[`docs/whats-new.md`](whats-new.md)**, not the release notes: per version 2–5 plain-language highlights (what's new and how to use it), written with every version bump; `release-notes.md` stays the detailed log. Esc or × closes it; the palette ("What's new") and Settings → About open it again. **Proposed:** an install from before What's new sees only the current entry, which sums up the 0.8 line.
 - Milestone M8 (release notes from 0.4.0 on).
 
 ---

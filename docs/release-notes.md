@@ -1,6 +1,6 @@
 # Flint release notes
 
-Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
+Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
 ## 0.8.15 (6 Nov 2026)
 

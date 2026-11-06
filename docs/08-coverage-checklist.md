@@ -858,3 +858,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | You're set: Remove what I created during the tour (one undoable step) | APP-10 · Decided · M8 step 4b | 02, D-116 |
 | 4 | Import from Obsidian (copy notes and images, never change the vault) | DATA-08 · Recorded · late v1 | 02, D-116 |
 
+## AY. Fresh install or update; What's new in plain language (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Fresh install (no settings) → walkthrough; update → What's new once, versions since `lastSeenVersion` | APP-10, APP-15 · Decided · M8 step 4b | 02, D-117 |
+| 2 | What's new shows `docs/whats-new.md` (2–5 plain highlights per version), not the release notes | APP-15 · Decided · M8 step 4b | 02, whats-new.md, D-117 |
+| 3 | What's new from the palette and Settings → About; no tray item | APP-15 · Decided · M8 step 4b | 02, D-117 |
+| 4 | Remove what I created during the tour: only items made during it | APP-10 · Decided · M8 step 4b | 02, D-117 |
+
