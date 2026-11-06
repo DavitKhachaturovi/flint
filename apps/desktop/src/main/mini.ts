@@ -106,6 +106,8 @@ export function createMini(options: {
   readonly url: string;
   readonly onTop: () => boolean;
   readonly hideFromSharing: () => boolean;
+  /** Shown, on screen (D-116: the walkthrough's last step waits for it). */
+  readonly onShown?: () => void;
   /** Hidden (×, the hotkey, the command): what it showed is left. */
   readonly onHidden: () => void;
   readonly log: (message: string) => void;
@@ -467,6 +469,7 @@ export function createMini(options: {
         if (foregroundWindow() !== handle()) forceForeground(handle());
       } else target.showInactive();
       send(Channels.miniShown, { focus });
+      options.onShown?.();
     };
     if (target.webContents.isLoading()) target.webContents.once('did-finish-load', reveal);
     else reveal();

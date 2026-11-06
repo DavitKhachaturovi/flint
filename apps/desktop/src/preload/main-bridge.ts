@@ -32,6 +32,9 @@ import {
   type TrashPreview,
   type TrashView,
   type NoteEditorState,
+  type OnboardingState,
+  type TourAction,
+  type TourEvent,
 } from '../shared/ipc.js';
 
 /**
@@ -142,6 +145,26 @@ export const main = {
   },
   restoreSnapshot(id: string, path: string | null): Promise<string | null> {
     return invoke(Channels.mainSnapshotRestore, id, path) as Promise<string | null>;
+  },
+  /** APP-10, APP-15, D-117: what onboarding shows on this start. */
+  onboarding(): Promise<OnboardingState | null> {
+    return invoke(Channels.mainOnboarding) as Promise<OnboardingState | null>;
+  },
+  /** D-119: the walkthrough's progress; `remove` resolves to the undo toast's text. */
+  tour(action: TourAction): Promise<string | null> {
+    return invoke(Channels.mainTour, action) as Promise<string | null>;
+  },
+  /** D-117: What's new was shown: this version is the last one seen. */
+  whatsNewSeen(): Promise<void> {
+    return invoke(Channels.mainWhatsNewSeen) as Promise<void>;
+  },
+  /** The main window came on screen. */
+  onShown(listener: () => void): void {
+    ipcRenderer.on(Channels.mainShown, () => listener());
+  },
+  /** D-116: something a walkthrough step waits for. */
+  onTourEvent(listener: (event: TourEvent) => void): void {
+    ipcRenderer.on(Channels.mainTourEvent, (_event, tourEvent: TourEvent) => listener(tourEvent));
   },
   /** APP-11, D-100: Settings. */
   settings(): Promise<SettingsView | null> {

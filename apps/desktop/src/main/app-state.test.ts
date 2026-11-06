@@ -77,6 +77,12 @@ describe('settings (APP-11)', () => {
     });
   });
 
+  it("D-117: the last version whose What's new was shown; none before What's new", () => {
+    expect(readSettings({}).lastSeenVersion).toBeNull();
+    expect(readSettings({ lastSeenVersion: '0.8.16' }).lastSeenVersion).toBe('0.8.16');
+    expect(readSettings({ lastSeenVersion: 16 }).lastSeenVersion).toBeNull();
+  });
+
   it("REM-06, D-94: Flint's own reminder sound is off unless turned on", () => {
     expect(readSettings({}).reminderSound).toBe(false);
     expect(readSettings({ reminderSound: true }).reminderSound).toBe(true);

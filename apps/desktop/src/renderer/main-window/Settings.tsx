@@ -280,8 +280,13 @@ export function SettingsScreen(props: {
   readonly onZoom: (level: number) => void;
   /** Bumped by Ctrl+F: the filter takes the caret. */
   readonly find: number;
+  /** APP-10, D-112: the walkthrough again, from its first step. */
+  readonly onReplayTour: () => void;
+  /** APP-15, D-117: What's new, every version's. */
+  readonly onWhatsNew: () => void;
 }): ReactElement {
   const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
+  const { onReplayTour, onWhatsNew } = props;
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
   const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
   // NOTE-07, D-104: the link-pattern editor open.
@@ -394,6 +399,16 @@ export function SettingsScreen(props: {
             onCancel={() => setFolderChoice(null)}
           />
         )}
+        <Row
+          name="Walkthrough"
+          note="The eight-step tour of Flint, from the start."
+          filter={filter}
+          words="tour onboarding help guide replay"
+        >
+          <button type="button" className="trash-action" onClick={onReplayTour}>
+            Replay walkthrough
+          </button>
+        </Row>
       </Section>
 
       <Section id="capture" filter={filter}>
@@ -779,6 +794,16 @@ export function SettingsScreen(props: {
           filter={filter}
           words="version about privacy"
         />
+        <Row
+          name="What’s new"
+          note="What changed in each version, in a few lines."
+          filter={filter}
+          words="whats new release notes changes update"
+        >
+          <button type="button" className="trash-action" onClick={onWhatsNew}>
+            What’s new
+          </button>
+        </Row>
         <Row name="Logs" note="Kept here only, never sent anywhere." filter={filter} words="logs">
           <button
             type="button"
@@ -858,7 +883,7 @@ export function SettingsIndex(props: {
  * holds decides the choices (the likeliest one preselected), and the confirmation says exactly what
  * will happen. Flint restarts on the new folder once it is ready.
  */
-function FolderChangePanel(props: {
+export function FolderChangePanel(props: {
   readonly choice: FolderChoice;
   readonly onChooseAgain: () => void;
   readonly onCancel: () => void;

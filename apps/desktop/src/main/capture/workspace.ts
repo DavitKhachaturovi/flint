@@ -2688,6 +2688,58 @@ export class Workspace {
     return merged ? { ok: true, listId: 'inbox', label } : last;
   }
 
+  /** D-117: what exists now (lists, notes and quick notes; every task), as the tour starts. */
+  tourBaseline(): { readonly lists: string[]; readonly tasks: string[] } {
+    return {
+      lists: this.lists.map(({ entry }) => this.listId(entry)),
+      tasks: this.lists.flatMap(({ file }) =>
+        [...allTasks(file.document)].map(({ task }) => task.key),
+      ),
+    };
+  }
+
+  /**
+   * D-116, D-117: "Remove what I created during the tour": every list, note, quick note and task
+   * that wasn't there when it started goes to Trash, as one undoable step. Edits to what was there
+   * stay. A new task in a new list goes with its list; a new subtask of a new task with its parent.
+   * Null when the tour made nothing.
+   */
+  async removeMadeSince(
+    baseline: { readonly lists: readonly string[]; readonly tasks: readonly string[] },
+    now: Date,
+  ): Promise<string | null> {
+    const knownLists = new Set(baseline.lists);
+    const knownTasks = new Set(baseline.tasks);
+    const { start, lists, tasks } = await this.serial(() => {
+      const newLists = this.lists
+        .map(({ entry }) => this.listId(entry))
+        .filter((id) => id !== INBOX_ID && !knownLists.has(id));
+      // In document order, so a parent comes before its subtasks (which go with it).
+      const newTasks = this.lists
+        .filter(({ entry }) => !newLists.includes(this.listId(entry)))
+        .flatMap(({ entry, file }) =>
+          [...allTasks(file.document)]
+            .filter(({ task }) => !knownTasks.has(task.key))
+            .map(({ task }) => ({ list: this.listId(entry), key: task.key })),
+        );
+      return Promise.resolve({ start: this.undoStack.length, lists: newLists, tasks: newTasks });
+    });
+    if (lists.length === 0 && tasks.length === 0) return null;
+    let count = 0;
+    for (const { list, key } of tasks) {
+      // Gone already when its parent went.
+      const current = this.find(list);
+      if (current && findTask(current.file.document, key)) {
+        if (await this.change(list, { kind: 'delete', key }, now)) count++;
+      }
+    }
+    for (const id of lists) if ((await this.deleteList(id, now)).ok) count++;
+    const label =
+      count === 1 ? 'Removed 1 item from the tour' : `Removed ${count} items from the tour`;
+    const merged = await this.serial(() => Promise.resolve(this.mergeSince(start, label)));
+    return merged ? label : null;
+  }
+
   /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list; undoable. */
   convertList(id: string, mode: 'tasks' | 'note', now: Date): Promise<ListOutcome> {
     return this.serial(async () => {

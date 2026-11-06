@@ -59,6 +59,8 @@ export interface Settings {
   readonly miniReminders: MiniReminders;
   /** D-109: mini mode always on top (its header's pin). */
   readonly miniOnTop: boolean;
+  /** APP-15, D-117: the version whose What's new was last shown; null before What's new existed. */
+  readonly lastSeenVersion: string | null;
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -93,6 +95,7 @@ export function defaultSettings(development = false): Settings {
     popupHideFromSharing: true,
     miniReminders: 'when-open',
     miniOnTop: true,
+    lastSeenVersion: null,
   };
 }
 
@@ -180,6 +183,7 @@ export function readSettings(stored: Stored, development = false): Settings {
       defaults.miniReminders,
     ),
     miniOnTop: pick(stored, 'miniOnTop', isBoolean, defaults.miniOnTop),
+    lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
   };
 }
 
@@ -188,6 +192,8 @@ export class SettingsFile {
   current: Settings;
   readonly path: string;
   private readonly development: boolean;
+  /** D-117: whether the file was there when loaded (none: a fresh install, which gets the tour). */
+  existed = false;
 
   constructor(path: string, development = false) {
     this.path = path;
@@ -197,7 +203,9 @@ export class SettingsFile {
 
   async load(): Promise<Settings> {
     try {
-      const parsed: unknown = JSON.parse(await readFile(this.path, 'utf8'));
+      const text = await readFile(this.path, 'utf8');
+      this.existed = true;
+      const parsed: unknown = JSON.parse(text);
       this.stored = typeof parsed === 'object' && parsed !== null ? (parsed as Stored) : {};
     } catch {
       this.stored = {};

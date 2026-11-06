@@ -889,3 +889,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | The 8 cards' titles and text, and You're set's | APP-10 · Decided · M8 step 4b | 02, D-120 |
 | 2 | The spotlight card: "3 / 8", centred when there is no ring | APP-13 · Decided · M8 step 4b | 09 §8, D-120 |
 
+## BC. The walkthrough, the spotlight and What's new built (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The spotlight: dim with cut-out targets (only they take clicks), rings, a card that never takes the keyboard | APP-13 · Done (0.8.16) | 09 §8, D-121 |
+| 2 | The 8-step walkthrough with its triggers; You're set; Remove what I created during the tour (one undo) | APP-10 · Done (0.8.16) | 02, D-121 |
+| 3 | Fresh install → tour; step 1's folder change goes on at step 2; a cut-short tour says so once | APP-10 · Done (0.8.16) | 02, D-121 |
+| 4 | What's new from `docs/whats-new.md` once after an update; Settings → About and the palette | APP-15 · Done (0.8.16) | 02, D-121 |
+| 5 | Replay walkthrough in Settings → General and the palette | APP-10, APP-11 · Done (0.8.16) | 02, D-121 |
+| 6 | Step 5's ring and words (no pin on an unpinned row) | APP-10 · Proposed (0.8.16) | D-121 |
+

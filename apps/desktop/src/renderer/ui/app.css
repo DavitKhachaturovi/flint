@@ -6675,3 +6675,212 @@ a.auto-link {
 .triage:focus {
   outline: none;
 }
+
+/* APP-10, APP-13, D-61, D-115 to D-120 (09 §8): the guidance spotlight. The dim covers the window
+   with the step's targets cut out (clip-path, so only they take clicks); a ring around each; the
+   card beside them. Below the palette (50), toasts (60), pickers and menus, so what a target opens
+   shows above it. */
+.spotlight-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--fl-spotlight-dim);
+  animation: spotlight-in var(--fl-dur-page) ease-out;
+  transition: clip-path var(--fl-dur-page) var(--fl-ease-spring);
+}
+
+.spotlight-ring {
+  position: fixed;
+  z-index: 41;
+  box-shadow: 0 0 0 2px var(--fl-accent);
+  pointer-events: none;
+  animation: spotlight-in var(--fl-dur-page) ease-out;
+  transition:
+    left var(--fl-dur-page) var(--fl-ease-spring),
+    top var(--fl-dur-page) var(--fl-ease-spring),
+    width var(--fl-dur-page) var(--fl-ease-spring),
+    height var(--fl-dur-page) var(--fl-ease-spring);
+}
+
+@keyframes spotlight-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.spotlight-card {
+  position: fixed;
+  z-index: 45;
+  box-sizing: border-box;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 16px 12px;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  color: var(--fl-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  animation: spotlight-card-in var(--fl-dur-page) var(--fl-ease-spring);
+}
+
+/* You're set: its two buttons on one line. */
+.spotlight-card.wide {
+  width: 400px;
+}
+
+.spotlight-card.measuring {
+  visibility: hidden;
+  left: 0;
+  top: 0;
+}
+
+@keyframes spotlight-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+.spotlight-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.spotlight-title {
+  color: var(--fl-text-highlight);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.spotlight-count {
+  color: var(--fl-text-faint);
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+}
+
+.spotlight-text {
+  margin: 0;
+}
+
+.spotlight-text .keycap {
+  height: 20px;
+  padding: 0 6px;
+}
+
+.spotlight-text .chip {
+  font-family: var(--fl-font-mono);
+}
+
+.spotlight-folder {
+  margin-top: 10px;
+}
+
+.spotlight-card .settings-panel {
+  margin-top: 10px;
+}
+
+.spotlight-note {
+  margin: 10px 0 0;
+  color: var(--fl-text-muted);
+  font-size: 12px;
+}
+
+.spotlight-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* APP-15, D-117: What's new: the spotlight's card, without the dim, in the middle near the top. */
+.spotlight-card.whats-new {
+  left: 50%;
+  top: 72px;
+  width: 440px;
+  translate: -50% 0;
+  padding-bottom: 6px;
+}
+
+.spotlight-card.whats-new.leaving {
+  animation: spotlight-card-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes spotlight-card-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+.whats-new-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -4px -4px 0 0;
+  border: 0;
+  border-radius: var(--fl-radius-button);
+  background: none;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.whats-new-close:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
+
+.whats-new-entries {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  margin-right: -8px;
+  padding-right: 8px;
+}
+
+.whats-new-entry + .whats-new-entry {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.whats-new-version {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 6px;
+  color: var(--fl-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.whats-new-date {
+  color: var(--fl-text-faint);
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.whats-new-text ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.whats-new-text li + li {
+  margin-top: 4px;
+}
+
+.whats-new-text p {
+  margin: 0 0 6px;
+}
+
+.whats-new-text strong {
+  color: var(--fl-text-primary);
+  font-weight: 600;
+}

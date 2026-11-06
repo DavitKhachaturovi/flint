@@ -30,6 +30,9 @@ import {
   type PopupSubmit,
   type ToastKind,
   type SettingChange,
+  type OnboardingState,
+  type TourAction,
+  type TourEvent,
   type MiniAlert,
   type SettingsView,
 } from '../shared/ipc.js';
@@ -87,6 +90,7 @@ import { compileLinkPatterns, findShortForms, readLinkPatterns } from '../shared
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
+import { TourFile } from './onboarding.js';
 import {
   appIcon,
   applyStartWithWindows,
@@ -282,6 +286,31 @@ async function start(): Promise<void> {
     !app.isPackaged,
   );
   const settings = await settingsFile.load();
+  // APP-10, APP-15, D-117, D-119: a fresh install (no settings yet) gets the walkthrough once the
+  // window shows; an update gets What's new. End-to-end runs start fresh every time, so only a test
+  // that asks for it (FLINT_E2E_ONBOARDING, development builds only) sees either.
+  const onboardingOn =
+    !e2eHooks() || (BUILD === 'development' && process.env.FLINT_E2E_ONBOARDING === '1');
+  const tour = new TourFile(join(app.getPath('userData'), 'tour.json'));
+  await tour.load();
+  const fresh = !settingsFile.existed;
+  if (onboardingOn && fresh) {
+    await tour.due();
+    // Its own What's new is not for a fresh install.
+    await settingsFile.update({ lastSeenVersion: app.getVersion() });
+  }
+  const tourAtStart = onboardingOn
+    ? await tour.atStart()
+    : { from: null as number | null, interrupted: false };
+  let tourInterrupted = tourAtStart.interrupted;
+  /** Where the page runs the tour from (it follows the tour, for a page reloaded mid-way). */
+  let tourFrom = tourAtStart.from;
+  const whatsNewDue =
+    onboardingOn && !fresh && settingsFile.current.lastSeenVersion !== app.getVersion()
+      ? { since: settingsFile.current.lastSeenVersion }
+      : null;
+  if (tourAtStart.from !== null) log(`walkthrough from step ${tourAtStart.from + 1}`);
+  if (tourInterrupted) log('walkthrough: the last one was cut short');
   const testData = testDataDirectory();
   const folder = await prepareFlintFolder(
     testData ? join(testData, 'Flint') : settings.flintFolder,
@@ -338,6 +367,13 @@ async function start(): Promise<void> {
     quitting = true;
   });
   recoverFromCrashes(mainWindow, 'main window', log);
+  // APP-10, APP-15, D-117: the tour and What's new wait for the window to be on screen.
+  mainWindow.on('show', () => mainWindow.webContents.send(Channels.mainShown));
+  /** D-116: what a walkthrough step waits for, to the main window while a tour runs. */
+  const tourEvent = (event: TourEvent): void => {
+    if (tour.running && !mainWindow.isDestroyed())
+      mainWindow.webContents.send(Channels.mainTourEvent, event);
+  };
   const mainState = rememberWindowState(mainWindow, 'main', {
     x: 0,
     y: 0,
@@ -366,7 +402,11 @@ async function start(): Promise<void> {
     url: pageUrl('mini', MINI_HOST),
     onTop: () => settingsFile.current.miniOnTop,
     hideFromSharing: () => settingsFile.current.miniHideFromSharing,
-    onHidden: () => noteEditors.leaveAll('mini'),
+    onShown: () => tourEvent('mini-open'),
+    onHidden: () => {
+      noteEditors.leaveAll('mini');
+      tourEvent('mini-closed');
+    },
     log,
   });
   /** D-109: which of Flint's two list windows sent something (null: neither). */
@@ -436,14 +476,34 @@ async function start(): Promise<void> {
         })
       : null,
   );
-  ipcMain.handle(Channels.mainChange, (event, id: unknown, change: unknown) =>
-    owns(event.sender) && typeof id === 'string' && typeof change === 'object' && change !== null
-      ? workspace.change(id, change as ListChange, new Date()).catch((error: unknown) => {
-          log(`could not change the list: ${String(error)}`);
-          return null;
-        })
-      : null,
-  );
+  /** D-116: the walkthrough's steps 3, 5 and 6: shorthand typed, a task pinned, a reminder set. */
+  const tourChange = (change: ListChange, now: Date): void => {
+    if (!tour.running) return;
+    if (change.kind === 'many') for (const each of change.changes) tourChange(each, now);
+    else if (change.kind === 'add') {
+      const parsed = workspace.parse(
+        { text: change.text, chooseNewList: change.chooseNewList ?? false },
+        now,
+      );
+      if (parsed.counts.priority + parsed.counts.reminder + parsed.counts.list > 0)
+        tourEvent('shorthand');
+      if (parsed.reminder) tourEvent('reminder');
+    } else if (change.kind === 'pin' && change.pinned) tourEvent('pinned');
+    else if (change.kind === 'reminder') tourEvent('reminder');
+  };
+  ipcMain.handle(Channels.mainChange, async (event, id: unknown, change: unknown) => {
+    if (!owns(event.sender) || typeof id !== 'string' || typeof change !== 'object' || !change)
+      return null;
+    const now = new Date();
+    const outcome = await workspace
+      .change(id, change as ListChange, now)
+      .catch((error: unknown) => {
+        log(`could not change the list: ${String(error)}`);
+        return null;
+      });
+    if (outcome) tourChange(change as ListChange, now);
+    return outcome;
+  });
   // UI-08: a text field's menu in any Flint window; the command runs on that window.
   ipcMain.on(Channels.editCommand, (event, command: unknown) => {
     const contents = event.sender;
@@ -824,6 +884,54 @@ async function start(): Promise<void> {
       version: app.getVersion(),
     };
   };
+  // APP-10, APP-15, D-117, D-119: what onboarding shows on this start, and the tour's progress.
+  ipcMain.handle(Channels.mainOnboarding, (event): OnboardingState | null => {
+    if (!owns(event.sender)) return null;
+    const state: OnboardingState = {
+      visible: mainWindow.isVisible(),
+      tourFrom,
+      interrupted: tourInterrupted,
+      whatsNew:
+        whatsNewDue && settingsFile.current.lastSeenVersion !== app.getVersion()
+          ? whatsNewDue
+          : null,
+      version: app.getVersion(),
+    };
+    // Said once (a reloaded page doesn't say it again).
+    tourInterrupted = false;
+    return state;
+  });
+  ipcMain.handle(Channels.mainTour, async (event, action: unknown): Promise<string | null> => {
+    if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
+    const { kind } = action as TourAction;
+    if (kind === 'start') {
+      await tour.start(workspace.tourBaseline());
+      tourFrom = 0;
+      log('walkthrough started');
+    } else if (kind === 'step') {
+      const { step } = action as Extract<TourAction, { kind: 'step' }>;
+      if (typeof step === 'number' && Number.isInteger(step) && step >= 0) {
+        await tour.step(step);
+        tourFrom = step;
+      }
+    } else if (kind === 'end') {
+      await tour.end();
+      tourFrom = null;
+      log('walkthrough ended');
+    } else if (kind === 'remove') {
+      const baseline = tour.baseline;
+      const label = baseline ? await workspace.removeMadeSince(baseline, new Date()) : null;
+      await tour.end();
+      tourFrom = null;
+      log(`walkthrough ended: ${label ?? 'nothing to remove'}`);
+      return label;
+    }
+    return null;
+  });
+  ipcMain.handle(Channels.mainWhatsNewSeen, async (event) => {
+    if (!owns(event.sender)) return;
+    await settingsFile.update({ lastSeenVersion: app.getVersion() });
+  });
   workspace.rolloverPrompt = settingsFile.current.rolloverPrompt;
   ipcMain.handle(Channels.mainSettings, (event) => (owns(event.sender) ? settingsView() : null));
   ipcMain.handle(Channels.mainSetSetting, async (event, change: unknown) => {
@@ -924,6 +1032,8 @@ async function start(): Promise<void> {
       log(`Flint folder copied to ${path}: ${copied.files} files, checked`);
     } else if (how === 'fresh') await mkdir(path, { recursive: true });
     await settingsFile.update({ flintFolder: path });
+    // D-119: a walkthrough goes on after the restart (step 1's Change…: at step 2).
+    if (tour.running) await tour.restartAt(Math.max(1, tour.currentStep));
     log(`Flint folder is now ${path} (${how}); restarting`);
     if (testHooks) {
       testHooks.relaunched = path;
@@ -944,7 +1054,7 @@ async function start(): Promise<void> {
     return { ok: true };
   });
   // D-104: back from that restart: on Settings.
-  if (process.argv.includes('--show-settings')) {
+  if (process.argv.includes('--show-settings') && tourAtStart.from === null) {
     showMain();
     const send = (): void => mainWindow.webContents.send(Channels.mainShowSettings, 'general');
     if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
@@ -1097,6 +1207,7 @@ async function start(): Promise<void> {
       }
       await drafts.clearIf(capture.draft, attachments);
       e2eHooks()?.captured.push(capture.text);
+      if (outcome.kind === 'saved') tourEvent('captured');
     } catch (error) {
       // D-27: the text comes back as the draft, with `Couldn't save your last capture · Retry`.
       log(`capture could not be saved: ${String(error)}`);
@@ -1164,6 +1275,9 @@ async function start(): Promise<void> {
       }
     },
   });
+  // D-115: the walkthrough's dim lifts while the popup is open.
+  popup.window.on('show', () => tourEvent('popup-open'));
+  popup.window.on('hide', () => tourEvent('popup-closed'));
   const hooks = e2eHooks();
   if (hooks) hooks.showPopup = () => popup.show(epochNow());
   if (hooks) {

@@ -83,6 +83,7 @@ import {
 import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
 import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js';
+import { onboardingOnce, Walkthrough, WhatsNew, type TourEnd } from './Onboarding.js';
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
@@ -425,6 +426,8 @@ export function App(): ReactElement {
   const content = useRef<HTMLDivElement>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
   /**
    * MEDIA-03, D-84: large files linked where they are: one notice each, kept until acted on or
    * dismissed (it never fades and never takes focus).
@@ -699,6 +702,11 @@ export function App(): ReactElement {
   }, [go, travel, listId, page]);
 
   const openList = useCallback((id: string): void => go({ list: id, page: null }), [go]);
+  /** D-116: the walkthrough's steps 3 to 6 are on Inbox. */
+  const tourInbox = useCallback((): void => {
+    const id = listsRef.current.find((list) => list.inbox)?.id;
+    if (id && (listIdRef.current !== id || pageRef.current !== null)) openList(id);
+  }, [openList]);
   /** TASK-14, D-113: Inbox opened in triage. */
   const startTriage = useCallback(
     (inboxId: string): void => {
@@ -1105,6 +1113,67 @@ export function App(): ReactElement {
 
   /** NAV-01, NAV-02, D-106: the Ctrl+K palette and the `?` cheat sheet. */
   const [palette, setPalette] = useState(false);
+  /**
+   * APP-10, APP-15 (D-113, D-115 to D-120): the walkthrough (a fresh install, a replay, or going
+   * on after step 1's folder change) and What's new (an update; or asked for), once the window is
+   * on screen.
+   */
+  const [tourRun, setTourRun] = useState<{ readonly from: number; readonly run: number } | null>(
+    null,
+  );
+  const [whatsNew, setWhatsNew] = useState<{ readonly since: string | null | undefined } | null>(
+    null,
+  );
+  const [appVersion, setAppVersion] = useState('');
+  const [tourFolder, setTourFolder] = useState('');
+  const startTour = useCallback((from: number): void => {
+    setWhatsNew(null);
+    void window.flintMain.settings().then((settings) => {
+      if (settings) {
+        setTourFolder(settings.flintFolder);
+        setAppVersion(settings.version);
+      }
+      setTourRun({ from, run: Date.now() });
+    });
+  }, []);
+  const startTourRef = useRef(startTour);
+  startTourRef.current = startTour;
+  useEffect(() => {
+    let begun = false;
+    void onboardingOnce().then((state) => {
+      if (!state) return;
+      setAppVersion(state.version);
+      const begin = (): void => {
+        if (begun) return;
+        begun = true;
+        if (state.tourFrom !== null) startTourRef.current(state.tourFrom);
+        else if (state.whatsNew) {
+          setWhatsNew({ since: state.whatsNew.since });
+          void window.flintMain.whatsNewSeen();
+        }
+        // D-119: a tour cut short by a quit or crash, said once.
+        if (state.interrupted)
+          showToastRef.current('The walkthrough was interrupted', false, {
+            label: 'Replay',
+            run: () => startTourRef.current(0),
+          });
+      };
+      if (state.visible) begin();
+      else window.flintMain.onShown(begin);
+    });
+  }, []);
+  const endTour = useCallback((how: TourEnd): void => {
+    setTourRun(null);
+    if (how === 'remove')
+      void window.flintMain.tour({ kind: 'remove' }).then((label) => {
+        showToastRef.current(label ?? 'The tour made nothing to remove', label !== null);
+      });
+    else {
+      void window.flintMain.tour({ kind: 'end' });
+      // D-115: Skip all and Esc say where it comes back from.
+      if (how === 'skipped') showToastRef.current('Replay it any time from Settings', false);
+    }
+  }, []);
   /** TASK-14, D-113: Inbox triage, open on this list (Inbox's ID); null when not triaging. */
   const [triage, setTriageState] = useState<string | null>(null);
   const triageRef = useRef<string | null>(null);
@@ -3910,6 +3979,19 @@ export function App(): ReactElement {
         hint: 'Ctrl+Alt+Space',
         run: () => window.flintMain.toggleMini(),
       },
+      // APP-10, APP-15, D-112, D-117: the walkthrough again, and What's new.
+      {
+        id: 'app:tour',
+        label: 'Replay walkthrough',
+        keywords: 'tour onboarding help start guide',
+        run: () => startTour(0),
+      },
+      {
+        id: 'app:whats-new',
+        label: 'What’s new',
+        keywords: 'whats new release notes changes update version',
+        run: () => setWhatsNew({ since: undefined }),
+      },
       {
         id: 'app:shortcuts',
         label: 'Keyboard shortcuts',
@@ -4574,6 +4656,8 @@ export function App(): ReactElement {
                   find={settingsFind}
                   onToast={(text) => showToast(text, false)}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
+                  onReplayTour={() => startTour(0)}
+                  onWhatsNew={() => setWhatsNew({ since: undefined })}
                   onLinkPatterns={(patterns) => {
                     setLinkPatterns(patterns);
                     setPatternsLoaded((count) => count + 1);
@@ -5107,6 +5191,22 @@ export function App(): ReactElement {
         </div>
       )}
 
+      {/* APP-10, APP-13, D-115 to D-120: the walkthrough's spotlight. */}
+      {tourRun && (
+        <Walkthrough
+          key={tourRun.run}
+          from={tourRun.from}
+          folder={tourFolder}
+          lists={lists}
+          paletteOpen={palette}
+          onInbox={tourInbox}
+          onEnd={endTour}
+        />
+      )}
+      {/* APP-15, D-117: What's new. */}
+      {whatsNew && !tourRun && appVersion !== '' && (
+        <WhatsNew version={appVersion} since={whatsNew.since} onClose={() => setWhatsNew(null)} />
+      )}
       {/* NAV-01, D-106: the Ctrl+K palette. */}
       {palette && (
         <Palette

@@ -1,0 +1,276 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  _electron as electron,
+  expect,
+  test,
+  type ElectronApplication,
+  type Page,
+} from '@playwright/test';
+
+/**
+ * APP-10, APP-13, APP-15 (D-113, D-115 to D-120): onboarding. A fresh install's walkthrough, each
+ * step moving on when it is done and only its target taking clicks; Remove what I created during
+ * the tour as one undoable step; Esc; a tour cut short; going on after step 1's folder change;
+ * What's new after an update. Each test starts its own Flint (onboarding is off in the other
+ * suites: FLINT_E2E_ONBOARDING turns it on), on the suite's fixed clock (D-107), off-screen, never
+ * focused.
+ */
+test.describe.configure({ mode: 'serial' });
+
+const appDirectory = join(import.meta.dirname, '..');
+const electronPath = execFileSync(process.execPath, ['-p', "require('electron')"], {
+  cwd: appDirectory,
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  encoding: 'utf8',
+}).trim();
+const CLOCK_OFFSET = new Date(2026, 2, 10, 10, 0).getTime() - Date.now();
+const VERSION = (
+  JSON.parse(readFileSync(join(appDirectory, 'package.json'), 'utf8')) as { version: string }
+).version;
+
+let dataDirectory = '';
+let app: ElectronApplication | undefined;
+
+/** A Flint on `dataDirectory`, its main window shown off-screen without the focus. */
+async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && key !== 'ELECTRON_RUN_AS_NODE') env[key] = value;
+  }
+  const started = await electron.launch({
+    executablePath: electronPath,
+    args: [appDirectory, '--hidden'],
+    env: {
+      ...env,
+      FLINT_E2E: '1',
+      FLINT_E2E_ONBOARDING: '1',
+      FLINT_DATA_DIR: dataDirectory,
+      FLINT_E2E_CLOCK_OFFSET: String(CLOCK_OFFSET),
+    },
+  });
+  app = started;
+  await expect
+    .poll(() => started.windows().some((page) => page.url().includes('main-window')), {
+      timeout: 15_000,
+    })
+    .toBe(true);
+  const main = started.windows().find((page) => page.url().includes('main-window')) as Page;
+  await main.waitForLoadState('domcontentloaded');
+  await started.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((each) => each.getTitle() === 'Flint');
+    if (!window) return;
+    window.setSkipTaskbar(true);
+    window.setBounds({ x: -6000, y: 0, width: 1300, height: 860 });
+    window.showInactive();
+  });
+  return { app: started, main };
+}
+
+async function fresh(settings?: object, tour?: object): Promise<void> {
+  dataDirectory = await mkdtemp(join(tmpdir(), 'flint-e2e-onboarding-'));
+  await mkdir(join(dataDirectory, 'Flint'), { recursive: true });
+  await mkdir(join(dataDirectory, 'appdata'), { recursive: true });
+  if (settings)
+    await writeFile(join(dataDirectory, 'appdata', 'settings.json'), JSON.stringify(settings));
+  if (tour) await writeFile(join(dataDirectory, 'appdata', 'tour.json'), JSON.stringify(tour));
+}
+
+test.afterEach(async () => {
+  await app?.close();
+  app = undefined;
+  await rm(dataDirectory, { recursive: true, force: true });
+});
+
+const exists = (path: string): Promise<boolean> =>
+  access(path).then(
+    () => true,
+    () => false,
+  );
+
+/** A click where `selector` is on screen, wherever the dim lets it land (not Playwright's). */
+async function clickAt(main: Page, selector: string): Promise<void> {
+  const box = await main.locator(selector).first().boundingBox();
+  if (!box) throw new Error(`${selector} is not on screen`);
+  await main.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+test('a fresh install: the walkthrough, each step moving on when it is done; Remove what I created, undoable (APP-10, D-116, D-117, D-120)', async () => {
+  await fresh();
+  const { main } = await launch();
+  const card = main.locator('.spotlight-card');
+  const inbox = (): Promise<string> => readFile(join(dataDirectory, 'Flint', 'Inbox.md'), 'utf8');
+
+  // 1: welcome, the folder, nothing ringed; under the dim nothing takes a click.
+  await expect(card).toContainText('Welcome to Flint');
+  await expect(card).toContainText('1 / 8');
+  await expect(card).toContainText(join(dataDirectory, 'Flint'));
+  await expect(card).toContainText('Nothing leaves your computer.');
+  await expect(main.locator('.spotlight-ring')).toHaveCount(0);
+  const before = await main.locator('.nav.on').textContent();
+  await clickAt(main, `.nav[data-key="@today"]`);
+  await expect(main.locator('.nav.on')).toHaveText(before ?? '');
+  // The card never takes the keyboard.
+  await card.getByRole('button', { name: 'Next' }).click();
+  await expect(card).toContainText('2 / 8');
+  expect(await main.evaluate(() => document.activeElement?.closest('.spotlight-card'))).toBeNull();
+  expect(
+    JSON.parse(await readFile(join(dataDirectory, 'appdata', 'tour.json'), 'utf8')),
+  ).toMatchObject({
+    step: 1,
+    restart: false,
+  });
+
+  // 2: a capture from the popup; the dim lifts while it is open.
+  await expect(card).toContainText('Capture from anywhere');
+  await app?.evaluate(() =>
+    (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
+  );
+  await expect(main.locator('.spotlight-dim')).toHaveCount(0);
+  const popupPage = (): Page | undefined =>
+    app?.windows().find((page) => page.url().includes('capture-popup'));
+  await expect.poll(() => popupPage() !== undefined, { timeout: 15_000 }).toBe(true);
+  const popup = popupPage() as Page;
+  await popup.locator('#capture').fill('call the bank');
+  await popup.locator('#capture').press('Enter');
+
+  // 3: on Inbox, the composer ringed and live; shorthand moves it on.
+  await expect(card).toContainText('3 / 8');
+  await expect(card).toContainText('Shorthand as you type');
+  await expect(main.locator('.spotlight-dim')).toHaveCount(1);
+  await expect(main.locator('.spotlight-ring')).toHaveCount(1);
+  await main.locator('.main .composer-input').click();
+  await main.keyboard.type('water the plants !h');
+  await main.keyboard.press('Enter');
+
+  // 4: the sidebar's + and Quick note; a new list moves it on.
+  await expect(card).toContainText('4 / 8');
+  await expect(main.locator('.spotlight-ring')).toHaveCount(2);
+  await main.locator('.add-list').click();
+  await main.locator('.fl-menu').getByText('New task list').click();
+  await main.keyboard.type('Errands');
+  await main.keyboard.press('Enter');
+
+  // 5: back on Inbox, the first task ringed; P pins it.
+  await expect(card).toContainText('5 / 8');
+  await expect(main.locator('h1')).toContainText('Inbox');
+  await main.locator('.main .row', { hasText: 'water the plants' }).click();
+  await main.keyboard.press('p');
+
+  // 6: the composer's bell; a reminder set moves it on.
+  await expect(card).toContainText('6 / 8');
+  await main.getByRole('button', { name: 'Set reminder' }).click();
+  await main.keyboard.type('tomorrow 10');
+  await main.keyboard.press('Enter');
+  await main.keyboard.type(' pay the rent');
+  await main.keyboard.press('Enter');
+
+  // 7: the palette's button; the palette opening moves it on. Esc then closes the palette only.
+  await expect(card).toContainText('7 / 8');
+  await main.keyboard.press('Control+k');
+  await expect(card).toContainText('8 / 8');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.palette-layer')).toHaveCount(0);
+  await expect(card).toContainText('Mini mode');
+
+  // 8: the title bar's mini button; mini opening ends the tour: You're set.
+  await expect(main.locator('.spotlight-ring')).toHaveCount(1);
+  await main.locator('.mini-toggle').click();
+  await expect(card).toContainText('You’re set');
+  await expect(card).toContainText('you can turn tips off in Settings');
+  await app?.evaluate(() =>
+    (globalThis as { __flintE2E?: { hideMini?: () => void } }).__flintE2E?.hideMini?.(),
+  );
+
+  // Remove what I created during the tour: the captures, the tasks, the list; one undo.
+  expect(await inbox()).toContain('call the bank');
+  expect(await exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(true);
+  await card.getByRole('button', { name: 'Remove what I created during the tour' }).click();
+  await expect(card).toHaveCount(0);
+  await expect(main.locator('.toast')).toContainText('Removed 4 items from the tour');
+  // Each item goes in turn: wait for all of them.
+  const made = /call the bank|water the plants|pay the rent/g;
+  await expect.poll(async () => (await inbox()).match(made)?.length ?? 0).toBe(0);
+  await expect.poll(() => exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(false);
+  expect(await exists(join(dataDirectory, 'appdata', 'tour.json'))).toBe(false);
+  await main.keyboard.press('Control+z');
+  await expect.poll(async () => (await inbox()).match(made)?.length ?? 0).toBe(3);
+  await expect.poll(() => exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(true);
+});
+
+test('Esc ends the walkthrough and says where to replay it; a tour cut short says so once, with Replay (D-115, D-119)', async () => {
+  await fresh(
+    { lastSeenVersion: VERSION },
+    { step: 3, restart: false, baseline: { lists: ['inbox'], tasks: [] } },
+  );
+  const { main } = await launch();
+  const toast = main.locator('.toast');
+  await expect(toast).toContainText('The walkthrough was interrupted');
+  await expect(main.locator('.spotlight-card')).toHaveCount(0);
+  expect(await exists(join(dataDirectory, 'appdata', 'tour.json'))).toBe(false);
+  await toast.getByRole('button', { name: 'Replay' }).click();
+  await expect(main.locator('.spotlight-card')).toContainText('1 / 8');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.spotlight-card')).toHaveCount(0);
+  await expect(main.locator('.spotlight-dim')).toHaveCount(0);
+  await expect(toast).toContainText('Replay it any time from Settings');
+  await expect.poll(() => exists(join(dataDirectory, 'appdata', 'tour.json'))).toBe(false);
+  // Settings and the palette start it again.
+  await main.locator('.nav', { hasText: 'Settings' }).click();
+  await main.getByRole('button', { name: 'Replay walkthrough' }).click();
+  await expect(main.locator('.spotlight-card')).toContainText('Welcome to Flint');
+  await main.locator('.spotlight-card').getByRole('button', { name: 'Skip all' }).click();
+  await expect(main.locator('.spotlight-card')).toHaveCount(0);
+});
+
+test('step 1’s folder change restarts Flint and the tour goes on at step 2 (D-119)', async () => {
+  // As a restart left it: the tour at step 2, going on.
+  await fresh(
+    { lastSeenVersion: VERSION },
+    { step: 1, restart: true, baseline: { lists: ['inbox'], tasks: [] } },
+  );
+  const { main } = await launch();
+  await expect(main.locator('.spotlight-card')).toContainText('Capture from anywhere');
+  await expect(main.locator('.spotlight-card')).toContainText('2 / 8');
+  // Going on, not cut short: a quit now would be.
+  expect(
+    JSON.parse(await readFile(join(dataDirectory, 'appdata', 'tour.json'), 'utf8')),
+  ).toMatchObject({ step: 1, restart: false });
+});
+
+test('an update shows What’s new once, in plain words; the palette and Settings show it again (APP-15, D-117)', async () => {
+  await fresh({ lastSeenVersion: '0.8.10' });
+  const { main } = await launch();
+  const card = main.locator('.whats-new');
+  await expect(card).toContainText('What’s new');
+  await expect(card.locator('.whats-new-version').first()).toContainText(`Flint ${VERSION}`);
+  // Plain language: no decision numbers.
+  expect(await card.textContent()).not.toMatch(/D-\d+/);
+  await expect
+    .poll(
+      async () =>
+        (
+          JSON.parse(await readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8')) as {
+            lastSeenVersion?: string;
+          }
+        ).lastSeenVersion,
+    )
+    .toBe(VERSION);
+  await card.getByRole('button', { name: 'Close' }).click();
+  await expect(card).toHaveCount(0);
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('what');
+  await main.locator('.palette-layer').getByText('What’s new').first().click();
+  await expect(card).toBeVisible();
+  await main.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+  await main.locator('.nav', { hasText: 'Settings' }).click();
+  await main
+    .locator('.settings-row', { hasText: 'What changed in each version' })
+    .getByRole('button')
+    .click();
+  await expect(card).toBeVisible();
+});

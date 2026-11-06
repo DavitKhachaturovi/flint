@@ -175,6 +175,16 @@ export const Channels = {
    * (answered from before the page loads).
    */
   mainStarted: 'main:started',
+  /** APP-10, APP-15, D-117: main → main window: it was shown (the tour and What's new wait). */
+  mainShown: 'main:shown',
+  /** Main window → main: what onboarding has to show this start (`OnboardingState`). */
+  mainOnboarding: 'main:onboarding',
+  /** Main window → main: the walkthrough started, moved on, ended, or removes what it made. */
+  mainTour: 'main:tour',
+  /** Main → main window: something a walkthrough step waits for happened (`TourEvent`). */
+  mainTourEvent: 'main:tour-event',
+  /** Main window → main: What's new was shown; this version is the last one seen. */
+  mainWhatsNewSeen: 'main:whats-new-seen',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
@@ -489,6 +499,38 @@ export type SettingChange =
       readonly value: boolean;
     }
   | { readonly key: 'miniReminders'; readonly value: 'when-open' | 'always' };
+
+/** APP-10, APP-15, D-117, D-119: what onboarding has to show on this start. */
+export interface OnboardingState {
+  /** Whether the main window is on screen now (else the tour and What's new wait for it). */
+  readonly visible: boolean;
+  /** The walkthrough to run once the window shows, from this step (0-based); null: none. */
+  readonly tourFrom: number | null;
+  /** D-119: a tour was cut short by a quit or crash: say so once, with Replay. */
+  readonly interrupted: boolean;
+  /** D-117: What's new is due, for the versions after `since` (null: an install from before it). */
+  readonly whatsNew: { readonly since: string | null } | null;
+  readonly version: string;
+}
+
+/** The walkthrough's progress, told to main so it survives the folder change's restart (D-119). */
+export type TourAction =
+  | { readonly kind: 'start' }
+  | { readonly kind: 'step'; readonly step: number }
+  | { readonly kind: 'end' }
+  /** D-116, D-117: what the tour made goes to Trash as one undoable step; ends it. */
+  | { readonly kind: 'remove' };
+
+/** What a walkthrough step waits for, seen by main (D-116). */
+export type TourEvent =
+  | 'captured'
+  | 'shorthand'
+  | 'pinned'
+  | 'reminder'
+  | 'popup-open'
+  | 'popup-closed'
+  | 'mini-open'
+  | 'mini-closed';
 
 /** D-67, D-100: how the main window looks (sent when it changes). */
 export interface Appearance {
