@@ -2,6 +2,18 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.13 (6 Nov 2026)
+
+- **Inbox triage:**
+  - Start it from the Triage button at the end of Inbox's title.
+  - Leave partway and it picks up where you were; Start over goes back to the first task.
+  - Hover the progress line to see a task's number, click to jump there.
+  - Click a task's notes to read all of it (in the side panel, or on the card in a narrow window).
+  - The card and its buttons move smoothly, and editing the title no longer jumps.
+- **Today:** the Timeline is always there, even without reminders.
+- **Sidebar:** a new list, note or group you're naming scrolls into view. Lists in a group can move to the top of the group; Move to top takes them to the top of Lists.
+- **Mini mode:** the note's title sits a little lower again, without moving the "Quick note" line, and switching tabs no longer shows a scrollbar or shifts anything sideways. Closing it returns you to the app you were in, never to a minimized Flint.
+
 ## 0.8.12 (6 Nov 2026)
 
 - **Inbox triage:** sort your Inbox one task at a time, oldest first, without leaving the keyboard. Press T in Inbox (or "Triage" under its title, or "Sort Inbox" on Today): M moves it to a list, Space marks it done, Delete deletes it, 3 / 2 / 1 / 0 set its priority, P pins it, R sets a reminder, → keeps it in Inbox. Ctrl+Z brings the last one back; at the end you see what you sorted.
