@@ -772,3 +772,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | Mini mode and the capture popup hidden from screen sharing (switches in Settings) | MINI-01, CAP-01 · Done (0.8.8); a real Teams share to verify | D-109 |
 | 10 | Mini mode's keys, letters only outside text fields; Esc never hides it | MINI-01 · Done (0.8.8) | 03, D-109 |
 
+## AR. Mini mode rebuilt on the main window's parts (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The shared parts moved to `renderer/ui/` and `ui/app.css`, behaviour-neutral (screenshot gate) | MINI-01 · Done (0.8.9) | 05, D-110 |
+| 2 | Mini built from the shared parts in a compact size, never copies | MINI-01 · Done (0.8.9) | 03, 09, D-110 |
+| 3 | Transparent window, mockup 05's card (22 px, floating shadow, 364 px, height fitting up to 460 px), resize handles, hanging from its corner, grip | MINI-01 · Done (0.8.9); the look on a real desktop to check | 05, 09, D-110 |
+| 4 | Today's next reminder on a card that turns into the alert; it never takes the caret | REM-06, TODAY-03 · Done (0.8.9) | 02, D-110 |
+| 5 | The compact composer: no tools, menus upward, the hint while focused and empty, the send arrow | MINI-01, CAP-03 · Done (0.8.9) | D-110 |
+| 6 | Drag and Alt+↑/↓ in mini (Today's pinned, Inbox); the tab switch and the pin's state animated | MINI-01, TASK-01 · Done (0.8.9) | 03, D-110 |
+| 7 | Note tab: title before text; a removed empty note never leaves it dead; New quick note off while empty | MINI-01, NOTE-08 · Done (0.8.9) | D-110 |
+| 8 | The animation-speed setting reaches mini mode | APP-11 · Done (0.8.9) | D-110 |
+

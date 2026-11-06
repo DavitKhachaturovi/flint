@@ -109,7 +109,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Action | Key | Status |
 |---|---|---|
 | Show or hide mini mode | Ctrl+Alt+Space, anywhere (changeable; D-109's exception to the no-Alt rule) | Decided |
-| Mini mode | Ctrl+1/2/3 tabs, ↑/↓, Space, P, Enter opens in the main window, N composer, D/S/O on a reminder card (letters only outside text fields), Esc never hides it (D-109) | Decided |
+| Mini mode | Ctrl+1/2/3 tabs, ↑/↓, Space, P, Enter opens in the main window, N composer, D/S/O on a reminder card (letters only outside text fields), Esc never hides it (D-109); Alt+↑/↓ moves the selected task, and rows drag (D-110) | Decided |
 | Command palette / fuzzy search | Ctrl+K, or the sidebar header's search button (D-107; D-106's header pill removed); in a step, Esc or Backspace in the empty field goes back one step, Esc closes from the top | Decided |
 | Keyboard cheat sheet | `?` in Navigate state (D-106) | Decided |
 | Keyboard cheat sheet | ? (Navigate state) | Decided |
@@ -209,6 +209,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Mini mode look
 - Small, always-on-top, minimal chrome. Shows Today or Inbox with a toggle; compact rows.
 - **D-109:** a third tab, Note: one quick note as a sticky note, in a compact editor (mockup 05 has Today and Inbox; the Note tab joins them).
+- **D-110:** built from the main window's own parts in a compact size, never copies: the same rows, selection glide, completion, drag, composer, toast, tabs, scrollbars and motion, so it never feels like another app. The card floats on a transparent window (mockup 05's corners and shadow), hangs from its snapped corner and fits its content up to a height limit; resized from its handles. The reminder card shows Today's next reminder and turns into the alert when one fires.
 
 ---
 
