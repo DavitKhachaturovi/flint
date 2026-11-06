@@ -99,7 +99,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 ### Inbox triage (TASK-14, D-113)
 | Action | Key | Status |
 |---|---|---|
-| Start triage | T in Inbox (nothing typed), Inbox's Triage pill (D-114), Today's "Sort Inbox · N", Ctrl+K "Triage Inbox" | Decided |
+| Start triage | T in Inbox (nothing typed), Inbox's "Triage · N" (D-115), Today's "Sort Inbox · N", Ctrl+K "Triage Inbox" | Decided |
 | Move to a list (next task) | M, then the list picker (type, Enter) | Decided |
 | Done / Delete (next task) | Space / Delete | Decided |
 | Priority high, medium, low, none (the card stays) | 3 / 2 / 1 / 0 | Decided |
@@ -110,7 +110,8 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Leave | Esc (at the summary, Enter or Esc); the place is kept for the session (D-114) | Decided |
 | Go to a task | A click on the progress line (hover shows "7 of 18") | Decided (D-114) |
 | From the first task again | Start over (beside the count, and on the summary) | Decided (D-114) |
-| The whole task | A click on the card's notes: the side panel (wide), unfolded on the card (narrow) | Decided (D-114) |
+| The whole task | A click on the card's notes: the side panel for that card (wide; Up next again with the next card or a click elsewhere, D-115), unfolded on the card (narrow) | Decided (D-114) |
+| A quick note's title, on into its text | Enter, Shift+Enter, Tab or ↓ in "Add a title" | Decided (D-115) |
 
 ### Task list — Edit state
 | Action | Key | Status |

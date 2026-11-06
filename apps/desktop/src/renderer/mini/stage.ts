@@ -1,3 +1,4 @@
+import { setFloatingArea } from '../ui/floating-area.js';
 import {
   useCallback,
   useEffect,
@@ -73,6 +74,8 @@ export function useStage(refs: {
 
   useEffect(() => {
     const take = (next: MiniLayout): void => {
+      // D-115: menus and pickers open within the part of the window on the screen.
+      setFloatingArea(next.visible ?? null);
       setLayout(next);
       setSize({ width: next.width, limit: next.limit });
       setHorizontal(next.horizontal);

@@ -1,9 +1,10 @@
 /** NOTE-08, D-99: a quick note's title row, shared by the main window and mini mode (D-110). */
-import { useState, type ReactElement } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 
 /**
  * NOTE-08, D-99: a quick note's title row: when it was made (its label), and "Add a title", which
- * on Enter makes it a normal note with that name.
+ * on Enter makes it a normal note with that name. D-115: Enter, Shift+Enter, Tab and ↓ save it and
+ * go on into the note's text (the editor below it); Esc puts it back.
  */
 export function QuickTitle(props: {
   /** When it was made. */
@@ -15,9 +16,13 @@ export function QuickTitle(props: {
   const { at, title, onTitle } = props;
   const [text, setText] = useState(title);
   // D-102: saved on Enter and when the field is left (as everything in Flint), when it changed.
+  // Sent once: going on into the text leaves the field too (its blur isn't a second save).
+  const sent = useRef<string | null>(null);
   const save = (): void => {
     const next = text.trim();
-    if (next !== '' && next !== title) onTitle(next);
+    if (next === '' || next === title || next === sent.current) return;
+    sent.current = next;
+    onTitle(next);
   };
   const made = new Date(at);
   const two = (value: number): string => String(value).padStart(2, '0');
@@ -41,9 +46,21 @@ export function QuickTitle(props: {
         onChange={(event) => setText(event.target.value)}
         onBlur={save}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') {
+          if (
+            (event.key === 'Enter' || event.key === 'Tab' || event.key === 'ArrowDown') &&
+            !event.ctrlKey &&
+            !event.altKey &&
+            !(event.key === 'Tab' && event.shiftKey)
+          ) {
             event.preventDefault();
-            event.currentTarget.blur();
+            save();
+            // The note's own editor, under this title (the main window's card, mini's Note tab).
+            const editor = event.currentTarget
+              .closest('.note-card, .mini-note')
+              ?.querySelector<HTMLElement>('.cm-content');
+            if (editor) editor.focus();
+            else event.currentTarget.blur();
+            return;
           }
           if (event.key === 'Escape') {
             setText(title);

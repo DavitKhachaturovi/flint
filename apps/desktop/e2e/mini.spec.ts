@@ -535,6 +535,56 @@ test('the Note tab: a title before any text; a removed empty note never leaves t
   await mini.keyboard.press('Control+1');
 });
 
+test('the Note tab: a title first, then Enter: the caret goes on into the text, one note (D-115)', async () => {
+  await mini.keyboard.press('Control+3');
+  await mini.locator('.mini-note-head .tool').click();
+  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  const title = mini.locator('.quick-title-input');
+  await expect(title).toHaveValue('');
+  const before = (await readdir(flint)).length;
+  await title.click();
+  await mini.keyboard.type('Title then text');
+  await mini.keyboard.press('Enter');
+  const editor = mini.locator('.mini-editor .cm-content');
+  await expect(editor).toBeFocused();
+  // Typed at once, before the note exists: still one note, with its title and the text.
+  await mini.keyboard.type('Right after');
+  await expect
+    .poll(() => readFile(join(flint, 'Title then text.md'), 'utf8').catch(() => ''))
+    .toContain('Right after');
+  await mini.waitForTimeout(600);
+  expect((await readdir(flint)).length).toBe(before + 1);
+  await mini.keyboard.press('Escape');
+  await mini.keyboard.press('Control+1');
+});
+
+test("menus open where they fit: the Note tab's ⋯ menu stays on the screen (D-115)", async () => {
+  await mini.keyboard.press('Control+3');
+  const more = mini.locator('.mini-note-head .tool');
+  await more.click();
+  const menu = mini.locator('.fl-menu');
+  await expect(menu).toBeVisible();
+  const box = await menu.boundingBox();
+  const visible = await mini.evaluate(async () => {
+    const layout = await (
+      window as unknown as {
+        flintMini: { layout: () => Promise<{ visible?: { right: number; bottom: number } }> };
+      }
+    ).flintMini.layout();
+    return layout.visible ?? null;
+  });
+  expect(visible).not.toBeNull();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(visible?.right ?? 0);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(visible?.bottom ?? 0);
+  // It opened toward the screen, ending at the button (the card hangs from the right corner).
+  const button = await more.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+    (button?.x ?? 0) + (button?.width ?? 0),
+  );
+  await mini.keyboard.press('Escape');
+  await mini.keyboard.press('Control+1');
+});
+
 /** Drags a resize handle by (dx, dy). */
 const resize = async (handle: string, dx: number, dy: number): Promise<void> => {
   const box = await mini.locator(`.mini-handle.${handle}`).boundingBox();

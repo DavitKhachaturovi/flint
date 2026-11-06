@@ -46,13 +46,22 @@ export function NoteTab(props: {
   useEffect(() => setTitled(''), [noteId]);
   const empty = text.trim() === '' && title === '' && titled === '';
 
-  const make = async (): Promise<string | null> => {
-    const id = await window.flintMain.quickNote();
-    if (id) {
-      made.current.add(id);
-      onMade(id);
-    }
-    return id;
+  // D-115: one note however it starts (a title, then the first keystroke right after it, both
+  // before it exists): the second waits for the first instead of making another.
+  const making = useRef<Promise<string | null> | null>(null);
+  useEffect(() => {
+    if (noteId === '') making.current = null;
+  }, [noteId]);
+  const make = (): Promise<string | null> => {
+    making.current ??= (async () => {
+      const id = await window.flintMain.quickNote();
+      if (id) {
+        made.current.add(id);
+        onMade(id);
+      }
+      return id;
+    })();
+    return making.current;
   };
   const saveTitle = async (name: string): Promise<void> => {
     setTitled(name);

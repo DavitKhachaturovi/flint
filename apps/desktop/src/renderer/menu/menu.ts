@@ -6,6 +6,8 @@
  * scrolls, and closes when that scrolls out of view (D-78).
  */
 
+import { floatingArea } from '../ui/floating-area.js';
+
 export interface MenuItem {
   readonly label: string;
   /** A key shown on the right, e.g. `Del`. */
@@ -236,6 +238,9 @@ export function openMenu(
   const place = (level: Level, beside: HTMLElement | null): void => {
     const { menu } = level;
     const { width, height } = menu.getBoundingClientRect();
+    // D-115: within the window's visible part (mini's window reaches past the screen's edge).
+    const area = floatingArea();
+    const tall = area.bottom - area.top;
     let x = at.x;
     let y = at.y;
     if (beside) {
@@ -243,29 +248,29 @@ export function openMenu(
       const item = beside.getBoundingClientRect();
       x = item.right + 2 - shift.x;
       y = item.top - 5 - shift.y;
-      if (x + shift.x + width > window.innerWidth - GAP) x = item.left - width - 2 - shift.x;
-      if (y + shift.y + height > window.innerHeight - GAP)
-        y = window.innerHeight - GAP - height - shift.y;
+      if (x + shift.x + width > area.right - GAP) x = item.left - width - 2 - shift.x;
+      if (y + shift.y + height > area.bottom - GAP) y = area.bottom - GAP - height - shift.y;
     } else {
-      if (x + width > window.innerWidth - GAP) x = Math.max(GAP, at.x - width);
-      if (y + height > window.innerHeight - GAP) {
-        if (at.y - height >= GAP) y = at.y - height;
+      if (x + width > area.right - GAP) x = Math.max(area.left + GAP, at.x - width);
+      if (y + height > area.bottom - GAP) {
+        if (at.y - height >= area.top + GAP) y = at.y - height;
         else if (options.room && !grown) {
           grown = true;
-          options.room.grow(y + height + 3 * GAP - window.innerHeight);
+          options.room.grow(y + height + 3 * GAP - area.bottom);
         } else {
           // D-87: room neither below nor above the click: as low as it fits, never past the
           // window's edge (and scrolling when it is taller than the window).
-          y = window.innerHeight - GAP - height;
-          if (height > window.innerHeight - 2 * GAP) {
-            menu.style.maxHeight = `${window.innerHeight - 2 * GAP}px`;
+          y = area.bottom - GAP - height;
+          if (height > tall - 2 * GAP) {
+            menu.style.maxHeight = `${tall - 2 * GAP}px`;
             menu.style.overflowY = 'auto';
           }
         }
       }
     }
+    x = Math.max(area.left + GAP - shift.x, x);
     menu.style.left = `${Math.round(x)}px`;
-    menu.style.top = `${Math.round(Math.max(GAP, y))}px`;
+    menu.style.top = `${Math.round(Math.max(area.top + GAP - shift.y, y))}px`;
     menu.style.translate = `${shift.x}px ${shift.y}px`;
     menu.style.visibility = '';
   };

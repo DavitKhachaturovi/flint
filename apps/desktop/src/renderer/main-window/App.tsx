@@ -207,8 +207,6 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 
 /** D-67, D-100: every duration token scaled by the animation speed (this window). */
-/** D-114: from this many open tasks in Inbox, its Triage pill is the primary (white) one. */
-const TRIAGE_LOUD = 5;
 /** D-99: a slow second click (renaming in the sidebar): longer than a double-click's gap. */
 const RENAME_DELAY_MS = 450;
 
@@ -1126,6 +1124,22 @@ export function App(): ReactElement {
   useEffect(() => {
     if (triage !== null && triage !== listId) setTriageState(null);
   }, [listId, triage]);
+  /**
+   * D-115: the note editor stays the same one while it is the same note: renamed (a quick note's
+   * title: the caret goes on into it) or given its ID by its first save; another note, a new one.
+   */
+  const noteEditor = useRef({ id: '', key: 0 });
+  const noteIdsFromEditor = useRef(new Set<string>());
+  const noteEditorKey = (id: string): string => {
+    if (id !== noteEditor.current.id)
+      noteEditor.current = {
+        id,
+        key: noteIdsFromEditor.current.has(id)
+          ? noteEditor.current.key
+          : noteEditor.current.key + 1,
+      };
+    return `note-${noteEditor.current.key}`;
+  };
   const triageDetails = useCallback((key: string | null): void => setSelected(key), []);
   const [cheatSheet, setCheatSheet] = useState(false);
   /** D-106: Trash's tab asked for (an archived task found with Ctrl+K). */
@@ -2326,12 +2340,8 @@ export function App(): ReactElement {
       // in the manual order, which is what it changes.
       const manual = (sidebarView?.sort ?? 'manual') === 'manual';
       const grouping: MenuEntry[] = [
-        // D-114: in a group, both: the top of Lists (out of the group) and the top of the group.
-        {
-          label: 'Move to top',
-          ...(manual ? {} : { hint: 'Switch to Manual', disabled: true }),
-          action: () => intoGroup({ group: null, index: 0 }),
-        },
+        // D-114, D-115: in a group, both: the top of the group, and out of it to the top of Lists
+        // (said so); outside groups, the top of Lists.
         ...(inGroup
           ? [
               {
@@ -2341,6 +2351,11 @@ export function App(): ReactElement {
               },
             ]
           : []),
+        {
+          label: inGroup ? 'Move out to top of Lists' : 'Move to top',
+          ...(manual ? {} : { hint: 'Switch to Manual', disabled: true }),
+          action: () => intoGroup({ group: null, index: 0 }),
+        },
         {
           label: 'Move to group',
           submenu: [
@@ -3825,7 +3840,9 @@ export function App(): ReactElement {
         ? [
             {
               id: 'list:top',
-              label: `Move ${view.mode === 'note' ? 'note' : 'list'} to top`,
+              label: groups.some((group) => group.lists.includes(view.id))
+                ? `Move ${view.mode === 'note' ? 'note' : 'list'} out to top of Lists`
+                : `Move ${view.mode === 'note' ? 'note' : 'list'} to top`,
               run: () => {
                 if (reorderable())
                   void sidebarChange({ kind: 'move', id: view.id, to: { group: null, index: 0 } });
@@ -4676,38 +4693,29 @@ export function App(): ReactElement {
                 view.mode === 'tasks' &&
                 view.id !== TODAY_ID && (
                   <header className="list-header">
-                    <div className="list-title-row">
-                      <h1>
-                        {view.name}
-                        {view.mode === 'tasks' && (
-                          <span className="count"> · {view.open} open</span>
-                        )}
-                      </h1>
-                      {/* TASK-14, D-113, D-114: one task at a time, by keyboard: a small pill at
-                          the title row's end, primary once Inbox has a few open tasks. */}
-                      {lists.find((list) => list.id === view.id)?.inbox && (
-                        <button
-                          type="button"
-                          className={[
-                            'triage-pill',
-                            view.open >= TRIAGE_LOUD ? 'loud' : '',
-                            view.open === 0 ? 'gone' : '',
-                          ].join(' ')}
-                          title="Sort Inbox one task at a time (T)"
-                          tabIndex={view.open === 0 ? -1 : undefined}
-                          aria-hidden={view.open === 0 ? true : undefined}
-                          onClick={() => setTriage(view.id)}
-                        >
-                          <SortIcon size={13} />
-                          Triage
-                          <span className="triage-pill-count">
-                            <MorphText text={String(view.open)} />
-                          </span>
-                        </button>
-                      )}
-                    </div>
+                    <h1>
+                      {view.name}
+                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
+                    </h1>
                     {lists.find((list) => list.id === view.id)?.inbox && (
-                      <span className="subtitle">{INBOX_SUBTITLE}</span>
+                      <span className="subtitle">
+                        {INBOX_SUBTITLE}
+                        {view.open > 0 && (
+                          <>
+                            {' · '}
+                            {/* TASK-14, D-113 (D-115: back from D-114's pill): one task at a
+                                time, by keyboard. */}
+                            <button
+                              type="button"
+                              className="subtitle-link"
+                              title="Sort Inbox one task at a time (T)"
+                              onClick={() => setTriage(view.id)}
+                            >
+                              Triage · {view.open}
+                            </button>
+                          </>
+                        )}
+                      </span>
                     )}
                     {view.readOnly && (
                       <span className="subtitle">
@@ -4762,11 +4770,14 @@ export function App(): ReactElement {
                     )}
                   </header>
                   <NoteEditor
-                    key={view.name}
+                    key={noteEditorKey(view.id)}
                     id={view.id}
                     text={view.noteText ?? ''}
                     readOnly={view.readOnly !== null}
-                    onId={setListId}
+                    onId={(id) => {
+                      noteIdsFromEditor.current.add(id);
+                      setListId(id);
+                    }}
                     onImage={showImage}
                     mono={view.mono === true}
                     focus={focusNote === view.id}
@@ -5342,8 +5353,8 @@ function NameField(props: {
   }, []);
   // D-114: a new list, note or group named outside the sidebar's visible part scrolls into view
   // (clear of Settings and Trash at the bottom and their fade). Measured by layout, not by what
-  // the sidebar's motion shows mid-glide; again once a folded group it is in has opened (until
-  // then the sidebar can't scroll that far), only in the first moments, never against the user.
+  // the sidebar's motion shows mid-glide, once that motion is over (a folded group it goes into
+  // opens first: until then the sidebar can't scroll that far).
   useEffect(() => {
     const field = box.current;
     const sidebar = field?.closest<HTMLElement>('.sidebar');
@@ -5367,20 +5378,18 @@ function NameField(props: {
       if (Math.abs(to - from) >= 1)
         sidebar.scrollTo({ top: to, behavior: reducedMotion() ? 'auto' : 'smooth' });
     };
-    const frame = requestAnimationFrame(ensure);
+    // Once the sidebar's own motion is over (a group opening, the rows making room): one scroll.
     const started = performance.now();
-    const settled = (event: Event): void => {
-      const group = field.closest('.nav-group');
-      if (performance.now() - started > 1200 || !group?.contains(event.target as Node)) return;
-      ensure();
+    let frame = 0;
+    const tick = (): void => {
+      const busy = sidebar
+        .getAnimations({ subtree: true })
+        .some((animation) => animation.playState === 'running');
+      if (busy && performance.now() - started < 1500) frame = requestAnimationFrame(tick);
+      else ensure();
     };
-    sidebar.addEventListener('transitionend', settled);
-    sidebar.addEventListener('animationend', settled);
-    return () => {
-      cancelAnimationFrame(frame);
-      sidebar.removeEventListener('transitionend', settled);
-      sidebar.removeEventListener('animationend', settled);
-    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, []);
   return (
     <div

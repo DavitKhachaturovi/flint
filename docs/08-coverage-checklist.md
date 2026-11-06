@@ -838,3 +838,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 12 | Triage: the progress line goes to a task | TASK-14 · Done (0.8.13) | 03, 09, D-114 |
 | 13 | Triage: in and out as a page | TASK-14 · Done (0.8.13) | D-114 |
 
+## AW. Fixes after 0.8.13; the walkthrough's spotlight (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Triage: back to "Triage · N" under Inbox's title | TASK-14 · Done (0.8.14) | 02, 03, D-115 |
+| 2 | Triage: the side panel's one rule (Up next, the task on a click, Up next again) | TASK-14 · Done (0.8.14) | 02, 03, D-115 |
+| 3 | Move to top of group / Move out to top of Lists | LIST-06 · Done (0.8.14) | 02, D-115 |
+| 4 | Mini: menus and pickers open where they fit on the screen | MINI-01, UI-08 · Done (0.8.14) | 09, D-115 |
+| 5 | A quick note's title: Enter, Shift+Enter, Tab, ↓ on into the text; never a new note | NOTE-08 · Done (0.8.14) | 03, D-115 |
+| 6 | The walkthrough's spotlight: only the target live, taught keys everywhere, Esc ends it | APP-10, APP-13 · Decided · M8 step 4b | 02, D-115 |
+

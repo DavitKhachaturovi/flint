@@ -66,7 +66,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ---
 
 - **D-87:** **Move to top** in a list's or note's right-click menu, under the Manual sort only; otherwise disabled with the "Switch to Manual" hint.
-- **D-114:** in a group, **Move to top of group** next to it; **Move to top** then goes to the top of Lists, out of the group (Proposed). Both are palette commands for the open list.
+- **D-114, D-115:** in a group, **Move to top of group** (stays in it) and **Move out to top of Lists** (leaves it); outside groups, **Move to top**. Both are palette commands for the open list.
 ## 2. Capture
 
 ### CAP-01 — Global hotkey quick-capture popup (v1)
@@ -306,7 +306,8 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Turns "sorted later, or never" into a 2-minute ritual.
 - **D-113 (decided):** a mode in the main column, one large card at a time (the task, its notes, when it was captured), "3 of 18" and a progress line; started from Inbox's "Triage · N" button, Today's "Sort Inbox · N", the palette and T in Inbox. Oldest first. M move, Space done, Delete delete advance; 3/2/1/0 priority, P pin, R reminder stay on the card; → or Enter keep and go on, ← back, Ctrl+Z undo, Esc leave. A summary at the end. Not in mini mode in v1. Milestone M8 (step 4a).
 - **Built (0.8.12):** as decided; the Proposed details of D-113 as built (top-level tasks, oldest by when Flint first saw it then from the bottom of the file, E edits the title, the slide between cards); the summary counts each task once, by what happened to it last.
-- **D-114 (0.8.13):** started from a pill at the end of Inbox's title row ("Triage 18", primary from 5 open tasks); the place is kept for the session, with **Start over**; the progress line goes to a task (hover shows "7 of 18", a click goes there); a click on the notes shows the whole task (the side panel on a wide window, following the card; unfolded on the card on a narrow one); the card's height eases; in and out as a page.
+- **D-114 (0.8.13):** the place is kept for the session, with **Start over**; the progress line goes to a task (hover shows "7 of 18", a click goes there); a click on the notes shows the whole task (unfolded on the card on a narrow window); the card's height eases; in and out as a page.
+- **D-115 (0.8.14):** started from the quiet "Triage · N" under Inbox's title again (D-114's pill reverted). On a wide window the side panel shows Up next until the notes are clicked, that task while its card is shown, and Up next again with every other card and after a click elsewhere.
 
 ---
 
@@ -680,6 +681,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
+- **D-115 (decided):** while a step's spotlight is up, only the ringed target is live; the keys taught work everywhere; the dim lifts while the popup or mini is open; Esc ends it ("Replay it any time from Settings"); the card never takes the keyboard.
 - **D-113 (decided):** 8 steps, each advancing by itself when you do the thing (otherwise Next): welcome and the Flint folder; capture from anywhere; shorthand while writing; task lists, notes and quick notes; Today and pins; reminders; Ctrl+K and `?`; mini mode. A fresh install gets it; an existing one gets What's new. Steps in D-113.
 - **Decided (D-112):** Settings has **Replay walkthrough**; the walkthrough's first step says it can be skipped now and replayed any time from Settings.
 - **Decided (D-64):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.

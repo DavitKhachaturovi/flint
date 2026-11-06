@@ -167,7 +167,7 @@ import {
 import { titlePlain } from '../../shared/inline-markdown.js';
 import type { ReminderTask } from '../reminders.js';
 import { listView, taskRow } from '../views.js';
-import { agoLabel, dayLabel, localStamp, TaskMetaFile } from '../task-meta.js';
+import { agoLabel, dayLabel, localStamp, parseStamp, TaskMetaFile } from '../task-meta.js';
 import { RECENT_CAPTURES, type PanelTask } from '../up-next.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
@@ -608,8 +608,10 @@ export class Workspace {
         titlePlain(line.replace(/^\s*(#{1,6}\s+|[-*+]\s+(\[.\]\s+)?|\d+\.\s+|>\s*)/, '')).trim(),
       )
       .find((line) => line !== '' && !line.startsWith('!['));
-    // When it was made: its name says (`Quick note 2026-11-04 1530`), else the file's time.
+    // When it was made: its name says (`Quick note 2026-11-04 1530`); titled, when Flint first saw
+    // it (D-115: never the file's time, which a rename makes "now"); else the file's time.
     const named = /^Quick note (\d{4})-(\d{2})-(\d{2}) (\d{2})(\d{2})/.exec(list.entry.name);
+    const seen = this.meta.get(this.listId(list.entry))?.created;
     const made = named
       ? new Date(
           Number(named[1]),
@@ -618,7 +620,7 @@ export class Workspace {
           Number(named[4]),
           Number(named[5]),
         )
-      : new Date(list.entry.created);
+      : ((seen ? parseStamp(seen) : null) ?? new Date(list.entry.created));
     const at = made.getTime();
     const two = (value: number): string => String(value).padStart(2, '0');
     const clock = `${two(made.getHours())}:${two(made.getMinutes())}`;
@@ -647,6 +649,8 @@ export class Workspace {
       await writeFileAtomic(path, `---\nflint: 1\nid: ${id}\nmode: note\nquick: true\n---\n`, {
         tempDirectory: tempDirectoryFor(path),
       });
+      // D-115: when it was made, kept through a title (the file's own time changes with it).
+      this.meta.seen([id], now);
       await this.refresh(path);
       return this.find(id) ? id : null;
     });

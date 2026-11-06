@@ -91,7 +91,10 @@ export function Triage(props: {
   readonly memory: MutableRefObject<TriageMemory | null>;
   /** D-114: where the whole task shows on a click on its notes: the side panel or the card. */
   readonly details: 'panel' | 'card';
-  /** D-114: the task the side panel shows (null: none). */
+  /**
+   * D-114, D-115: the task the side panel shows (null: Up next). Only a click on the notes shows
+   * it, for that card; another card (and a click elsewhere, App's) goes back to Up next.
+   */
   readonly onDetails: (key: string | null) => void;
 }): ReactElement {
   const { view, lists, change, undo, onImage, onExit, memory, details, onDetails } = props;
@@ -115,8 +118,7 @@ export function Triage(props: {
   const [leaving, setLeaving] = useState<{ task: TaskRow; direction: 'next' | 'back' } | null>(
     null,
   );
-  // D-114: the whole task: the side panel follows the card while it is open; on a narrow window,
-  // the card's notes unfold.
+  // D-114: on a narrow window, the card's notes unfold (a click again folds them).
   const [showing, setShowing] = useState(false);
 
   // The card shown: the queue's task still in Inbox at that place; one gone meanwhile (moved, done,
@@ -143,11 +145,6 @@ export function Triage(props: {
   const leaveRef = useRef(leave);
   leaveRef.current = leave;
 
-  const panelKey = details === 'panel' && showing ? (task?.key ?? null) : null;
-  useEffect(() => {
-    if (details === 'panel' && showing) onDetails(panelKey);
-  }, [details, showing, panelKey, onDetails]);
-
   // The summary counts tasks, each by what happened to it last (kept twice after ← is one).
   const counts = useMemo(() => {
     const last = new Map<string, Outcome>();
@@ -161,7 +158,9 @@ export function Triage(props: {
     if (task && !reducedMotion()) setLeaving({ task, direction: how });
     setDirection(how);
     setEditing(false);
-    if (details === 'card') setShowing(false);
+    setShowing(false);
+    // D-115: the side panel goes back to Up next with every new card.
+    if (details === 'panel') onDetails(null);
     setIndex(Math.max(0, to));
   };
   /** An action that takes the task out of Inbox (or keeps it): counted, then the next card. */
@@ -269,8 +268,9 @@ export function Triage(props: {
     },
     /** D-114: the whole task, beside the card or on it. */
     show: (): void => {
-      if (details === 'panel') setShowing(true);
-      else setShowing((current) => !current);
+      if (details === 'panel') {
+        if (task) onDetails(task.key);
+      } else setShowing((current) => !current);
     },
   };
 

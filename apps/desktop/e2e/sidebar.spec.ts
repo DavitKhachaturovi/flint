@@ -164,16 +164,19 @@ test('in a group: Move to top of group, and Move to top (of Lists, out of the gr
   const three = main.locator('.nav:not(.flip-ghost)', { hasText: 'Errand three' });
   await three.scrollIntoViewIfNeeded();
   await three.click({ button: 'right' });
-  await expect(main.locator('.fl-menu').getByText('Move to top', { exact: true })).toBeVisible();
+  // D-115: the one that leaves the group says so.
+  await expect(main.locator('.fl-menu').getByText('Move to top', { exact: true })).toHaveCount(0);
+  await expect(main.locator('.fl-menu').getByText('Move out to top of Lists')).toBeVisible();
   await main.locator('.fl-menu').getByText('Move to top of group').click();
   await expect.poll(groupLists).toEqual(['errand-three', 'errand-one', 'errand-two']);
   // A list outside a group has only Move to top.
   await main.locator('.nav:not(.flip-ghost)', { hasText: 'List 05' }).click({ button: 'right' });
+  await expect(main.locator('.fl-menu').getByText('Move to top', { exact: true })).toBeVisible();
   await expect(main.locator('.fl-menu').getByText('Move to top of group')).toHaveCount(0);
   await main.keyboard.press('Escape');
   // Move to top takes it out of the group, to the top of Lists.
   await three.click({ button: 'right' });
-  await main.locator('.fl-menu').getByText('Move to top', { exact: true }).click();
+  await main.locator('.fl-menu').getByText('Move out to top of Lists').click();
   await expect.poll(async () => (await saved())[0]).toEqual({ list: 'errand-three' });
   // The palette has them for the open list.
   await main.locator('.nav:not(.flip-ghost)', { hasText: 'Errand two' }).click();

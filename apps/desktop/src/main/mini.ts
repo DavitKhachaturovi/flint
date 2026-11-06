@@ -176,12 +176,19 @@ export function createMini(options: {
   const layoutFor = (place: Place, stage: Rect, moving?: number): MiniLayout => {
     const factor = zoom();
     const inset = insetIn(place.hang, stage);
-    const room = roomFor(place.hang, areaOf(place.hang));
+    const area = areaOf(place.hang);
+    const room = roomFor(place.hang, area);
     return {
       corner: inset.corner,
       horizontal: inset.horizontal / factor,
       vertical: inset.vertical / factor,
       room,
+      visible: {
+        left: (Math.max(stage.x, area.x) - stage.x) / factor,
+        top: (Math.max(stage.y, area.y) - stage.y) / factor,
+        right: (Math.min(stage.x + stage.width, area.x + area.width) - stage.x) / factor,
+        bottom: (Math.min(stage.y + stage.height, area.y + area.height) - stage.y) / factor,
+      },
       width: place.width,
       limit: place.limit,
       ...(moving !== undefined && { moving }),

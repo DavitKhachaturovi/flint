@@ -819,6 +819,16 @@ export interface MiniLayout {
   readonly vertical: number;
   /** The most the card may take on this screen. */
   readonly room: { readonly width: number; readonly height: number };
+  /**
+   * D-115: the part of the window on the screen's work area (page pixels, from the window's top
+   * left): menus and pickers open within it (the window reaches past the screen beside the card).
+   */
+  readonly visible?: {
+    readonly left: number;
+    readonly top: number;
+    readonly right: number;
+    readonly bottom: number;
+  };
   /** Its width and height limit (remembered per monitor setup). */
   readonly width: number;
   readonly limit: number;

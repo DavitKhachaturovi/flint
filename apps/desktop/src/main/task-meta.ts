@@ -131,7 +131,8 @@ export class TaskMetaFile {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const parse = (stamp: string): Date | null => {
+/** A stamp (`2026-11-04T15:30`) as a local date, or null. */
+export const parseStamp = (stamp: string): Date | null => {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(stamp);
   return match
     ? new Date(
@@ -146,7 +147,7 @@ const parse = (stamp: string): Date | null => {
 
 /** A day as the panel shows it: `29 Oct` (with the year when it isn't this year's). */
 export function dayLabel(stamp: string, now: Date): string {
-  const date = parse(stamp);
+  const date = parseStamp(stamp);
   if (!date) return '';
   const day = `${date.getDate()} ${MONTHS[date.getMonth()] ?? ''}`;
   return date.getFullYear() === now.getFullYear() ? day : `${day} ${date.getFullYear()}`;
@@ -154,7 +155,7 @@ export function dayLabel(stamp: string, now: Date): string {
 
 /** How long ago: `just now`, `5 min ago`, `2 h ago`, `yesterday`, else the day. */
 export function agoLabel(stamp: string, now: Date): string {
-  const date = parse(stamp);
+  const date = parseStamp(stamp);
   if (!date) return '';
   const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
   if (minutes < 1) return 'just now';

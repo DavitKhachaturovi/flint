@@ -88,12 +88,8 @@ test.afterAll(async () => {
 
 test('triage: T in Inbox, oldest first; priority and pin stay on the card, → keeps (TASK-14, D-113)', async () => {
   await main.locator('.sidebar > .nav[data-key="inbox"]').click();
-  // Inbox's title row offers it (D-114): a pill with the count, quiet under five open tasks.
-  const pill = main.locator('.list-title-row .triage-pill');
-  await expect(pill).toBeVisible();
-  await expect(pill).toContainText('Triage');
-  await expect(pill.locator('.triage-pill-count')).toHaveText('4');
-  await expect(pill).not.toHaveClass(/loud/);
+  // Inbox's header offers it (D-115: the quiet link under the title, as in D-113).
+  await expect(main.locator('.subtitle-link', { hasText: 'Triage · 4' })).toBeVisible();
   await main.keyboard.press('t');
   await expect(main.locator('.triage')).toBeVisible();
   await expect(main.locator('.triage-count')).toHaveText('1 of 4');
@@ -192,7 +188,7 @@ test('triage: left partway it opens there again; Start over; the progress line j
   await expect(main.locator('.content.back')).toBeVisible();
   await expect(main.locator('.triage')).toHaveCount(0);
   // Back again: where it was, with Start over.
-  await main.locator('.list-title-row .triage-pill').click();
+  await main.locator('.subtitle-link', { hasText: 'Triage' }).click();
   await expect(main.locator('.triage-count')).toHaveText('2 of 3');
   await expect(main.locator('.content.forward')).toBeVisible();
   await main.locator('.triage-restart').click();
@@ -241,18 +237,36 @@ test('triage: editing the title moves nothing; the card eases its height; the no
   await expect(main.locator('.triage-body.whole')).toBeVisible();
   await main.locator('.triage-body').click();
   await expect(main.locator('.triage-body.whole')).toHaveCount(0);
-  // A wide one: the side panel shows the task, and follows the card.
+  // A wide one (D-115): Up next until the notes are clicked; the task then; Up next again with the
+  // next card and after a click elsewhere; every time.
   await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows().find((each) => each.getTitle() === 'Flint');
     window?.setBounds({ x: -6000, y: 0, width: 1700, height: 860 });
   });
-  await expect(main.locator('.context-panel')).toBeVisible();
+  const panel = main.locator('.context-panel');
+  const upNext = panel.locator('.panel-label', { hasText: 'Up next' });
+  await expect(upNext).toBeVisible();
+  for (let round = 0; round < 2; round++) {
+    await main.locator('.triage-body').click();
+    await expect(panel).toContainText('Oldest thing');
+    await expect(upNext).toHaveCount(0);
+    // A click elsewhere (the column's blank space): Up next.
+    const stage = await main.locator('.triage-stage').boundingBox();
+    if (!stage) throw new Error('no stage');
+    await main.mouse.click(stage.x + stage.width / 2, stage.y + stage.height + 140);
+    await expect(upNext).toBeVisible();
+  }
   await main.locator('.triage-body').click();
-  await expect(main.locator('.context-panel')).toContainText('Oldest thing');
+  await expect(panel).toContainText('Oldest thing');
   await main.keyboard.press('ArrowRight');
   await expect(title()).not.toHaveText('Oldest thing');
-  const next = (await title().textContent()) ?? '';
-  await expect(main.locator('.context-panel')).toContainText(next);
+  await expect(upNext).toBeVisible();
+  await main.keyboard.press('ArrowLeft');
+  await expect(title()).toHaveText('Oldest thing');
+  await expect(upNext).toBeVisible();
+  await main.locator('.triage-body').click();
+  await expect(panel).toContainText('Oldest thing');
+  await main.keyboard.press('ArrowRight');
   // A taller card (long notes) joins at the end: going there, the stage eases to its height.
   const text = await inbox();
   const notes = Array.from({ length: 12 }, (_, line) => `    note line ${line + 1}`).join('\n');

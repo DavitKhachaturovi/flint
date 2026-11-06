@@ -13,6 +13,7 @@ import {
   type LocalDateTime,
 } from '@flint/core/time';
 import { closeMenu, followAnchor, type MenuOptions } from '../menu/menu.js';
+import { floatingArea } from '../ui/floating-area.js';
 
 /**
  * The pickers of the composer and the capture popup (CAP-11, D-57; 09 §8): priority, list, and
@@ -104,20 +105,22 @@ function openPanel(
   let grown = false;
   const place = (): void => {
     const { height } = panel.getBoundingClientRect();
-    const x = Math.max(GAP, Math.min(host.anchor.left, window.innerWidth - WIDTH - GAP));
+    // D-115: within the window's visible part (mini's window reaches past the screen's edge).
+    const area = floatingArea();
+    const x = Math.max(area.left + GAP, Math.min(host.anchor.left, area.right - WIDTH - GAP));
     let y = host.anchor.bottom + GAP;
-    if (y + height > window.innerHeight - GAP) {
-      if (host.anchor.top - GAP - height >= GAP) y = host.anchor.top - GAP - height;
+    if (y + height > area.bottom - GAP) {
+      if (host.anchor.top - GAP - height >= area.top + GAP) y = host.anchor.top - GAP - height;
       else if (host.room && !grown) {
         grown = true;
-        host.room.grow(y + height + 3 * GAP - window.innerHeight);
+        host.room.grow(y + height + 3 * GAP - area.bottom);
       } else {
         // D-77: no room above or below: as close to the button as the window allows.
-        y = window.innerHeight - GAP - height;
+        y = area.bottom - GAP - height;
       }
     }
     panel.style.left = `${Math.round(x)}px`;
-    panel.style.top = `${Math.round(Math.max(GAP, y))}px`;
+    panel.style.top = `${Math.round(Math.max(area.top + GAP, y))}px`;
     // D-76: it grows out of its button's side.
     const above = y < host.anchor.top;
     panel.style.transformOrigin = `${Math.round(host.anchor.left + host.anchor.width / 2 - x)}px ${above ? '100%' : '0'}`;

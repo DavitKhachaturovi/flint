@@ -312,3 +312,31 @@ test('the capture popup fades in and out: main says hiding, hides after the fade
     await popup.locator('.card').evaluate((card) => getComputedStyle(card).boxShadow),
   ).toContain('0px 12px 30px -10px');
 });
+
+test("a quick note's title: Enter, Tab, ↓ and Shift+Enter save it and go on into its text; no new note (D-115)", async () => {
+  for (const key of ['Enter', 'Tab', 'ArrowDown', 'Shift+Enter']) {
+    const name = `Titled by ${key.replace('+', ' ')}`;
+    await main.locator('.nav.quick-new').click();
+    const editor = main.locator('.note-card .cm-content');
+    // The new quick note is open (not the one before it, still shown for a moment).
+    await expect(main.locator('.quick-title-input')).toHaveValue('');
+    await expect(editor).toBeFocused();
+    await main.keyboard.type('First line');
+    const head = main.locator('.quick-title .subtitle');
+    const made = await head.textContent();
+    await main.locator('.quick-title-input').click();
+    await main.keyboard.type(name);
+    await main.keyboard.press(key);
+    // The caret goes on into the note's text, and stays there once the title is saved.
+    await expect(editor).toBeFocused();
+    await expect.poll(async () => (await readdir(flint)).includes(`${name}.md`)).toBe(true);
+    await expect(editor).toBeFocused();
+    await main.keyboard.type(' and more');
+    await expect
+      .poll(() => readFile(join(flint, `${name}.md`), 'utf8'))
+      .toContain('First line and more');
+    // Still the same quick note, from when it was made.
+    await expect(head).toHaveText(made ?? '');
+    expect((await readdir(flint)).filter((file) => file.startsWith('Quick note'))).toEqual([]);
+  }
+});
