@@ -560,9 +560,25 @@ test('one size for every tab: Note takes the whole height; resized from either s
   const today = await cardBox();
   expect(today.width).toBe(364);
   expect(today.height).toBeLessThan(460);
-  // The Note tab always takes the height limit; the width stays.
+  // The Note tab always takes the height limit; the width stays. D-112: no scrollbar while the
+  // height eases there, and the title sits a little below the tabs.
+  await mini.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { sizing: string[] }).sizing = seen;
+    const body = document.querySelector('.mini-body') as HTMLElement;
+    new MutationObserver(() => {
+      if (document.querySelector('.mini-card.sizing')) seen.push(getComputedStyle(body).overflowY);
+    }).observe(document.querySelector('.mini-card') as HTMLElement, { attributes: true });
+  });
   await mini.keyboard.press('Control+3');
   await expect.poll(async () => (await cardBox()).height).toBe(460);
+  expect(await mini.evaluate(() => (window as unknown as { sizing: string[] }).sizing)).toContain(
+    'hidden',
+  );
+  await expect(mini.locator('.mini-card.sizing')).toHaveCount(0);
+  expect(
+    await mini.locator('.mini-note').evaluate((note) => getComputedStyle(note).paddingTop),
+  ).toBe('10px');
   expect((await cardBox()).width).toBe(364);
   await mini.keyboard.press('Control+1');
   await expect.poll(async () => (await cardBox()).height).toBe(today.height);

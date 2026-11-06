@@ -213,6 +213,44 @@ test('a note is renamed from its title, as in the sidebar; its text selects only
   );
 });
 
+test("the side panel's subtasks move as the list's rows do: in, out, and an empty new one (D-112)", async () => {
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()
+      .find((each) => each.getTitle() === 'Flint')
+      ?.setBounds({ x: -6000, y: 0, width: 1700, height: 900 });
+  });
+  await open('Work');
+  await main.evaluate(() => {
+    const seen = new Set<string>();
+    (window as unknown as { panelMotion: Set<string> }).panelMotion = seen;
+    new MutationObserver(() => {
+      for (const sub of document.querySelectorAll('.panel-subtask.enter, .panel-subtask.leaving'))
+        seen.add(sub.className);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  const motion = (): Promise<string[]> =>
+    main.evaluate(() => [...(window as unknown as { panelMotion: Set<string> }).panelMotion]);
+  await main.locator('.row', { hasText: 'Plan the sprint' }).click({ position: { x: 300, y: 12 } });
+  const panel = main.locator('.context-panel');
+  await panel.locator('.panel-add', { hasText: 'Add subtask' }).click();
+  await main.keyboard.type('Draft the agenda');
+  await main.keyboard.press('Enter');
+  await expect(
+    panel.locator('.panel-subtask:not(.adding)', { hasText: 'Draft the agenda' }),
+  ).toHaveCount(1);
+  await expect.poll(motion).toContain('panel-subtask enter');
+  // The empty field, left, plays out.
+  await main.keyboard.press('Escape');
+  await expect.poll(motion).toContain('panel-subtask adding leaving');
+  await expect(panel.locator('.panel-subtask.adding')).toHaveCount(0);
+  // Deleted, the subtask folds away where it was.
+  await panel.locator('.panel-subtask', { hasText: 'Draft the agenda' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: /^Delete/ }).click();
+  await expect.poll(motion).toContain('panel-subtask leaving');
+  await expect(panel.locator('.panel-subtask', { hasText: 'Draft the agenda' })).toHaveCount(0);
+  await main.keyboard.press('Escape');
+});
+
 test('the capture popup fades in and out: main says hiding, hides after the fade; the page fades (D-111)', async () => {
   // The popup is made at startup (pre-warmed): watch it before it is shown. Animations are counted
   // as they start (the fades are short); main's messages are logged in order.
@@ -269,4 +307,8 @@ test('the capture popup fades in and out: main says hiding, hides after the fade
   expect(events.indexOf('hiding')).toBeLessThan(events.indexOf('hidden'));
   expect(await visible()).toBe(false);
   await expect(popup.locator('.card')).toHaveClass(/waiting/);
+  // D-112: the same softer shadow as mini mode's card.
+  expect(
+    await popup.locator('.card').evaluate((card) => getComputedStyle(card).boxShadow),
+  ).toContain('0px 12px 30px -10px');
 });

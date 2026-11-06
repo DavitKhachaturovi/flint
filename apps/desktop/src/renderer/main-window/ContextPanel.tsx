@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useScrollsWhenTaller } from '../ui/scrolls.js';
+import { usePresence } from '../ui/presence.js';
 import type { TaskRow, UpNextItem } from '../../shared/ipc.js';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { mediaUrl } from '../../shared/body-markdown.js';
@@ -298,7 +299,7 @@ function TaskDetails(props: {
   const { state, handlers } = props;
   const { task, listName, readOnly } = state;
   const [editingTitle, setEditingTitle] = useState(false);
-  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [addingSubtask, setAddingSubtask] = useState<'open' | 'leaving' | false>(false);
   const editable = !readOnly && !task.done;
   useEffect(() => {
     setEditingTitle(false);
@@ -420,22 +421,27 @@ function TaskDetails(props: {
         <span className="panel-label">
           Subtasks{task.subtasks.length > 0 ? ` · ${done} of ${task.subtasks.length}` : ''}
         </span>
-        {task.subtasks.map((sub) => (
-          <PanelSubtask key={sub.key} sub={sub} handlers={handlers} />
-        ))}
-        {editable &&
-          (addingSubtask ? (
-            // D-86: typed here; Enter adds it and keeps the field for the next one.
-            <PanelSubtaskField
-              onAdd={(text) => handlers.onNewSubtask(task, text)}
-              onLeave={() => setAddingSubtask(false)}
-            />
-          ) : (
-            <button type="button" className="panel-add" onClick={() => setAddingSubtask(true)}>
-              <PlusIcon size={12} />
-              Add subtask
-            </button>
-          ))}
+        <PanelSubtasks key={task.key} subtasks={task.subtasks} handlers={handlers} />
+        {editable && (
+          <>
+            {addingSubtask !== false && (
+              // D-86: typed here; Enter adds it and keeps the field for the next one. D-112:
+              // left empty, it plays the list's remove animation.
+              <PanelSubtaskField
+                leaving={addingSubtask === 'leaving'}
+                onAdd={(text) => handlers.onNewSubtask(task, text)}
+                onLeave={(empty) => setAddingSubtask(empty && !reducedMotion() ? 'leaving' : false)}
+                onGone={() => setAddingSubtask(false)}
+              />
+            )}
+            {addingSubtask !== 'open' && (
+              <button type="button" className="panel-add" onClick={() => setAddingSubtask('open')}>
+                <PlusIcon size={12} />
+                Add subtask
+              </button>
+            )}
+          </>
+        )}
       </section>
       <Stamps created={task.created} edited={task.edited} />
       <Extras text={taskText(task)} onImage={handlers.onImage} />
@@ -663,11 +669,18 @@ function PanelNotes(props: {
 function PanelSubtask(props: {
   readonly sub: TaskRow;
   readonly handlers: PanelHandlers;
+  /** D-112: easing in (new), or playing out (gone). */
+  readonly motion?: 'enter' | 'leaving' | null;
+  readonly onGone?: () => void;
 }): ReactElement {
-  const { sub, handlers } = props;
+  const { sub, handlers, motion = null, onGone } = props;
   return (
     <div
-      className={sub.done ? 'panel-subtask done' : 'panel-subtask'}
+      className={['panel-subtask', sub.done ? 'done' : '', motion ?? ''].filter(Boolean).join(' ')}
+      inert={motion === 'leaving'}
+      onAnimationEnd={(event) => {
+        if (motion === 'leaving' && event.target === event.currentTarget) onGone?.();
+      }}
       // D-89: a click opens the subtask's details (it is selected in the list); back returns.
       onClick={(event) => {
         if ((event.target as Element).closest('button')) return;
@@ -714,15 +727,59 @@ function PanelSubtask(props: {
   );
 }
 
+/**
+ * D-112: a task's subtasks in the panel, with the list's motion: a new one eases in, one that goes
+ * (deleted, moved) plays the remove animation where it was. Keyed by the task, so another task's
+ * subtasks just appear.
+ */
+function PanelSubtasks(props: {
+  readonly subtasks: readonly TaskRow[];
+  readonly handlers: PanelHandlers;
+}): ReactElement {
+  const { subtasks, handlers } = props;
+  const { entries, gone } = usePresence(subtasks, (sub) => sub.key);
+  // The ones that arrived after the panel showed this task ease in.
+  const seen = useRef<Set<string> | null>(null);
+  const fresh = new Set<string>();
+  if (seen.current === null) seen.current = new Set(subtasks.map((sub) => sub.key));
+  else for (const sub of subtasks) if (!seen.current.has(sub.key)) fresh.add(sub.key);
+  useEffect(() => {
+    for (const sub of subtasks) seen.current?.add(sub.key);
+  });
+  return (
+    <>
+      {entries.map(({ item: sub, key, leaving }) => (
+        <PanelSubtask
+          key={key}
+          sub={sub}
+          handlers={handlers}
+          motion={leaving ? 'leaving' : fresh.has(key) ? 'enter' : null}
+          onGone={() => gone(key)}
+        />
+      ))}
+    </>
+  );
+}
+
 /** D-86: a new subtask's title, typed in the panel. */
 function PanelSubtaskField(props: {
   readonly onAdd: (text: string) => void;
-  readonly onLeave: () => void;
+  /** Left: `empty` when nothing was typed (it then plays out, D-112). */
+  readonly onLeave: (empty: boolean) => void;
+  readonly leaving: boolean;
+  readonly onGone: () => void;
 }): ReactElement {
-  const { onAdd, onLeave } = props;
+  const { onAdd, onLeave, leaving, onGone } = props;
   const [value, setValue] = useState('');
+  const added = useRef(false);
   return (
-    <div className="panel-subtask adding">
+    <div
+      className={leaving ? 'panel-subtask adding leaving' : 'panel-subtask adding'}
+      inert={leaving}
+      onAnimationEnd={(event) => {
+        if (leaving && event.target === event.currentTarget) onGone();
+      }}
+    >
       <span className="check" aria-hidden="true" />
       <input
         className="title-input panel-subtask-input"
@@ -733,18 +790,23 @@ function PanelSubtaskField(props: {
         spellCheck={false}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => {
-          if (value.trim() !== '') onAdd(value);
-          onLeave();
+          if (leaving) return;
+          const typed = value.trim() !== '';
+          if (typed) onAdd(value);
+          onLeave(!typed && !added.current);
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            if (value.trim() !== '') onAdd(value);
+            if (value.trim() !== '') {
+              onAdd(value);
+              added.current = true;
+            }
             setValue('');
           } else if (event.key === 'Escape') {
             event.preventDefault();
             setValue('');
-            onLeave();
+            onLeave(true);
           }
         }}
       />

@@ -117,10 +117,18 @@ export function useStage(refs: {
     const before = lastHeight.current;
     const after = element.offsetHeight;
     if (before === null || before === after || reducedMotion()) return;
-    element.animate([{ height: `${before}px` }, { height: `${after}px` }], {
+    // D-112: no scrollbar while the height eases (the new tab may be taller than the card yet).
+    element.classList.add('sizing');
+    const easing = element.animate([{ height: `${before}px` }, { height: `${after}px` }], {
       duration: durationMs('--fl-dur-page', 320),
       easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
     });
+    const done = (): void => {
+      if (element.getAnimations().every((each) => each === easing || each.playState !== 'running'))
+        element.classList.remove('sizing');
+    };
+    easing.addEventListener('finish', done);
+    easing.addEventListener('cancel', done);
   }, [card, version]);
   useEffect(() => {
     const element = card.current;

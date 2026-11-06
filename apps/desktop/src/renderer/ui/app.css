@@ -6225,3 +6225,14 @@ a.auto-link {
     transform: scale(0.9);
   }
 }
+
+/* D-112: the panel's subtasks move as the list's rows do: a new one opens its place, one that goes
+   (a deleted subtask, an empty new one left) folds away where it was. */
+.panel-subtask.enter {
+  animation: row-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.panel-subtask.leaving {
+  pointer-events: none;
+  animation: row-remove var(--fl-dur-complete) ease-in-out forwards;
+}

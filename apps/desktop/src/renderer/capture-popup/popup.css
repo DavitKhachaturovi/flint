@@ -27,7 +27,7 @@ body {
   position: relative;
   background: var(--fl-ground-float);
   border-radius: var(--fl-radius-popup);
-  box-shadow: var(--fl-shadow-float);
+  box-shadow: var(--fl-shadow-desktop);
   padding: 12px;
 }
 

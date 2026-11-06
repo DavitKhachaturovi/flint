@@ -147,6 +147,11 @@ body {
 }
 
 /* The body scrolls past the height limit, its bar inside the card's rounded area (D-96). */
+/* D-112: no scrollbar while the card's height eases to another tab's. */
+.mini-card.sizing .mini-body {
+  overflow-y: hidden;
+}
+
 .mini-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -299,7 +304,8 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding: 0 4px;
+  /* D-112: the title and the text a little lower under the tabs, together. */
+  padding: 10px 4px 0;
 }
 
 .mini-note .note-editor {
