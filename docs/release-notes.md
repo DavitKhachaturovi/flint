@@ -2,6 +2,17 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.9 (6 Nov 2026)
+
+- **Mini mode, redone** to look and feel like the rest of Flint:
+  - About a third smaller, with the rounded floating card from the design: it hangs from its screen corner, grows and shrinks with what's in it, and scrolls past its height limit. Drag its edges to resize it; drag the small bar at the top (or the header) to move it.
+  - The same tasks as the main window: the same selection that glides, the same check and completion, drag to reorder (and Alt+↑/↓), the same scrollbars and menus.
+  - The top of Today shows your next reminder with a countdown; when a reminder fires, that card turns into Done / Snooze 10m / Open. It never takes the cursor away while you type.
+  - The box at the bottom works like the main window's, chips and all; the shorthand hint shows while it's empty.
+  - Switching tabs eases in; the pin shows whether mini stays on top.
+  - Note: you can type the title first; New quick note waits until there's something in the current one; fixed a note tab where nothing could be clicked after an empty note was removed.
+- The animation speed setting now applies to mini mode too.
+
 ## 0.8.8 (5 Nov 2026)
 
 - **Mini mode**: a small window that stays on top, for calls. Ctrl+Alt+Space opens and hides it (also from the tray, Ctrl+K or the button at the top right of Flint).
