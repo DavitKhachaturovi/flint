@@ -2,6 +2,20 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.10 (6 Nov 2026)
+
+- **Link patterns** can have two changing parts: give two examples like `unicorn-api-PR-45` and `platform-PR-12` and one pattern covers every repository.
+- **Notes:** selecting text highlights just the text, not whole lines. Click a note's title to rename it.
+- **The task box** keeps what you typed in each list until you send it, even when you go elsewhere and come back; its notes field can be clicked again after the title.
+- While you edit a task, `!h`, `@15:00` and `##list` show on the row as you type (the priority bar, the time, the list).
+- An empty new task you leave now fades away instead of vanishing.
+- **Mini mode:**
+  - One size for all tabs: Today and Inbox grow with what's in them up to it, Note always uses all of it. Resize from either side, wherever it is; a button next to the pin puts it back to the standard size.
+  - Click a selected task again to open it in Flint. The bell on a task turns its reminder off and on.
+  - D, S and O work as soon as mini has the focus.
+  - A softer shadow below, and the space just above it no longer catches the mouse.
+- Mini mode and the capture popup now fade in and out (typing and focus are never delayed).
+
 ## 0.8.9 (6 Nov 2026)
 
 - **Mini mode, redone** to look and feel like the rest of Flint:
