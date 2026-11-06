@@ -300,9 +300,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Inbox tasks untouched for 14+ days become slightly dimmer: a gentle nudge without adding UI.
 - Requires a per-task "last touched" timestamp, which **v1 must already record** (04) so this can ship without a migration.
 
-### TASK-14 — Triage mode for Inbox (Later)
+### TASK-14 — Triage mode for Inbox (v1, D-113; was Later)
 - Steps through Inbox tasks one at a time: pick a list, priority, pin (TODAY-01), or delete, all by keyboard.
 - Turns "sorted later, or never" into a 2-minute ritual.
+- **D-113 (decided):** a mode in the main column, one large card at a time (the task, its notes, when it was captured), "3 of 18" and a progress line; started from Inbox's "Triage · N" button, Today's "Sort Inbox · N", the palette and T in Inbox. Oldest first. M move, Space done, Delete delete advance; 3/2/1/0 priority, P pin, R reminder stay on the card; → or Enter keep and go on, ← back, Ctrl+Z undo, Esc leave. A summary at the end. Not in mini mode in v1. Milestone M8 (step 4a).
 
 ---
 
@@ -676,6 +677,7 @@ Without sync, the local disk is the only copy, so this matters more.
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
+- **D-113 (decided):** 8 steps, each advancing by itself when you do the thing (otherwise Next): welcome and the Flint folder; capture from anywhere; shorthand while writing; task lists, notes and quick notes; Today and pins; reminders; Ctrl+K and `?`; mini mode. A fresh install gets it; an existing one gets What's new. Steps in D-113.
 - **Decided (D-112):** Settings has **Replay walkthrough**; the walkthrough's first step says it can be skipped now and replayed any time from Settings.
 - **Decided (D-64):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.
 - Milestone M8.
@@ -718,10 +720,12 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - When the user repeats an inefficient pattern (e.g. sets priority with the button 3× instead of typing `!h`), Flint offers a one-line tip.
 - Rules: a **non-blocking card in a corner** of the main window; **never** in the capture popup; **never takes focus**; **never appears mid-typing**; each tip shows **once** and never again once dismissed; **at most one tip per session**; **"Don't show tips"** on the card and in settings (APP-11).
 - Pattern detection is **local only**: counters in app data, no telemetry (APP-09).
+- **D-113 (decided):** the first set of nine tips (shorthand over the composer's buttons, Ctrl+K over the mouse, capture from anywhere, ↑/↓ and Space, `/` in notes, Trash keeps deleted items, own short links, triage for a full Inbox, the side panel on a wide window); listed in D-113.
 - Milestone M8.
 
 ### APP-15 — What's new (v1, D-61)
 - After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the tray ("What's new").
+- **D-113 (decided):** one floating card (the spotlight's card, no dim) with the notes of every version since the last one seen, scrolling when long; Close. Also from the tray and the palette (the latest notes).
 - **Every version bump comes with short release notes**, which are what this shows. **D-64:** versioning starts with the next build: **0.4.x during M4** (the minor number is the milestone), bumped for every build handed out, each with a short entry in [`docs/release-notes.md`](release-notes.md), which the app bundles for What's new.
 - Milestone M8 (release notes from 0.4.0 on).
 

@@ -55,7 +55,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Multi-line paste → N tasks with "Keep as one?" | TASK-09 |
 | Draft persistence | CAP-08 |
 | Multi-select and bulk actions | TASK-07 |
-| Triage mode for Inbox (Later) | TASK-14 |
+| Triage mode for Inbox (v1, D-113) | TASK-14 |
 | Temporary sort by priority | TASK-08 |
 | Stale-task fading (Later) | TASK-13 (+ `lastTouched` recorded in v1, 04 §3) |
 | Smart link titles; long URLs never wrap | TASK-10 |
@@ -809,4 +809,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | Mini's Note tab a little lower under the tabs; no scrollbar while the height eases | MINI-01 · Done (0.8.11) | 09, D-112 |
 | 3 | The capture popup takes the softer desktop shadow | CAP-01 · Done (0.8.11) | 09, D-112 |
 | 4 | Replay walkthrough in Settings; the walkthrough says so | APP-10, APP-11 · Decided (M8 step 4) | 02, D-112 |
+
+## AU. M8 step 4 decided (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Inbox triage, a card at a time, by keyboard, oldest first, with a summary | TASK-14 · v1 (moved from Later) · M8 step 4a | 02, D-113 |
+| 2 | The 8-step walkthrough, each step advancing when it is done | APP-10, APP-13 · Decided · M8 step 4b | 02, D-113 |
+| 3 | Existing installs get What's new, fresh ones the walkthrough | APP-10, APP-15 · Decided · M8 step 4b | D-113 |
+| 4 | What's new as one card with the notes since last seen | APP-15 · Decided · M8 step 4b | 02, D-113 |
+| 5 | The first nine contextual tips | APP-14 · Decided · M8 step 4b | 02, D-113 |
 

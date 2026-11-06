@@ -18,7 +18,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 **Next steps.**
 1. Davit's look at 0.8.10 (D-111) and the hand checks above.
 2. Fixes after his look, if any (mini's size is his to judge in use, D-110).
-3. **M8 step 4: onboarding**: the first-run walkthrough (replacing the teaching Inbox; it includes opening the palette with Ctrl+K), contextual tips (among them the one-time "Ctrl+K opens this" for someone who opens the palette with the mouse several times over time, D-107), What's new from `docs/release-notes.md`, Replay walkthrough and What's new as palette commands (APP-10, APP-13, APP-14, APP-15).
+3. **M8 step 4a: Inbox triage** (TASK-14, into v1 by D-113), then **4b: onboarding** as decided in D-113 (8-step walkthrough, nine tips, What's new card, Replay walkthrough in Settings, D-112). Earlier plan for 4b, for reference: **onboarding**: the first-run walkthrough (replacing the teaching Inbox; it includes opening the palette with Ctrl+K), contextual tips (among them the one-time "Ctrl+K opens this" for someone who opens the palette with the mouse several times over time, D-107), What's new from `docs/release-notes.md`, Replay walkthrough and What's new as palette commands (APP-10, APP-13, APP-14, APP-15).
 4. **M8 step 5:** the Clipboard section of the context panel (NAV-08), late in v1; then the rest of M8 in §2.
 5. **M9:** ship (§2): the installer and pipeline as the release path, the version in the app, the performance budgets verified (05 §4).
 
@@ -89,7 +89,6 @@ If a piece fails badly, record the finding and decide in the Decision Log before
 - Restoring single blocks inside a note from a snapshot (DATA-04, D-99).
 - Merging the current lists into another Flint folder when changing it (DATA-07, D-104).
 - **TASK-13** Stale-task fading (v1 already records `lastTouched`).
-- **TASK-14** Inbox triage mode.
 - **Sync** between machines (see 04, Future: sync). **SYNC-01 (D-78):** cloud sync through the providers' own APIs, Google Drive first, then OneDrive (Microsoft Graph), no iCloud: opt-in sign-in (OAuth with PKCE, loopback redirect), tokens in Electron `safeStorage`, Google access limited to Flint's own files (`drive.file`), automatic or manual sync, merged per task by ID with deletion tombstones (no conflict copies); turning it on changes the no-network promise (APP-09) for this feature.
 - **macOS and ARM** builds.
 - **Light mode** (v1 is dark only; tokens in `docs/design/tokens.css` get a light set).
