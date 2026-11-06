@@ -867,3 +867,11 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | What's new from the palette and Settings → About; no tray item | APP-15 · Decided · M8 step 4b | 02, D-117 |
 | 4 | Remove what I created during the tour: only items made during it | APP-10 · Decided · M8 step 4b | 02, D-117 |
 
+## AZ. Tips: when, where, how long; Reset tips (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A tip 2 s after its pattern, not while typing or with a menu open; never during the walkthrough, triage or What's new | APP-14 · Decided · M8 step 4b | 02, D-118 |
+| 2 | Bottom right of the main window, above the toasts; stays until closed or hidden; shown after ~3 s visible or closed | APP-14 · Decided · M8 step 4b | 02, D-118 |
+| 3 | Settings: Reset tips next to Replay walkthrough; both in the palette | APP-11, APP-14 · Decided · M8 step 4b | 02, D-118 |
+
