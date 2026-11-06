@@ -2,6 +2,12 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.11 (6 Nov 2026)
+
+- Subtasks in the side panel now slide in and fade away like tasks in the list.
+- Mini mode's note sits a little lower under the tabs, and switching to it no longer flashes a scrollbar.
+- The capture popup has the same softer shadow as mini mode.
+
 ## 0.8.10 (6 Nov 2026)
 
 - **Link patterns** can have two changing parts: give two examples like `unicorn-api-PR-45` and `platform-PR-12` and one pattern covers every repository.
