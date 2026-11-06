@@ -66,6 +66,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ---
 
 - **D-87:** **Move to top** in a list's or note's right-click menu, under the Manual sort only; otherwise disabled with the "Switch to Manual" hint.
+- **D-114:** in a group, **Move to top of group** next to it; **Move to top** then goes to the top of Lists, out of the group (Proposed). Both are palette commands for the open list.
 ## 2. Capture
 
 ### CAP-01 — Global hotkey quick-capture popup (v1)
@@ -305,6 +306,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Turns "sorted later, or never" into a 2-minute ritual.
 - **D-113 (decided):** a mode in the main column, one large card at a time (the task, its notes, when it was captured), "3 of 18" and a progress line; started from Inbox's "Triage · N" button, Today's "Sort Inbox · N", the palette and T in Inbox. Oldest first. M move, Space done, Delete delete advance; 3/2/1/0 priority, P pin, R reminder stay on the card; → or Enter keep and go on, ← back, Ctrl+Z undo, Esc leave. A summary at the end. Not in mini mode in v1. Milestone M8 (step 4a).
 - **Built (0.8.12):** as decided; the Proposed details of D-113 as built (top-level tasks, oldest by when Flint first saw it then from the bottom of the file, E edits the title, the slide between cards); the summary counts each task once, by what happened to it last.
+- **D-114 (0.8.13):** started from a pill at the end of Inbox's title row ("Triage 18", primary from 5 open tasks); the place is kept for the session, with **Start over**; the progress line goes to a task (hover shows "7 of 18", a click goes there); a click on the notes shows the whole task (the side panel on a wide window, following the card; unfolded on the card on a narrow one); the card's height eases; in and out as a page.
 
 ---
 

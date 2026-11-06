@@ -4257,6 +4257,8 @@ a.auto-link {
   position: relative;
   margin: 14px 0 2px;
   transition: height var(--fl-dur-state) ease;
+  /* D-114: the rail fades in where "No reminders today." was. */
+  animation: fade-in var(--fl-dur-state) ease-out;
 }
 
 .timeline-hour {
@@ -6244,7 +6246,71 @@ a.auto-link {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: view-in var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* D-114: Inbox's title row: the title, and the Triage pill at its end (white once Inbox has five
+   or more open tasks, quiet before; gone at zero, easing out). */
+.list-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.list-title-row h1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.triage-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px 0 9px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition:
+    background-color var(--fl-dur-state) ease,
+    color var(--fl-dur-state) ease,
+    box-shadow var(--fl-dur-state) ease,
+    opacity var(--fl-dur-state) ease,
+    scale var(--fl-dur-state) var(--fl-ease-spring),
+    transform var(--fl-dur-fast) var(--fl-ease-spring);
+}
+
+.triage-pill:hover {
+  background: var(--fl-ground-float);
+}
+
+.triage-pill.loud {
+  background: var(--fl-strong-bg);
+  box-shadow: var(--fl-shadow-primary-button);
+  color: var(--fl-strong-fg);
+}
+
+.triage-pill.loud:hover {
+  background: var(--fl-text-highlight);
+}
+
+.triage-pill:active {
+  transform: scale(0.96);
+}
+
+.triage-pill.gone {
+  opacity: 0;
+  scale: 0.92;
+  pointer-events: none;
+}
+
+.triage-pill-count {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  opacity: 0.75;
 }
 
 .triage-head {
@@ -6270,22 +6336,79 @@ a.auto-link {
   font-weight: 600;
 }
 
+.triage-head-space {
+  flex: 1;
+}
+
+/* D-114: back to the first task; quiet, beside the count. */
+.triage-restart {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--fl-radius-pill);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+  animation: fade-in var(--fl-dur-state) ease-out;
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.triage-restart:hover {
+  background: var(--fl-ground-float);
+  color: var(--fl-text-primary);
+}
+
 .triage-count {
-  margin-left: auto;
   font-family: var(--fl-font-mono);
   font-size: var(--fl-size-meta);
   color: var(--fl-text-muted);
 }
 
+/* D-114: the line as it looks, in a taller strip that takes the pointer: hovering shows the task at
+   that point, a click goes there. */
 .triage-progress {
+  position: relative;
+  margin: -6px 4px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.triage-progress-line {
   height: 3px;
-  margin: 0 4px;
   border-radius: var(--fl-radius-pill);
   background: var(--fl-ground-tile);
   overflow: hidden;
+  transition: transform var(--fl-dur-fast) ease;
 }
 
-.triage-progress span {
+.triage-progress.hover .triage-progress-line {
+  transform: scaleY(1.6);
+}
+
+.triage-progress-tip {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 7px;
+  translate: -50% 0;
+  background: var(--fl-ground-float);
+  box-shadow:
+    0 0 0 1px var(--fl-edge-float),
+    var(--fl-shadow-float);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  white-space: nowrap;
+  color: var(--fl-text-primary);
+  pointer-events: none;
+  animation: panel-crossfade var(--fl-dur-fast) ease-out;
+}
+
+.triage-progress-tip.here {
+  color: var(--fl-text-muted);
+}
+
+.triage-progress-line span {
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -6301,6 +6424,8 @@ a.auto-link {
 
 .triage-stage > * {
   grid-area: 1 / 1;
+  /* D-114: each card its own height; the stage eases between them (Triage.tsx). */
+  align-self: start;
 }
 
 .triage-card {
@@ -6369,10 +6494,31 @@ a.auto-link {
 
 .triage-card-title {
   display: flex;
-  min-height: 32px;
+  min-height: 30px;
   font-size: 22px;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--fl-text-highlight);
+}
+
+/* D-114: the title edited in exactly its own type and place: nothing moves as editing starts. */
+.triage-title-input {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  caret-color: var(--fl-accent);
+  overflow-wrap: anywhere;
 }
 
 .triage-title {
@@ -6383,11 +6529,6 @@ a.auto-link {
 .triage-title .title {
   white-space: normal;
   color: inherit;
-}
-
-.triage-card-title .title-input {
-  font-size: 22px;
-  font-weight: 600;
 }
 
 .triage-meta {
@@ -6409,6 +6550,36 @@ a.auto-link {
 .triage-body {
   color: var(--fl-text-secondary);
   font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* D-114: unfolded on the card (a narrow window), at its full height. */
+.triage-body.whole .body-block.full {
+  animation: panel-crossfade var(--fl-dur-state) ease-out;
+}
+
+/* D-114: the actions fold away under the summary and come back with the next card. */
+.triage-actions-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1),
+    opacity var(--fl-dur-base) ease,
+    translate var(--fl-dur-page) cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.triage-actions-fold > * {
+  min-height: 0;
+  overflow: hidden;
+  /* Room for the buttons' rings and pressed scale. */
+  margin: -4px;
+  padding: 4px;
+}
+
+.triage-actions-fold.gone {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  translate: 0 -6px;
 }
 
 .triage-actions {
@@ -6439,6 +6610,18 @@ a.auto-link {
   box-shadow: inset 0 0 0 1px var(--fl-edge-float);
 }
 
+.triage-actions .secondary-button {
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    background-color var(--fl-dur-state) ease,
+    box-shadow var(--fl-dur-state) ease,
+    opacity var(--fl-dur-state) ease;
+}
+
+.triage-actions .secondary-button:disabled {
+  opacity: 0.45;
+}
+
 .triage-actions .keycap {
   height: 18px;
   padding: 0 5px;
@@ -6454,6 +6637,7 @@ a.auto-link {
 }
 
 .triage-priorities {
+  position: relative;
   display: inline-flex;
   gap: 2px;
   padding: 3px;
@@ -6479,9 +6663,26 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
-.triage-priority.on {
+/* D-114: one highlight that glides to the priority set (as the row selection does). */
+.triage-priority-glide {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 28px;
+  border-radius: 9px;
   background: var(--fl-ground-float);
   box-shadow: 0 0 0 1px var(--fl-edge-float);
+  transition:
+    transform var(--fl-dur-state) var(--fl-ease-spring),
+    width var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.triage-priority {
+  position: relative;
+  z-index: 1;
+}
+
+.triage-priority.on {
   color: var(--fl-text-primary);
 }
 
@@ -6508,6 +6709,11 @@ a.auto-link {
   gap: 10px;
   padding: 26px 28px;
   animation: rise-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+.triage-summary-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .triage-summary h2 {

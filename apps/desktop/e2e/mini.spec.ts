@@ -570,15 +570,49 @@ test('one size for every tab: Note takes the whole height; resized from either s
       if (document.querySelector('.mini-card.sizing')) seen.push(getComputedStyle(body).overflowY);
     }).observe(document.querySelector('.mini-card') as HTMLElement, { attributes: true });
   });
+  // D-114: frame by frame through the switch, the body never shows a scrollbar and the note's ⋯
+  // button never moves sideways.
+  await mini.evaluate(() => {
+    const frames: { bar: number; x: number | null }[] = [];
+    (window as unknown as { frames: typeof frames }).frames = frames;
+    const body = document.querySelector('.mini-body') as HTMLElement;
+    const started = performance.now();
+    const sample = (): void => {
+      const more = document.querySelector('.mini-note-head .tool');
+      frames.push({
+        // A thumb shows: the body can scroll and its content is taller than it.
+        bar:
+          getComputedStyle(body).overflowY !== 'hidden' && body.scrollHeight > body.clientHeight
+            ? 1
+            : 0,
+        x: more ? Math.round(more.getBoundingClientRect().right) : null,
+      });
+      if (performance.now() - started < 1200) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await mini.keyboard.press('Control+3');
   await expect.poll(async () => (await cardBox()).height).toBe(460);
   expect(await mini.evaluate(() => (window as unknown as { sizing: string[] }).sizing)).toContain(
     'hidden',
   );
   await expect(mini.locator('.mini-card.sizing')).toHaveCount(0);
+  await mini.waitForTimeout(1300);
+  const frames = await mini.evaluate(
+    () => (window as unknown as { frames: { bar: number; x: number | null }[] }).frames,
+  );
+  expect(frames.length).toBeGreaterThan(10);
+  expect(frames.filter((frame) => frame.bar > 0)).toEqual([]);
+  expect(new Set(frames.flatMap((frame) => (frame.x === null ? [] : [frame.x]))).size).toBe(1);
+  // D-114: the "Quick note" line 2 px lower than before D-112; the title and text a little lower.
   expect(
     await mini.locator('.mini-note').evaluate((note) => getComputedStyle(note).paddingTop),
-  ).toBe('10px');
+  ).toBe('2px');
+  expect(
+    await mini
+      .locator('.mini-note .quick-title')
+      .evaluate((title) => getComputedStyle(title).rowGap),
+  ).toBe('7px');
   expect((await cardBox()).width).toBe(364);
   await mini.keyboard.press('Control+1');
   await expect.poll(async () => (await cardBox()).height).toBe(today.height);
@@ -605,6 +639,52 @@ test('one size for every tab: Note takes the whole height; resized from either s
   expect(
     await mini.locator('.mini-card').evaluate((card) => getComputedStyle(card).maxHeight),
   ).toBe('460px');
+});
+
+test('a long Inbox (a scrollbar) to Note and back: nothing moves sideways, no scrollbar flashes (D-114)', async () => {
+  const before = await readFile(join(flint, 'Inbox.md'), 'utf8');
+  const many = Array.from({ length: 30 }, (_, at) => `- [ ] Long inbox ${at + 1} [id:: lo${at}]`);
+  await writeFile(join(flint, 'Inbox.md'), `${before.trimEnd()}\n${many.join('\n')}\n`);
+  await mini.keyboard.press('Control+2');
+  await expect(mini.locator('.mini-view .row', { hasText: 'Long inbox 30' })).toHaveCount(1);
+  await mini.waitForTimeout(600);
+  // Its content width with the list scrolling: the same on every tab, every frame.
+  const width = await mini.locator('.mini-view').evaluate((view) => view.clientWidth);
+  await mini.evaluate(() => {
+    const frames: { width: number; x: number | null; bar: boolean }[] = [];
+    (window as unknown as { frames: typeof frames }).frames = frames;
+    const started = performance.now();
+    const sample = (): void => {
+      const view = document.querySelector<HTMLElement>('.mini-view');
+      const body = document.querySelector('.mini-body') as HTMLElement;
+      const more = document.querySelector('.mini-note-head .tool');
+      frames.push({
+        width: view?.clientWidth ?? 0,
+        x: more ? Math.round(more.getBoundingClientRect().right) : null,
+        bar:
+          view?.classList.contains('note') === true &&
+          getComputedStyle(body).overflowY !== 'hidden' &&
+          body.scrollHeight > body.clientHeight,
+      });
+      if (performance.now() - started < 1400) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await mini.keyboard.press('Control+3');
+  await mini.waitForTimeout(700);
+  await mini.keyboard.press('Control+2');
+  await mini.waitForTimeout(900);
+  const frames = await mini.evaluate(
+    () =>
+      (window as unknown as { frames: { width: number; x: number | null; bar: boolean }[] }).frames,
+  );
+  expect(frames.length).toBeGreaterThan(20);
+  expect(new Set(frames.map((frame) => frame.width))).toEqual(new Set([width]));
+  expect(frames.filter((frame) => frame.bar)).toEqual([]);
+  expect(new Set(frames.flatMap((frame) => (frame.x === null ? [] : [frame.x]))).size).toBe(1);
+  await writeFile(join(flint, 'Inbox.md'), before);
+  await expect(mini.locator('.mini-view .row', { hasText: 'Long inbox 30' })).toHaveCount(0);
+  await mini.keyboard.press('Control+1');
 });
 
 test('a slow second click on a selected row opens it; the bell turns a reminder off and on, the row staying (D-111)', async () => {

@@ -582,6 +582,13 @@ function Timeline(props: {
     setPlaced({ key: current.key, minutes: current.minutes });
     onMove(reminder, current.minutes);
   };
+  // D-114: always there; with no reminders today, a quiet line instead of the rail.
+  if (reminders.length === 0)
+    return (
+      <Section id="timeline" label="Timeline" folds={folds}>
+        <p className="today-none">No reminders today.</p>
+      </Section>
+    );
   return (
     <Section
       id="timeline"
@@ -732,7 +739,7 @@ function Entries(props: {
 }
 
 /**
- * D-92 (mockup 12): Today's column: Timeline (while there are reminders today), Done today and
+ * D-92 (mockup 12): Today's column: Timeline (always, D-114: a quiet line without reminders), Done today and
  * Captured today (always, D-93: "· 0" and a quiet line when empty). Beside Focus on wide screens
  * (in the context panel's place, sticky as it is); stacked under Focus on narrow windows, where
  * the timeline folds too. Opening an entry opens its task.
@@ -749,17 +756,16 @@ export function TodayColumn(props: {
   const column = useRef<HTMLElement>(null);
   useScrollsWhenTaller(column);
   const sections: ReactElement[] = [];
-  if (extras.reminders.length > 0)
-    sections.push(
-      <Timeline
-        key="timeline"
-        reminders={extras.reminders}
-        now={now}
-        folds={stacked}
-        onOpen={(reminder) => onOpen(reminder.key, reminder.listId)}
-        onMove={onMoveReminder}
-      />,
-    );
+  sections.push(
+    <Timeline
+      key="timeline"
+      reminders={extras.reminders}
+      now={now}
+      folds={stacked}
+      onOpen={(reminder) => onOpen(reminder.key, reminder.listId)}
+      onMove={onMoveReminder}
+    />,
+  );
   sections.push(
     <Section key="done" id="done" label={`Done today · ${extras.done.length}`} folds>
       {extras.done.length === 0 && <p className="today-none">Nothing done yet today.</p>}

@@ -820,3 +820,21 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | What's new as one card with the notes since last seen | APP-15 · Decided · M8 step 4b | 02, D-113 |
 | 5 | The first nine contextual tips | APP-14 · Decided · M8 step 4b | 02, D-113 |
 
+## AV. Fixes after 0.8.11 and 0.8.12 (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Mini's Note tab: the "Quick note" line back in place, only the title and the editor lower | MINI-01 · Done (0.8.13) | D-114 |
+| 2 | Mini: no scrollbar and no sideways shift when another tab comes in | MINI-01 · Done (0.8.13) | 09, D-114 |
+| 3 | Today's Timeline always shows, quietly when empty | TODAY-03 · Done (0.8.13) | D-114 |
+| 4 | A new list, note or group out of sight scrolls into view | LIST-01, LIST-05 · Done (0.8.13) | D-114 |
+| 5 | Move to top of group (and Move to top out of a group) | LIST-06 · Done (0.8.13) | 02, D-114 |
+| 6 | Hiding mini or the popup returns the focus to the app before, never restoring the minimized main window | MINI-01, CAP-01 · Done (0.8.13) | D-114 |
+| 7 | Triage pill at the end of Inbox's title row | TASK-14 · Done (0.8.13) | 09, D-114 |
+| 8 | Triage: the card's height eases; the buttons move | TASK-14 · Done (0.8.13) | 09, D-114 |
+| 9 | Triage: the place kept for the session; Start over | TASK-14 · Done (0.8.13) | 02, 03, D-114 |
+| 10 | Triage: a click on the notes shows the whole task | TASK-14 · Done (0.8.13) | 02, 03, D-114 |
+| 11 | Triage: editing the title moves nothing | TASK-14 · Done (0.8.13) | 09, D-114 |
+| 12 | Triage: the progress line goes to a task | TASK-14 · Done (0.8.13) | 03, 09, D-114 |
+| 13 | Triage: in and out as a page | TASK-14 · Done (0.8.13) | D-114 |
+

@@ -88,8 +88,12 @@ test.afterAll(async () => {
 
 test('triage: T in Inbox, oldest first; priority and pin stay on the card, → keeps (TASK-14, D-113)', async () => {
   await main.locator('.sidebar > .nav[data-key="inbox"]').click();
-  // Inbox's header offers it.
-  await expect(main.locator('.subtitle-link', { hasText: 'Triage · 4' })).toBeVisible();
+  // Inbox's title row offers it (D-114): a pill with the count, quiet under five open tasks.
+  const pill = main.locator('.list-title-row .triage-pill');
+  await expect(pill).toBeVisible();
+  await expect(pill).toContainText('Triage');
+  await expect(pill.locator('.triage-pill-count')).toHaveText('4');
+  await expect(pill).not.toHaveClass(/loud/);
   await main.keyboard.press('t');
   await expect(main.locator('.triage')).toBeVisible();
   await expect(main.locator('.triage-count')).toHaveText('1 of 4');
@@ -169,8 +173,101 @@ test('triage: a capture meanwhile joins at the end; the summary; Esc and the oth
   await expect(main.locator('.triage')).toHaveCount(0);
   // Today's "Sort Inbox" opens it there.
   await main.locator('.sidebar > .nav[data-key="@today"]').click();
+  // D-114: Today's Timeline is there without reminders too, quietly.
+  await expect(main.locator('.today-timeline')).toContainText('No reminders today.');
   await main.locator('.today-sort-inbox .primary-button').click();
   await expect(main.locator('.triage')).toBeVisible();
   await expect(main.locator('h1')).toContainText('Inbox');
+  await main.keyboard.press('Escape');
+});
+
+test('triage: left partway it opens there again; Start over; the progress line jumps (D-114)', async () => {
+  await main.locator('.sidebar > .nav[data-key="inbox"]').click();
+  await main.keyboard.press('t');
+  await expect(main.locator('.triage-count')).toHaveText('1 of 3');
+  await main.keyboard.press('ArrowRight');
+  await expect(main.locator('.triage-count')).toHaveText('2 of 3');
+  // Leaving slides back to Inbox as a page does.
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.content.back')).toBeVisible();
+  await expect(main.locator('.triage')).toHaveCount(0);
+  // Back again: where it was, with Start over.
+  await main.locator('.list-title-row .triage-pill').click();
+  await expect(main.locator('.triage-count')).toHaveText('2 of 3');
+  await expect(main.locator('.content.forward')).toBeVisible();
+  await main.locator('.triage-restart').click();
+  await expect(main.locator('.triage-count')).toHaveText('1 of 3');
+  // Hovering the line shows the task at that point; a click goes there.
+  const line = main.locator('.triage-progress');
+  const box = await line.boundingBox();
+  if (!box) throw new Error('no progress line');
+  await main.mouse.move(box.x + box.width * 0.9, box.y + box.height / 2);
+  await expect(main.locator('.triage-progress-tip')).toHaveText('3 of 3');
+  await main.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2);
+  await expect(main.locator('.triage-count')).toHaveText('3 of 3');
+  await main.mouse.move(box.x + box.width * 0.1, box.y + 200);
+  await expect(main.locator('.triage-progress-tip')).toHaveCount(0);
+});
+
+test('triage: editing the title moves nothing; the card eases its height; the notes open the side panel (D-114)', async () => {
+  // Start over put the queue in order again; the card with notes, by the keys.
+  for (let step = 0; step < 3 && (await title().textContent()) !== 'Oldest thing'; step++) {
+    const count = await main.locator('.triage-count').textContent();
+    await main.keyboard.press(count?.startsWith('3') ? 'ArrowLeft' : 'ArrowRight');
+    await expect(main.locator('.triage-count')).not.toHaveText(count ?? '');
+  }
+  await expect(title()).toHaveText('Oldest thing');
+  await main.waitForTimeout(600);
+  const before = await title().boundingBox();
+  await title().click();
+  const field = main.locator('.triage-title-input');
+  await expect(field).toBeFocused();
+  const after = await field.boundingBox();
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(1);
+  expect(Math.abs((after?.x ?? 0) - (before?.x ?? 0))).toBeLessThan(1);
+  await main.keyboard.press('Escape');
+  await expect(title()).toHaveText('Oldest thing');
+  // The next card is a different height: the stage eases to it.
+  await main.evaluate(() => {
+    const stage = document.querySelector('.triage-stage');
+    const seen: string[] = [];
+    (window as unknown as { eased: string[] }).eased = seen;
+    new MutationObserver(() => {
+      for (const each of stage?.getAnimations() ?? []) if (each.id) seen.push(each.id);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  // A narrow window: the notes unfold on the card (and fold again).
+  await main.locator('.triage-body').click();
+  await expect(main.locator('.triage-body.whole')).toBeVisible();
+  await main.locator('.triage-body').click();
+  await expect(main.locator('.triage-body.whole')).toHaveCount(0);
+  // A wide one: the side panel shows the task, and follows the card.
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((each) => each.getTitle() === 'Flint');
+    window?.setBounds({ x: -6000, y: 0, width: 1700, height: 860 });
+  });
+  await expect(main.locator('.context-panel')).toBeVisible();
+  await main.locator('.triage-body').click();
+  await expect(main.locator('.context-panel')).toContainText('Oldest thing');
+  await main.keyboard.press('ArrowRight');
+  await expect(title()).not.toHaveText('Oldest thing');
+  const next = (await title().textContent()) ?? '';
+  await expect(main.locator('.context-panel')).toContainText(next);
+  // A taller card (long notes) joins at the end: going there, the stage eases to its height.
+  const text = await inbox();
+  const notes = Array.from({ length: 12 }, (_, line) => `    note line ${line + 1}`).join('\n');
+  const head = 'mode: tasks\n---\n';
+  await writeFile(
+    join(flint, 'Inbox.md'),
+    text.replace(head, `${head}- [ ] Long one [id:: t9]\n${notes}\n`),
+  );
+  await expect(main.locator('.triage-count')).toHaveText(/of 4$/);
+  const line = await main.locator('.triage-progress').boundingBox();
+  if (!line) throw new Error('no progress line');
+  await main.mouse.click(line.x + line.width - 2, line.y + line.height / 2);
+  await expect(title()).toHaveText('Long one');
+  await expect
+    .poll(() => main.evaluate(() => (window as unknown as { eased: string[] }).eased))
+    .toContain('triage-height');
   await main.keyboard.press('Escape');
 });

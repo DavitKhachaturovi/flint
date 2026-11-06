@@ -58,7 +58,7 @@ import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/me
 
 import { NoteEditor } from './NoteEditor.js';
 import { NoteTitle } from './NoteTitle.js';
-import { Triage } from './Triage.js';
+import { Triage, type TriageMemory } from './Triage.js';
 import {
   ContextPanel,
   type FactKind,
@@ -207,6 +207,8 @@ function sidebarShape(lists: readonly ListSummary[], sidebar: SidebarView | null
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 
 /** D-67, D-100: every duration token scaled by the animation speed (this window). */
+/** D-114: from this many open tasks in Inbox, its Triage pill is the primary (white) one. */
+const TRIAGE_LOUD = 5;
 /** D-99: a slow second click (renaming in the sidebar): longer than a double-click's gap. */
 const RENAME_DELAY_MS = 450;
 
@@ -1106,9 +1108,25 @@ export function App(): ReactElement {
   /** NAV-01, NAV-02, D-106: the Ctrl+K palette and the `?` cheat sheet. */
   const [palette, setPalette] = useState(false);
   /** TASK-14, D-113: Inbox triage, open on this list (Inbox's ID); null when not triaging. */
-  const [triage, setTriage] = useState<string | null>(null);
+  const [triage, setTriageState] = useState<string | null>(null);
   const triageRef = useRef<string | null>(null);
   triageRef.current = triage && triage === listId ? triage : null;
+  /** D-114: where triage was, for the session (it opens there again). */
+  const triageMemory = useRef<TriageMemory | null>(null);
+  /**
+   * D-114: in and out of triage as a page goes (it slides in, and back out to Inbox); starting it
+   * clears the selection, so the side panel shows a task only once the card's notes are clicked.
+   */
+  const setTriage = useCallback((id: string | null): void => {
+    setHeading(id ? 'forward' : 'back');
+    if (id) setSelected(null);
+    setTriageState(id);
+  }, []);
+  // D-114: another list or page leaves triage (its place is kept).
+  useEffect(() => {
+    if (triage !== null && triage !== listId) setTriageState(null);
+  }, [listId, triage]);
+  const triageDetails = useCallback((key: string | null): void => setSelected(key), []);
   const [cheatSheet, setCheatSheet] = useState(false);
   /** D-106: Trash's tab asked for (an archived task found with Ctrl+K). */
   const [trashTab, setTrashTab] = useState<{
@@ -2308,11 +2326,21 @@ export function App(): ReactElement {
       // in the manual order, which is what it changes.
       const manual = (sidebarView?.sort ?? 'manual') === 'manual';
       const grouping: MenuEntry[] = [
+        // D-114: in a group, both: the top of Lists (out of the group) and the top of the group.
         {
           label: 'Move to top',
           ...(manual ? {} : { hint: 'Switch to Manual', disabled: true }),
-          action: () => intoGroup({ group: inGroup?.id ?? null, index: 0 }),
+          action: () => intoGroup({ group: null, index: 0 }),
         },
+        ...(inGroup
+          ? [
+              {
+                label: 'Move to top of group',
+                ...(manual ? {} : { hint: 'Switch to Manual', disabled: true }),
+                action: () => intoGroup({ group: inGroup.id, index: 0 }),
+              },
+            ]
+          : []),
         {
           label: 'Move to group',
           submenu: [
@@ -3786,6 +3814,39 @@ export function App(): ReactElement {
             },
           ]
         : []),
+      // LIST-06, D-114: the open list to the top of Lists, or of its group (the manual order).
+      ...(view &&
+      (sidebarView?.sort ?? 'manual') === 'manual' &&
+      sidebarView?.items.some(
+        (item) =>
+          (item.kind === 'list' && item.id === view.id) ||
+          (item.kind === 'group' && item.lists.includes(view.id)),
+      )
+        ? [
+            {
+              id: 'list:top',
+              label: `Move ${view.mode === 'note' ? 'note' : 'list'} to top`,
+              run: () => {
+                if (reorderable())
+                  void sidebarChange({ kind: 'move', id: view.id, to: { group: null, index: 0 } });
+              },
+            },
+            ...groups
+              .filter((group) => group.lists.includes(view.id))
+              .map((group) => ({
+                id: 'list:top-of-group',
+                label: `Move ${view.mode === 'note' ? 'note' : 'list'} to top of group`,
+                run: () => {
+                  if (reorderable())
+                    void sidebarChange({
+                      kind: 'move',
+                      id: view.id,
+                      to: { group: group.id, index: 0 },
+                    });
+                },
+              })),
+          ]
+        : []),
       ...fromMenu(panelItem(), 'panel'),
       {
         id: 'app:size',
@@ -4421,7 +4482,8 @@ export function App(): ReactElement {
                 pageTask ? 'task-page' : '',
                 heading ?? '',
               ].join(' ')}
-              key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}`}
+              // D-114: triage is a page of Inbox's: in and out of it slide as pages do.
+              key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}/${view && triage === view.id ? 'triage' : ''}`}
             >
               {view && pageTask && (
                 <TaskPage
@@ -4603,6 +4665,9 @@ export function App(): ReactElement {
                   undo={undo}
                   onImage={showImage}
                   onExit={() => setTriage(null)}
+                  memory={triageMemory}
+                  details={panelShown ? 'panel' : 'card'}
+                  onDetails={triageDetails}
                 />
               )}
               {view &&
@@ -4611,28 +4676,38 @@ export function App(): ReactElement {
                 view.mode === 'tasks' &&
                 view.id !== TODAY_ID && (
                   <header className="list-header">
-                    <h1>
-                      {view.name}
-                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                    </h1>
-                    {lists.find((list) => list.id === view.id)?.inbox && (
-                      <span className="subtitle">
-                        {INBOX_SUBTITLE}
-                        {view.open > 0 && (
-                          <>
-                            {' · '}
-                            {/* TASK-14, D-113: one task at a time, by keyboard. */}
-                            <button
-                              type="button"
-                              className="subtitle-link"
-                              title="Sort Inbox one task at a time (T)"
-                              onClick={() => setTriage(view.id)}
-                            >
-                              Triage · {view.open}
-                            </button>
-                          </>
+                    <div className="list-title-row">
+                      <h1>
+                        {view.name}
+                        {view.mode === 'tasks' && (
+                          <span className="count"> · {view.open} open</span>
                         )}
-                      </span>
+                      </h1>
+                      {/* TASK-14, D-113, D-114: one task at a time, by keyboard: a small pill at
+                          the title row's end, primary once Inbox has a few open tasks. */}
+                      {lists.find((list) => list.id === view.id)?.inbox && (
+                        <button
+                          type="button"
+                          className={[
+                            'triage-pill',
+                            view.open >= TRIAGE_LOUD ? 'loud' : '',
+                            view.open === 0 ? 'gone' : '',
+                          ].join(' ')}
+                          title="Sort Inbox one task at a time (T)"
+                          tabIndex={view.open === 0 ? -1 : undefined}
+                          aria-hidden={view.open === 0 ? true : undefined}
+                          onClick={() => setTriage(view.id)}
+                        >
+                          <SortIcon size={13} />
+                          Triage
+                          <span className="triage-pill-count">
+                            <MorphText text={String(view.open)} />
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                    {lists.find((list) => list.id === view.id)?.inbox && (
+                      <span className="subtitle">{INBOX_SUBTITLE}</span>
                     )}
                     {view.readOnly && (
                       <span className="subtitle">
@@ -5264,6 +5339,48 @@ function NameField(props: {
     };
     document.addEventListener('pointerdown', down, true);
     return () => document.removeEventListener('pointerdown', down, true);
+  }, []);
+  // D-114: a new list, note or group named outside the sidebar's visible part scrolls into view
+  // (clear of Settings and Trash at the bottom and their fade). Measured by layout, not by what
+  // the sidebar's motion shows mid-glide; again once a folded group it is in has opened (until
+  // then the sidebar can't scroll that far), only in the first moments, never against the user.
+  useEffect(() => {
+    const field = box.current;
+    const sidebar = field?.closest<HTMLElement>('.sidebar');
+    if (!field || !sidebar) return;
+    const ensure = (): void => {
+      let top = 0;
+      for (
+        let at: HTMLElement | null = field;
+        at && at !== sidebar;
+        at = at.offsetParent as HTMLElement | null
+      )
+        top += at.offsetTop;
+      const foot = sidebar.querySelector<HTMLElement>('.sidebar-foot');
+      const room = sidebar.clientHeight - (foot ? foot.offsetHeight + 32 : 0);
+      const from = sidebar.scrollTop;
+      const margin = 12;
+      let to = from;
+      if (top - margin < from) to = top - margin;
+      else if (top + field.offsetHeight + margin > from + room)
+        to = top + field.offsetHeight + margin - room;
+      if (Math.abs(to - from) >= 1)
+        sidebar.scrollTo({ top: to, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    };
+    const frame = requestAnimationFrame(ensure);
+    const started = performance.now();
+    const settled = (event: Event): void => {
+      const group = field.closest('.nav-group');
+      if (performance.now() - started > 1200 || !group?.contains(event.target as Node)) return;
+      ensure();
+    };
+    sidebar.addEventListener('transitionend', settled);
+    sidebar.addEventListener('animationend', settled);
+    return () => {
+      cancelAnimationFrame(frame);
+      sidebar.removeEventListener('transitionend', settled);
+      sidebar.removeEventListener('animationend', settled);
+    };
   }, []);
   return (
     <div

@@ -205,3 +205,84 @@ export function windowProcessId(hwnd: bigint): number {
   getWindowProcessId(hwnd, processId);
   return processId[0] ?? 0;
 }
+
+const dwmapi = koffi.load('dwmapi.dll');
+const isWindow = user32.func('bool IsWindow(uintptr_t hWnd)') as (hwnd: Handle) => boolean;
+const isWindowVisible = user32.func('bool IsWindowVisible(uintptr_t hWnd)') as (
+  hwnd: Handle,
+) => boolean;
+const isIconic = user32.func('bool IsIconic(uintptr_t hWnd)') as (hwnd: Handle) => boolean;
+const isWindowEnabled = user32.func('bool IsWindowEnabled(uintptr_t hWnd)') as (
+  hwnd: Handle,
+) => boolean;
+const getWindow = user32.func('uintptr_t GetWindow(uintptr_t hWnd, uint32 uCmd)') as (
+  hwnd: Handle,
+  command: number,
+) => Handle;
+const getWindowLongPtr = user32.func('intptr_t GetWindowLongPtrW(uintptr_t hWnd, int nIndex)') as (
+  hwnd: Handle,
+  index: number,
+) => number | bigint;
+const getWindowTextLength = user32.func('int GetWindowTextLengthW(uintptr_t hWnd)') as (
+  hwnd: Handle,
+) => number;
+const dwmGetWindowAttribute = dwmapi.func(
+  'int32 DwmGetWindowAttribute(uintptr_t hwnd, uint32 dwAttribute, _Out_ uint32_t *pvAttribute, uint32 cbAttribute)',
+) as (hwnd: Handle, attribute: number, value: Uint32Array, size: number) => number;
+
+const GW_HWNDNEXT = 2;
+const GW_OWNER = 4;
+const GWL_EXSTYLE = -20;
+const WS_EX_TOOLWINDOW = 0x80;
+const WS_EX_NOACTIVATE = 0x08000000;
+const DWMWA_CLOAKED = 14;
+
+/**
+ * Whether a window is one to hand the focus back to: it still exists, is shown (not minimized, not
+ * hidden or cloaked on another desktop), takes input, and isn't one of Flint's own windows when
+ * `notOurs` is set. A minimized window is never brought back (D-114: hiding mini or the popup must
+ * never restore the minimized main window).
+ */
+export function canTakeFocus(hwnd: bigint, notOurs = false): boolean {
+  if (hwnd === 0n || !isWindow(hwnd) || !isWindowVisible(hwnd) || isIconic(hwnd)) return false;
+  if (!isWindowEnabled(hwnd)) return false;
+  if (notOurs && windowProcessId(hwnd) === process.pid) return false;
+  const cloaked = new Uint32Array(1);
+  if (dwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, cloaked, 4) === 0 && cloaked[0] !== 0)
+    return false;
+  return true;
+}
+
+/**
+ * D-114: the app window below `from` in the z-order, as Alt+Tab would list it (shown, not
+ * minimized, no tool or no-activate window, unowned, with a title), never one of Flint's own; 0n
+ * when there is none. What a hidden mini or popup hands the focus to when it doesn't know the window
+ * that was in front before it.
+ */
+export function nextAppWindow(from: bigint): bigint {
+  let hwnd = BigInt(getWindow(from, GW_HWNDNEXT));
+  for (let guard = 0; hwnd !== 0n && guard < 512; guard++) {
+    const extended = Number(BigInt(getWindowLongPtr(hwnd, GWL_EXSTYLE)) & 0xffffffffn);
+    if (
+      canTakeFocus(hwnd, true) &&
+      BigInt(getWindow(hwnd, GW_OWNER)) === 0n &&
+      (extended & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) === 0 &&
+      getWindowTextLength(hwnd) > 0
+    )
+      return hwnd;
+    hwnd = BigInt(getWindow(hwnd, GW_HWNDNEXT));
+  }
+  return 0n;
+}
+
+/**
+ * D-114: where a hidden window gives the focus back: the window in front before it if that can
+ * still take it, else the next app window in the z-order. Never a minimized window, never Flint's
+ * main window by accident. Returns whether the focus moved.
+ */
+export function returnFocus(from: bigint, previous: bigint): boolean {
+  const back =
+    previous !== 0n && previous !== from && canTakeFocus(previous) ? previous : nextAppWindow(from);
+  if (back === 0n || foregroundWindow() === back) return back !== 0n;
+  return setForegroundWindow(back);
+}

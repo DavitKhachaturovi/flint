@@ -13,7 +13,7 @@ import {
   type PopupSubmitAck,
 } from '../shared/ipc.js';
 import {
-  bringToForeground,
+  returnFocus,
   forceForeground,
   foregroundWindow,
   handleValue,
@@ -197,11 +197,8 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
   const hideAndReturn = (): number => {
     if (fading) return epochNow();
     const hadFocus = window.isFocused();
-    if (hadFocus) {
-      if (previous !== 0n && previous !== windowHandle && foregroundWindow() !== previous)
-        bringToForeground(previous);
-      else if (foregroundWindow() === windowHandle) window.blur();
-    }
+    // D-114: to the window in front before, else the next app window; never a minimized one.
+    if (hadFocus) returnFocus(windowHandle, previous);
     fadeOut();
     return epochNow();
   };

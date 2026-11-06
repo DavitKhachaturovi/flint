@@ -21,7 +21,7 @@ import {
   type Hang,
 } from './mini-place.js';
 import { e2eHooks, recoverFromCrashes, testWindowArguments } from './shell.js';
-import { bringToForeground, forceForeground, foregroundWindow, handleValue } from './win32.js';
+import { forceForeground, foregroundWindow, handleValue, returnFocus } from './win32.js';
 import { writeFileAtomic } from './storage/atomic.js';
 import { monitorSetupKey, type DisplayInfo, type Rect } from './window-state.js';
 
@@ -243,6 +243,11 @@ export function createMini(options: {
       (rect) => x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height,
     );
     setInteractive(over || surface.held);
+    // D-114: the window in front while mini isn't, so a click into mini knows where to go back.
+    if (!hooks) {
+      const front = foregroundWindow();
+      if (front !== 0n && front !== handle()) lastOther = front;
+    }
     const near =
       at.x >= bounds.x - NEAR &&
       at.x <= bounds.x + bounds.width + NEAR &&
@@ -295,6 +300,10 @@ export function createMini(options: {
       hide();
     });
     made.on('show', watch);
+    // D-114: a click into mini (shown without the focus) goes back to the window in front before.
+    made.on('focus', () => {
+      if (lastOther !== 0n && lastOther !== handle()) previous = lastOther;
+    });
     // Dragged by its header or grip and let go: near a corner, into it; elsewhere it stays.
     made.on('moved', () => {
       if (hooks || placing > 0 || !stageNow) return;
@@ -426,6 +435,8 @@ export function createMini(options: {
   let hiding: NodeJS.Timeout | undefined;
   /** The window in front before mini took the focus (it gets it back when mini hides). */
   let previous = 0n;
+  /** D-114: the last other window in front while mini was shown without the focus. */
+  let lastOther = 0n;
   const handle = (): bigint => (window ? handleValue(window.getNativeWindowHandle()) : 0n);
   const show = (focus: boolean): void => {
     window ??= make();
@@ -438,7 +449,10 @@ export function createMini(options: {
       // Tests never take the focus (Davit's machine runs them).
       if (focus && !hooks) {
         const current = foregroundWindow();
-        if (current !== handle()) previous = current;
+        if (current !== handle()) {
+          previous = current;
+          lastOther = current;
+        }
         target.show();
         target.focus();
         // D-111 (as the popup, CAP-01): Windows sometimes refuses to hand over the foreground (its
@@ -459,13 +473,14 @@ export function createMini(options: {
     clearTimeout(watching);
     watching = undefined;
     setInteractive(false);
-    if (hadFocus && !hooks) {
-      if (previous !== 0n && previous !== handle()) bringToForeground(previous);
-      else target.blur();
-    }
+    // D-114: the focus goes back to the app in front before (also when mini got the focus by a
+    // click), else to the next app window; never a minimized window, never by Windows' own pick
+    // (which could restore the minimized main window).
+    if (hadFocus && !hooks) returnFocus(handle(), previous);
     options.onHidden();
     hiding = setTimeout(() => {
       hiding = undefined;
+      lastOther = 0n;
       target.hide();
       send(Channels.miniHidden);
     }, HIDE_MS);

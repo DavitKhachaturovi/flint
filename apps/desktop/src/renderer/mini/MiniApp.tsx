@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import {
   TODAY_ID,
   type ListSummary,
@@ -13,7 +20,7 @@ import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.
 import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
 import { CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
 import { Composer } from '../ui/Composer.js';
-import { applySpeed, nudge, reducedMotion } from '../ui/motion.js';
+import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
 import { ToastView, useToast } from '../ui/Toast.js';
 import { MiniList } from './MiniList.js';
@@ -130,6 +137,24 @@ export function MiniApp(): ReactElement {
   const composer = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  // D-114: while another tab rises in (8 px, `view-in`), the body never shows a scrollbar for it;
+  // the Note tab fills the card, so the rise alone would overflow it for a moment.
+  const shownTab = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const element = body.current;
+    const before = shownTab.current;
+    shownTab.current = tab;
+    if (!element || before === null || before === tab || reducedMotion()) return;
+    element.classList.add('switching');
+    const timer = setTimeout(
+      () => element.classList.remove('switching'),
+      durationMs('--fl-dur-page', 320) + 40,
+    );
+    return () => {
+      clearTimeout(timer);
+      element.classList.remove('switching');
+    };
+  }, [tab]);
   const seq = useRef(0);
   const noteRef = useRef<string | null>(null);
   noteRef.current = noteId;

@@ -147,8 +147,10 @@ body {
 }
 
 /* The body scrolls past the height limit, its bar inside the card's rounded area (D-96). */
-/* D-112: no scrollbar while the card's height eases to another tab's. */
-.mini-card.sizing .mini-body {
+/* D-112, D-114: no scrollbar (and nothing shifting sideways for one) while the card's height eases
+   to another tab's or another tab rises in. */
+.mini-card.sizing .mini-body,
+.mini-body.switching {
   overflow-y: hidden;
 }
 
@@ -157,8 +159,10 @@ body {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  margin-right: -6px;
-  padding-right: 6px;
+  /* D-114: the scrollbar's place is kept (as in the sidebar), so its appearing or going (a long
+     list, another tab) moves nothing sideways; the gutter sits in the card's padding. */
+  scrollbar-gutter: stable;
+  margin-right: -8px;
 }
 
 /* D-110: another tab arrives as a page does (09 §9). */
@@ -304,8 +308,13 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  /* D-112: the title and the text a little lower under the tabs, together. */
-  padding: 10px 4px 0;
+  /* D-114: the "Quick note" line 2 px lower than in 0.8.10; the title and the text below it a
+     few pixels lower, together (the gap under the "Quick note" line). */
+  padding: 2px 4px 0;
+}
+
+.mini-note .quick-title {
+  gap: 7px;
 }
 
 .mini-note .note-editor {
