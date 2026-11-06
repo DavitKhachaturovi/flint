@@ -882,3 +882,10 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | Step 1's folder change restarts Flint and the tour goes on at step 2, what it made still known | APP-10, DATA-07 · Decided · M8 step 4b | 02, D-119 |
 | 2 | A tour cut short by a quit or crash: not resumed; once "The walkthrough was interrupted · Replay" | APP-10 · Decided · M8 step 4b | 02, D-119 |
 
+## BB. The walkthrough's words (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The 8 cards' titles and text, and You're set's | APP-10 · Decided · M8 step 4b | 02, D-120 |
+| 2 | The spotlight card: "3 / 8", centred when there is no ring | APP-13 · Decided · M8 step 4b | 09 §8, D-120 |
+

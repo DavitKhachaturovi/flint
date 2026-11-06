@@ -1059,3 +1059,21 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **D-118's Proposed detail (decided):** Reset tips also clears the earlier counted hints in `tips.json` (the empty quick note's) and turns Don't show tips off.
 - **Changing the folder in step 1 (decided):** step 1's Change… is Settings' flow (D-104); on a fresh install the folder holds only an empty Inbox, so it offers Move my lists here or Start fresh. Flint restarts on the new folder and the walkthrough **goes on at step 2** (not back on Settings). The step and the IDs of what the tour made are kept in the settings, so You're set's Remove what I created during the tour still works.
 - **Any other quit or crash during the tour (decided):** the next start does not resume it (a dim on a later day, out of context); it counts as skipped. On that first start a quiet one-time toast: **"The walkthrough was interrupted · Replay"**; Replay starts it from step 1. What the interrupted tour made stays as real data.
+
+### D-120 — The walkthrough's words (onboarding Q6)
+- **Date:** 6 Nov 2026 · **Status:** Decided by Davit (onboarding Q6); to be built in M8 step 4b
+- **Each card:** a title, one or two lines, a "3 / 8" counter in mono, **Next** (primary) / **Skip** / **Skip all** (quiet). A step with a trigger moves on by itself when it is done and never says "click Next"; Next stays for anyone who would rather not try. Second person, plain, no exclamation marks.
+
+  | # | Title | Text |
+  |---|---|---|
+  | 1 | Welcome to Flint | Your lists and notes are plain markdown files in `C:\Users\…\Flint`, readable in Obsidian or any editor. Nothing leaves your computer. **Change…** · *Skip now, replay any time from Settings.* |
+  | 2 | Capture from anywhere | In any app, press **Ctrl+Shift+Space**, type, Enter: it lands in Inbox. **Ctrl+Shift+X** captures the text you've selected. Try it now. |
+  | 3 | Shorthand as you type | Add a task here: `!h` sets priority, `@15:00` a reminder, `##Work` a list. Shift+Enter adds notes; paste screenshots and code straight in. |
+  | 4 | Lists, notes, quick notes | **+** makes a task list, a note or a group. **Ctrl+Shift+J** opens a quick note for a thought that isn't a task yet. |
+  | 5 | Today | Pin a task and it shows on Today, whatever list it's in. Click its pin, or press **P**. |
+  | 6 | Reminders | Give a task a time (type `@15:00` or use the bell) and Windows reminds you, by default even during Do Not Disturb. Missed ones wait in Today's Overdue card. |
+  | 7 | Everything, one key away | **Ctrl+K** finds any list, task or command. Press **?** (outside a text field) to see every shortcut. |
+  | 8 | Mini mode | A small Flint that stays on top, for calls and meetings, and is hidden when you share your screen: this button or **Ctrl+Alt+Space**. |
+  | ✓ | You're set | Replay this tour any time from Settings. Flint will point out a few more things as you go; you can turn tips off in Settings. **Done** · *Remove what I created during the tour* |
+
+- Step 1's path is the real Flint folder. The claims were checked against the code: reminders use Windows' reminder scenario, shown during Do Not Disturb with Windows' default priority settings (REM-06); the composer's reminder button is the bell; mini is hidden from screen sharing by default (`miniHideFromSharing`, D-109).
