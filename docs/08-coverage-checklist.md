@@ -875,3 +875,10 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | Bottom right of the main window, above the toasts; stays until closed or hidden; shown after ~3 s visible or closed | APP-14 · Decided · M8 step 4b | 02, D-118 |
 | 3 | Settings: Reset tips next to Replay walkthrough; both in the palette | APP-11, APP-14 · Decided · M8 step 4b | 02, D-118 |
 
+## BA. A restart during the walkthrough (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Step 1's folder change restarts Flint and the tour goes on at step 2, what it made still known | APP-10, DATA-07 · Decided · M8 step 4b | 02, D-119 |
+| 2 | A tour cut short by a quit or crash: not resumed; once "The walkthrough was interrupted · Replay" | APP-10 · Decided · M8 step 4b | 02, D-119 |
+
