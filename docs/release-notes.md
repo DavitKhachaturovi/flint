@@ -2,6 +2,10 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.15 (6 Nov 2026)
+
+- **After an update:** your link patterns (and the animation speed) work right away; no need to save them again in Settings.
+
 ## 0.8.14 (6 Nov 2026)
 
 - **Inbox triage:** the Triage link is back under Inbox's title. Click a task's notes to see it in the side panel; the next task, or a click elsewhere, shows Up next again.

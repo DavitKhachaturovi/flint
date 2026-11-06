@@ -8,7 +8,7 @@ import {
   type MiniState,
   type MiniSurface,
 } from '../shared/ipc.js';
-import { main } from './main-bridge.js';
+import { invoke, main, send } from './main-bridge.js';
 import { applyTestClock } from './test-clock.js';
 
 /**
@@ -66,17 +66,17 @@ const platform = Object.fromEntries(
 const mini = {
   /** × (and the hotkey's second press): hidden, to the tray; it stays alive. */
   hide(): void {
-    ipcRenderer.send(Channels.miniHide);
+    send(Channels.miniHide);
   },
   state(): Promise<MiniState> {
-    return ipcRenderer.invoke(Channels.miniState) as Promise<MiniState>;
+    return invoke(Channels.miniState) as Promise<MiniState>;
   },
   setState(state: Partial<Pick<MiniState, 'tab' | 'noteId'>>): void {
-    ipcRenderer.send(Channels.miniSetState, state);
+    send(Channels.miniSetState, state);
   },
   /** The header's pin: always on top, or not. */
   setOnTop(onTop: boolean): Promise<boolean> {
-    return ipcRenderer.invoke(Channels.miniSetOnTop, onTop) as Promise<boolean>;
+    return invoke(Channels.miniSetOnTop, onTop) as Promise<boolean>;
   },
   /** Shown; `focus` when Davit opened it (not when a reminder did). */
   onShown(listener: (shown: { readonly focus: boolean }) => void): void {
@@ -92,17 +92,17 @@ const mini = {
   },
   /** Open, double-click or Enter: the main window at this place (mini stays). */
   open(place: { readonly listId: string; readonly key?: string }): void {
-    ipcRenderer.send(Channels.miniOpen, place);
+    send(Channels.miniOpen, place);
   },
   /** REM-06, D-109: the reminder cards waiting, and acting on one (the toast goes too). */
   alerts(): Promise<readonly MiniAlert[]> {
-    return ipcRenderer.invoke(Channels.miniGetAlerts) as Promise<readonly MiniAlert[]>;
+    return invoke(Channels.miniGetAlerts) as Promise<readonly MiniAlert[]>;
   },
   onAlerts(listener: (alerts: readonly MiniAlert[]) => void): void {
     ipcRenderer.on(Channels.miniAlerts, (_event, alerts: readonly MiniAlert[]) => listener(alerts));
   },
   alertAction(id: string, action: MiniAlertAction): void {
-    ipcRenderer.send(Channels.miniAlertAction, id, action);
+    send(Channels.miniAlertAction, id, action);
   },
   /** D-110: where the card sits in the transparent window, and how big it may be. */
   onLayout(listener: (layout: MiniLayout) => void): void {
@@ -110,11 +110,11 @@ const mini = {
   },
   /** The layout now (the page asks when it starts, in case it missed the message). */
   layout(): Promise<MiniLayout | null> {
-    return ipcRenderer.invoke(Channels.miniGetLayout) as Promise<MiniLayout | null>;
+    return invoke(Channels.miniGetLayout) as Promise<MiniLayout | null>;
   },
   /** Snapping into another corner: the card is hidden, the window may move. */
   layoutReady(id: number): void {
-    ipcRenderer.send(Channels.miniLayoutReady, id);
+    send(Channels.miniLayoutReady, id);
   },
   /** The window has moved into the corner: the card settles in. */
   onSettled(listener: (id: number) => void): void {
@@ -122,11 +122,11 @@ const mini = {
   },
   /** The card's size and where clicks reach the page (elsewhere they pass through). */
   surface(surface: MiniSurface): void {
-    ipcRenderer.send(Channels.miniSurface, surface);
+    send(Channels.miniSurface, surface);
   },
   /** A resize let go: its width and height limit, remembered. */
   resized(size: MiniResize): void {
-    ipcRenderer.send(Channels.miniResized, size);
+    send(Channels.miniResized, size);
   },
 };
 

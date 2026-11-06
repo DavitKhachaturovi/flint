@@ -321,6 +321,9 @@ async function start(): Promise<void> {
       additionalArguments: testWindowArguments(),
     },
   });
+  // D-116: the page's calls wait for this (preload/main-bridge.ts); true once all is set up.
+  let setUp = false;
+  ipcMain.handle(Channels.mainStarted, () => setUp);
   // D-81: its own origin, so its zoom (UI-12) never reaches the capture popup.
   void mainWindow.loadURL(pageUrl('main-window', MAIN_WINDOW_HOST));
   // APP-02/03: closing hides; quitting is explicit (tray, M2).
@@ -345,6 +348,11 @@ async function start(): Promise<void> {
   /** APP-05, D-96: from every entry point, as it was left (maximized, or its remembered bounds). */
   const showMain = (): void => mainState.show();
 
+  // D-116: an end-to-end test holds the start here, before the folder is read (slow on the first
+  // start after an update), so the page asks main for its settings before main can answer.
+  // Development builds only.
+  const slowStart = BUILD === 'development' ? Number(process.env.FLINT_E2E_SLOW_START ?? 0) : 0;
+  if (slowStart > 0) await new Promise((resolve) => setTimeout(resolve, slowStart));
   // Captures (CAP-01, CAP-02, CAP-05, D-27): every list loaded, drafts kept in app data.
   const workspace = await Workspace.open(
     folder.folder,
@@ -1559,6 +1567,10 @@ async function start(): Promise<void> {
 
   const testToast = devEnv('FLINT_TEST_TOAST') as ToastKind | undefined;
   if (testToast) setTimeout(() => sendTestToast(testToast), 1500);
+
+  // D-116: every handler is registered: the pages' calls can go (asked or told, whichever is first).
+  setUp = true;
+  toWindows(Channels.mainStarted);
 }
 
 /** A chip-sized thumbnail of a pasted image (CAP-06). */

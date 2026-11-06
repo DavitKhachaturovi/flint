@@ -637,6 +637,13 @@ Without sync, the local disk is the only copy, so this matters more.
 - **D-104 (0.8.2), changing it:** Settings → General → Flint folder → **Change…**: Windows' folder picker, then Flint asks in the row, depending on the chosen folder: an empty one: **Move my lists here** (copied and checked file by file; the old folder stays as a backup) or **Start fresh here**; one with Flint lists: **Open these lists** (merging is Later); another non-empty one: **Use a Flint subfolder inside it** or **Use this folder directly**, then Move or Start fresh. The OneDrive warning shows when it applies; a failed copy leaves everything as it was and says why. Flint restarts on the new folder, back on Settings.
 - **Proposed (D-24):** a list that can't be read because it is cloud-only or locked shows that plainly instead of an empty list; a OneDrive conflict copy shows a notice saying so instead of appearing as a normal extra list.
 
+### DATA-08 — Import from Obsidian (late v1, low priority)
+- **Recorded (D-116), details to be grilled when it comes up.** The first-run welcome offers it, skippable ("you can import later from Settings → Data"); Settings → Data has it too.
+- Pick a vault: Flint **copies** all its notes into the Flint folder as plain notes (no checklist-to-task conversion; notes often mix text and checklists). It never moves or changes the vault.
+- Notes are copied flat; a duplicate name gets " (2)". To consider: the vault's top-level folders as sidebar groups.
+- Embedded images (`![[image.png]]`) are copied into `attachments/` and the embeds rewritten so they still show.
+- Not the same as putting the Flint folder inside a vault, which already works (D-23).
+
 ---
 
 ## 10. App behaviour
@@ -682,6 +689,7 @@ Without sync, the local disk is the only copy, so this matters more.
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.
 - Then a short **walkthrough** of the features that are specific to Flint, using the spotlight (APP-13): the global capture hotkey, shorthand, `##` lists, capture-selection, Today and reminders, keyboard navigation. About **5–6 steps**, each skippable (Next / Skip / Skip all), and **replayable** later (tray, settings).
 - **D-115 (decided):** while a step's spotlight is up, only the ringed target is live; the keys taught work everywhere; the dim lifts while the popup or mini is open; Esc ends it ("Replay it any time from Settings"); the card never takes the keyboard.
+- **D-116 (decided):** each step's ring and what moves it on: (1) welcome and the folder, a centred card, Next; (2) capture, no ring, a capture saved from the popup; (3) shorthand, Inbox's composer, a task added with typed `!h`, `@time` or `##list`; (4) the sidebar's + and the Quick note row, a list, note or quick note made; (5) the first task's pin (Today when Inbox is empty), a task pinned; (6) the composer's reminder button, a reminder set; (7) the sidebar's palette button, the palette opened; (8) the title bar's mini-mode button, mini opened. Then **You're set** with Done and **Remove what I created during the tour** (one undoable step to Trash; otherwise all stays as real data).
 - **D-113 (decided):** 8 steps, each advancing by itself when you do the thing (otherwise Next): welcome and the Flint folder; capture from anywhere; shorthand while writing; task lists, notes and quick notes; Today and pins; reminders; Ctrl+K and `?`; mini mode. A fresh install gets it; an existing one gets What's new. Steps in D-113.
 - **Decided (D-112):** Settings has **Replay walkthrough**; the walkthrough's first step says it can be skipped now and replayed any time from Settings.
 - **Decided (D-64):** the walkthrough **replaces the earlier "teaching Inbox"** (sample tasks that each taught a shortcut), so there is one onboarding system. Inbox starts empty.

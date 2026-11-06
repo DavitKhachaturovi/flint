@@ -170,6 +170,11 @@ export const Channels = {
   mainSetPanel: 'main:set-panel',
   /** Main window → main: a note in monospace or not (NOTE-06, D-84). */
   mainNoteMono: 'main:note-mono',
+  /**
+   * D-116: main → main window and mini: everything is set up, calls can go; asked, whether it is
+   * (answered from before the page loads).
+   */
+  mainStarted: 'main:started',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */

@@ -849,3 +849,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | A quick note's title: Enter, Shift+Enter, Tab, ↓ on into the text; never a new note | NOTE-08 · Done (0.8.14) | 03, D-115 |
 | 6 | The walkthrough's spotlight: only the target live, taught keys everywhere, Esc ends it | APP-10, APP-13 · Decided · M8 step 4b | 02, D-115 |
 
+## AX. Settings right after an update; the walkthrough's steps; Import from Obsidian (6 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Settings saved by an older version work at once after an update (the pages' calls wait for main) | NOTE-07, APP-11 · Done (0.8.15) | D-116, `e2e/startup.spec.ts` |
+| 2 | The walkthrough's rings and what moves each step on; the title bar's mini button for step 8 | APP-10, APP-13 · Decided · M8 step 4b | 02, D-116 |
+| 3 | You're set: Remove what I created during the tour (one undoable step) | APP-10 · Decided · M8 step 4b | 02, D-116 |
+| 4 | Import from Obsidian (copy notes and images, never change the vault) | DATA-08 · Recorded · late v1 | 02, D-116 |
+
