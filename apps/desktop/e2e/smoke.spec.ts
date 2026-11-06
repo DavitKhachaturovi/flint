@@ -2103,18 +2103,25 @@ test('fixes after 0.4.22: a click selects, panel subtasks, the motion of sorts a
   await resetMotion();
   await main.locator('.nav', { hasText: 'Clicks' }).click({ button: 'right' });
   await main.locator('.fl-menu .fl-menu-item', { hasText: 'Sort tasks by' }).hover();
-  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Priority' }).click();
-  const glides = await main.evaluate(
-    () =>
-      document
+  // The sort comes back over IPC (slower on CI): watched frame by frame until a glide shows.
+  await main.evaluate(() => {
+    (window as { glided?: boolean }).glided = false;
+    const until = performance.now() + 4000;
+    const look = (): void => {
+      const gliding = document
         .getAnimations()
-        .filter((animation) =>
+        .some((animation) =>
           (animation.effect as KeyframeEffect | null)
             ?.getKeyframes()
             .some((frame) => 'translate' in frame),
-        ).length,
-  );
-  expect(glides).toBeGreaterThan(0);
+        );
+      if (gliding) (window as { glided?: boolean }).glided = true;
+      else if (performance.now() < until) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await main.locator('.fl-submenu .fl-menu-item', { hasText: 'Priority' }).click();
+  await expect.poll(() => main.evaluate(() => (window as { glided?: boolean }).glided)).toBe(true);
   await expect
     .poll(motion)
     .toEqual(expect.arrayContaining(['animationend sort-indicator sort-in']));
