@@ -2,6 +2,13 @@
 
 Short notes for every build handed out (APP-15, D-64). The app shows them as "What's new" from M8. Newest first.
 
+## 0.8.14 (6 Nov 2026)
+
+- **Inbox triage:** the Triage link is back under Inbox's title. Click a task's notes to see it in the side panel; the next task, or a click elsewhere, shows Up next again.
+- **Quick notes:** Enter, Tab or ↓ in "Add a title" saves the title and puts you in the note's text. Giving a quick note a title no longer looks like a new note.
+- **Sidebar:** in a group, "Move to top of group" keeps it in the group; "Move out to top of Lists" takes it out.
+- **Mini mode:** menus open where there's room, never cut off at the screen's edge.
+
 ## 0.8.13 (6 Nov 2026)
 
 - **Inbox triage:**
