@@ -2,6 +2,11 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.28 (7 Nov 2026)
+
+- **Privacy, stated plainly (D-132):** Settings → About starts with "Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own."
+- **Docs:** the plan after v1 (GitHub, Releases, signing) in 06 §5; 1.0.0 is kept for the first release on GitHub, so M9 stays 0.9.x; the checklist's older M8 rows say where they were built.
+
 ## 0.8.27 (7 Nov 2026)
 
 - **Sidebar highlight (D-131):** after deleting a quick note, the highlight lands exactly on the list or note that opens instead, also inside a group.
