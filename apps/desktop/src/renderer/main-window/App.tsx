@@ -3771,7 +3771,29 @@ export function App(): ReactElement {
     const key = placeKey(listId, page);
     if (restored.current === key) return;
     restored.current = key;
-    root.scrollTo({ top: scrollMemory.current.get(key) ?? 0, behavior: 'instant' });
+    const want = scrollMemory.current.get(key) ?? 0;
+    root.scrollTo({ top: want, behavior: 'instant' });
+    if (Math.round(root.scrollTop) >= want - 1) return;
+    // D-130: the place isn't tall enough yet (its rows still arriving on a slow machine, CI run
+    // 39853): it follows the page as it grows, until it gets there, 1.5 s pass, another place is
+    // shown, or the user scrolls, types or clicks.
+    const until = performance.now() + 1500;
+    let stopped = false;
+    const stop = (): void => {
+      stopped = true;
+    };
+    const events = ['wheel', 'keydown', 'pointerdown'] as const;
+    for (const name of events) window.addEventListener(name, stop, { capture: true, once: true });
+    const done = (): void => {
+      for (const name of events) window.removeEventListener(name, stop, { capture: true });
+    };
+    const follow = (): void => {
+      if (stopped || restored.current !== key || performance.now() > until) return done();
+      root.scrollTo({ top: want, behavior: 'instant' });
+      if (Math.round(root.scrollTop) >= want - 1) return done();
+      requestAnimationFrame(follow);
+    };
+    requestAnimationFrame(follow);
   }, [view, listId, page]);
 
   // D-107: a note's line chosen in the palette: the note opens scrolled to it, the line flashed.

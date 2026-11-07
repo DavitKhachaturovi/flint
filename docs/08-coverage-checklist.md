@@ -966,3 +966,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Win+V's pins: not reported by Windows' API; no marker | NAV-08 · Checked (D-129) | D-129 |
 | 6 | Copy as Win+V's pick (no duplicate) | NAV-08 · Done (0.8.24) | D-129 |
 | 7 | Always show contents only in the section and the palette; the setting's new description | NAV-08, APP-11 · Done (0.8.24) | 02, D-129 |
+| 8 | A place's scroll position restored on a slow machine too; nothing scrolls under the Clipboard section | NAV-04, NAV-08 · Done (0.8.25) | D-130 |

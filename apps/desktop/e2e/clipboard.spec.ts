@@ -220,6 +220,8 @@ test('the Clipboard section: placeholder bars at rest, contents only after the p
   // D-129: the picture as its thumbnail.
   await expect(section.locator('.clip-row.image img.clip-thumb')).toBeVisible();
   await section.locator('.clip-eye').click();
+  // The pointer still resting on the section would show the contents again (D-128): away.
+  await main.mouse.move(10, 10);
   await expect(section.locator('.clip-text')).toHaveCount(0);
 });
 

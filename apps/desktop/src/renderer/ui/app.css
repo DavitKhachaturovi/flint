@@ -7038,6 +7038,11 @@ body[data-tour-step='5'] .main .row .pin-hover {
    the panel. At rest a row is a placeholder (a bar, a tile for a picture) with its kind and age;
    the content crossfades in while the pointer rests on the section and out when it leaves. Rows
    arriving slide in, rows going fold away. */
+/* D-130: what the panel scrolls into view stops above the docked section. */
+.context-panel {
+  scroll-padding-bottom: var(--clip-height, 0px);
+}
+
 .clip-section {
   position: sticky;
   bottom: 0;

@@ -171,6 +171,23 @@ export function ClipboardSection(props: {
   const [confirming, setConfirming] = useState(false);
   const resting = useRef<number | undefined>(undefined);
   const rowsBox = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const present = view !== null && view.state !== 'disabled';
+  // D-130: what the panel scrolls into view never lands under the docked section: the panel keeps
+  // the section's height as its scroll padding.
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const panel = section?.closest<HTMLElement>('.context-panel');
+    if (!section || !panel) return;
+    const sized = new ResizeObserver(() =>
+      panel.style.setProperty('--clip-height', `${section.offsetHeight}px`),
+    );
+    sized.observe(section);
+    return () => {
+      sized.disconnect();
+      panel.style.removeProperty('--clip-height');
+    };
+  }, [present]);
   useEffect(() => () => window.clearTimeout(resting.current), []);
   useEffect(() => {
     if (pressed === null) return;
@@ -220,6 +237,7 @@ export function ClipboardSection(props: {
 
   return (
     <section
+      ref={sectionRef}
       className={`clip-section${open ? ' open' : ''}${shown ? ' shown' : ''}`}
       aria-label="Clipboard"
       onPointerEnter={rest}
