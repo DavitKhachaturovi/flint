@@ -235,3 +235,19 @@ test('an empty quick note gone back to is kept; left again, it goes (NOTE-08, D-
   await main.locator('.nav', { hasText: 'Inbox' }).click();
   await expect(quickRows).toHaveCount(before, { timeout: 6000 });
 });
+
+test('a list written by another program, opened while still empty, shows its tasks once they arrive (DATA-06, D-134)', async () => {
+  const path = join(flint, 'Written outside.md');
+  // As an editor saves in two steps: the file first, empty, then its text.
+  await writeFile(path, '');
+  const nav = main.locator('.nav:not(.flip-ghost)', { hasText: 'Written outside' });
+  await nav.scrollIntoViewIfNeeded();
+  await nav.click();
+  await expect(main.locator('h1')).toContainText('Written outside');
+  await writeFile(
+    path,
+    '---\nflint: 1\nid: wo1\nmode: tasks\n---\n- [ ] Arrived from outside [id:: wo1a]\n',
+  );
+  await expect(main.locator('.main .row', { hasText: 'Arrived from outside' })).toBeVisible();
+  await expect(main.locator('.nav.on:not(.flip-ghost)')).toContainText('Written outside');
+});

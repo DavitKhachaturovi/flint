@@ -3674,6 +3674,20 @@ export function App(): ReactElement {
     knownLists.current = ids;
     // Only a list that was there and is gone; a new one may not be in the lists yet.
     if (!before.has(listId) || ids.has(listId)) return;
+    // D-134: not gone, only named at last: a list opened while its file was still empty (another
+    // program saving it in two steps) went by its file name (`file:<name>`); once its text, and so
+    // its id, arrives, the same list stays open under its id (in place: no step back).
+    if (listId.startsWith('file:')) {
+      const name = listId.slice('file:'.length);
+      const same = lists.find((list) => list.name === name);
+      if (same) {
+        const trail = history.current;
+        const here = trail.places[trail.at];
+        if (here?.list === listId) trail.places[trail.at] = { ...here, list: same.id };
+        setListId(same.id);
+        return;
+      }
+    }
     const trail = history.current;
     for (let at = trail.at - 1; at >= 0; at--) {
       const place = trail.places[at];

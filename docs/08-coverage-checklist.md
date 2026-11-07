@@ -999,4 +999,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Settings' link pattern editor and folder panel fade out on Cancel or Save (a copy; the save isn't delayed) | APP-11, UI-10 · Done (0.8.29) | 09, D-133 |
 | 5 | Trash: the buttons fade back after the question; an emptied day or list folds away; "Trash is empty." fades in | DATA-02, UI-10 · Done (0.8.29) | 09, D-133 |
 | 6 | Instant by decision: reduce-motion, typing, the popup's first frame, opening a list's rows | UI-10 · Recorded | D-133 |
-
+| 7 | A list opened while another program was still writing it shows its tasks once they arrive | DATA-06 · Done (0.8.30) | D-134 |
