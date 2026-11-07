@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.9.0 (7 Nov 2026)
+
+- **Flint is open source:** it is now a personal project under the MIT licence, with its home on GitHub. Nothing changes in how you use it.
+
 ## 0.8.30 (7 Nov 2026)
 
 - **Fix:** a list another program is still saving opens properly once its tasks arrive.

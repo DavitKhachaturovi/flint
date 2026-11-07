@@ -6,7 +6,7 @@ productName: Flint
 # The packaged app is "flint" (install folder %LOCALAPPDATA%\Programs\flint), not the workspace name.
 extraMetadata:
   name: flint
-copyright: Davit Khachaturovi
+copyright: Copyright © 2026 Davit Khachaturovi
 directories:
   output: dist-installer
   buildResources: resources

@@ -12,11 +12,11 @@ This is the source of truth for how Flint **looks**. Behaviour and interaction l
 
 **"Solid glass."** Smooth, elegant, calm. The feel of Apple's Liquid Glass (soft depth, light catching edges, springy motion, generous rounded corners) **without translucency**: every surface is an opaque gray.
 
-**Inspiration:** a chat-style Excel add-in for Excel. Taken from it:
+**Inspiration:** a chat-style add-in for Excel. Taken from it:
 - Soft, layered shadows under cards.
 - Smooth, generous rounded corners.
 - **Icon tiles**: icons sit in small rounded squares.
-- **Chips** with an icon and monospaced text (the add-in's `Sheet1!A1` style), removable with ×.
+- **Chips** with an icon and monospaced text (like a cell reference, `Sheet1!A1`), removable with ×.
 - A composer-style input: chips above the text, small tools below, round send button.
 - Headings with the key words emphasized.
 - Rounded-square bullets.

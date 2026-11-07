@@ -56,7 +56,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 
 **Not in v1 (may be revisited later):**
 - **Syncing of any kind** (OneDrive, cloud, server). See 04, "Future: sync".
-- **Integrations** with other apps (planned later; see 05, "Future integration").
+- **Integrations** with other apps (planned later, through the CLI and the shared packages; see 05 §7).
 
 **Considered and not selected** (ideas raised during design that were *not* chosen; do not implement without a new decision):
 - Auto-stamping captures with context (active git branch/repo, window title).

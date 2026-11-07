@@ -2,6 +2,12 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.9.0 (7 Nov 2026)
+
+- **Open source (D-135):** Flint is Davit Khachaturovi's personal project, open source under the MIT licence, moving to github.com/DavitKhachaturovi/flint. M9 begins.
+- **Neutral examples:** private names are gone from the code, tests, docs and mockups; the examples use neutral names (the list "Unicorn", "Alex", acme, Contoso). The design screenshots are re-rendered from the mockups.
+- No change to how Flint works.
+
 ## 0.8.30 (7 Nov 2026)
 
 - **Lists saved by other programs (D-134):** a list you open while another program is still saving it now shows its tasks as soon as they arrive (it could jump back to Inbox instead).
@@ -192,7 +198,7 @@ Detailed notes for every build handed out (D-64). Newest first. The app's What's
 
 ## 0.8.0 (4 Nov 2026)
 
-Versions now follow the milestone: 0.8 is M8 (polish), and 1.0 is the first release for coworkers.
+Versions now follow the milestone: 0.8 is M8 (polish), and 1.0 is the first public release.
 
 - **Change your hotkeys in Settings → Capture & hotkeys**: click the hotkey, press the new keys. Flint still tells you when another app already uses them. The tray is shorter: Open Flint, Quick capture, Mini mode, Settings, Quit Flint.
 - **Quick notes keep their title**: the title saves when you click away, and a titled quick note stays under Quick notes until you keep it as a note or the day ends.

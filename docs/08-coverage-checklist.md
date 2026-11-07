@@ -19,9 +19,9 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Sync via OneDrive (original idea) | Decided **not in v1**: D-03, 04 §7 |
 | Reminder on every task: button, set time, Windows notification or sound | REM-01, REM-06, D-07 |
 | Desktop app, easily installable .exe, Windows x64 first, macOS/ARM later | D-05, 05 §6–7 |
-| Future integration with other (JS/TS) apps | 05 §7, D-04 |
+| Future integrations through the CLI and the shared TypeScript packages | 05 §7, D-04 |
 | Built/maintained by Claude, no dev resources | README Status, D-04 |
-| Name: Flint; repo `C:\Forge\flint` | README, D-06 |
+| Name: Flint; repo `github.com/DavitKhachaturovi/flint`, cloned at `C:\Forge\flint` | README, D-06, D-135 |
 
 ## B. Davit's selected feature notes (in the order noted)
 
@@ -106,7 +106,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Cold start irrelevant if Flint is never not running | 05 §4 |
 | No blank/white flash (background color, rendered while hidden) | 05 §4, 03 §4 |
 | Only main window + popup alive at idle; mini mode on demand then hidden | 05 §3 |
-| Core logic in pure TS packages; narrow Platform interface (future shell switch, other apps) | 05 §2, 05 §7 |
+| Core logic in pure TS packages; narrow Platform interface (future shell switch, integrations) | 05 §2, 05 §7 |
 | CodeMirror 6 editor; electron-builder (NSIS) + electron-updater | 05 §1 |
 | Code signing (SmartScreen) | Later: 05 §6, D-19 (Artifact Signing unavailable in Georgia; unsigned internal builds in v1) |
 | Azure DevOps pipeline on Windows agent | 05 §6 |
@@ -143,13 +143,13 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Item | Where |
 |---|---|
 | No throwaway spike; risky pieces first in M2/M3 | 06 §1–2, D-18 |
-| Internal tool, `.exe` handed out manually | 05 §6, D-19, 06 Q-10 |
+| Personal open-source project (MIT); the installer on GitHub Releases from 1.0.0 | 05 §6, D-19, D-135, 06 Q-10 |
 | Unsigned v1; SmartScreen "Run anyway" | 05 §6, D-19 |
 | No auto-update in v1; v1 makes no network requests | APP-06, APP-09, D-19 |
 | Dataview inline fields `[key:: value]` for task metadata | 04 §3, D-20, Q-09 |
 | Everything important in the markdown line; side files only hold losable bookkeeping | 04 §3 |
 | Round-trip and fuzz tests for the file format | 04 §3, 06 M1 |
-| Repo on Azure DevOps (`DavitKhachaturovi/flint`) | README, CLAUDE.md |
+| Repo on GitHub (`DavitKhachaturovi/flint`, public, one branch `main`) | README, CLAUDE.md, D-135 |
 | Open-sourcing out of scope for now | D-19 |
 
 ## F. Pre-M1 review (Oct 2026)
@@ -674,7 +674,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Version numbers follow the milestone: 0.8.0 next; M9 stays 0.9.x (the coworkers' release included), 1.0.0 the first release on GitHub Releases (D-132) | Q-22 · Decided | 06, D-101, D-132 |
+| 1 | Version numbers follow the milestone: 0.8.0 next; M9 stays 0.9.x, 1.0.0 the first release on GitHub Releases (D-132) | Q-22 · Decided | 06, D-101, D-132 |
 | 2 | Hotkeys recorded in Settings with conflict detection; the Hotkeys window and the tray's Hotkeys… removed | APP-08 · Done (0.8.0) | 02, 03, 09, D-102 |
 | 3 | A quick note's title saved when the field is left; a title keeps it a quick note until Keep as a note, a group or the next day | NOTE-08 · Done (0.8.0) | 02, 04, D-102 |
 | 4 | No flash of the selected row when a list or note is made in its group | LIST-05, UI-04 · Done (0.8.0) | D-102 |
@@ -985,7 +985,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | "Your notes never leave your machine…" as the Privacy row, first in Settings → About | APP-09 · Done (0.8.28) | 02, D-132 |
 | 2 | The installer states it | APP-09 · Not in v1 (one-click installer, no page; D-132) | D-132 |
 | 3 | The Privacy sentence changes if auto-update comes | APP-09, APP-06 · After v1 | 06 §5, D-132 |
-| 4 | After v1: GitHub, internal references removed, GitHub Releases with auto-update, signing (SignPath Foundation or Certum) | — · Plan (06 §5) | 06, D-132 |
+| 4 | GitHub, private references removed, GitHub Releases with auto-update, signing (SignPath Foundation or Certum) | — · Brought forward into M9 (D-135) | 06 §5, D-132, D-135 |
 | 5 | 1.0.0 only for the first release on GitHub Releases; M9 stays 0.9.x | Q-22 · Decided (D-132) | 06, D-101, D-132 |
 | 6 | The checklist's older M8 rows marked with where they were built | — · Done (0.8.28) | D-132 |
 
@@ -1000,3 +1000,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Trash: the buttons fade back after the question; an emptied day or list folds away; "Trash is empty." fades in | DATA-02, UI-10 · Done (0.8.29) | 09, D-133 |
 | 6 | Instant by decision: reduce-motion, typing, the popup's first frame, opening a list's rows | UI-10 · Recorded | D-133 |
 | 7 | A list opened while another program was still writing it shows its tasks once they arrive | DATA-06 · Done (0.8.30) | D-134 |
+
+## BM. Flint on GitHub, open source (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Personal open-source project, MIT (`LICENSE`), public at github.com/DavitKhachaturovi/flint; supersedes D-19 | — · Decided (0.9.0) | README, 05 §6, 06 §5, D-135 |
+| 2 | No private names in code, tests, fixtures, mockups, screenshots or docs; neutral examples; the rule kept in CLAUDE.md | — · Done (0.9.0) | 06 §5, CLAUDE.md, D-135 |
+| 3 | Screenshots re-rendered from the cleaned mockups | — · Done (0.9.0) | 09 §10, D-135 |
+| 4 | The history rewritten once from a kit outside the repository (replacements, noreply author, internal-only files, older screenshots), verified, secrets-scanned | — · Kit ready; Davit runs it | 06 §5, D-135 |
+| 5 | One branch `main`; no tags until v1.0.0; work continues in a fresh clone | — · Decided | 06 §5, D-135 |
+| 6 | Q-07: the CLI's name `flint` | CLI-01 · Proposed | 02, 06, D-135 |
+| 7 | Q-11: trademark an accepted risk; WIPO check by Davit before the first push | — · Accepted risk | 06, D-135 |
+

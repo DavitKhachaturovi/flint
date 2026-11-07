@@ -243,9 +243,9 @@ describe('D-105: inference, the fixed part, built-ins', () => {
 
   it('a short form with no fixed part is refused, with a suggestion', async () => {
     const { fixedPartProblem, suggestShortForm } = await import('./link-patterns.js');
-    expect(
-      fixedPartProblem({ short: '{name}', url: 'https://drop.example/{name}' }),
-    ).toContain('fixed text');
+    expect(fixedPartProblem({ short: '{name}', url: 'https://drop.example/{name}' })).toContain(
+      'fixed text',
+    );
     expect(fixedPartProblem({ short: 'AB#{id}', url: 'https://x.dev/{id}' })).toBeNull();
     expect(fixedPartProblem({ short: '{name}-repo', url: 'https://x.dev/{name}' })).toBeNull();
     expect(fixedPartProblem({ short: '#{id}', url: 'https://x.dev/{id}' })).toContain('fixed');

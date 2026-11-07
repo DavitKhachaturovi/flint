@@ -126,14 +126,14 @@ describe('parseCapture: lists (CAP-05, D-25)', () => {
   });
 
   it('offers a close match for a prefix; Enter takes it, Tab makes a new list', () => {
-    expect(capture('x ##unis').target).toEqual({
+    expect(capture('x ##unic').target).toEqual({
       kind: 'close-match',
       list: unicorn,
-      name: 'unis',
+      name: 'unic',
     });
-    expect(capture('x ##unis', { chooseNewList: true }).target).toEqual({
+    expect(capture('x ##unic', { chooseNewList: true }).target).toEqual({
       kind: 'new',
-      name: 'unis',
+      name: 'unic',
     });
   });
 
@@ -248,8 +248,12 @@ describe('list helpers', () => {
   });
 
   it('suggests task lists by prefix, substring, then letters in order', () => {
-    expect(suggestLists('in', lists).map((list) => list.name)).toEqual(['Inbox', 'Infra']);
-    expect(suggestLists('stream', lists).map((list) => list.name)).toEqual(['Unicorn']);
+    expect(suggestLists('in', lists).map((list) => list.name)).toEqual([
+      'Inbox',
+      'Infra',
+      'Unicorn',
+    ]);
+    expect(suggestLists('corn', lists).map((list) => list.name)).toEqual(['Unicorn']);
     expect(suggestLists('', lists).map((list) => list.name)).toEqual([
       'Units',
       'Inbox',
@@ -275,7 +279,7 @@ describe('property: parseCapture', () => {
     '!h',
     '!low',
     '##infra',
-    '##unis',
+    '##unic',
     '##con',
     '##meeting-notes',
     '@30m',

@@ -771,7 +771,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Supports the same shorthand as the capture box (CAP-03) and a target list.
 - Cheap to build: it writes to the same markdown files using the **same core package** as the app; the running app picks up the change via the file watcher (DATA-06).
 - Lets AI models and agents (e.g. Claude) add tasks too.
-- Command name: `flint` was proposed before the app was named Flint; see Q-07.
+- Command name: `flint`, matching the product name (Q-07, **Proposed** in D-135).
 
 ### CLI-02 — Machine-friendly output (Later, with the CLI)
 - `flint list --json` and **stable exit codes**, so models and scripts can read tasks, not just add them.

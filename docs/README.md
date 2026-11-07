@@ -1,6 +1,6 @@
 # Flint — Documentation Index
 
-**Flint** is a minimalist, keyboard-first, quick-capture notes and task app for developers, by Davit Khachaturovi.
+**Flint** is a minimalist, keyboard-first, quick-capture notes and task app for developers. It is Davit Khachaturovi's personal, open-source project (MIT, [LICENSE](../LICENSE)).
 It exists for one moment: you are on a call or deep in work, a task or bug pops into your head, and you need it written down in under three seconds without losing focus.
 
 These documents are the **single source of truth** for Flint v1. If code and docs disagree, the docs win until they are deliberately updated. Any change in scope, behavior, or architecture must be reflected here in the same change.
@@ -21,11 +21,11 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 
 ## Status
 
-- **Phase:** M4 (task lists) up to step 8, the D-80 to D-82 fixes and the M5 editor complete (0.4.17), on branch `m4-lists`; next the context panel (NAV-07), then M4 step 9. The current state is in [06 §0](06-roadmap-and-open-questions.md).
+- **Phase:** M9 (ship). M1 to M8 are complete; the current state is in [06 §0](06-roadmap-and-open-questions.md).
 - **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg` and `flint-taskbar-24.svg` (D-74).
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
-- **Repository:** `C:\Forge\flint`, Azure DevOps `DavitKhachaturovi/flint` (branch `main`).
-- **Target platform (v1):** Windows x64, an unsigned installable `.exe` handed to coworkers manually (internal tool, D-19). macOS and ARM come later.
+- **Repository:** [github.com/DavitKhachaturovi/flint](https://github.com/DavitKhachaturovi/flint) (public, one branch `main`), cloned at `C:\Forge\flint` (D-135).
+- **Target platform (v1):** Windows x64, an unsigned one-click `.exe` installer published on GitHub Releases from 1.0.0 (D-135). macOS and ARM come later.
 - **Stack:** Electron + React + TypeScript + Vite. See [05](05-architecture-and-performance.md).
 - **Who builds it:** No dedicated developer resources are assigned. Flint is expected to be built and maintained primarily by Claude (Claude Code), with other engineers able to step in. This is why the stack is TypeScript end to end.
 

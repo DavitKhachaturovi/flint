@@ -2,6 +2,12 @@
   "name": "flint",
   "private": true,
   "description": "Flint: keyboard-first quick-capture notes and tasks for developers.",
+  "license": "MIT",
+  "author": "Davit Khachaturovi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DavitKhachaturovi/flint.git"
+  },
   "type": "module",
   "workspaces": [
     "packages/*",

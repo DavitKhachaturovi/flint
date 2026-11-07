@@ -290,12 +290,12 @@ test('shorthand chips, the ## menu and the close-match card (CAP-04, CAP-05, D-2
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
 
-  await box.fill('fix token refresh !h ##unis @tomorrow 10');
+  await box.fill('fix token refresh !h ##unic @tomorrow 10');
   await expect(popup.locator('.chip')).toHaveText(['High', 'Unicorn', 'Tomorrow 10:00']);
-  await expect(popup.locator('.option')).toHaveText(['UnicornEnter', 'New list "unis"Tab']);
+  await expect(popup.locator('.option')).toHaveText(['UnicornEnter', 'New list "unic"Tab']);
   await box.press('Tab');
-  await expect(popup.locator('.option')).toHaveText(['New list "unis"Enter', 'UnicornTab']);
-  await expect(popup.locator('.target-name')).toHaveText('New list "unis"');
+  await expect(popup.locator('.option')).toHaveText(['New list "unic"Enter', 'UnicornTab']);
+  await expect(popup.locator('.target-name')).toHaveText('New list "unic"');
   await box.press('Tab');
   // D-40: the first Enter accepts the close match (the token takes its spelling), the next saves.
   await box.press('Enter');
@@ -3404,9 +3404,7 @@ test('fixes after 0.8.2: link patterns between fixed text, guarded, edited; buil
   await field('Example link').fill('https://dev.azure.com/acme/web/_git/unicorn-api');
   await field('Short form').fill('unicorn-api-repo');
   await expect(field('Second link')).toBeVisible();
-  await field('Second link').pressSequentially(
-    'https://dev.azure.com/acme/web/_git/platform',
-  );
+  await field('Second link').pressSequentially('https://dev.azure.com/acme/web/_git/platform');
   await field('Second short form').pressSequentially('platform-repo');
   await expect(field('Second short form')).toHaveValue('platform-repo');
   await expect(editor.locator('.link-preview')).toContainText('unicorn-api-repo');

@@ -79,21 +79,19 @@ describe('##lists from capture (CAP-05, D-25)', () => {
       now,
     );
     expect(outcome).toMatchObject({ kind: 'saved', listName: 'Unicorn', createdList: null });
-    expect(await readFile(join(folder, 'Unicorn.md'), 'utf8')).toContain(
-      '- [ ] review PR [id:: ',
-    );
+    expect(await readFile(join(folder, 'Unicorn.md'), 'utf8')).toContain('- [ ] review PR [id:: ');
     const again = await open();
     expect(again.listInfos().find((list) => list.id === 'uni1')?.recentRank).toBe(0);
   });
 
   it('Enter takes the close match; Tab (chooseNewList) creates the typed list', async () => {
     const workspace = await open();
-    expect(await workspace.capture({ text: 'a ##unis', chooseNewList: false }, now)).toMatchObject({
+    expect(await workspace.capture({ text: 'a ##unic', chooseNewList: false }, now)).toMatchObject({
       listName: 'Unicorn',
     });
-    const created = await workspace.capture({ text: 'b ##unis', chooseNewList: true }, now);
-    expect(created).toMatchObject({ listName: 'unis', createdList: { name: 'unis' } });
-    const file = await readFile(join(folder, 'unis.md'), 'utf8');
+    const created = await workspace.capture({ text: 'b ##unic', chooseNewList: true }, now);
+    expect(created).toMatchObject({ listName: 'unic', createdList: { name: 'unic' } });
+    const file = await readFile(join(folder, 'unic.md'), 'utf8');
     expect(file).toMatch(/^---\nflint: 1\nid: [a-z0-9]{4,6}\nmode: tasks\n---\n- \[ \] b \[id:: /);
   });
 
