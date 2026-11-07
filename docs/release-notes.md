@@ -2,6 +2,12 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.9.2 (8 Nov 2026)
+
+- **A clean quit (D-138):** quitting within a moment of closing the capture popup (or mini mode) could leave Flint unable to exit, an error box nobody saw. Fixed; quitting and Restart to update are tested with a draft waiting.
+- **Performance, checked on every run (D-137):** typing, the popup, opening lists and notes, Ctrl+K, idle CPU and memory are measured each run and fail past their limits. Memory after start is about 300–350 MB; a list of 1,000 tasks opens in about 150 ms, over its 100 ms budget, until long lists are virtualised after 1.0.
+- **README** at the root of the repository, with a screenshot of the app.
+
 ## 0.9.1 (7 Nov 2026)
 
 - **Auto-update (APP-06, D-136):** installed copies check GitHub Releases 30 s after start and every 4 hours, download a new version in the background and install it when Flint quits, or at once with Restart now. A quiet toast says "Update ready · Restart now / Later"; Restart to update is also in the palette and the tray while an update waits.
