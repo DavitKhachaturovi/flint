@@ -799,12 +799,14 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="about" filter={filter}>
+        {/* APP-09, D-16, D-132: stated plainly, first in About (update it if auto-update comes). */}
         <Row
-          name={`Flint ${view.version}`}
-          note="Everything stays on this computer: Flint makes no network requests."
+          name="Privacy"
+          note="Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own."
           filter={filter}
-          words="version about privacy"
+          words="privacy telemetry network data account offline"
         />
+        <Row name={`Flint ${view.version}`} filter={filter} words="version about" />
         <Row
           name="What’s new"
           note="What changed in each version, in a few lines."

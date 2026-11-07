@@ -321,6 +321,11 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   // D-122: Settings → About has What's new and Replay walkthrough.
   const about = main.locator('#settings-about');
   await expect(about.getByRole('button', { name: 'Replay walkthrough' })).toBeVisible();
+  // APP-09, D-132: stated plainly, first in About.
+  await expect(about.locator('.settings-row').first()).toContainText('Privacy');
+  await expect(about.locator('.settings-row').first()).toContainText(
+    'Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own.',
+  );
   await about
     .locator('.settings-row', { hasText: 'What changed in each version' })
     .getByRole('button')

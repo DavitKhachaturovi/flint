@@ -214,7 +214,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Inline markdown rendered in task titles | LIST-02 · v1 · M4 | 03 §4, D-52 |
 | 4 | Thin token-designed scrollbar at the window edge | UI-02 · v1 · M4 | 09 §8, tokens.css, D-52 |
 | 5 | Create a list: "+" next to Lists and Ctrl+Shift+N, task list or note | LIST-01 · v1 · M4 (plain note editing until M5, D-64) | 03 §3, D-52 |
-| 6 | Settings entry hidden until Settings exists | APP-11 · v1 · M4 (Settings M8) | D-52 |
+| 6 | Settings entry hidden until Settings exists | APP-11 · Done (Settings in M8 step 1, D-100) | D-52 |
 | 7 | Proper small icon sizes in the `.ico`; bigger in-app logo and wordmark | UI-07 · v1 · M4 | 09 §7, §8, D-52 |
 | 8 | Task bodies: inline up to ~8 lines, otherwise a full page; "Open as page" for every task; page replaces the list with a back arrow | TASK-05 · v1 · M4 | 03 §3, 09 §8, D-53 |
 | 9 | Locked, springy mouse drag for rows (collapse while dragged) and sidebar lists | TASK-01, LIST-01 · Done (0.4.14; no drag to sidebar, D-64) | 03 Mouse, 09 §9, D-54 |
@@ -226,7 +226,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 15 | Overdue reminders: "Overdue · <time>", brighter text, small dot, no red, no badges; top of Reminders in Today | REM-11 · v1 · M4 row, M6 Today | 03 §4, 09 §8, D-58 |
 | 16 | Multi-select floating action bar; sidebar Ctrl/Shift-click and Delete | TASK-07, LIST-01 · v1 · M4 | 03 Mouse, 09 §8, D-59 |
 | 17 | Fonts: Onest, FiraGO for Georgian (unicode-range), Geist Mono; mockups and screenshots re-rendered | UI-05 · v1 · M4 | 09 §7, 03 §4, D-60 (supersedes D-17's fonts) |
-| 18 | Guidance spotlight: first-run walkthrough (replacing the teaching Inbox, D-64), contextual tips, What's new with release notes | APP-13, APP-10, APP-14, APP-15 · v1 · M8 (release notes from 0.4.0, D-64) | 09 §8, 04 §2, D-61 |
+| 18 | Guidance spotlight: first-run walkthrough (replacing the teaching Inbox, D-64), contextual tips, What's new with release notes | APP-13, APP-10, APP-14, APP-15 · Done (0.8.16–0.8.18, D-121 to D-123; release notes from 0.4.0, D-64) | 09 §8, 04 §2, D-61 |
 | 19 | Tabs bar (Obsidian-style) | NAV-05 · Later | 06 §3, D-62 |
 | 20 | Priority visibility: no text fading or bolding for now | Q-17 · Open question | 06 §4, D-62 |
 | 21 | Grayscale syntax highlighting; tokens in tokens.css and 09; mockup 07 and its screenshot | UI-06 · v1 · M4 (popup, bodies), M5 (CodeMirror) | 09 §10, §11, tokens.css, D-63 |
@@ -263,12 +263,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 10 | Overdue: bell + dot + brighter time, no "Overdue" word; the bell never moves | REM-11, REM-12 · v1 · M4 step 6 (start) | 09 §8, D-68 |
 | 11 | Bell strike slower and smooth in both directions | REM-12 · v1 · M4 step 6 (start) | 09 §9, D-68 |
 | 12 | Motion rule: ≤ ~150 ms gating, ~250–300 ms non-blocking; slower list switching; fuller completion; un-complete animation | UI-04, TASK-06 · v1 · M4 step 6 (start) | 03 §5, 09 §9, D-67 |
-| 13 | Animation-speed setting that scales all motion | APP-11, APP-12 · v1 · M8 | D-67 |
+| 13 | Animation-speed setting that scales all motion | APP-11, APP-12 · Done (0.4.34; mini mode 0.8.9) | D-67, D-100, D-110 |
 | 14a | Capture popup: drag only by a grip at the top of the card | CAP-01 · v1 · M4 step 6 (start) | 03 §3, D-47, D-68 |
 | 14b | No "Nothing was selected" message (admin hint stays) | CAP-07 · v1 · M4 step 6 (start) | D-68 |
 | 14c | Focus returns to the window active right before the popup last got focus; none if it had none | CAP-01 · v1 · M4 step 6 (start) | D-41, D-68 |
 | 14d | Date/time picker: day, then a time-of-day view (common times + custom field), back to the calendar | CAP-11 · v1 · M4 step 6 (start) | D-68 |
-| 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · v1 · M8 at the latest | D-67 |
+| 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · v1 · M8, the step after D-132 | D-67, D-89 |
 
 ## J. Feedback on 0.4.5 (1 Nov 2026)
 
@@ -304,7 +304,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2a | Click another task's text: straight into editing, no glide first | TASK-02 · v1 · M4 step 6 (0.4.6 fixes) | 03 §2, D-74 |
 | 2b | The editing row looks like a dark input field (well, subtle edge) | TASK-02 · v1 · M4 step 6 (0.4.6 fixes) | 03 §2, 09 §8, D-74 |
 | 3 | Icon: the master logo's corner proportions at every size; leaf ~10 % smaller at taskbar/tray sizes; in-app logos unchanged | UI-07 · v1 · M4 step 6 (0.4.6 fixes) | 09 §8, D-74 |
-| 4 | Motion never delays input; fuller durations (selection ~200, menus ~200, pages ~280, completion ~400 ms); popup instant | UI-04, UI-10 · v1 · M4 step 6 (0.4.6 fixes); speed setting M8 | 03 §5, 09 §9, tokens.css, D-75 |
+| 4 | Motion never delays input; fuller durations (selection ~200, menus ~200, pages ~280, completion ~400 ms); popup instant | UI-04, UI-10 · v1 · M4 step 6 (0.4.6 fixes); speed setting Done (0.4.34) | 03 §5, 09 §9, tokens.css, D-75 |
 | — | Sidebar: groups and ungrouped lists in one manual order; groups keep positions under sorts | LIST-05, LIST-06 · Done (0.4.14) | 02, 04 §2, D-74 |
 | — | Duplicated task without its reminder; "<name> copy" for lists | TASK-16, LIST-01 · v1 · M4 step 7 | 02, D-74 |
 | — | Wheels: touchpad scrolling adds up deltas, one stop per threshold | CAP-11 · v1 · M4 step 6 (0.4.6 fixes) | 02, D-74 |
@@ -406,7 +406,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 11 | Sidebar highlight stays while a task is dragged | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 12 | Every dragged task keeps its selection highlight | TASK-01 · Done (0.4.15) | 02, D-80 |
 | 13 | Animated fold and unfold of bodies and subtasks while dragging | TASK-01 · Done (0.4.15) | 02, D-80 |
-| 14 | Settings: Keyboard shortcuts section, global hotkeys rebound there, `?` shows the same list | APP-11, APP-08, NAV-02 · v1 · M8 | 02, 06 §2, D-80 |
+| 14 | Settings: Keyboard shortcuts section, global hotkeys rebound there, `?` shows the same list | APP-11, APP-08, NAV-02 · Done (M8 steps 1 and 2, D-100, D-106) | 02, 06 §2, D-80 |
 | — | M5 editor, first step: CodeMirror live preview for notes and task bodies (marks on the cursor's line only, inline images, field chips, CAP-06 paste) | NOTE-01, TASK-05, LIST-04, MEDIA-01 · Done (0.4.16, first step) | 02 NOTE-01, 06 §0, D-79 |
 
 ## Q. Feedback on 0.4.15 (2 Nov 2026)
@@ -494,7 +494,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 10 | Right-click inside a selection acts on all (counted labels); outside selects just that item | TASK-07, LIST-01, UI-08 · Done (0.4.20) | 02, 03, D-86 |
 | 11 | After Convert to note (task or list) the note opens, cursor ready | TASK-17, LIST-04 · Done (0.4.20) | 02, D-86 |
 | 12 | A task's page on a card | TASK-05 · Done (0.4.20) | 02, 09 §8, D-86 |
-| 13 | Clipboard section: Windows clipboard history, docked, insert / Capture as task, settings note | NAV-08 · v1 · late (with M8) | 02, D-86 |
+| 13 | Clipboard section: Windows clipboard history, docked, insert / Capture as task, settings note | NAV-08 · Done (0.8.23, 0.8.24: D-128, D-129) | 02, D-86 |
 
 ## W. After 0.4.20 (3 Nov 2026)
 
@@ -606,8 +606,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | "N reminders you missed" opens Today's Overdue card | REM-07, REM-05 · Done (0.4.28) | 02, D-94 |
 | 4 | R sets or changes the selected task's reminder anywhere | REM-01 · Done (0.4.28) | 02, 03 §3, D-94 |
 | 5 | Flint's own chime, off by default (`reminderSound`); the "Nudge" sound | REM-06 · Done (0.4.28; Nudge after 0.4.28, D-95; the switch in Settings with M8) | 02, 04 §2, D-94, D-95 |
-| 6 | The in-app alert when a reminder fires | REM-06 · v1 · M8 (with mini mode) | 02, D-94 |
-| 7 | The Focus Assist note in Settings | REM-06 · v1 · M8 | 02, D-94 |
+| 6 | The in-app alert when a reminder fires | REM-06 · Done (0.8.8, with mini mode, D-109) | 02, D-94 |
+| 7 | The Focus Assist note in Settings | REM-06 · Done (0.4.34) | 02, D-94 |
 
 ## AE. Fixes after 0.4.27 and 0.4.28 (4 Nov 2026)
 
@@ -640,7 +640,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Back to top in every scrolling page | NAV-09 · Done (0.4.31) | 02, 03, 09, D-98 |
 | 5 | A trash item opened read-only; "Restore to edit" with Restore | DATA-02 · Done (0.4.31) | 02, 09, D-98 |
 | 6 | Restore's toast: Undo and "Go to <list>" | DATA-02 · Done (0.4.31) | 02, D-98 |
-| 7 | Reminder sound: Windows sound or Flint chime (the toast silent then), with an info card | REM-06, APP-11 · v1 · M8 | 02, D-98 |
+| 7 | Reminder sound: Windows sound or Flint chime (the toast silent then), with an info card | REM-06, APP-11 · Done (0.4.34) | 02, D-98 |
 
 ## AH. Quick notes and fixes after 0.4.31 and 0.4.32 (4 Nov 2026)
 
@@ -654,7 +654,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | "Restore to edit": in view with the same gap for every kind, fading after 4 s | DATA-02 · Done (0.4.33) | D-99 |
 | 7 | The tray slimmed; Export and Snapshots from Trash's header until Settings → Data | APP-03, DATA-04, DATA-05 · Done (0.4.33) | 02, D-99 |
 | 8 | Snapshots compared with now: tasks by ID restorable one by one, a note's line diff, deleted ones read-only | DATA-04 · Done (0.4.33) | 02, 09, D-99 |
-| 9 | Snapshot settings in Settings → Data | DATA-04, APP-11 · v1 · M8 | 02, D-99 |
+| 9 | Snapshot settings in Settings → Data | DATA-04, APP-11 · Done (M8 step 1, D-100) | 02, D-99 |
 | 10 | Restoring single blocks inside a note | DATA-04 · Later | D-99 |
 
 ## AI. M8 step 1: Settings (4 Nov 2026)
@@ -674,7 +674,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Version numbers follow the milestone: 0.8.0 next, 1.0.0 at the end of M9 | Q-22 · Decided | 06, D-101 |
+| 1 | Version numbers follow the milestone: 0.8.0 next; M9 stays 0.9.x (the coworkers' release included), 1.0.0 the first release on GitHub Releases (D-132) | Q-22 · Decided | 06, D-101, D-132 |
 | 2 | Hotkeys recorded in Settings with conflict detection; the Hotkeys window and the tray's Hotkeys… removed | APP-08 · Done (0.8.0) | 02, 03, 09, D-102 |
 | 3 | A quick note's title saved when the field is left; a title keeps it a quick note until Keep as a note, a group or the next day | NOTE-08 · Done (0.8.0) | 02, 04, D-102 |
 | 4 | No flash of the selected row when a list or note is made in its group | LIST-05, UI-04 · Done (0.8.0) | D-102 |
@@ -739,7 +739,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | One result order: Go to, Commands, Tasks, Lists and notes, lines in notes last | NAV-01 · Done (0.8.6) | 02, D-107 |
 | 5 | No header pill; the sidebar header's search button; the palette's footer of keys | NAV-01 · Done (0.8.6) | 02, 03, 09, D-107 |
 | 6 | A note's line opens the note scrolled to it, flashed | NAV-01 · Done (0.8.6) | 02, D-107 |
-| 7 | Onboarding: Ctrl+K in the walkthrough; the mouse-opener's one-time Ctrl+K tip | APP-13, APP-14 · Planned (M8 step 4) | D-107 |
+| 7 | Onboarding: Ctrl+K in the walkthrough; the mouse-opener's one-time Ctrl+K tip | APP-13, APP-14 · Done (0.8.16, 0.8.18) | D-107 |
 | 8 | docs/06 §0's handoff brought up to date | — · Done | 06 |
 | 9 | End-to-end tests on a fixed clock | — · Done (0.8.6) | 05, D-107 |
 | 10 | Day-change tests across midnight; the day change acted on at midnight (bug fixed) | TODAY-01, TODAY-02, TODAY-03, REM-07 · Done (0.8.6) | 02, 05, D-107 |
@@ -754,8 +754,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | The search button's hover reliable (out of the drag strip) | NAV-01 · Done (0.8.7) | 09, D-108 |
 | 3 | A stronger, longer flash for a note's line from the palette | NAV-01 · Done (0.8.7) | 09, D-108 |
 | 4 | "Good evening" until 04:00 | TODAY-01 · Done (0.8.7) | D-108 |
-| 5 | Mini mode beside the main window, in sync; Open brings the main window forward | MINI-01 · Decided (M8 step 3) | 02, D-109 |
-| 6 | Mini mode's Note tab: one quick note as a sticky note | MINI-01, NOTE-08 · Decided (M8 step 3) | 02, 03, D-109 |
+| 5 | Mini mode beside the main window, in sync; Open brings the main window forward | MINI-01 · Done (0.8.8) | 02, D-109 |
+| 6 | Mini mode's Note tab: one quick note as a sticky note | MINI-01, NOTE-08 · Done (0.8.8) | 02, 03, D-109 |
 
 ## AQ. M8 step 3: mini mode with the reminder alert (5 Nov 2026)
 
@@ -808,17 +808,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | The side panel's subtasks ease in and fold away like the list's rows | NAV-07, TASK-05 · Done (0.8.11) | D-112 |
 | 2 | Mini's Note tab a little lower under the tabs; no scrollbar while the height eases | MINI-01 · Done (0.8.11) | 09, D-112 |
 | 3 | The capture popup takes the softer desktop shadow | CAP-01 · Done (0.8.11) | 09, D-112 |
-| 4 | Replay walkthrough in Settings; the walkthrough says so | APP-10, APP-11 · Decided (M8 step 4) | 02, D-112 |
+| 4 | Replay walkthrough in Settings; the walkthrough says so | APP-10, APP-11 · Done (0.8.16; in Settings → About since 0.8.17) | 02, D-112 |
 
 ## AU. M8 step 4 decided (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | 1 | Inbox triage, a card at a time, by keyboard, oldest first, with a summary | TASK-14 · Done (0.8.12) | 02, 03, 09, D-113 |
-| 2 | The 8-step walkthrough, each step advancing when it is done | APP-10, APP-13 · Decided · M8 step 4b | 02, D-113 |
-| 3 | Existing installs get What's new, fresh ones the walkthrough | APP-10, APP-15 · Decided · M8 step 4b | D-113 |
-| 4 | What's new as one card with the notes since last seen | APP-15 · Decided · M8 step 4b | 02, D-113 |
-| 5 | The first nine contextual tips | APP-14 · Decided · M8 step 4b | 02, D-113 |
+| 2 | The 8-step walkthrough, each step advancing when it is done | APP-10, APP-13 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-113 |
+| 3 | Existing installs get What's new, fresh ones the walkthrough | APP-10, APP-15 · Done (M8 step 4b, 0.8.16–0.8.18) | D-113 |
+| 4 | What's new as one card with the notes since last seen | APP-15 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-113 |
+| 5 | The first nine contextual tips | APP-14 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-113 |
 
 ## AV. Fixes after 0.8.11 and 0.8.12 (6 Nov 2026)
 
@@ -847,47 +847,47 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Move to top of group / Move out to top of Lists | LIST-06 · Done (0.8.14) | 02, D-115 |
 | 4 | Mini: menus and pickers open where they fit on the screen | MINI-01, UI-08 · Done (0.8.14) | 09, D-115 |
 | 5 | A quick note's title: Enter, Shift+Enter, Tab, ↓ on into the text; never a new note | NOTE-08 · Done (0.8.14) | 03, D-115 |
-| 6 | The walkthrough's spotlight: only the target live, taught keys everywhere, Esc ends it | APP-10, APP-13 · Decided · M8 step 4b | 02, D-115 |
+| 6 | The walkthrough's spotlight: only the target live, taught keys everywhere, Esc ends it | APP-10, APP-13 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-115 |
 
 ## AX. Settings right after an update; the walkthrough's steps; Import from Obsidian (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | 1 | Settings saved by an older version work at once after an update (the pages' calls wait for main) | NOTE-07, APP-11 · Done (0.8.15) | D-116, `e2e/startup.spec.ts` |
-| 2 | The walkthrough's rings and what moves each step on; the title bar's mini button for step 8 | APP-10, APP-13 · Decided · M8 step 4b | 02, D-116 |
-| 3 | You're set: Remove what I created during the tour (one undoable step) | APP-10 · Decided · M8 step 4b | 02, D-116 |
+| 2 | The walkthrough's rings and what moves each step on; the title bar's mini button for step 8 | APP-10, APP-13 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-116 |
+| 3 | You're set: Remove what I created during the tour (one undoable step) | APP-10 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-116 |
 | 4 | Import from Obsidian (copy notes and images, never change the vault) | DATA-08 · Later (after v1, D-131) | 02, D-116, D-131 |
 
 ## AY. Fresh install or update; What's new in plain language (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Fresh install (no settings) → walkthrough; update → What's new once, versions since `lastSeenVersion` | APP-10, APP-15 · Decided · M8 step 4b | 02, D-117 |
-| 2 | What's new shows `docs/whats-new.md` (2–5 plain highlights per version), not the release notes | APP-15 · Decided · M8 step 4b | 02, whats-new.md, D-117 |
-| 3 | What's new from the palette and Settings → About; no tray item | APP-15 · Decided · M8 step 4b | 02, D-117 |
-| 4 | Remove what I created during the tour: only items made during it | APP-10 · Decided · M8 step 4b | 02, D-117 |
+| 1 | Fresh install (no settings) → walkthrough; update → What's new once, versions since `lastSeenVersion` | APP-10, APP-15 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-117 |
+| 2 | What's new shows `docs/whats-new.md` (2–5 plain highlights per version), not the release notes | APP-15 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, whats-new.md, D-117 |
+| 3 | What's new from the palette and Settings → About; no tray item | APP-15 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-117 |
+| 4 | Remove what I created during the tour: only items made during it | APP-10 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-117 |
 
 ## AZ. Tips: when, where, how long; Reset tips (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | A tip 2 s after its pattern, not while typing or with a menu open; never during the walkthrough, triage or What's new | APP-14 · Decided · M8 step 4b | 02, D-118 |
-| 2 | Bottom right of the main window, above the toasts; stays until closed or hidden; shown after ~3 s visible or closed | APP-14 · Decided · M8 step 4b | 02, D-118 |
-| 3 | Settings: Reset tips next to Replay walkthrough; both in the palette | APP-11, APP-14 · Decided · M8 step 4b | 02, D-118 |
+| 1 | A tip 2 s after its pattern, not while typing or with a menu open; never during the walkthrough, triage or What's new | APP-14 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-118 |
+| 2 | Bottom right of the main window, above the toasts; stays until closed or hidden; shown after ~3 s visible or closed | APP-14 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-118 |
+| 3 | Settings: Reset tips next to Replay walkthrough; both in the palette | APP-11, APP-14 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-118 |
 
 ## BA. A restart during the walkthrough (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | Step 1's folder change restarts Flint and the tour goes on at step 2, what it made still known | APP-10, DATA-07 · Decided · M8 step 4b | 02, D-119 |
-| 2 | A tour cut short by a quit or crash: not resumed; once "The walkthrough was interrupted · Replay" | APP-10 · Decided · M8 step 4b | 02, D-119 |
+| 1 | Step 1's folder change restarts Flint and the tour goes on at step 2, what it made still known | APP-10, DATA-07 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-119 |
+| 2 | A tour cut short by a quit or crash: not resumed; once "The walkthrough was interrupted · Replay" | APP-10 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-119 |
 
 ## BB. The walkthrough's words (6 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | The 8 cards' titles and text, and You're set's | APP-10 · Decided · M8 step 4b | 02, D-120 |
-| 2 | The spotlight card: "3 / 8", centred when there is no ring | APP-13 · Decided · M8 step 4b | 09 §8, D-120 |
+| 1 | The 8 cards' titles and text, and You're set's | APP-10 · Done (M8 step 4b, 0.8.16–0.8.18) | 02, D-120 |
+| 2 | The spotlight card: "3 / 8", centred when there is no ring | APP-13 · Done (M8 step 4b, 0.8.16–0.8.18) | 09 §8, D-120 |
 
 ## BC. The walkthrough, the spotlight and What's new built (6 Nov 2026)
 
@@ -977,3 +977,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | An empty quick note gone back to isn't removed; each leave waits anew | NOTE-08 · Done (0.8.27) | D-131 |
 | 3 | Density (comfortable / compact) | APP-11 · Later (D-131) | 02, D-131 |
 | 4 | Import from Obsidian: top level or a group, the vault's folders decided then | DATA-08 · Later (D-131) | 02, D-131 |
+
+## BK. The statement, the plan after v1, versioning (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | "Your notes never leave your machine…" as the Privacy row, first in Settings → About | APP-09 · Done (0.8.28) | 02, D-132 |
+| 2 | The installer states it | APP-09 · Not in v1 (one-click installer, no page; D-132) | D-132 |
+| 3 | The Privacy sentence changes if auto-update comes | APP-09, APP-06 · After v1 | 06 §5, D-132 |
+| 4 | After v1: GitHub, internal references removed, GitHub Releases with auto-update, signing (SignPath Foundation or Certum) | — · Plan (06 §5) | 06, D-132 |
+| 5 | 1.0.0 only for the first release on GitHub Releases; M9 stays 0.9.x | Q-22 · Decided (D-132) | 06, D-101, D-132 |
+| 6 | The checklist's older M8 rows marked with where they were built | — · Done (0.8.28) | D-132 |
+

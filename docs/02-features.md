@@ -687,6 +687,7 @@ Without sync, the local disk is the only copy, so this matters more.
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
 - The only network access is checking for and downloading updates (APP-06), and that is Later: **v1 makes no network requests at all.**
 - **Enforced (D-31):** an end-to-end test fails on any network request the app attempts. A future network feature allowlists exactly its own endpoint there; the check is never loosened.
+- **D-132 (built, 0.8.28):** stated first in Settings → About, a **Privacy** row: "Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own." The walkthrough's step 1 says "Nothing leaves your computer." The installer doesn't state it in v1 (one-click, no page). If auto-update comes after v1 (06 §5), the sentence changes with it.
 
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.

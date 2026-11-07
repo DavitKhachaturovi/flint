@@ -164,7 +164,7 @@ flint/
 
 ### Auto-update (APP-06) — Later (D-19)
 - Not in v1: Flint is distributed manually as an `.exe`. Users update by running the newer installer over the old one (same per-user install location; settings and data are kept).
-- When added later: electron-updater with the NSIS target and a generic feed (e.g. a static Azure Storage endpoint published by the pipeline); check and download in the background; **install on quit, or at idle**, never during active use.
+- When added later: electron-updater with the NSIS target (D-132: likely GitHub Releases as the feed, after the move in 06 §5; before that, e.g. a static Azure Storage endpoint published by the pipeline); check and download in the background; **install on quit, or at idle**, never during active use.
 
 ### Window state (APP-05)
 - Persist bounds per **monitor setup** (keyed by the set of connected displays and their bounds); if a saved position is off-screen, fall back to the active monitor.
