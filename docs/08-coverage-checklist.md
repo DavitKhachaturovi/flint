@@ -21,7 +21,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Desktop app, easily installable .exe, Windows x64 first, macOS/ARM later | D-05, 05 §6–7 |
 | Future integrations through the CLI and the shared TypeScript packages | 05 §7, D-04 |
 | Built/maintained by Claude, no dev resources | README Status, D-04 |
-| Name: Flint; repo `github.com/DavitKhachaturovi/flint`, cloned at `C:\Forge\flint` | README, D-06, D-135 |
+| Name: Flint; repo `github.com/DavitKhachaturovi/flint`, cloned at `C:\Forge\flint-repo` | README, D-06, D-135 |
 
 ## B. Davit's selected feature notes (in the order noted)
 

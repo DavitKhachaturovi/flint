@@ -24,7 +24,7 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 - **Phase:** M9 (ship). M1 to M8 are complete; the current state is in [06 §0](06-roadmap-and-open-questions.md).
 - **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg` and `flint-taskbar-24.svg` (D-74).
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
-- **Repository:** [github.com/DavitKhachaturovi/flint](https://github.com/DavitKhachaturovi/flint) (public, one branch `main`), cloned at `C:\Forge\flint` (D-135).
+- **Repository:** [github.com/DavitKhachaturovi/flint](https://github.com/DavitKhachaturovi/flint) (public, one branch `main`), cloned at `C:\Forge\flint-repo` (D-135) (`C:\Forge\flint` is Davit's own Flint folder).
 - **Target platform (v1):** Windows x64, an unsigned one-click `.exe` installer published on GitHub Releases from 1.0.0 (D-135). macOS and ARM come later.
 - **Stack:** Electron + React + TypeScript + Vite. See [05](05-architecture-and-performance.md).
 - **Who builds it:** No dedicated developer resources are assigned. Flint is expected to be built and maintained primarily by Claude (Claude Code), with other engineers able to step in. This is why the stack is TypeScript end to end.

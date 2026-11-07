@@ -1,4 +1,6 @@
-# Flint
+<p align="center"><img src="assets/icon/flint-icon-512.svg" width="112" height="112" alt="Flint logo: a knapped flint leaf on a dark tile"></p>
+
+<h1 align="center">Flint</h1>
 
 A fast, keyboard-first place for the tasks and notes that pop up while you work. Built for developers on Windows.
 
