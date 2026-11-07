@@ -2,9 +2,14 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.9.3 (8 Nov 2026)
+
+- **Nothing lost on a quick quit (D-138):** quitting (or Restart to update) right after closing the capture popup waits a moment for what is still being saved: the draft, a capture, a list change, pins and Today's order.
+- **No more error boxes on the way out:** an unexpected error while Flint quits is written to the log and the quit goes on; test runs never show error boxes on the screen.
+
 ## 0.9.2 (8 Nov 2026)
 
-- **A clean quit (D-138):** quitting within a moment of closing the capture popup (or mini mode) could leave Flint unable to exit, an error box nobody saw. Fixed; quitting and Restart to update are tested with a draft waiting.
+- **A clean quit (D-138):** quitting within a moment of closing the capture popup (or mini mode) could leave Flint unable to exit, behind an error box. Fixed; quitting and Restart to update are tested with a draft waiting.
 - **Performance, checked on every run (D-137):** typing, the popup, opening lists and notes, Ctrl+K, idle CPU and memory are measured each run and fail past their limits. Memory after start is about 300–350 MB; a list of 1,000 tasks opens in about 150 ms, over its 100 ms budget, until long lists are virtualised after 1.0.
 - **README** at the root of the repository, with a screenshot of the app.
 

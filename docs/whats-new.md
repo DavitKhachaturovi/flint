@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.9.3 (8 Nov 2026)
+
+- **Safer quitting:** if you quit or restart for an update right after closing the capture popup, Flint first finishes saving your draft.
+
 ## 0.9.2 (8 Nov 2026)
 
 - **Fix:** Flint always quits cleanly now, also right after you close the capture popup or restart for an update.
