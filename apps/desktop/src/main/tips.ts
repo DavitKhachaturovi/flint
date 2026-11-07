@@ -65,6 +65,11 @@ export class TipsFile {
   /** One write at a time, the latest counts last. */
   private writing: Promise<void> = Promise.resolve();
 
+  /** Once every write asked for so far is done (tests clean up after it). */
+  settled(): Promise<void> {
+    return this.writing;
+  }
+
   private save(): void {
     const text = `${JSON.stringify(this.counts, null, 2)}\n`;
     this.writing = this.writing

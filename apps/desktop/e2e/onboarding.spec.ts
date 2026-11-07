@@ -157,9 +157,29 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
   await expect(editor).toBeVisible();
   await main.waitForTimeout(800);
   await expect(card).toContainText('4 / 8');
+  // D-125: the card never covers the ringed targets or where you type: it moved out of the way.
+  const covers = (): Promise<string[]> =>
+    main.evaluate(() => {
+      const box = document.querySelector('.spotlight-card')?.getBoundingClientRect();
+      if (!box) return ['no card'];
+      const kept = document.querySelectorAll(
+        '.spotlight-ring, .note-card .list-header, .note-card .cm-line',
+      );
+      return [...kept].flatMap((element) => {
+        const other = element.getBoundingClientRect();
+        const apart =
+          box.right <= other.left ||
+          other.right <= box.left ||
+          box.bottom <= other.top ||
+          other.bottom <= box.top;
+        return apart ? [] : [element.className];
+      });
+    });
+  await expect.poll(covers).toEqual([]);
   await editor.click();
   await main.keyboard.type('buy stamps');
   await expect(card).toContainText('4 / 8');
+  expect(await covers()).toEqual([]);
   await expect(card).toContainText('5 / 8', { timeout: 6000 });
   const notes = async (): Promise<string[]> =>
     (await readdir(join(dataDirectory, 'Flint'))).filter((name) => name.startsWith('Quick note'));
@@ -274,8 +294,15 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   // D-122: a comfortable size; Got it at the bottom closes it (Esc and × too).
   const box = await card.boundingBox();
   expect(box?.width ?? 0).toBeGreaterThan(560);
+  // D-125: the app dimmed behind it; nothing there takes a click until it is closed.
+  await expect(main.locator('.whats-new-dim')).toHaveCount(1);
+  const before = await main.locator('.nav.on').textContent();
+  await clickAt(main, '.nav:has-text("Settings")');
+  await expect(main.locator('.nav.on')).toHaveText(before ?? '');
+  await expect(card).toBeVisible();
   await card.getByRole('button', { name: 'Got it' }).click();
   await expect(card).toHaveCount(0);
+  await expect(main.locator('.whats-new-dim')).toHaveCount(0);
   await main.keyboard.press('Control+k');
   await main.keyboard.type('what');
   await main.locator('.palette-layer').getByText('What’s new').first().click();
@@ -295,7 +322,7 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   await expect(card).toHaveCount(0);
 });
 
-test('a tip: once its pattern happened, after a quiet moment; seen after 3 s or closed; one a session; Reset tips; Don’t show tips (APP-14, D-118)', async () => {
+test('a tip: once its pattern happened, after a quiet moment; seen after 3 s or closed; two a session, ten minutes apart; Reset tips; Don’t show tips (APP-14, D-118, D-125)', async () => {
   await fresh({ lastSeenVersion: VERSION });
   await writeFile(
     join(dataDirectory, 'Flint', 'Inbox.md'),
@@ -331,13 +358,47 @@ test('a tip: once its pattern happened, after a quiet moment; seen after 3 s or 
   ).toBeNull();
   // Seen after about 3 s on screen.
   await expect.poll(async () => (await tips())['shown:paletteKey'], { timeout: 6000 }).toBe(1);
+  // D-125: as far from the right edge as from the bottom.
+  const corner = await main.evaluate(() => {
+    const box = document.querySelector('.tip-card')?.getBoundingClientRect();
+    return box
+      ? {
+          right: Math.round(window.innerWidth - box.right),
+          bottom: Math.round(window.innerHeight - box.bottom),
+        }
+      : null;
+  });
+  expect(corner).not.toBeNull();
+  expect(corner?.right).toBe(corner?.bottom);
   await tip.getByRole('button', { name: 'Got it' }).click();
   await expect(tip).toHaveCount(0);
 
-  // One a session: the first delete's tip waits for another session.
+  // D-125: two a session, ten minutes apart. Within the ten minutes the first delete's tip waits.
   await main.locator('.row', { hasText: 'first to go' }).click();
   await main.keyboard.press('Delete');
   await expect(main.locator('.row', { hasText: 'first to go' })).toHaveCount(0);
+  await main.waitForTimeout(3500);
+  await expect(tip).toHaveCount(0);
+  // Ten minutes on, the next delete brings it.
+  await running.evaluate(() =>
+    (globalThis as { __flintE2E?: { tipGapPassed?: () => void } }).__flintE2E?.tipGapPassed?.(),
+  );
+  await main.locator('.row', { hasText: 'second to go' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Delete' }).click();
+  await expect(tip).toContainText('Trash for 30 days', { timeout: 5000 });
+  await tip.getByRole('button', { name: 'Close' }).click();
+  await expect(tip).toHaveCount(0);
+  expect((await tips())['shown:trash']).toBe(1);
+  // A third waits for another session, however long it has been: a link pasted (D-93: a
+  // synthetic paste, the clipboard untouched).
+  await running.evaluate(() =>
+    (globalThis as { __flintE2E?: { tipGapPassed?: () => void } }).__flintE2E?.tipGapPassed?.(),
+  );
+  await main.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData('text/plain', 'https://github.com/flint/flint/pull/7');
+    document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data }));
+  });
   await main.waitForTimeout(3500);
   await expect(tip).toHaveCount(0);
 
@@ -347,7 +408,7 @@ test('a tip: once its pattern happened, after a quiet moment; seen after 3 s or 
   await main.keyboard.type('reset tips');
   await main.locator('.palette-layer').getByText('Reset tips').first().click();
   await expect(main.locator('.toast')).toContainText('Tips reset');
-  await main.locator('.row', { hasText: 'second to go' }).click({ button: 'right' });
+  await main.locator('.row', { hasText: 'third to go' }).click({ button: 'right' });
   await main.locator('.fl-menu .fl-menu-item', { hasText: 'Delete' }).click();
   await expect(tip).toContainText('Trash for 30 days', { timeout: 5000 });
   await running.evaluate(({ BrowserWindow }) =>

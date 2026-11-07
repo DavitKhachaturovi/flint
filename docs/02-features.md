@@ -734,13 +734,15 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 
 ### APP-13 — Guidance spotlight (v1, D-61)
 - One shared **spotlight** component for all guidance: a **soft dim** over the window and a **ring** around the target element, with a small card (one or two lines) and **Next / Skip / Skip all**. Used by the walkthrough (APP-10), contextual tips (APP-14) and What's new (APP-15). Visual spec in 09 §8.
+- **D-125 (decided, 0.8.20):** the card never covers the ringed target or where you type in what a target opened (step 4: the quick note's title and text, the new list's name field); it glides out of the way to a corner of the window instead.
 - Milestone M8.
 
 ### APP-14 — Contextual tips (v1, D-61)
 - When the user repeats an inefficient pattern (e.g. sets priority with the button 3× instead of typing `!h`), Flint offers a one-line tip.
-- Rules: a **non-blocking card in a corner** of the main window; **never** in the capture popup; **never takes focus**; **never appears mid-typing**; each tip shows **once** and never again once dismissed; **at most one tip per session**; **"Don't show tips"** on the card and in settings (APP-11).
+- Rules: a **non-blocking card in a corner** of the main window; **never** in the capture popup; **never takes focus**; **never appears mid-typing**; each tip shows **once** and never again once dismissed; **at most one tip per session** (**D-125:** two, at least 10 minutes apart); **"Don't show tips"** on the card and in settings (APP-11).
 - Pattern detection is **local only**: counters in app data, no telemetry (APP-09).
-- **D-123 (built, 0.8.18):** as decided; the words Proposed (D-123); Settings → About: Tips (Show tips) with Reset tips.
+- **D-123 (built, 0.8.18):** as decided; the words (decided in D-125); Settings → About: Tips (Show tips) with Reset tips.
+- **D-125 (decided, 0.8.20):** at most **two tips a session**, at least **10 minutes** apart, so they never come back to back (a pattern inside the ten minutes still counts; its tip comes the next time it happens after them). The card sits as far from the window's right edge as from its bottom.
 - **D-118 (decided):** a tip shows 2 s after its pattern, while nothing is being typed and no menu, picker or dialog is open; never during the walkthrough, triage or What's new, nor in the session the walkthrough ran. Bottom right of the main window, above the toasts, fading in; stays until × or **Got it** or the window is hidden (no timeout). It counts as shown after about 3 s visible, or when closed; hidden sooner, it can come again. Settings has **Reset tips** next to **Replay walkthrough** (all tips eligible again, the empty quick note's hint too, and Don't show tips off; D-119); both are palette commands.
 - **D-113 (decided):** the first set of nine tips (shorthand over the composer's buttons, Ctrl+K over the mouse, capture from anywhere, ↑/↓ and Space, `/` in notes, Trash keeps deleted items, own short links, triage for a full Inbox, the side panel on a wide window); listed in D-113.
 - Milestone M8.
@@ -748,7 +750,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 ### APP-15 — What's new (v1, D-61)
 - After an update, the **first open** shows what's new once, with the same spotlight highlights (APP-13). It stays available later from the palette and Settings → About (D-117: no tray item).
 - **D-113 (decided):** one floating card (the spotlight's card, no dim) with the notes of every version since the last one seen, scrolling when long; Close. Also from the tray and the palette (the latest notes).
-- **D-121 (built, 0.8.16):** from Settings → About and the palette it shows every entry, newest first. **D-122:** a reading-size card (620 px) with **Got it** at the bottom.
+- **D-121 (built, 0.8.16):** from Settings → About and the palette it shows every entry, newest first. **D-122:** a reading-size card (620 px) with **Got it** at the bottom. **D-125 (changes D-113's no dim):** the app is dimmed behind it, as in the walkthrough, and takes no clicks until Got it, Esc or × closes it.
 - **Every version bump comes with short release notes** (D-117: the plain-language `whats-new.md` is what this shows). **D-64:** versioning starts with the next build: **0.4.x during M4** (the minor number is the milestone), bumped for every build handed out, each with a short entry in [`docs/release-notes.md`](release-notes.md), which the app bundles for What's new.
 - **D-117 (decided):** a fresh install (no `settings.json`) gets the walkthrough; an existing one gets What's new once on the first start of a new version (in the main window, the next time it opens), every version since `lastSeenVersion`, newest first. It shows **[`docs/whats-new.md`](whats-new.md)**, not the release notes: per version 2–5 plain-language highlights (what's new and how to use it), written with every version bump; `release-notes.md` stays the detailed log. Esc or × closes it; the palette ("What's new") and Settings → About open it again. An install from before What's new sees only the current entry, which sums up the 0.8 line; a build with only small fixes may have one line (D-118).
 - Milestone M8 (release notes from 0.4.0 on).

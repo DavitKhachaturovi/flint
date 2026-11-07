@@ -5,8 +5,9 @@ import { CloseIcon } from './icons.js';
 import { onboardingOnce } from './Onboarding.js';
 
 /**
- * APP-14 (D-113, D-118): the contextual tips in the main window. A pattern anywhere says so with
- * `tipHappened` (or the `flint:tip` event); main counts it and says when its tip is due. The tip
+ * APP-14 (D-113, D-118, D-125): the contextual tips in the main window. A pattern anywhere says so
+ * with `tipHappened` (or the `flint:tip` event); main counts it and says when its tip is due (at
+ * most two a session, ten minutes apart). The tip
  * then waits for 2 s without typing, with no menu, picker, palette or dialog open, and not while
  * the walkthrough, triage or What's new is up; it shows in the bottom-right corner, never taking
  * the focus, until × or Got it or the window is hidden. It counts as seen after about 3 s on

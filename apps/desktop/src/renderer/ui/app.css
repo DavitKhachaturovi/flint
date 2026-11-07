@@ -6763,6 +6763,13 @@ body[data-tour-step='5'] .main .row .pin-hover {
   animation: spotlight-card-in var(--fl-dur-page) var(--fl-ease-spring);
 }
 
+/* D-125: moving out of the way of what a target opened, it glides (never delays a keypress). */
+.spotlight-card.placed {
+  transition:
+    left var(--fl-dur-page) var(--fl-ease-spring),
+    top var(--fl-dur-page) var(--fl-ease-spring);
+}
+
 /* You're set: its two buttons on one line. */
 .spotlight-card.wide {
   width: 400px;
@@ -6836,8 +6843,19 @@ body[data-tour-step='5'] .main .row .pin-hover {
   margin-top: 14px;
 }
 
-/* APP-15, D-117, D-122: What's new: the spotlight's card, without the dim, in the middle near the
-   top, a comfortable reading size; long notes scroll, Got it at the bottom. */
+/* APP-15, D-117, D-122, D-125: What's new: the spotlight's card over its dim (nothing behind it
+   takes a click), in the middle near the top, a comfortable reading size; long notes scroll, Got
+   it at the bottom. */
+.whats-new-dim.leaving {
+  animation: spotlight-out var(--fl-dur-state) ease-in forwards;
+}
+
+@keyframes spotlight-out {
+  to {
+    opacity: 0;
+  }
+}
+
 .spotlight-card.whats-new {
   left: 50%;
   top: max(48px, 9vh);
@@ -6933,15 +6951,16 @@ body[data-tour-step='5'] .main .row .pin-hover {
 }
 
 /* APP-14, D-118 (09 §8): a tip: the spotlight's card alone, bottom right, above where toasts
-   appear, rising in; it never takes the focus. */
+   appear, rising in; it never takes the focus. D-125: as far from the right edge as from the
+   bottom. */
 .tip-card {
   position: fixed;
-  right: 24px;
+  right: 84px;
   bottom: 84px;
   z-index: 58;
   box-sizing: border-box;
   width: 300px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(100vw - 108px);
   padding: 14px 34px 10px 16px;
   border-radius: var(--fl-radius-card);
   background: var(--fl-ground-float);

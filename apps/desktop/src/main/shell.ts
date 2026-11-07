@@ -84,6 +84,8 @@ export interface E2EHooks {
   /** DATA-07, D-104: the folder the picker returns (no dialog), and where Flint would restart. */
   pickFolder?: string;
   relaunched?: string;
+  /** APP-14, D-125: the ten minutes between two tips of a session, passed. */
+  tipGapPassed?: () => void;
 }
 
 export function e2eHooks(): E2EHooks | undefined {

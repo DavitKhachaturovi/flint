@@ -1,5 +1,6 @@
 /**
- * APP-14, D-113, D-118: the contextual tips: each shown once, at most one per session, counted
+ * APP-14, D-113, D-118, D-125: the contextual tips: each shown once, at most two a session ten
+ * minutes apart, counted
  * locally (app data's `tips.json`). A tip is due once its pattern has happened `after` times. In
  * the text, `…` is a key (a keycap).
  */
@@ -49,6 +50,19 @@ export const TIPS: Readonly<Record<TipId, Tip>> = {
   // The window wide enough for the side panel, the first time.
   panel: { after: 1, text: 'Select a task to see and edit its details here.' },
 };
+
+/** D-125: at most this many tips a session… */
+export const TIPS_PER_SESSION = 2;
+/** …and at least this long between two of them (ms), so they never come back to back. */
+export const TIP_GAP_MS = 10 * 60_000;
+
+/**
+ * D-125: whether a session that showed tips at `shownAt` (ms, in order) may show another `now`.
+ */
+export function tipAllowed(shownAt: readonly number[], now: number): boolean {
+  const last = shownAt.at(-1);
+  return shownAt.length < TIPS_PER_SESSION && (last === undefined || now - last >= TIP_GAP_MS);
+}
 
 export const isTipId = (value: unknown): value is TipId =>
   typeof value === 'string' && Object.hasOwn(TIPS, value);

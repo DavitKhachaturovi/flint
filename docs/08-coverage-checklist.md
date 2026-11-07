@@ -916,9 +916,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | The nine tips, their patterns, once each, one a session, none in a walkthrough's session | APP-14 · Done (0.8.18) | 02, D-123 |
+| 1 | The nine tips, their patterns, once each, one a session, none in a walkthrough's session | APP-14 · Done (0.8.18; D-125: two a session) | 02, D-123 |
 | 2 | When and where a tip shows; seen after 3 s or closed; back after a hidden window | APP-14 · Done (0.8.18) | 09, D-123 |
 | 3 | Don't show tips (card, Settings → About), Reset tips (Settings, palette) | APP-14, APP-11 · Done (0.8.18) | 02, D-123 |
-| 4 | The tips' words | APP-14 · Proposed (0.8.18) | D-123 |
+| 4 | The tips' words | APP-14 · Done (0.8.18, decided in D-125) | D-123, D-125 |
 | 5 | Pickers: Enter takes what was typed for, under a resting pointer too | UI-08 · Done (0.8.19) | D-124 |
 
+## BF. What's new dimmed; the card keeps clear; tips two a session (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | What's new over the dim; nothing behind it takes a click until Got it, Esc or × | APP-15 · Done (0.8.20) | 02, 09, D-125 |
+| 2 | The walkthrough's card never covers a ring or where you type (step 4: the quick note, the name field); it glides out of the way | APP-13 · Done (0.8.20) | 02, 09, D-125 |
+| 3 | Two tips a session at most, at least 10 minutes apart | APP-14 · Done (0.8.20) | 02, D-125 |
+| 4 | The tip as far from the right edge as from the bottom (84 px) | APP-14 · Done (0.8.20) | 09, D-125 |

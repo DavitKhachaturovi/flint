@@ -72,6 +72,11 @@ interface Step {
    * (step 4: the quick note just made, the new list's name field).
    */
   readonly also?: readonly string[];
+  /**
+   * D-125: what the card must never cover besides the targets: where you type in what a target
+   * opened (every match of each selector).
+   */
+  readonly clear?: readonly string[];
   /** On Inbox (steps 3 to 6). */
   readonly inbox?: boolean;
   /** What moves it on by itself (main's event); `list`: a list, note or quick note made. */
@@ -119,6 +124,7 @@ const STEPS: readonly Step[] = [
     ),
     targets: ['[aria-label="New list or note"]', '[title="Quick note (Ctrl+Shift+J)"]'],
     also: ['.main .note-card', '.sidebar .name-field'],
+    clear: ['.main .note-card .list-header', '.main .note-card .cm-line', '.sidebar .name-field'],
     inbox: true,
     until: 'made',
   },
@@ -215,13 +221,34 @@ const sameHoles = (a: readonly Hole[], b: readonly Hole[]): boolean =>
       hole.height === b[index]?.height,
   );
 
+/** D-125: every element `selectors` match, as the box the card keeps clear of. */
+function findClear(selectors: readonly string[]): Hole[] {
+  return selectors.flatMap((selector) =>
+    [...document.querySelectorAll<HTMLElement>(selector)].flatMap((element): Hole[] => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return [];
+      return [
+        {
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          radius: 0,
+        },
+      ];
+    }),
+  );
+}
+
 interface Holes {
   /** Around the step's targets: ringed, and what the card sits beside. */
   readonly ringed: readonly Hole[];
   /** What a target opened (`also`): live, not ringed. */
   readonly open: readonly Hole[];
+  /** D-125: where you type in what it opened: the card keeps clear of it. */
+  readonly clear: readonly Hole[];
 }
-const NO_HOLES: Holes = { ringed: [], open: [] };
+const NO_HOLES: Holes = { ringed: [], open: [], clear: [] };
 
 /** Where the step's targets are, followed every frame while it shows (they scroll and resize). */
 function useHoles(step: Step | null): Holes {
@@ -237,8 +264,13 @@ function useHoles(step: Step | null): Holes {
       let ringed = findHoles(step.targets);
       if (ringed.length === 0 && step.fallback) ringed = findHoles(step.fallback);
       const open = step.also ? findHoles(step.also) : [];
-      if (!sameHoles(ringed, last.ringed) || !sameHoles(open, last.open)) {
-        last = { ringed, open };
+      const clear = step.clear ? findClear(step.clear) : [];
+      if (
+        !sameHoles(ringed, last.ringed) ||
+        !sameHoles(open, last.open) ||
+        !sameHoles(clear, last.clear)
+      ) {
+        last = { ringed, open, clear };
         setHoles(last);
       }
       frame = requestAnimationFrame(tick);
@@ -282,12 +314,16 @@ const EDGE = 16;
 
 /**
  * Where the card goes: beside the targets (to the right of the sidebar's, below or above the
- * others), or in the middle when there are none.
+ * others), or in the middle when there are none. D-125: it never covers a target or what it must
+ * keep clear (where you type in what a target opened): then it moves out of the way, to the
+ * window's bottom-right corner, else the top-right, else the bottom-left.
  */
 function cardPlace(
   holes: readonly Hole[],
+  clear: readonly Hole[],
   card: { readonly width: number; readonly height: number },
   view: { readonly width: number; readonly height: number },
+  sidebarRight: number | null,
 ): { readonly left: number; readonly top: number } {
   const clampX = (x: number): number => Math.max(EDGE, Math.min(x, view.width - card.width - EDGE));
   const clampY = (y: number): number =>
@@ -301,12 +337,28 @@ function cardPlace(
   const top = Math.min(...holes.map((hole) => hole.y));
   const right = Math.max(...holes.map((hole) => hole.x + hole.width));
   const bottom = Math.max(...holes.map((hole) => hole.y + hole.height));
-  const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect();
-  if (sidebar && right <= sidebar.right + RING_OFFSET)
-    return { left: clampX(right + CARD_GAP), top: clampY(top) };
-  if (bottom + CARD_GAP + card.height <= view.height - EDGE)
-    return { left: clampX(left), top: bottom + CARD_GAP };
-  return { left: clampX(left), top: clampY(top - CARD_GAP - card.height) };
+  const beside =
+    sidebarRight !== null && right <= sidebarRight + RING_OFFSET
+      ? { left: clampX(right + CARD_GAP), top: clampY(top) }
+      : bottom + CARD_GAP + card.height <= view.height - EDGE
+        ? { left: clampX(left), top: bottom + CARD_GAP }
+        : { left: clampX(left), top: clampY(top - CARD_GAP - card.height) };
+  const away = [
+    beside,
+    { left: clampX(view.width), top: clampY(view.height) },
+    { left: clampX(view.width), top: clampY(0) },
+    { left: clampX(0), top: clampY(view.height) },
+  ];
+  const keep = [...holes, ...clear];
+  const free = (place: { readonly left: number; readonly top: number }): boolean =>
+    keep.every(
+      (box) =>
+        place.left + card.width <= box.x ||
+        box.x + box.width <= place.left ||
+        place.top + card.height <= box.y ||
+        box.y + box.height <= place.top,
+    );
+  return away.find(free) ?? beside;
 }
 
 /** A button on the card: a click works, the keyboard stays where it was (D-115). */
@@ -442,9 +494,23 @@ export function Walkthrough(props: {
     const element = card.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();
-    const placed = cardPlace(holes.ringed, { width, height }, view);
+    const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect();
+    const placed = cardPlace(
+      holes.ringed,
+      holes.clear,
+      { width, height },
+      view,
+      sidebar ? sidebar.right : null,
+    );
     setPlace((now) => (now?.left === placed.left && now.top === placed.top ? now : placed));
   });
+  // D-125: once placed, a card moving out of the way glides there (not from where it was measured).
+  const [placedStep, setPlacedStep] = useState(-1);
+  useEffect(() => {
+    if (!place || placedStep === step) return;
+    const frame = requestAnimationFrame(() => setPlacedStep(step));
+    return () => cancelAnimationFrame(frame);
+  }, [place, placedStep, step]);
 
   const ringed = current !== null && current.targets.length > 0;
   const dim = useMemo(
@@ -545,7 +611,7 @@ export function Walkthrough(props: {
       <div
         key={step}
         ref={card}
-        className={`spotlight-card${step >= DONE_STEP ? ' wide' : ''}${place ? '' : ' measuring'}`}
+        className={`spotlight-card${step >= DONE_STEP ? ' wide' : ''}${place ? '' : ' measuring'}${placedStep === step ? ' placed' : ''}`}
         role="dialog"
         aria-label={step >= DONE_STEP ? 'You’re set' : (current?.title ?? '')}
         style={place ? { left: place.left, top: place.top } : undefined}
@@ -560,8 +626,8 @@ const ALL_ENTRIES = readWhatsNew(whatsNewText);
 
 /**
  * APP-15, D-117: What's new: the plain-language entries of `docs/whats-new.md` since the last
- * version seen (`since` undefined: every entry, from the palette or Settings). A floating card
- * without a dim; Esc or × closes it.
+ * version seen (`since` undefined: every entry, from the palette or Settings). A card over the
+ * dimmed app (D-125); Got it, Esc or × closes it.
  */
 export function WhatsNew(props: {
   readonly version: string;
@@ -593,46 +659,53 @@ export function WhatsNew(props: {
   }, [entries, onClose]);
   if (entries.length === 0) return null;
   return (
-    <div
-      className={leaving ? 'spotlight-card whats-new leaving' : 'spotlight-card whats-new'}
-      role="dialog"
-      aria-label="What’s new"
-      onAnimationEnd={(event) => {
-        if (leaving && event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="spotlight-head">
-        <span className="spotlight-title">What&rsquo;s new</span>
-        <button
-          type="button"
-          tabIndex={-1}
-          className="whats-new-close"
-          aria-label="Close"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={close}
-        >
-          <CloseIcon size={13} />
-        </button>
+    <>
+      {/* D-125: the app dimmed behind it, as in the walkthrough, until Got it, Esc or ×. */}
+      <div
+        className={leaving ? 'spotlight-dim whats-new-dim leaving' : 'spotlight-dim whats-new-dim'}
+        aria-hidden="true"
+      />
+      <div
+        className={leaving ? 'spotlight-card whats-new leaving' : 'spotlight-card whats-new'}
+        role="dialog"
+        aria-label="What’s new"
+        onAnimationEnd={(event) => {
+          if (leaving && event.target === event.currentTarget) onClose();
+        }}
+      >
+        <div className="spotlight-head">
+          <span className="spotlight-title">What&rsquo;s new</span>
+          <button
+            type="button"
+            tabIndex={-1}
+            className="whats-new-close"
+            aria-label="Close"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={close}
+          >
+            <CloseIcon size={13} />
+          </button>
+        </div>
+        <div className="whats-new-entries">
+          {entries.map((entry) => (
+            <section key={entry.version} className="whats-new-entry">
+              <h3 className="whats-new-version">
+                Flint {entry.version}
+                {entry.date && <span className="whats-new-date">{entry.date}</span>}
+              </h3>
+              <div
+                className="whats-new-text"
+                dangerouslySetInnerHTML={{ __html: bodyHtml(entry.markdown) }}
+              />
+            </section>
+          ))}
+        </div>
+        <div className="spotlight-actions">
+          <CardButton primary onClick={close}>
+            Got it
+          </CardButton>
+        </div>
       </div>
-      <div className="whats-new-entries">
-        {entries.map((entry) => (
-          <section key={entry.version} className="whats-new-entry">
-            <h3 className="whats-new-version">
-              Flint {entry.version}
-              {entry.date && <span className="whats-new-date">{entry.date}</span>}
-            </h3>
-            <div
-              className="whats-new-text"
-              dangerouslySetInnerHTML={{ __html: bodyHtml(entry.markdown) }}
-            />
-          </section>
-        ))}
-      </div>
-      <div className="spotlight-actions">
-        <CardButton primary onClick={close}>
-          Got it
-        </CardButton>
-      </div>
-    </div>
+    </>
   );
 }

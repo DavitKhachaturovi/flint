@@ -91,7 +91,7 @@ import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import { TourFile } from './onboarding.js';
-import { isTipId, TIPS } from '../shared/tips.js';
+import { isTipId, TIP_GAP_MS, tipAllowed, TIPS } from '../shared/tips.js';
 import {
   appIcon,
   applyStartWithWindows,
@@ -463,9 +463,9 @@ async function start(): Promise<void> {
       ? tips.due(name, times)
       : false,
   );
-  // APP-14, D-118: the tips: each once, at most one a session, none in a session the walkthrough
-  // ran (or started in), none with Don't show tips.
-  let tipThisSession = false;
+  // APP-14, D-118, D-125: the tips: each once, at most two a session and ten minutes apart, none
+  // in a session the walkthrough ran (or started in), none with Don't show tips.
+  let tipsThisSession: number[] = [];
   ipcMain.handle(Channels.mainTipEvent, (event, tip: unknown) => {
     // End-to-end runs see tips only when they ask for onboarding (each starts as a fresh install).
     if (!owns(event.sender) || !isTipId(tip) || !onboardingOn) return false;
@@ -473,20 +473,26 @@ async function start(): Promise<void> {
     return (
       count >= TIPS[tip].after &&
       !settingsFile.current.tipsOff &&
-      !tipThisSession &&
+      tipAllowed(tipsThisSession, Date.now()) &&
       !tourThisSession
     );
   });
   ipcMain.handle(Channels.mainTipShown, (event, tip: unknown) => {
     if (!owns(event.sender) || !isTipId(tip)) return;
     tips.markShown(tip);
-    tipThisSession = true;
+    tipsThisSession = [...tipsThisSession, Date.now()];
     log(`tip shown: ${tip}`);
   });
+  // D-125: tests skip the ten minutes between two tips.
+  const tipHooks = e2eHooks();
+  if (tipHooks)
+    tipHooks.tipGapPassed = () => {
+      tipsThisSession = tipsThisSession.map((at) => at - TIP_GAP_MS);
+    };
   ipcMain.handle(Channels.mainResetTips, async (event) => {
     if (!owns(event.sender)) return;
     tips.reset();
-    tipThisSession = false;
+    tipsThisSession = [];
     await settingsFile.update({ tipsOff: false });
     log('tips reset');
   });
