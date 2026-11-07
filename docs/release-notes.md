@@ -2,6 +2,11 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.25 (7 Nov 2026)
+
+- **Back where you were (D-130):** a list opened again returns to its scroll position on a slow PC too (it could land at the top while its rows were still being drawn).
+- **Side panel:** what the panel scrolls into view no longer ends up under the Clipboard section.
+
 ## 0.8.24 (7 Nov 2026)
 
 - **Pictures in the Clipboard section (D-129):** pictures you copied show as thumbnails (a blank tile until the pointer rests on the section). Click one to paste it into a note or the composer (saved to attachments/); Capture as task puts it in the capture popup.
