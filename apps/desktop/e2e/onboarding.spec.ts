@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -117,19 +117,21 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
   await card.getByRole('button', { name: 'Next' }).click();
   await expect(card).toContainText('2 / 8');
   expect(await main.evaluate(() => document.activeElement?.closest('.spotlight-card'))).toBeNull();
-  expect(
-    JSON.parse(await readFile(join(dataDirectory, 'appdata', 'tour.json'), 'utf8')),
-  ).toMatchObject({
-    step: 1,
-    restart: false,
-  });
+  await expect
+    .poll(
+      async () =>
+        JSON.parse(await readFile(join(dataDirectory, 'appdata', 'tour.json'), 'utf8')) as object,
+    )
+    .toMatchObject({ step: 1, restart: false });
 
-  // 2: a capture from the popup; the dim lifts while it is open.
+  // 2: a capture from the popup; D-122: the dim and the card stay while it is open.
   await expect(card).toContainText('Capture from anywhere');
   await app?.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
-  await expect(main.locator('.spotlight-dim')).toHaveCount(0);
+  await main.waitForTimeout(300);
+  await expect(main.locator('.spotlight-dim')).toHaveCount(1);
+  await expect(card).toContainText('2 / 8');
   const popupPage = (): Page | undefined =>
     app?.windows().find((page) => page.url().includes('capture-popup'));
   await expect.poll(() => popupPage() !== undefined, { timeout: 15_000 }).toBe(true);
@@ -146,19 +148,29 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
   await main.keyboard.type('water the plants !h');
   await main.keyboard.press('Enter');
 
-  // 4: the sidebar's + and Quick note; a new list moves it on.
+  // 4: the sidebar's + and Quick note. D-122: an empty quick note isn't "made": the step waits,
+  // the note stays open; its text moves it on once the typing pauses.
   await expect(card).toContainText('4 / 8');
   await expect(main.locator('.spotlight-ring')).toHaveCount(2);
-  await main.locator('.add-list').click();
-  await main.locator('.fl-menu').getByText('New task list').click();
-  await main.keyboard.type('Errands');
-  await main.keyboard.press('Enter');
+  await clickAt(main, '[title="Quick note (Ctrl+Shift+J)"]');
+  const editor = main.locator('.note-card .cm-content');
+  await expect(editor).toBeVisible();
+  await main.waitForTimeout(800);
+  await expect(card).toContainText('4 / 8');
+  await editor.click();
+  await main.keyboard.type('buy stamps');
+  await expect(card).toContainText('4 / 8');
+  await expect(card).toContainText('5 / 8', { timeout: 6000 });
+  const notes = async (): Promise<string[]> =>
+    (await readdir(join(dataDirectory, 'Flint'))).filter((name) => name.startsWith('Quick note'));
+  await expect.poll(notes).toHaveLength(1);
 
-  // 5: back on Inbox, the first task ringed; P pins it.
-  await expect(card).toContainText('5 / 8');
+  // 5: back on Inbox, the faint pin of the first task ringed; a click on it pins.
   await expect(main.locator('h1')).toContainText('Inbox');
-  await main.locator('.main .row', { hasText: 'water the plants' }).click();
-  await main.keyboard.press('p');
+  await expect(main.locator('.spotlight-ring')).toHaveCount(1);
+  await clickAt(main, '.main .row[data-key]:not(.done) .pin-hover');
+  // It settles in with a pop (D-89, D-122).
+  await expect(main.locator('.main .row .pin-ind.pinned-now')).toHaveCount(1);
 
   // 6: the composer's bell; a reminder set moves it on.
   await expect(card).toContainText('6 / 8');
@@ -185,20 +197,20 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
     (globalThis as { __flintE2E?: { hideMini?: () => void } }).__flintE2E?.hideMini?.(),
   );
 
-  // Remove what I created during the tour: the captures, the tasks, the list; one undo.
+  // Remove what I created during the tour: the captures, the tasks, the quick note; one undo.
   expect(await inbox()).toContain('call the bank');
-  expect(await exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(true);
+  expect(await notes()).toHaveLength(1);
   await card.getByRole('button', { name: 'Remove what I created during the tour' }).click();
   await expect(card).toHaveCount(0);
   await expect(main.locator('.toast')).toContainText('Removed 4 items from the tour');
   // Each item goes in turn: wait for all of them.
   const made = /call the bank|water the plants|pay the rent/g;
   await expect.poll(async () => (await inbox()).match(made)?.length ?? 0).toBe(0);
-  await expect.poll(() => exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(false);
+  await expect.poll(notes).toHaveLength(0);
   expect(await exists(join(dataDirectory, 'appdata', 'tour.json'))).toBe(false);
   await main.keyboard.press('Control+z');
   await expect.poll(async () => (await inbox()).match(made)?.length ?? 0).toBe(3);
-  await expect.poll(() => exists(join(dataDirectory, 'Flint', 'Errands.md'))).toBe(true);
+  await expect.poll(notes).toHaveLength(1);
 });
 
 test('Esc ends the walkthrough and says where to replay it; a tour cut short says so once, with Replay (D-115, D-119)', async () => {
@@ -259,7 +271,10 @@ test('an update shows What’s new once, in plain words; the palette and Setting
         ).lastSeenVersion,
     )
     .toBe(VERSION);
-  await card.getByRole('button', { name: 'Close' }).click();
+  // D-122: a comfortable size; Got it at the bottom closes it (Esc and × too).
+  const box = await card.boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(560);
+  await card.getByRole('button', { name: 'Got it' }).click();
   await expect(card).toHaveCount(0);
   await main.keyboard.press('Control+k');
   await main.keyboard.type('what');
@@ -268,9 +283,14 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   await main.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
   await main.locator('.nav', { hasText: 'Settings' }).click();
-  await main
+  // D-122: Settings → About has What's new and Replay walkthrough.
+  const about = main.locator('#settings-about');
+  await expect(about.getByRole('button', { name: 'Replay walkthrough' })).toBeVisible();
+  await about
     .locator('.settings-row', { hasText: 'What changed in each version' })
     .getByRole('button')
     .click();
   await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Close' }).click();
+  await expect(card).toHaveCount(0);
 });

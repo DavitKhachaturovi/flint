@@ -573,8 +573,15 @@ export class Workspace {
         inbox: info.id === INBOX_ID,
         ...(info.recentRank === undefined ? {} : { recentRank: info.recentRank }),
         ...(quick && { quick }),
+        ...(info.mode === 'note' && loaded && { made: this.madeAt(loaded) }),
       };
     });
+  }
+
+  /** D-115, D-122: when a note was made: when Flint first saw it, else the file's own time. */
+  private madeAt(list: Loaded): number {
+    const seen = this.meta.get(this.listId(list.entry))?.created;
+    return ((seen ? parseStamp(seen) : null) ?? new Date(list.entry.created)).getTime();
   }
 
   /**

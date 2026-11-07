@@ -110,13 +110,21 @@ export class TourFile {
 
   async end(): Promise<void> {
     this.record = null;
+    await this.writing.catch(() => undefined);
     await rm(this.path, { force: true });
   }
 
-  private async write(record: TourRecord): Promise<void> {
+  /** D-122: one write at a time, in order (two at once could leave the older one on disk). */
+  private writing: Promise<void> = Promise.resolve();
+
+  private write(record: TourRecord): Promise<void> {
     this.record = record;
-    await writeFileAtomic(this.path, `${JSON.stringify(record)}\n`, {
-      tempDirectory: join(dirname(this.path), 'tmp'),
-    });
+    const text = `${JSON.stringify(record)}\n`;
+    this.writing = this.writing
+      .catch(() => undefined)
+      .then(() =>
+        writeFileAtomic(this.path, text, { tempDirectory: join(dirname(this.path), 'tmp') }),
+      );
+    return this.writing;
   }
 }

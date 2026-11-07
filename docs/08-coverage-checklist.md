@@ -898,5 +898,17 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Fresh install → tour; step 1's folder change goes on at step 2; a cut-short tour says so once | APP-10 · Done (0.8.16) | 02, D-121 |
 | 4 | What's new from `docs/whats-new.md` once after an update; Settings → About and the palette | APP-15 · Done (0.8.16) | 02, D-121 |
 | 5 | Replay walkthrough in Settings → General and the palette | APP-10, APP-11 · Done (0.8.16) | 02, D-121 |
-| 6 | Step 5's ring and words (no pin on an unpinned row) | APP-10 · Proposed (0.8.16) | D-121 |
+| 6 | Step 5's ring and words (no pin on an unpinned row) | APP-10 · Done (0.8.17, D-122: the hover pin) | D-121, D-122 |
+
+## BD. Fixes after 0.8.16; the hover pin; mini's Open a note… (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The hover pin on an open task's row; a click pins, with a pop | TODAY-01 · Done (0.8.17) | 02, 03, 09, D-122 |
+| 2 | Step 5 rings the hover pin: "Click its pin, or select it and press P." | APP-10 · Done (0.8.17) | 02, D-122 |
+| 3 | What's new at a reading size, with Got it | APP-15 · Done (0.8.17) | 09, D-122 |
+| 4 | Replay walkthrough in Settings → About | APP-10, APP-11 · Done (0.8.17) | 02, D-122 |
+| 5 | The walkthrough's dim and card stay while the popup or mini is open | APP-13 · Done (0.8.17) | 02, D-122 |
+| 6 | Step 4 only for something real; an empty quick note stays open | APP-10 · Done (0.8.17) | 02, D-122 |
+| 7 | Mini: the Note tab's Open a note… | MINI-01, NOTE-08 · Done (0.8.17) | 02, D-122 |
 

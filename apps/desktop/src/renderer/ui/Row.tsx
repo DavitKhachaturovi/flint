@@ -98,6 +98,10 @@ interface LiveShorthand {
   readonly list: string | null;
 }
 
+/** D-122: tasks just pinned from the faint pin (when), so their pin settles in with a pop. */
+const justPinned = new Map<string, number>();
+const pinnedNow = (key: string): boolean => Date.now() - (justPinned.get(key) ?? 0) < 1000;
+
 function liveShorthand(
   text: string,
   lists: readonly ListInfo[],
@@ -294,11 +298,11 @@ export function Row(
             <MorphText text={name} />
           </span>
         ))}
-        {task.pinned && !(task.home && task.done) && (
-          // D-86: the pin unpins.
+        {task.pinned && !(task.home && task.done) ? (
+          // D-86: the pin unpins. D-122: just pinned from the faint pin, it settles in with a pop.
           <button
             type="button"
-            className="pin-ind"
+            className={pinnedNow(task.key) ? 'pin-ind pinned-now' : 'pin-ind'}
             title="Unpin (P)"
             onClick={(event) => {
               event.stopPropagation();
@@ -307,6 +311,25 @@ export function Row(
           >
             <PinIcon />
           </button>
+        ) : (
+          !task.done &&
+          !compact &&
+          !ghost && (
+            // D-122: a faint pin on hover, where the pin of a pinned task shows; a click pins.
+            <button
+              type="button"
+              className="pin-hover"
+              title="Pin to Today (P)"
+              aria-label="Pin to Today"
+              onClick={(event) => {
+                event.stopPropagation();
+                justPinned.set(task.key, Date.now());
+                props.onPin(task, true);
+              }}
+            >
+              <PinIcon />
+            </button>
+          )
         )}
         {reminder && !task.done && compact && (
           // D-110, D-111: in mini the bell turns the reminder off and on, struck as in the main

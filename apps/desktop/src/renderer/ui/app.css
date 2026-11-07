@@ -3359,6 +3359,45 @@ a.auto-link {
   color: var(--fl-text-primary);
 }
 
+/* D-122: the faint pin, where a pinned task's pin shows: on hover of an open task's row (its place
+   is kept, so nothing moves); a click pins it and the pin settles in with a pop. The walkthrough's
+   step 5 shows it on every open row. */
+.pin-hover {
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  color: var(--fl-text-faint);
+  opacity: 0;
+  transition:
+    opacity var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.row:hover .pin-hover,
+body[data-tour-step='5'] .main .row .pin-hover {
+  opacity: 0.55;
+}
+
+.row .pin-hover:hover {
+  opacity: 1;
+  color: var(--fl-text-primary);
+}
+
+.pin-ind.pinned-now {
+  animation: pin-pop var(--fl-dur-complete) var(--fl-ease-press);
+}
+
+@keyframes pin-pop {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.7) rotate(-18deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.2) rotate(4deg);
+  }
+}
+
 /* CAP-05, D-51, D-87: the composer's `##` menu and close-match card, as in the capture popup. */
 .composer-suggestions {
   list-style: none;
@@ -6797,13 +6836,21 @@ a.auto-link {
   margin-top: 14px;
 }
 
-/* APP-15, D-117: What's new: the spotlight's card, without the dim, in the middle near the top. */
+/* APP-15, D-117, D-122: What's new: the spotlight's card, without the dim, in the middle near the
+   top, a comfortable reading size; long notes scroll, Got it at the bottom. */
 .spotlight-card.whats-new {
   left: 50%;
-  top: 72px;
-  width: 440px;
+  top: max(48px, 9vh);
+  width: min(620px, calc(100vw - 64px));
+  max-width: none;
   translate: -50% 0;
-  padding-bottom: 6px;
+  padding: 22px 24px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.spotlight-card.whats-new .spotlight-title {
+  font-size: 17px;
 }
 
 .spotlight-card.whats-new.leaving {
@@ -6838,7 +6885,7 @@ a.auto-link {
 }
 
 .whats-new-entries {
-  max-height: min(60vh, 520px);
+  max-height: min(64vh, 680px);
   overflow-y: auto;
   margin-right: -8px;
   padding-right: 8px;
@@ -6854,9 +6901,9 @@ a.auto-link {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 4px 0 6px;
+  margin: 8px 0 8px;
   color: var(--fl-text-primary);
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
@@ -6873,7 +6920,7 @@ a.auto-link {
 }
 
 .whats-new-text li + li {
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .whats-new-text p {

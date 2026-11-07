@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { ListSummary, ListView } from '../../shared/ipc.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
+import { openNotePicker } from '../pickers/pickers.js';
 import { NoteEditor } from '../main-window/NoteEditor.js';
 import { QuickTitle } from '../ui/QuickTitle.js';
 
@@ -17,6 +18,8 @@ export function NoteTab(props: {
   readonly view: ListView | null;
   readonly quick: ListSummary | null;
   readonly quickNotes: readonly ListSummary[];
+  /** D-122: every note (quick notes and notes), for Open a note…. */
+  readonly notes: readonly ListSummary[];
   readonly kept: boolean;
   /** The note was made here (first keystroke, or a title). */
   readonly onMade: (id: string) => void;
@@ -24,7 +27,9 @@ export function NoteTab(props: {
   readonly onKeep: () => void;
   readonly onToast: (text: string, undo: boolean) => void;
 }): ReactElement {
-  const { noteId, view, quick, quickNotes, kept, onMade, onSwitch, onKeep, onToast } = props;
+  const { noteId, view, quick, quickNotes, notes, kept, onMade, onSwitch, onKeep, onToast } = props;
+  /** D-122: a note opened with Open a note… (not a quick note): its name is its title. */
+  const permanent = quick !== null && quick.mode === 'note' && !quick.quick;
   // The editor stays the same one when its note is made on the first keystroke (a new one only
   // for another note), so nothing typed meanwhile is lost.
   const made = useRef(new Set<string>());
@@ -41,7 +46,13 @@ export function NoteTab(props: {
   const [typed, setTyped] = useState<string | null>(null);
   useEffect(() => setTyped(null), [noteId, editorKey]);
   const text = typed ?? savedText;
-  const title = quick?.quick ? (quick.quick.label === quick.name ? quick.name : '') : '';
+  const title = permanent
+    ? (quick?.name ?? '')
+    : quick?.quick
+      ? quick.quick.label === quick.name
+        ? quick.name
+        : ''
+      : '';
   const [titled, setTitled] = useState('');
   useEffect(() => setTitled(''), [noteId]);
   const empty = text.trim() === '' && title === '' && titled === '';
@@ -70,6 +81,34 @@ export function NoteTab(props: {
     const outcome = await window.flintMain.listAction({ kind: 'rename', id, name });
     if (outcome && !outcome.ok) onToast(outcome.problem, false);
   };
+  const more = useRef<HTMLButtonElement>(null);
+  /** D-122: Open a note…: the picker under the ⋯ button; the note opens here. */
+  const openNote = (): void => {
+    const button = more.current;
+    if (!button) return;
+    const today = new Date().toDateString();
+    const sorted = [...notes]
+      .filter((note) => note.id !== noteId)
+      .sort((a, b) => (b.made ?? 0) - (a.made ?? 0));
+    openNotePicker(
+      { anchor: button.getBoundingClientRect(), returnFocus: null, trigger: button },
+      sorted.map((note) => {
+        const made = new Date(note.made ?? 0);
+        const when =
+          note.made === undefined
+            ? null
+            : made.toDateString() === today
+              ? made.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+              : made.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return {
+          id: note.id,
+          label: note.quick?.label ?? note.name,
+          hint: note.quick ? 'Quick note' : when,
+        };
+      }),
+      onSwitch,
+    );
+  };
   const menu = (at: { x: number; y: number }): void => {
     const others = quickNotes.filter((list) => list.id !== noteId);
     const entries: MenuEntry[] = [
@@ -78,9 +117,11 @@ export function NoteTab(props: {
         action: () => onSwitch(list.id),
       })),
       ...(others.length > 0 ? (['divider'] as const) : []),
+      // D-122: any note, quick or not, newest first.
+      { label: 'Open a note…', disabled: notes.length === 0, action: openNote },
       // D-110: not while this one is empty (it would only be removed).
       { label: 'New quick note', disabled: empty, action: () => onSwitch('') },
-      { label: 'Keep as a note', disabled: !noteId || kept, action: onKeep },
+      { label: 'Keep as a note', disabled: !noteId || kept || permanent, action: onKeep },
       {
         label: 'Open in Flint',
         disabled: !noteId,
@@ -95,11 +136,13 @@ export function NoteTab(props: {
       <div className="mini-note-head">
         <QuickTitle
           key={noteId || 'new'}
-          at={quick?.quick?.at ?? Date.now()}
+          at={quick?.quick?.at ?? quick?.made ?? Date.now()}
+          kind={permanent ? 'Note' : 'Quick note'}
           title={title}
           onTitle={(name) => void saveTitle(name)}
         />
         <button
+          ref={more}
           type="button"
           className="tool"
           aria-label="Quick notes"

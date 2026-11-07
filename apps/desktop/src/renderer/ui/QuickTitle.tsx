@@ -12,8 +12,10 @@ export function QuickTitle(props: {
   /** D-102: its title, once it has one (it stays a quick note until kept or the next day). */
   readonly title: string;
   readonly onTitle: (title: string) => void;
+  /** D-122: what the line above says it is: a quick note (default) or, in mini, a note. */
+  readonly kind?: string;
 }): ReactElement {
-  const { at, title, onTitle } = props;
+  const { at, title, onTitle, kind = 'Quick note' } = props;
   const [text, setText] = useState(title);
   // D-102: saved on Enter and when the field is left (as everything in Flint), when it changed.
   // Sent once: going on into the text leaves the field too (its blur isn't a second save).
@@ -34,7 +36,7 @@ export function QuickTitle(props: {
   return (
     <div className="quick-title">
       <span className="subtitle">
-        Quick note · {day}
+        {kind} · {day}
         {clock}
       </span>
       <input

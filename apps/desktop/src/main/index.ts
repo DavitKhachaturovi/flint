@@ -403,10 +403,7 @@ async function start(): Promise<void> {
     onTop: () => settingsFile.current.miniOnTop,
     hideFromSharing: () => settingsFile.current.miniHideFromSharing,
     onShown: () => tourEvent('mini-open'),
-    onHidden: () => {
-      noteEditors.leaveAll('mini');
-      tourEvent('mini-closed');
-    },
+    onHidden: () => noteEditors.leaveAll('mini'),
     log,
   });
   /** D-109: which of Flint's two list windows sent something (null: neither). */
@@ -541,10 +538,16 @@ async function start(): Promise<void> {
               : request.kind === 'deleteMany'
                 ? workspace.deleteLists(request.ids, now)
                 : workspace.deleteList(request.id, now);
-    return run.catch((error: unknown) => {
-      log(`list action failed: ${String(error)}`);
-      return { ok: false, problem: 'Flint could not change the file' } as const;
-    });
+    return run
+      .then((outcome) => {
+        // D-122: the walkthrough's step 4: a named list or note, or a quick note given a title.
+        if (outcome.ok && (request.kind === 'new' || request.kind === 'rename')) tourEvent('made');
+        return outcome;
+      })
+      .catch((error: unknown) => {
+        log(`list action failed: ${String(error)}`);
+        return { ok: false, problem: 'Flint could not change the file' } as const;
+      });
   });
   ipcMain.handle(Channels.mainAttach, (event, bytes: unknown, type: unknown) =>
     owns(event.sender) && bytes instanceof Uint8Array && typeof type === 'string'
@@ -727,19 +730,36 @@ async function start(): Promise<void> {
   );
   ipcMain.handle(Channels.mainSidebarAction, (event, action: unknown) => {
     if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
-    return workspace.sidebarAction(action as SidebarAction, new Date()).catch((error: unknown) => {
-      log(`sidebar change failed: ${String(error)}`);
-      return { ok: false, problem: 'Flint could not change the sidebar' } as const;
-    });
+    return workspace
+      .sidebarAction(action as SidebarAction, new Date())
+      .then((outcome) => {
+        // D-122: step 4: a new group.
+        if (outcome.ok && (action as SidebarAction).kind === 'newGroup') tourEvent('made');
+        return outcome;
+      })
+      .catch((error: unknown) => {
+        log(`sidebar change failed: ${String(error)}`);
+        return { ok: false, problem: 'Flint could not change the sidebar' } as const;
+      });
   });
-  ipcMain.handle(Channels.mainSaveNote, (event, id: unknown, text: unknown) =>
-    owns(event.sender) && typeof id === 'string' && typeof text === 'string'
-      ? workspace.saveNote(id, text, new Date()).catch((error: unknown) => {
-          log(`could not save the note: ${String(error)}`);
-          return { ok: false, problem: 'Flint could not save the note' } as const;
-        })
-      : null,
-  );
+  ipcMain.handle(Channels.mainSaveNote, async (event, id: unknown, text: unknown) => {
+    if (!owns(event.sender) || typeof id !== 'string' || typeof text !== 'string') return null;
+    const now = new Date();
+    const outcome = await workspace.saveNote(id, text, now).catch((error: unknown) => {
+      log(`could not save the note: ${String(error)}`);
+      return { ok: false, problem: 'Flint could not save the note' } as const;
+    });
+    // D-122: step 4: a quick note with something in it (an empty one opened isn't "made").
+    if (
+      outcome.ok &&
+      tour.running &&
+      tour.currentStep === 3 &&
+      text.trim() !== '' &&
+      workspace.summaries(now).some((list) => list.id === outcome.listId && list.quick)
+    )
+      tourEvent('made');
+    return outcome;
+  });
   ipcMain.handle(Channels.mainReserveId, (event) =>
     owns(event.sender) ? workspace.reserveId() : null,
   );
@@ -1275,9 +1295,6 @@ async function start(): Promise<void> {
       }
     },
   });
-  // D-115: the walkthrough's dim lifts while the popup is open.
-  popup.window.on('show', () => tourEvent('popup-open'));
-  popup.window.on('hide', () => tourEvent('popup-closed'));
   const hooks = e2eHooks();
   if (hooks) hooks.showPopup = () => popup.show(epochNow());
   if (hooks) {

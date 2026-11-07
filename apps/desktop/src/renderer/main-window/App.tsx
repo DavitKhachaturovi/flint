@@ -5197,7 +5197,6 @@ export function App(): ReactElement {
           key={tourRun.run}
           from={tourRun.from}
           folder={tourFolder}
-          lists={lists}
           paletteOpen={palette}
           onInbox={tourInbox}
           onEnd={endTour}

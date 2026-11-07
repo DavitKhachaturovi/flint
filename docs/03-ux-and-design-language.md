@@ -88,7 +88,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Open task as page (TASK-05) | Shift+Enter | Proposed (D-53) |
 | Back from a task's page to its list | Esc (or the back arrow, Alt+←) | Proposed (D-53) |
 | Select all open tasks (TASK-07) | Ctrl+A (the visible open tasks; never completed ones) | Decided (D-77) |
-| Pin / unpin (TODAY-01, D-85) | P | Proposed |
+| Pin / unpin (TODAY-01, D-85) | P; D-122: the faint pin on a row's hover pins, a pinned task's pin unpins | Proposed |
 | Set reminder | R (the date and time picker for the selected task; D-94, built 0.4.28) | Proposed |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |
 | Delete (to Trash, undo toast) | Delete | Proposed |

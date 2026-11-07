@@ -399,16 +399,6 @@ export function SettingsScreen(props: {
             onCancel={() => setFolderChoice(null)}
           />
         )}
-        <Row
-          name="Walkthrough"
-          note="The eight-step tour of Flint, from the start."
-          filter={filter}
-          words="tour onboarding help guide replay"
-        >
-          <button type="button" className="trash-action" onClick={onReplayTour}>
-            Replay walkthrough
-          </button>
-        </Row>
       </Section>
 
       <Section id="capture" filter={filter}>
@@ -802,6 +792,16 @@ export function SettingsScreen(props: {
         >
           <button type="button" className="trash-action" onClick={onWhatsNew}>
             What’s new
+          </button>
+        </Row>
+        <Row
+          name="Walkthrough"
+          note="The eight-step tour of Flint, from the start."
+          filter={filter}
+          words="tour onboarding help guide replay"
+        >
+          <button type="button" className="trash-action" onClick={onReplayTour}>
+            Replay walkthrough
           </button>
         </Row>
         <Row name="Logs" note="Kept here only, never sent anywhere." filter={filter} words="logs">

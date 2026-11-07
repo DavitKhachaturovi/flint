@@ -585,6 +585,48 @@ test("menus open where they fit: the Note tab's ⋯ menu stays on the screen (D-
   await mini.keyboard.press('Control+1');
 });
 
+test('the Note tab: Open a note… lists every note, newest first, five in view; the chosen one opens here (D-122)', async () => {
+  for (const name of ['Plan', 'Ideas', 'Recipes', 'Books', 'Travel', 'Garden', 'Music'])
+    await writeFile(
+      join(flint, `${name}.md`),
+      `---
+flint: 1
+id: n${name.toLowerCase()}
+mode: note
+---
+${name} text here.
+`,
+    );
+  await expect(main.locator('.nav', { hasText: 'Music' })).toBeVisible();
+  await mini.keyboard.press('Control+3');
+  await mini.locator('.mini-note-head .tool').click();
+  await mini.locator('.fl-menu-item', { hasText: 'Open a note…' }).click();
+  const picker = mini.locator('.fl-picker');
+  await expect(picker).toBeVisible();
+  await expect(picker.locator('.fl-picker-search')).toBeFocused();
+  // Five in view, the rest scroll.
+  const rows = picker.locator('.fl-picker-rows.five');
+  const sizes = await rows.evaluate((element) => ({
+    client: element.clientHeight,
+    scroll: element.scrollHeight,
+    row: element.querySelector('.fl-picker-row')?.getBoundingClientRect().height ?? 0,
+  }));
+  expect(sizes.scroll).toBeGreaterThan(sizes.client);
+  expect(Math.round(sizes.client / sizes.row)).toBe(5);
+  // Typing narrows it; Enter opens the note in the Note tab, as a note (not a quick note).
+  await mini.keyboard.type('plan');
+  await expect(picker.locator('.fl-picker-label')).toHaveText(['Plan']);
+  await mini.keyboard.press('Enter');
+  await expect(mini.locator('.mini-editor .cm-content')).toContainText('Plan text here.');
+  await expect(mini.locator('.quick-title .subtitle')).toContainText('Note ·');
+  await expect(mini.locator('.quick-title-input')).toHaveValue('Plan');
+  await mini.locator('.mini-note-head .tool').click();
+  await expect(mini.locator('.fl-menu-item', { hasText: 'Keep as a note' }).last()).toBeDisabled();
+  await mini.keyboard.press('Escape');
+  // The caret is in the note (where Ctrl+1 is a heading): the tab by a click.
+  await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
+});
+
 /** Drags a resize handle by (dx, dy). */
 const resize = async (handle: string, dx: number, dy: number): Promise<void> => {
   const box = await mini.locator(`.mini-handle.${handle}`).boundingBox();

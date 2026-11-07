@@ -2,6 +2,13 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.17 (7 Nov 2026)
+
+- **Pin from the row:** hover an open task and click the faint pin to put it on Today; the pin pops in.
+- **Mini mode:** the Note tab's ⋯ menu has "Open a note…": search any note or quick note (newest first) and it opens right there.
+- **The walkthrough:** the dim and the card stay while the capture popup or mini is open; step 4 waits for something real (an empty quick note stays open for you to type in); step 5 points at the new pin; Replay walkthrough is in Settings → About.
+- **What's new:** a proper reading size, with Got it at the bottom.
+
 ## 0.8.16 (6 Nov 2026)
 
 - **The walkthrough (M8 step 4b):** a fresh install starts an 8-step tour once the window shows: welcome and the Flint folder (Change… restarts Flint and the tour goes on), capture from anywhere, shorthand, lists and quick notes, Today, reminders, the palette, mini mode. Each step moves on when you do the thing; only the ringed part of the window takes clicks; Esc or Skip all ends it. At the end, "Remove what I created during the tour" puts everything the tour made in Trash at once (Ctrl+Z brings it back). Replay it from Settings → General or Ctrl+K.

@@ -435,6 +435,70 @@ export function openListPicker(
   show(search);
 }
 
+/** A note for mini's Open a note… (D-122). */
+export interface NotePick {
+  readonly id: string;
+  /** What it is called: a quick note's first line or time, a note's name. */
+  readonly label: string;
+  /** Muted beside it: "Quick note", or when it was made. */
+  readonly hint: string | null;
+}
+
+/**
+ * D-122: mini mode's Open a note…: a search field, then the notes (quick notes and notes), newest
+ * first, five in view and the rest scrolling; or those whose name has what is typed.
+ */
+export function openNotePicker(
+  host: PickerHost,
+  notes: readonly NotePick[],
+  onPick: (id: string) => void,
+): void {
+  const opened = openPanel(host, 'Open a note');
+  if (!opened) return;
+  const { panel, close, show } = opened;
+  const search = element('input', 'fl-picker-search');
+  search.placeholder = 'Open a note…';
+  search.spellcheck = false;
+  const box = element('div', 'fl-picker-rows five');
+  panel.append(search, box);
+  const highlight = rowList(box);
+  const render = (): void => {
+    const typed = search.value.trim().toLowerCase();
+    const found = notes.filter((note) => typed === '' || note.label.toLowerCase().includes(typed));
+    const rows = found.map((note) =>
+      makeRow(
+        note.label,
+        note.hint,
+        () => {
+          close();
+          onPick(note.id);
+        },
+        noteIcon(),
+      ),
+    );
+    box.replaceChildren(...rows.map((row) => row.button));
+    if (rows.length === 0)
+      box.append(
+        element('p', 'fl-picker-empty', typed === '' ? 'No notes yet' : 'No note by that name'),
+      );
+    highlight.set(rows, 0, typed !== '');
+  };
+  search.addEventListener('input', render);
+  search.addEventListener('keydown', (event) => {
+    if (highlight.keys(event)) event.preventDefault();
+  });
+  render();
+  show(search);
+}
+
+/** The note icon of the sidebar (icon tile). */
+function noteIcon(): HTMLElement {
+  const tile = element('span', 'fl-picker-tile');
+  tile.innerHTML =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>';
+  return tile;
+}
+
 /** The list icon of the sidebar (icon tile). */
 function listIcon(): HTMLElement {
   const tile = element('span', 'fl-picker-tile');

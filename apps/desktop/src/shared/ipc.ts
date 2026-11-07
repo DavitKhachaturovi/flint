@@ -301,6 +301,8 @@ export interface ListSummary {
    * and when it was made (newest first under Inbox).
    */
   readonly quick?: { readonly label: string; readonly at: number };
+  /** D-122: a note's (or quick note's) creation time, ms: mini's Open a note… lists newest first. */
+  readonly made?: number;
 }
 
 /** A task as a row (TASK-01..06). */
@@ -525,12 +527,11 @@ export type TourAction =
 export type TourEvent =
   | 'captured'
   | 'shorthand'
+  /** D-122: step 4: a named list, note or group, or a quick note with text or a title. */
+  | 'made'
   | 'pinned'
   | 'reminder'
-  | 'popup-open'
-  | 'popup-closed'
-  | 'mini-open'
-  | 'mini-closed';
+  | 'mini-open';
 
 /** D-67, D-100: how the main window looks (sent when it changes). */
 export interface Appearance {

@@ -58,6 +58,11 @@
   overflow-y: auto;
 }
 
+/* D-122: mini's Open a note…: five notes in view, the rest scroll. */
+.fl-picker-rows.five {
+  max-height: calc(5 * var(--fl-picker-row, 34px));
+}
+
 .fl-picker-rows::-webkit-scrollbar {
   width: 8px;
 }

@@ -13,7 +13,6 @@ import { bodyHtml } from '../../shared/body-markdown.js';
 import {
   TODAY_ID,
   type FolderChoice,
-  type ListSummary,
   type OnboardingState,
   type TourEvent,
 } from '../../shared/ipc.js';
@@ -68,10 +67,15 @@ interface Step {
   readonly targets: readonly string[];
   /** Used when none of `targets` is on screen (step 5 with an empty Inbox: Today). */
   readonly fallback?: readonly string[];
+  /**
+   * D-122: what the step's target opens, live too but not ringed, and not where the card goes
+   * (step 4: the quick note just made, the new list's name field).
+   */
+  readonly also?: readonly string[];
   /** On Inbox (steps 3 to 6). */
   readonly inbox?: boolean;
   /** What moves it on by itself (main's event); `list`: a list, note or quick note made. */
-  readonly until?: TourEvent | 'list' | 'palette';
+  readonly until?: TourEvent | 'palette';
 }
 
 /** D-120: the words, card by card (step 5's: D-121, Proposed). */
@@ -114,18 +118,20 @@ const STEPS: readonly Step[] = [
       </>
     ),
     targets: ['[aria-label="New list or note"]', '[title="Quick note (Ctrl+Shift+J)"]'],
+    also: ['.main .note-card', '.sidebar .name-field'],
     inbox: true,
-    until: 'list',
+    until: 'made',
   },
   {
     title: 'Today',
     text: (
       <>
-        Pin a task and it shows on Today, whatever list it&rsquo;s in. Select it and press{' '}
-        <Key>P</Key>, or right-click it and choose Pin.
+        Pin a task and it shows on Today, whatever list it&rsquo;s in. Click its pin, or select it
+        and press <Key>P</Key>.
       </>
     ),
-    targets: ['.main .row[data-key]:not(.done)'],
+    // D-122: the faint pin on the first open task (shown on every row during this step).
+    targets: ['.main .row[data-key]:not(.done) .pin-hover'],
     fallback: [`.nav[data-key="${TODAY_ID}"]`],
     inbox: true,
     until: 'pinned',
@@ -209,22 +215,31 @@ const sameHoles = (a: readonly Hole[], b: readonly Hole[]): boolean =>
       hole.height === b[index]?.height,
   );
 
+interface Holes {
+  /** Around the step's targets: ringed, and what the card sits beside. */
+  readonly ringed: readonly Hole[];
+  /** What a target opened (`also`): live, not ringed. */
+  readonly open: readonly Hole[];
+}
+const NO_HOLES: Holes = { ringed: [], open: [] };
+
 /** Where the step's targets are, followed every frame while it shows (they scroll and resize). */
-function useHoles(step: Step | null): Hole[] {
-  const [holes, setHoles] = useState<Hole[]>([]);
+function useHoles(step: Step | null): Holes {
+  const [holes, setHoles] = useState<Holes>(NO_HOLES);
   useEffect(() => {
     if (!step) {
-      setHoles([]);
+      setHoles(NO_HOLES);
       return;
     }
     let frame = 0;
-    let last: Hole[] = [];
+    let last: Holes = NO_HOLES;
     const tick = (): void => {
-      let found = findHoles(step.targets);
-      if (found.length === 0 && step.fallback) found = findHoles(step.fallback);
-      if (!sameHoles(found, last)) {
-        last = found;
-        setHoles(found);
+      let ringed = findHoles(step.targets);
+      if (ringed.length === 0 && step.fallback) ringed = findHoles(step.fallback);
+      const open = step.also ? findHoles(step.also) : [];
+      if (!sameHoles(ringed, last.ringed) || !sameHoles(open, last.open)) {
+        last = { ringed, open };
+        setHoles(last);
       }
       frame = requestAnimationFrame(tick);
     };
@@ -258,6 +273,9 @@ function useWindowSize(): { readonly width: number; readonly height: number } {
   }, []);
   return size;
 }
+
+/** D-122: how long typing must pause before a step made by typing moves on (ms). */
+const TYPING_PAUSE = 1500;
 
 const CARD_GAP = 14;
 const EDGE = 16;
@@ -320,17 +338,13 @@ export type TourEnd = 'done' | 'skipped' | 'remove';
 export function Walkthrough(props: {
   readonly from: number;
   readonly folder: string;
-  readonly lists: readonly ListSummary[];
   readonly paletteOpen: boolean;
   /** Steps 3 to 6 are on Inbox. */
   readonly onInbox: () => void;
   readonly onEnd: (how: TourEnd) => void;
 }): ReactElement | null {
-  const { from, folder, lists, paletteOpen, onInbox, onEnd } = props;
+  const { from, folder, paletteOpen, onInbox, onEnd } = props;
   const [step, setStep] = useState(from);
-  /** D-115: the dim lifts while the capture popup or mini mode is open. */
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [miniOpen, setMiniOpen] = useState(false);
   const [choice, setChoice] = useState<FolderChoice | null>(null);
   const current = step < DONE_STEP ? (STEPS[step] ?? null) : null;
   const holes = useHoles(current);
@@ -361,37 +375,51 @@ export function Walkthrough(props: {
     if (inbox) onInbox();
   }, [inbox, step, onInbox]);
 
-  // What moves the step on: main's events.
+  // What moves the step on: main's events. D-122: the dim and the card stay while the capture
+  // popup or mini mode is open (they float above them).
   const until = current?.until;
-  useEffect(
-    () =>
-      onTourEvent((event) => {
-        if (event === 'popup-open') setPopupOpen(true);
-        else if (event === 'popup-closed') setPopupOpen(false);
-        else if (event === 'mini-open') setMiniOpen(true);
-        else if (event === 'mini-closed') setMiniOpen(false);
-        if (event === until) next();
-      }),
-    [until, next],
-  );
-  // Step 4: a list, note or quick note that wasn't there when the step began.
-  // What exists is asked of main when the step begins: a list step 3's `##` made may not have
-  // reached the page yet, and must not count.
-  const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
   useEffect(() => {
-    setKnown(null);
-    if (until !== 'list') return;
-    let current = true;
-    void window.flintMain.lists().then((now) => {
-      if (current) setKnown(new Set(now.map((list) => list.id)));
+    let waiting: number | undefined;
+    let typedLast = 0;
+    const onKey = (): void => {
+      typedLast = Date.now();
+    };
+    window.addEventListener('keydown', onKey, true);
+    const stop = onTourEvent((event) => {
+      if (event !== until) return;
+      // D-122: something made while typing in it (a quick note's text) moves on once the typing
+      // pauses, so the note isn't left mid-sentence.
+      const typing = (): boolean => {
+        const active = document.activeElement;
+        return (
+          active instanceof HTMLElement &&
+          (active.isContentEditable || active instanceof HTMLTextAreaElement) &&
+          Date.now() - typedLast < TYPING_PAUSE
+        );
+      };
+      if (event !== 'made' || !typing()) {
+        next();
+        return;
+      }
+      const check = (): void => {
+        if (typing()) waiting = window.setTimeout(check, 300);
+        else next();
+      };
+      waiting = window.setTimeout(check, 300);
     });
     return () => {
-      current = false;
+      stop();
+      window.clearTimeout(waiting);
+      window.removeEventListener('keydown', onKey, true);
     };
-  }, [until]);
+  }, [until, next]);
+  // D-122: step 5 rings a row's faint pin, shown on every open row while it is up.
   useEffect(() => {
-    if (until === 'list' && known && lists.some((list) => !known.has(list.id))) next();
-  }, [until, known, lists, next]);
+    document.body.dataset['tourStep'] = String(step + 1);
+    return () => {
+      delete document.body.dataset['tourStep'];
+    };
+  }, [step]);
   // Step 7: the palette opened (Ctrl+K or its button).
   useEffect(() => {
     if (until === 'palette' && paletteOpen) next();
@@ -414,15 +442,16 @@ export function Walkthrough(props: {
     const element = card.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();
-    const placed = cardPlace(holes, { width, height }, view);
+    const placed = cardPlace(holes.ringed, { width, height }, view);
     setPlace((now) => (now?.left === placed.left && now.top === placed.top ? now : placed));
   });
 
-  const elsewhere = popupOpen || miniOpen;
   const ringed = current !== null && current.targets.length > 0;
   const dim = useMemo(
     () =>
-      ringed && holes.length === 0 ? null : dimPath(ringed ? holes : [], view.width, view.height),
+      ringed && holes.ringed.length === 0
+        ? null
+        : dimPath(ringed ? [...holes.ringed, ...holes.open] : [], view.width, view.height),
     [ringed, holes, view],
   );
 
@@ -495,12 +524,11 @@ export function Walkthrough(props: {
 
   return (
     <div className="spotlight" data-step={step + 1}>
-      {!elsewhere && dim !== null && (
+      {dim !== null && (
         <div className="spotlight-dim" style={{ clipPath: dim }} aria-hidden="true" />
       )}
-      {!elsewhere &&
-        ringed &&
-        holes.map((hole, index) => (
+      {ringed &&
+        holes.ringed.map((hole, index) => (
           <div
             key={index}
             className="spotlight-ring"
@@ -599,6 +627,11 @@ export function WhatsNew(props: {
             />
           </section>
         ))}
+      </div>
+      <div className="spotlight-actions">
+        <CardButton primary onClick={close}>
+          Got it
+        </CardButton>
       </div>
     </div>
   );

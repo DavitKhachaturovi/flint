@@ -224,6 +224,8 @@ export function MiniApp(): ReactElement {
   const quickNotes = lists
     .filter((list) => list.quick && !removed.current.has(list.id))
     .sort((a, b) => (b.quick?.at ?? 0) - (a.quick?.at ?? 0));
+  /** D-122: every note, for Open a note… (the note opened here stays while it exists). */
+  const notes = lists.filter((list) => list.mode === 'note' && !removed.current.has(list.id));
   useEffect(() => {
     if (tab !== 'note' || lists.length === 0) return;
     if (noteId === '') return;
@@ -562,6 +564,7 @@ export function MiniApp(): ReactElement {
                 view={noteView}
                 quick={quick}
                 quickNotes={quickNotes}
+                notes={notes}
                 kept={kept}
                 onMade={(id) => {
                   made.current.add(id);
