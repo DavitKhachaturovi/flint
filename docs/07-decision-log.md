@@ -1122,3 +1122,9 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Tips, two a session (APP-14, changes D-113 and D-118):** at most **two** tips a session, at least **10 minutes** apart (counted from when the first was seen), so they never come back to back. A pattern that happens inside the ten minutes is still counted; its tip comes the next time the pattern happens after them. Reset tips also clears this session's count.
 - **The tip's place (09 §8):** as far from the window's right edge as from its bottom (84 px each); the bottom distance is unchanged.
 - **Tests:** `e2e/onboarding.spec.ts` (What's new's dim takes the clicks and goes with Got it; step 4's card covers neither the rings nor the quick note's title and text; the second tip waits for the ten minutes and a third for another session, a test hook passing the ten minutes; the tip's corner distances equal); unit `tips.test.ts` (`tipAllowed`).
+
+### D-126 — What's new at the optical centre (0.8.21)
+- **Date:** 7 Nov 2026 · **Status:** Decided by Davit (his look at 0.8.20); built in 0.8.21
+- **D-125 confirmed:** the tip's place, step 4's card and What's new's dim work as built.
+- **What's new's place (APP-15, 09 §8):** a little lower than before, its middle at about the window's optical centre (45 % of its height), not dead centre; its entries scroll from 60 % of the window's height (was 64 %) so the card stays inside the window.
+- **Tests:** `e2e/onboarding.spec.ts` checks the card's middle at 45 %.

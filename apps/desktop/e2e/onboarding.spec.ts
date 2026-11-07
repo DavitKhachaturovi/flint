@@ -294,6 +294,14 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   // D-122: a comfortable size; Got it at the bottom closes it (Esc and × too).
   const box = await card.boundingBox();
   expect(box?.width ?? 0).toBeGreaterThan(560);
+  // D-126: its middle at the optical centre, 45 % of the window's height.
+  const height = await main.evaluate(() => window.innerHeight);
+  await expect
+    .poll(async () => {
+      const now = await card.boundingBox();
+      return now ? Math.round(((now.y + now.height / 2) / height) * 100) : 0;
+    })
+    .toBe(45);
   // D-125: the app dimmed behind it; nothing there takes a click until it is closed.
   await expect(main.locator('.whats-new-dim')).toHaveCount(1);
   const before = await main.locator('.nav.on').textContent();

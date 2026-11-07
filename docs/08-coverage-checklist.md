@@ -930,3 +930,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | The walkthrough's card never covers a ring or where you type (step 4: the quick note, the name field); it glides out of the way | APP-13 · Done (0.8.20) | 02, 09, D-125 |
 | 3 | Two tips a session at most, at least 10 minutes apart | APP-14 · Done (0.8.20) | 02, D-125 |
 | 4 | The tip as far from the right edge as from the bottom (84 px) | APP-14 · Done (0.8.20) | 09, D-125 |
+| 5 | What's new at the optical centre (its middle at 45 % of the window) | APP-15 · Done (0.8.21) | 09, D-126 |
