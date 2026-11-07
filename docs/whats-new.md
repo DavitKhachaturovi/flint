@@ -2,6 +2,13 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.23 (7 Nov 2026)
+
+- **Your clipboard history, in Flint:** the side panel's Clipboard section lists what you copied (Windows' Win+V history). Click an item to paste it where your cursor is; right-click to make it a task or copy it again.
+- **Safe for screen sharing:** items show as blank bars until you rest the pointer on the section. The eye button shows them always.
+- **From the keyboard:** Ctrl+Shift+H opens Paste from clipboard history… Enter pastes, Shift+Enter makes a task, Ctrl+C copies.
+- **Settings → Clipboard** turns it off or shows contents always.
+
 ## 0.8.22 (7 Nov 2026)
 
 - **Getting ready for clipboard history:** press Ctrl+K and run "Check clipboard history" to see whether Flint can read Windows' clipboard history (the Win+V list). Flint only reads it; it never changes or records your clipboard.
