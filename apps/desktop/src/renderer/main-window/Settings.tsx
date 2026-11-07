@@ -804,6 +804,30 @@ export function SettingsScreen(props: {
             Replay walkthrough
           </button>
         </Row>
+        <Row
+          name="Tips"
+          note="Now and then, a one-line hint about a quicker way to do what you just did."
+          filter={filter}
+          words="tips hints reset show"
+        >
+          <button
+            type="button"
+            className="trash-action"
+            onClick={() =>
+              void window.flintMain.resetTips().then(() => {
+                onToast('Tips reset');
+                void window.flintMain.settings().then(setView);
+              })
+            }
+          >
+            Reset tips
+          </button>
+          <Switch
+            on={!view.tipsOff}
+            label="Show tips"
+            onChange={(on) => set({ key: 'tipsOff', value: !on })}
+          />
+        </Row>
         <Row name="Logs" note="Kept here only, never sent anywhere." filter={filter} words="logs">
           <button
             type="button"

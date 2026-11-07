@@ -140,9 +140,15 @@ export function Composer(props: {
     ]);
     return true;
   };
+  const byButton = useRef(false);
   const submit = (): void => {
     const typed = text.escaped();
     if (typed.trim() === '') return;
+    // APP-14, D-113: a task whose priority, list or reminder came from the buttons (the main
+    // window's tips count it; mini mode's page has none).
+    if (byButton.current)
+      window.dispatchEvent(new CustomEvent('flint:tip', { detail: 'shorthand' }));
+    byButton.current = false;
     const parts = [
       ...(notes?.trim() ? [notes.replace(/\s+$/, '')] : []),
       ...pasted.flatMap((item) =>
@@ -247,6 +253,8 @@ export function Composer(props: {
    * that kind already in the text is replaced (never left behind as text, D-25); null removes it.
    */
   const replaceToken = (kind: TokenKind, token: string | null): void => {
+    // APP-14, D-113: set with a button, not typed (the shorthand tip counts these).
+    if (token !== null) byButton.current = true;
     for (let guard = 0; guard < 10; guard++) {
       const { text: parsedText, toOriginal } = text.mapped();
       const found = parseCapture(parsedText, { now: new Date(), lists: infos }).tokens.find(

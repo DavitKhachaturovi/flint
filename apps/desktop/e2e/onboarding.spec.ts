@@ -294,3 +294,91 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   await card.getByRole('button', { name: 'Close' }).click();
   await expect(card).toHaveCount(0);
 });
+
+test('a tip: once its pattern happened, after a quiet moment; seen after 3 s or closed; one a session; Reset tips; Don’t show tips (APP-14, D-118)', async () => {
+  await fresh({ lastSeenVersion: VERSION });
+  await writeFile(
+    join(dataDirectory, 'Flint', 'Inbox.md'),
+    [
+      '---\nflint: 1\nid: inbox\nmode: tasks\n---',
+      '- [ ] first to go [id:: tp1]',
+      '- [ ] second to go [id:: tp2]',
+      '- [ ] third to go [id:: tp3]',
+      '',
+    ].join('\n'),
+  );
+  const { app: running, main } = await launch();
+  const tip = main.locator('.tip-card');
+  const tips = async (): Promise<Record<string, number>> =>
+    JSON.parse(
+      await readFile(join(dataDirectory, 'appdata', 'tips.json'), 'utf8').catch(() => '{}'),
+    ) as Record<string, number>;
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+
+  // The palette opened with the mouse 3 times: the Ctrl+K tip, after a quiet moment.
+  for (let time = 0; time < 3; time++) {
+    await main.locator('.palette-button').click();
+    await expect(main.locator('.palette-layer')).toHaveCount(1);
+    await main.keyboard.press('Escape');
+    await expect(main.locator('.palette-layer')).toHaveCount(0);
+  }
+  await main.waitForTimeout(1000);
+  await expect(tip).toHaveCount(0);
+  await expect(tip).toContainText('Ctrl+K', { timeout: 4000 });
+  await expect(tip.locator('.keycap')).toHaveText(['Ctrl+K']);
+  expect(
+    await main.evaluate(() => document.activeElement?.closest('.tip-card') ?? null),
+  ).toBeNull();
+  // Seen after about 3 s on screen.
+  await expect.poll(async () => (await tips())['shown:paletteKey'], { timeout: 6000 }).toBe(1);
+  await tip.getByRole('button', { name: 'Got it' }).click();
+  await expect(tip).toHaveCount(0);
+
+  // One a session: the first delete's tip waits for another session.
+  await main.locator('.row', { hasText: 'first to go' }).click();
+  await main.keyboard.press('Delete');
+  await expect(main.locator('.row', { hasText: 'first to go' })).toHaveCount(0);
+  await main.waitForTimeout(3500);
+  await expect(tip).toHaveCount(0);
+
+  // Reset tips: every tip again. The delete's tip; hidden with the window before it was seen,
+  // it comes back.
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('reset tips');
+  await main.locator('.palette-layer').getByText('Reset tips').first().click();
+  await expect(main.locator('.toast')).toContainText('Tips reset');
+  await main.locator('.row', { hasText: 'second to go' }).click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Delete' }).click();
+  await expect(tip).toContainText('Trash for 30 days', { timeout: 5000 });
+  await running.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((each) => each.getTitle() === 'Flint')
+      ?.hide(),
+  );
+  await expect(tip).toHaveCount(0);
+  expect((await tips())['shown:trash']).toBeUndefined();
+  await running.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((each) => each.getTitle() === 'Flint')
+      ?.showInactive(),
+  );
+  await expect(tip).toContainText('Trash for 30 days', { timeout: 5000 });
+
+  // Don't show tips: gone, and off in the settings.
+  await tip.getByRole('button', { name: 'Don’t show tips' }).click();
+  await expect(tip).toHaveCount(0);
+  await expect
+    .poll(
+      async () =>
+        (
+          JSON.parse(await readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8')) as {
+            tipsOff?: boolean;
+          }
+        ).tipsOff,
+    )
+    .toBe(true);
+  await main.locator('.nav', { hasText: 'Settings' }).click();
+  await expect(
+    main.locator('#settings-about').getByRole('switch', { name: 'Show tips' }),
+  ).toHaveAttribute('aria-checked', 'false');
+});

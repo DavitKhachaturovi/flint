@@ -32,9 +32,46 @@ export class TipsFile {
     const seen = this.counts[name] ?? 0;
     if (seen >= times) return false;
     this.counts[name] = seen + 1;
-    void writeFileAtomic(this.path, `${JSON.stringify(this.counts, null, 2)}\n`, {
-      tempDirectory: join(dirname(this.path), 'tmp'),
-    }).catch(() => undefined);
+    this.save();
     return true;
+  }
+
+  /** APP-14, D-118: a tip's pattern happened once more (not counted once it was shown). */
+  bump(tip: string): number {
+    if (this.shown(tip)) return 0;
+    const key = `tip:${tip}`;
+    const count = (this.counts[key] ?? 0) + 1;
+    this.counts[key] = count;
+    this.save();
+    return count;
+  }
+
+  shown(tip: string): boolean {
+    return (this.counts[`shown:${tip}`] ?? 0) > 0;
+  }
+
+  /** D-118: seen (about 3 s on screen, or closed): never again. */
+  markShown(tip: string): void {
+    this.counts[`shown:${tip}`] = 1;
+    this.save();
+  }
+
+  /** D-118, D-119: Reset tips: every tip (and the earlier counted hints) eligible again. */
+  reset(): void {
+    this.counts = {};
+    this.save();
+  }
+
+  /** One write at a time, the latest counts last. */
+  private writing: Promise<void> = Promise.resolve();
+
+  private save(): void {
+    const text = `${JSON.stringify(this.counts, null, 2)}\n`;
+    this.writing = this.writing
+      .catch(() => undefined)
+      .then(() =>
+        writeFileAtomic(this.path, text, { tempDirectory: join(dirname(this.path), 'tmp') }),
+      )
+      .catch(() => undefined);
   }
 }

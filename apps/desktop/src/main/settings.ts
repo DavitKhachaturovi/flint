@@ -61,6 +61,8 @@ export interface Settings {
   readonly miniOnTop: boolean;
   /** APP-15, D-117: the version whose What's new was last shown; null before What's new existed. */
   readonly lastSeenVersion: string | null;
+  /** APP-14, D-118: Don't show tips (off by default: tips show). */
+  readonly tipsOff: boolean;
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -96,6 +98,7 @@ export function defaultSettings(development = false): Settings {
     miniReminders: 'when-open',
     miniOnTop: true,
     lastSeenVersion: null,
+    tipsOff: false,
   };
 }
 
@@ -184,6 +187,7 @@ export function readSettings(stored: Stored, development = false): Settings {
     ),
     miniOnTop: pick(stored, 'miniOnTop', isBoolean, defaults.miniOnTop),
     lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
+    tipsOff: pick(stored, 'tipsOff', isBoolean, defaults.tipsOff),
   };
 }
 

@@ -912,3 +912,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Step 4 only for something real; an empty quick note stays open | APP-10 · Done (0.8.17) | 02, D-122 |
 | 7 | Mini: the Note tab's Open a note… | MINI-01, NOTE-08 · Done (0.8.17) | 02, D-122 |
 
+## BE. The tips built (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The nine tips, their patterns, once each, one a session, none in a walkthrough's session | APP-14 · Done (0.8.18) | 02, D-123 |
+| 2 | When and where a tip shows; seen after 3 s or closed; back after a hidden window | APP-14 · Done (0.8.18) | 09, D-123 |
+| 3 | Don't show tips (card, Settings → About), Reset tips (Settings, palette) | APP-14, APP-11 · Done (0.8.18) | 02, D-123 |
+| 4 | The tips' words | APP-14 · Proposed (0.8.18) | D-123 |
+

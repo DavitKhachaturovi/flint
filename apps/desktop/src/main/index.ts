@@ -91,6 +91,7 @@ import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import { TourFile } from './onboarding.js';
+import { isTipId, TIPS } from '../shared/tips.js';
 import {
   appIcon,
   applyStartWithWindows,
@@ -305,6 +306,8 @@ async function start(): Promise<void> {
   let tourInterrupted = tourAtStart.interrupted;
   /** Where the page runs the tour from (it follows the tour, for a page reloaded mid-way). */
   let tourFrom = tourAtStart.from;
+  /** D-118: a session the walkthrough ran in shows no tips. */
+  let tourThisSession = tourAtStart.from !== null;
   const whatsNewDue =
     onboardingOn && !fresh && settingsFile.current.lastSeenVersion !== app.getVersion()
       ? { since: settingsFile.current.lastSeenVersion }
@@ -369,6 +372,7 @@ async function start(): Promise<void> {
   recoverFromCrashes(mainWindow, 'main window', log);
   // APP-10, APP-15, D-117: the tour and What's new wait for the window to be on screen.
   mainWindow.on('show', () => mainWindow.webContents.send(Channels.mainShown));
+  mainWindow.on('hide', () => mainWindow.webContents.send(Channels.mainHidden));
   /** D-116: what a walkthrough step waits for, to the main window while a tour runs. */
   const tourEvent = (event: TourEvent): void => {
     if (tour.running && !mainWindow.isDestroyed())
@@ -459,6 +463,33 @@ async function start(): Promise<void> {
       ? tips.due(name, times)
       : false,
   );
+  // APP-14, D-118: the tips: each once, at most one a session, none in a session the walkthrough
+  // ran (or started in), none with Don't show tips.
+  let tipThisSession = false;
+  ipcMain.handle(Channels.mainTipEvent, (event, tip: unknown) => {
+    // End-to-end runs see tips only when they ask for onboarding (each starts as a fresh install).
+    if (!owns(event.sender) || !isTipId(tip) || !onboardingOn) return false;
+    const count = tips.bump(tip);
+    return (
+      count >= TIPS[tip].after &&
+      !settingsFile.current.tipsOff &&
+      !tipThisSession &&
+      !tourThisSession
+    );
+  });
+  ipcMain.handle(Channels.mainTipShown, (event, tip: unknown) => {
+    if (!owns(event.sender) || !isTipId(tip)) return;
+    tips.markShown(tip);
+    tipThisSession = true;
+    log(`tip shown: ${tip}`);
+  });
+  ipcMain.handle(Channels.mainResetTips, async (event) => {
+    if (!owns(event.sender)) return;
+    tips.reset();
+    tipThisSession = false;
+    await settingsFile.update({ tipsOff: false });
+    log('tips reset');
+  });
   ipcMain.handle(Channels.mainLists, (event) =>
     owns(event.sender) ? workspace.summaries(new Date()) : [],
   );
@@ -902,6 +933,7 @@ async function start(): Promise<void> {
       popupHideFromSharing: current.popupHideFromSharing,
       miniReminders: current.miniReminders,
       version: app.getVersion(),
+      tipsOff: current.tipsOff,
     };
   };
   // APP-10, APP-15, D-117, D-119: what onboarding shows on this start, and the tour's progress.
@@ -927,6 +959,7 @@ async function start(): Promise<void> {
     if (kind === 'start') {
       await tour.start(workspace.tourBaseline());
       tourFrom = 0;
+      tourThisSession = true;
       log('walkthrough started');
     } else if (kind === 'step') {
       const { step } = action as Extract<TourAction, { kind: 'step' }>;

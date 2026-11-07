@@ -535,6 +535,14 @@ const builtIn = (presets: readonly LinkPreset[]): CompiledPattern[] =>
   );
 let BUILT_IN = builtIn(LINK_PRESETS);
 
+const EVERY_PRESET = builtIn(LINK_PRESETS);
+/** APP-14, D-113: whether the text has an Azure DevOps, GitHub or Jira link (the links tip). */
+export function hasPresetLink(text: string): boolean {
+  return [...text.matchAll(/https?:\/\/[^\s<>()]+/gi)].some(
+    (match) => shortFormOf(match[0].replace(/[.,;:!?]+$/, ''), EVERY_PRESET) !== null,
+  );
+}
+
 /** D-105: the built-in recognizers turned off in Settings → Links (by preset id). */
 export function setBuiltInLinksOff(off: readonly string[]): void {
   BUILT_IN = builtIn(LINK_PRESETS.filter((preset) => !off.includes(preset.id)));

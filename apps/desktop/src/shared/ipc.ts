@@ -177,6 +177,8 @@ export const Channels = {
   mainStarted: 'main:started',
   /** APP-10, APP-15, D-117: main → main window: it was shown (the tour and What's new wait). */
   mainShown: 'main:shown',
+  /** APP-14, D-118: main → main window: it was hidden (a tip not seen yet comes back later). */
+  mainHidden: 'main:hidden',
   /** Main window → main: what onboarding has to show this start (`OnboardingState`). */
   mainOnboarding: 'main:onboarding',
   /** Main window → main: the walkthrough started, moved on, ended, or removes what it made. */
@@ -185,6 +187,12 @@ export const Channels = {
   mainTourEvent: 'main:tour-event',
   /** Main window → main: What's new was shown; this version is the last one seen. */
   mainWhatsNewSeen: 'main:whats-new-seen',
+  /** APP-14, D-118: main window → main: a tip's pattern happened; resolves to whether it is due. */
+  mainTipEvent: 'main:tip-event',
+  /** Main window → main: a tip was seen (3 s on screen, or closed): never again. */
+  mainTipShown: 'main:tip-shown',
+  /** Main window → main: Reset tips (D-118, D-119). */
+  mainResetTips: 'main:reset-tips',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
@@ -481,6 +489,8 @@ export interface SettingsView {
   readonly popupHideFromSharing: boolean;
   readonly miniReminders: 'when-open' | 'always';
   readonly version: string;
+  /** APP-14, D-118: Don't show tips. */
+  readonly tipsOff: boolean;
 }
 
 /** The settings the Settings view can change, and the values they take. */
@@ -489,7 +499,10 @@ export type SettingChange =
       readonly key: 'startWithWindows' | 'notifications' | 'reminderSound';
       readonly value: boolean;
     }
-  | { readonly key: 'hideNotificationText' | 'rolloverPrompt'; readonly value: boolean }
+  | {
+      readonly key: 'hideNotificationText' | 'rolloverPrompt' | 'tipsOff';
+      readonly value: boolean;
+    }
   | { readonly key: 'autoArchiveDays'; readonly value: number | null }
   | {
       readonly key: 'snapshotEveryMinutes' | 'keepHourlyHours' | 'keepDailyDays';

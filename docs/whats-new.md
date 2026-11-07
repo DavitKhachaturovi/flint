@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.18 (7 Nov 2026)
+
+- **Tips:** now and then Flint suggests a quicker way to do what you just did, in a small card in the corner. Turn them off with "Don't show tips", or bring them back in Settings → About → Reset tips.
+
 ## 0.8.17 (7 Nov 2026)
 
 - **Pin from the row:** hover a task and click the faint pin to put it on Today.

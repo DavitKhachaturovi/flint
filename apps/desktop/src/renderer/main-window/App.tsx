@@ -84,6 +84,7 @@ import { TrashPreviewView, TrashScreen } from './Trash.js';
 import { SnapshotDiffView, SnapshotsScreen } from './Snapshots.js';
 import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js';
 import { onboardingOnce, Walkthrough, WhatsNew, type TourEnd } from './Onboarding.js';
+import { TipLayer, tipHappened, useFrontAdds } from './Tips.js';
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
@@ -428,6 +429,8 @@ export function App(): ReactElement {
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
+  /** APP-14, D-113: the capture tip's pattern (a task added right after coming to the front). */
+  const frontAdd = useFrontAdds();
   /**
    * MEDIA-03, D-84: large files linked where they are: one notice each, kept until acted on or
    * dismissed (it never fades and never takes focus).
@@ -818,6 +821,21 @@ export function App(): ReactElement {
   const scroller = useRef<HTMLDivElement>(null);
   const [pairSize, setPairSize] = useState<'full' | 'compact' | null>(null);
   const wide = pairSize !== null;
+  // APP-14, D-113: patterns the window sees itself: a note opened (the first), Inbox with 20 or
+  // more open tasks, the window wide enough for the side panel (the first time).
+  const tipView = view && { id: view.id, mode: view.mode, open: view.open };
+  const noteOpened = tipView?.mode === 'note' ? tipView.id : null;
+  useEffect(() => {
+    if (noteOpened) tipHappened('slash');
+  }, [noteOpened]);
+  const fullInbox =
+    tipView !== null && tipView.id === lists.find((list) => list.inbox)?.id && tipView.open >= 20;
+  useEffect(() => {
+    if (fullInbox) tipHappened('triage');
+  }, [fullInbox]);
+  useEffect(() => {
+    if (wide) tipHappened('panel');
+  }, [wide]);
   const [panelHidden, setPanelHidden] = useState(false);
   useEffect(() => {
     window.flintMain.onPanel(setPanelHidden);
@@ -1472,10 +1490,11 @@ export function App(): ReactElement {
         ...(chooseNewList && { chooseNewList }),
       });
       if (!outcome?.key) return;
+      frontAdd();
       if (outcome.listId !== listId) showToast(outcome.label, true);
       else setSelected(outcome.key);
     },
-    [change, listId, showToast],
+    [change, listId, showToast, frontAdd],
   );
 
   /**
@@ -1518,7 +1537,10 @@ export function App(): ReactElement {
   const remove = useCallback(
     async (key: string): Promise<void> => {
       const outcome = await change({ kind: 'delete', key });
-      if (outcome) showToast(outcome.label, true);
+      if (outcome) {
+        showToast(outcome.label, true);
+        tipHappened('trash');
+      }
     },
     [change, showToast],
   );
@@ -1597,6 +1619,7 @@ export function App(): ReactElement {
       `Deleted ${tasksCount(markedRows.length)}`,
       markedRows.map((row) => ({ kind: 'delete', key: row.key })),
     );
+    tipHappened('trash');
     setMarked(NOTHING);
   }, [bulk, markedRows]);
   const bulkMove = useCallback(
@@ -1812,6 +1835,7 @@ export function App(): ReactElement {
             label: 'Delete',
             action: () =>
               void window.flintMain.listAction({ kind: 'delete', id: list.id }).then((outcome) => {
+                tipHappened('trash');
                 if (outcome?.ok) showToast(outcome.label, true);
               }),
           },
@@ -2332,6 +2356,7 @@ export function App(): ReactElement {
               label: `Delete ${ids.length} lists and notes`,
               action: () =>
                 void window.flintMain.listAction({ kind: 'deleteMany', ids }).then((outcome) => {
+                  tipHappened('trash');
                   setMarkedLists(NOTHING);
                   if (ids.includes(listId)) openList('inbox');
                   done(outcome);
@@ -2493,6 +2518,7 @@ export function App(): ReactElement {
             label: list.mode === 'note' ? 'Delete note' : 'Delete list',
             action: () =>
               void window.flintMain.listAction({ kind: 'delete', id: list.id }).then((outcome) => {
+                tipHappened('trash');
                 if (!outcome) return;
                 if (!outcome.ok) return showToast(outcome.problem, false);
                 if (listId === list.id) openList('inbox');
@@ -3987,6 +4013,12 @@ export function App(): ReactElement {
         run: () => startTour(0),
       },
       {
+        id: 'app:reset-tips',
+        label: 'Reset tips',
+        keywords: 'tips hints show again',
+        run: () => void window.flintMain.resetTips().then(() => showToast('Tips reset', false)),
+      },
+      {
         id: 'app:whats-new',
         label: 'What’s new',
         keywords: 'whats new release notes changes update version',
@@ -5206,6 +5238,11 @@ export function App(): ReactElement {
       {whatsNew && !tourRun && appVersion !== '' && (
         <WhatsNew version={appVersion} since={whatsNew.since} onClose={() => setWhatsNew(null)} />
       )}
+      {/* APP-14, D-118: a tip, bottom right, never during the walkthrough, triage or What's new. */}
+      <TipLayer
+        blocked={tourRun !== null || whatsNew !== null || triage !== null}
+        onOff={() => void window.flintMain.setSetting({ key: 'tipsOff', value: true })}
+      />
       {/* NAV-01, D-106: the Ctrl+K palette. */}
       {palette && (
         <Palette

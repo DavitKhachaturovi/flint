@@ -1,5 +1,6 @@
 import { ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
+import type { TipId } from '../shared/tips.js';
 import {
   Channels,
   type AttachFileOutcome,
@@ -158,9 +159,24 @@ export const main = {
   whatsNewSeen(): Promise<void> {
     return invoke(Channels.mainWhatsNewSeen) as Promise<void>;
   },
+  /** APP-14, D-118: a tip's pattern happened; whether the tip is due now. */
+  tipEvent(tip: TipId): Promise<boolean> {
+    return invoke(Channels.mainTipEvent, tip) as Promise<boolean>;
+  },
+  /** The tip was seen (about 3 s on screen, or closed). */
+  tipShown(tip: TipId): Promise<void> {
+    return invoke(Channels.mainTipShown, tip) as Promise<void>;
+  },
+  resetTips(): Promise<void> {
+    return invoke(Channels.mainResetTips) as Promise<void>;
+  },
   /** The main window came on screen. */
   onShown(listener: () => void): void {
     ipcRenderer.on(Channels.mainShown, () => listener());
+  },
+  /** APP-14, D-118: the main window was hidden. */
+  onHidden(listener: () => void): void {
+    ipcRenderer.on(Channels.mainHidden, () => listener());
   },
   /** D-116: something a walkthrough step waits for. */
   onTourEvent(listener: (event: TourEvent) => void): void {

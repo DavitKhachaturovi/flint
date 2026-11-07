@@ -396,7 +396,11 @@ export function PaletteButton(props: { readonly onOpen: () => void }): ReactElem
       aria-label="Search or run a command"
       title="Search or run a command (Ctrl+K)"
       onMouseDown={(event) => event.preventDefault()}
-      onClick={props.onOpen}
+      onClick={() => {
+        // APP-14, D-107, D-113: opened with the mouse (the Ctrl+K tip counts it).
+        window.dispatchEvent(new CustomEvent('flint:tip', { detail: 'paletteKey' }));
+        props.onOpen();
+      }}
     >
       <SearchIcon size={15} />
     </button>

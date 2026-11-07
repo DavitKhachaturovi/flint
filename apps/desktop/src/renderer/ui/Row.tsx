@@ -261,7 +261,13 @@ export function Row(
         type="button"
         className={checked ? 'check on' : 'check'}
         aria-label={task.done ? 'Reopen task' : 'Complete task'}
-        onClick={() => !ghost && onToggle(task.key)}
+        onClick={() => {
+          if (ghost) return;
+          // APP-14, D-113: completed with the mouse (the keyboard tip counts it; main window only).
+          if (!task.done)
+            window.dispatchEvent(new CustomEvent('flint:tip', { detail: 'keyboardComplete' }));
+          onToggle(task.key);
+        }}
       >
         {checked && <CheckIcon />}
       </button>

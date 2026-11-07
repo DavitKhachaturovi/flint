@@ -6931,3 +6931,81 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-primary);
   font-weight: 600;
 }
+
+/* APP-14, D-118 (09 §8): a tip: the spotlight's card alone, bottom right, above where toasts
+   appear, rising in; it never takes the focus. */
+.tip-card {
+  position: fixed;
+  right: 24px;
+  bottom: 84px;
+  z-index: 58;
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - 48px);
+  padding: 14px 34px 10px 16px;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  color: var(--fl-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  animation: spotlight-card-in var(--fl-dur-page) var(--fl-ease-spring);
+}
+
+.tip-card.leaving {
+  animation: spotlight-card-out var(--fl-dur-state) ease-in forwards;
+}
+
+.tip-text {
+  margin: 0;
+}
+
+.tip-text .keycap {
+  height: 20px;
+  padding: 0 6px;
+  margin: 0 1px;
+}
+
+.tip-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  margin-right: -24px;
+}
+
+.tip-off {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--fl-text-faint);
+  font-size: 12px;
+  transition: color var(--fl-dur-fast);
+}
+
+.tip-off:hover {
+  color: var(--fl-text-secondary);
+}
+
+.tip-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--fl-radius-button);
+  background: none;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.tip-close:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-primary);
+}
