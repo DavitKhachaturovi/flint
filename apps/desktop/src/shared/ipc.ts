@@ -193,6 +193,8 @@ export const Channels = {
   mainTipShown: 'main:tip-shown',
   /** Main window → main: Reset tips (D-118, D-119). */
   mainResetTips: 'main:reset-tips',
+  /** NAV-08, D-127: main window → main: read Windows' clipboard history (`true`: retry after a crash). */
+  mainClipboardHistory: 'main:clipboard-history',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
@@ -923,4 +925,17 @@ export interface MiniSurface {
 export interface NoteEditorState {
   readonly noteId: string;
   readonly editor: 'main' | 'mini' | null;
+}
+
+/**
+ * NAV-08, D-127: a check of Windows' clipboard history: how it went (`crashed`: the last read
+ * never finished, reads are off until retried), how long it took, how many items and text items,
+ * and the start of the newest text (the check shows it, so the reading can be seen to work).
+ */
+export interface ClipboardHistoryCheck {
+  readonly kind: 'ok' | 'off' | 'denied' | 'unavailable' | 'crashed';
+  readonly ms: number;
+  readonly count: number;
+  readonly texts: number;
+  readonly newest: string | null;
 }

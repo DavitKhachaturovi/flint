@@ -36,6 +36,7 @@ import {
   type OnboardingState,
   type TourAction,
   type TourEvent,
+  type ClipboardHistoryCheck,
 } from '../shared/ipc.js';
 
 /**
@@ -169,6 +170,10 @@ export const main = {
   },
   resetTips(): Promise<void> {
     return invoke(Channels.mainResetTips) as Promise<void>;
+  },
+  /** NAV-08, D-127: read Windows' clipboard history (`retry`: after a read that never finished). */
+  clipboardHistory(retry: boolean): Promise<ClipboardHistoryCheck> {
+    return invoke(Channels.mainClipboardHistory, retry) as Promise<ClipboardHistoryCheck>;
   },
   /** The main window came on screen. */
   onShown(listener: () => void): void {

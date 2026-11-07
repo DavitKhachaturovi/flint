@@ -153,6 +153,7 @@ flint/
 - **The day change (D-107):** acted on at local midnight (a timer to the next midnight, re-armed), with a once-a-minute check and `powerMonitor` resume as fallbacks: done pins lose their pin (D-85), then the main window reads every view again (Today's rollover card and reminders).
 
 ### Clipboard and paste (CAP-06, TASK-09)
+- **Windows' clipboard history (NAV-08, D-127):** `main/clipboard-history.ts` calls its WinRT interfaces through koffi (method positions from Windows' own metadata, only reads ever called), behind `main/clipboard-guard.ts`'s crash marker; read-only, text first.
 - Images from the clipboard → saved to `attachments/` → relative link.
 - Detection heuristics for stack traces/JSON/code: valid JSON parse, typical stack-frame line patterns (`at …(file:line)`, `File "…", line N`, `Exception`, `Traceback`), indentation/brace density. Detected content → fenced code block, not split into tasks.
 

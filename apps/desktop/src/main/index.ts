@@ -35,6 +35,7 @@ import {
   type TourEvent,
   type MiniAlert,
   type SettingsView,
+  type ClipboardHistoryCheck,
 } from '../shared/ipc.js';
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
@@ -91,6 +92,8 @@ import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import { TourFile } from './onboarding.js';
+import { ClipboardGuard } from './clipboard-guard.js';
+import { readClipboardHistory } from './clipboard-history.js';
 import { isTipId, TIP_GAP_MS, tipAllowed, TIPS } from '../shared/tips.js';
 import {
   appIcon,
@@ -489,6 +492,44 @@ async function start(): Promise<void> {
     tipHooks.tipGapPassed = () => {
       tipsThisSession = tipsThisSession.map((at) => at - TIP_GAP_MS);
     };
+  // NAV-08, D-127: Windows' clipboard history, read-only, behind the crash marker. End-to-end
+  // runs never read the real history: they set what it holds (D-93).
+  const clipboardGuard = new ClipboardGuard(
+    join(app.getPath('userData'), 'clipboard-reading'),
+    (limit) => {
+      const fake = e2eHooks();
+      return fake
+        ? Promise.resolve(fake.clipboardHistory ?? { kind: 'off' })
+        : readClipboardHistory(limit);
+    },
+  );
+  if (clipboardGuard.crashed)
+    log('clipboard history: the last read never finished; reads are off until retried');
+  app.on('before-quit', () => clipboardGuard.quitting());
+  ipcMain.handle(
+    Channels.mainClipboardHistory,
+    async (event, retry: unknown): Promise<ClipboardHistoryCheck> => {
+      if (!owns(event.sender))
+        return { kind: 'unavailable', ms: 0, count: 0, texts: 0, newest: null };
+      const started = performance.now();
+      const read = await clipboardGuard.read(25, retry === true);
+      const ms = Math.round(performance.now() - started);
+      const texts = read.kind === 'ok' ? read.items.filter((item) => item.text !== null) : [];
+      log(
+        `clipboard history: ${read.kind}` +
+          (read.kind === 'ok' ? `, ${read.items.length} items (${texts.length} text)` : '') +
+          (read.kind === 'unavailable' ? `: ${read.reason}` : '') +
+          `, ${ms} ms`,
+      );
+      return {
+        kind: read.kind,
+        ms,
+        count: read.kind === 'ok' ? read.items.length : 0,
+        texts: texts.length,
+        newest: texts[0]?.text?.replace(/\s+/g, ' ').trim().slice(0, 40) ?? null,
+      };
+    },
+  );
   ipcMain.handle(Channels.mainResetTips, async (event) => {
     if (!owns(event.sender)) return;
     tips.reset();

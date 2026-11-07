@@ -931,3 +931,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Two tips a session at most, at least 10 minutes apart | APP-14 · Done (0.8.20) | 02, D-125 |
 | 4 | The tip as far from the right edge as from the bottom (84 px) | APP-14 · Done (0.8.20) | 09, D-125 |
 | 5 | What's new at the optical centre (its middle at 45 % of the window) | APP-15 · Done (0.8.21) | 09, D-126 |
+
+## BG. M8 step 5: Windows' clipboard history, the reading (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Reading Windows' clipboard history through koffi (WinRT), read-only, text first | NAV-08 · Done (0.8.22) | 05, D-127 |
+| 2 | The crash marker: a read that never finished keeps reading off until Retry | NAV-08 · Done (0.8.22) | 02, D-127 |
+| 3 | Ctrl+K → Check clipboard history (the proof, before the section) | NAV-08 · Done (0.8.22); Davit's check on his machine pending | 02, D-127 |
+| 4 | The Clipboard section in the side panel | NAV-08 · v1 · after the check | 02, D-86, D-127 |

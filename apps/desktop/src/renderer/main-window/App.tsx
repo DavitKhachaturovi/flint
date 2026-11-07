@@ -1156,6 +1156,33 @@ export function App(): ReactElement {
   }, []);
   const startTourRef = useRef(startTour);
   startTourRef.current = startTour;
+  /**
+   * NAV-08, D-127: reads Windows' clipboard history once and says how it went (the first part of
+   * M8 step 5, before the section: proof that the reading works on this machine). A read that
+   * never finished last time leaves reading off until Retry.
+   */
+  const checkClipboardHistory = useCallback((retry: boolean): void => {
+    void window.flintMain.clipboardHistory(retry).then((check) => {
+      const say = showToastRef.current;
+      if (check.kind === 'ok')
+        say(
+          `Clipboard history works: ${check.count} ${check.count === 1 ? 'item' : 'items'} (${check.texts} text), read in ${check.ms} ms` +
+            (check.newest === null ? '' : `. Newest: “${check.newest}”`),
+          false,
+        );
+      else if (check.kind === 'off')
+        say('Clipboard history is off in Windows (Settings → System → Clipboard)', false);
+      else if (check.kind === 'denied') say('Windows refused: Flint wasn’t in front', false);
+      else if (check.kind === 'crashed')
+        say('The last clipboard history read never finished, so reading is off', false, {
+          label: 'Retry',
+          run: () => checkClipboardHistoryRef.current(true),
+        });
+      else say('Clipboard history couldn’t be read (the log says why)', false);
+    });
+  }, []);
+  const checkClipboardHistoryRef = useRef(checkClipboardHistory);
+  checkClipboardHistoryRef.current = checkClipboardHistory;
   useEffect(() => {
     let begun = false;
     void onboardingOnce().then((state) => {
@@ -4017,6 +4044,13 @@ export function App(): ReactElement {
         label: 'Reset tips',
         keywords: 'tips hints show again',
         run: () => void window.flintMain.resetTips().then(() => showToast('Tips reset', false)),
+      },
+      // NAV-08, D-127: the check that Windows' clipboard history can be read (step 5's first part).
+      {
+        id: 'app:check-clipboard',
+        label: 'Check clipboard history',
+        keywords: 'clipboard history win+v paste diagnostic',
+        run: () => checkClipboardHistory(false),
       },
       {
         id: 'app:whats-new',

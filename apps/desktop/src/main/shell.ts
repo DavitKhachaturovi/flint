@@ -5,6 +5,7 @@ import net from 'node:net';
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
 import { CLOCK_ARGUMENT, installTestClock } from '../shared/test-clock.js';
 import { writeFileAtomic } from './storage/atomic.js';
+import type { ClipboardHistoryRead } from './clipboard-history.js';
 import {
   monitorSetupKey,
   rememberBounds,
@@ -86,6 +87,8 @@ export interface E2EHooks {
   relaunched?: string;
   /** APP-14, D-125: the ten minutes between two tips of a session, passed. */
   tipGapPassed?: () => void;
+  /** NAV-08, D-127: what Windows' clipboard history "holds" (tests never read the real one). */
+  clipboardHistory?: ClipboardHistoryRead;
 }
 
 export function e2eHooks(): E2EHooks | undefined {
