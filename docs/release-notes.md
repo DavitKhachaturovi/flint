@@ -2,6 +2,12 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.20 (7 Nov 2026)
+
+- **What's new (D-125):** the app is dimmed behind the card, as in the walkthrough, until Got it, Esc or ×; nothing behind it takes a click.
+- **The walkthrough:** the step card never covers the ringed target or the field you type in. In step 4 it glides to the bottom-right corner when the quick note opens, so the note's title and text stay in view.
+- **Tips:** up to two a session, at least 10 minutes apart; the card now sits as far from the right edge as from the bottom.
+
 ## 0.8.19 (7 Nov 2026)
 
 - **Pickers:** typing to narrow a list (Move to, Open a note…) and pressing Enter always takes the top match, even with the mouse resting over the list.

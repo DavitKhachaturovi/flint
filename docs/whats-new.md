@@ -2,6 +2,12 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.20 (7 Nov 2026)
+
+- **What's new stands out:** the app dims behind this card until you press Got it.
+- **The tour stays out of your way:** its card moves aside when a quick note opens, so you can see what you type.
+- **Tips:** up to two a session, never back to back.
+
 ## 0.8.19 (7 Nov 2026)
 
 - **Pickers:** type to narrow a list and press Enter: it always takes the top match.
