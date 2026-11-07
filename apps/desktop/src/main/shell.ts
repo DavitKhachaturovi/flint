@@ -89,6 +89,12 @@ export interface E2EHooks {
   tipGapPassed?: () => void;
   /** NAV-08, D-127: what Windows' clipboard history "holds" (tests never read the real one). */
   clipboardHistory?: ClipboardHistoryRead;
+  /** D-128: the clipboard's sequence number (a test bumps it when the history changes). */
+  clipboardSequence?: number;
+  /** D-128: history turned off by a group policy. */
+  clipboardPolicyOff?: boolean;
+  /** D-128: what Copy would have put on the clipboard. */
+  copied?: string[];
 }
 
 export function e2eHooks(): E2EHooks | undefined {

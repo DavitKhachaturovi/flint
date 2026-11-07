@@ -415,3 +415,20 @@
   outline: 1px solid var(--fl-accent);
   outline-offset: 2px;
 }
+
+/* NAV-08, D-128: the clipboard picker's keys, under its rows. */
+.fl-picker-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 10px 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--fl-edge-divider);
+  color: var(--fl-text-faint);
+  font-size: var(--fl-size-meta);
+}
+
+.fl-picker-key {
+  font-family: var(--fl-font-mono);
+  color: var(--fl-text-muted);
+}

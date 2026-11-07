@@ -20,6 +20,7 @@ import type {
 } from '../../shared/ipc.js';
 import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
+import { clipboardChanged } from './ClipboardSection.js';
 import {
   compileLinkPatterns,
   fixedPartProblem,
@@ -45,6 +46,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'mini', name: 'Mini mode' },
   { id: 'today', name: 'Today & lists' },
   { id: 'links', name: 'Links' },
+  { id: 'clipboard', name: 'Clipboard' },
   { id: 'data', name: 'Data' },
   { id: 'appearance', name: 'Appearance' },
   { id: 'shortcuts', name: 'Keyboard shortcuts' },
@@ -318,9 +320,10 @@ export function SettingsScreen(props: {
   useEffect(() => {
     if (find > 0) field.current?.focus();
   }, [find]);
-  const set = (change: SettingChange): void => {
+  const set = (change: SettingChange, then?: () => void): void => {
     void window.flintMain.setSetting(change).then((next) => {
       if (next) setView(next);
+      then?.();
     });
   };
   const filter = query.trim().toLowerCase();
@@ -606,6 +609,42 @@ export function SettingsScreen(props: {
           onPatterns={onLinkPatterns}
           onBuiltInLinksOff={onBuiltInLinksOff}
         />
+      </Section>
+
+      {/* NAV-08, D-128: Windows' clipboard history in the side panel and its picker. */}
+      <Section id="clipboard" filter={filter}>
+        <Row
+          name="Clipboard history"
+          note="Shows Windows' clipboard history in the side panel and in Paste from clipboard history… (Ctrl+Shift+H). Flint only reads it, and only while its window is active."
+          filter={filter}
+          words="clipboard history win+v paste copied"
+        >
+          <Switch
+            on={view.clipboardHistory}
+            label="Clipboard history"
+            onChange={(on) => {
+              set({ key: 'clipboardHistory', value: on }, clipboardChanged);
+            }}
+          />
+        </Row>
+        <Row
+          name="Always show contents"
+          note="Off: the side panel shows what you copied only while the pointer rests on it, so a screen share doesn't show it."
+          filter={filter}
+          words="clipboard contents show hide screen sharing private win+v paste"
+        >
+          <Switch
+            on={view.clipboardShowContents}
+            label="Always show contents"
+            onChange={(on) => {
+              set({ key: 'clipboardShowContents', value: on }, clipboardChanged);
+              if (on)
+                void window.flintMain.tipDue('clipboardContentsShown', 1).then((due) => {
+                  if (due) onToast('Clipboard contents will be visible when you share your screen');
+                });
+            }}
+          />
+        </Row>
       </Section>
 
       <Section id="data" filter={filter}>

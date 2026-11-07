@@ -57,6 +57,7 @@ const AT = {
   vectorGetAt: 6,
   vectorSize: 7,
   // IClipboardHistoryItem
+  itemId: 6,
   itemTimestamp: 7,
   itemContent: 8,
   // IDataPackageView
@@ -174,7 +175,7 @@ async function awaitOperation<T>(
       if (status[0] !== ASYNC_STARTED)
         throw new WinRtError(`${what} ended with status ${status[0]}`);
       if (Date.now() - started > ASYNC_TIMEOUT_MS) throw new WinRtError(`${what} timed out`);
-      await wait(4);
+      await wait(2);
     }
   } finally {
     if (info[0]) {
@@ -187,6 +188,8 @@ async function awaitOperation<T>(
 
 /** One item of the history: its text, or null when it isn't text (a picture, files). */
 export interface ClipboardHistoryItem {
+  /** Windows' id for it (stays the same while it is in the history). */
+  readonly id: string;
   /** When it was copied (ms since 1970). */
   readonly at: number;
   readonly text: string | null;
@@ -216,11 +219,52 @@ export function clipboardHistoryEnabled(): boolean | null {
   }
 }
 
+const advapi32 = koffi.load('advapi32.dll');
+const regGetValue = advapi32.func(
+  'int32 RegGetValueW(uintptr_t hkey, const char16_t *subKey, const char16_t *value, uint32 flags, _Out_ uint32_t *type, _Out_ uint32_t *data, _Inout_ uint32_t *size)',
+) as (
+  hkey: bigint,
+  subKey: string,
+  value: string,
+  flags: number,
+  type: number[],
+  data: number[],
+  size: number[],
+) => number;
+/** HKEY_LOCAL_MACHINE, as a 64-bit handle (sign-extended). */
+const HKEY_LOCAL_MACHINE = 0xffffffff80000002n;
+const RRF_RT_REG_DWORD = 0x10;
+
+/**
+ * D-128: the "Allow Clipboard History" group policy turned history off on this PC (Windows'
+ * Settings can't turn it on then).
+ */
+export function clipboardHistoryPolicyOff(): boolean {
+  try {
+    const data = [1];
+    const status = regGetValue(
+      HKEY_LOCAL_MACHINE,
+      'SOFTWARE\\Policies\\Microsoft\\Windows\\System',
+      'AllowClipboardHistory',
+      RRF_RT_REG_DWORD,
+      [0],
+      data,
+      [4],
+    );
+    return status === 0 && data[0] === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** Windows' DateTime (100 ns since 1601) as ms since 1970. */
 const fromDateTime = (ticks: bigint | number): number =>
   Number(BigInt(ticks) / 10_000n - 11_644_473_600_000n);
 
-/** The newest `limit` items of Windows' clipboard history, newest first. */
+/**
+ * The newest `limit` items of Windows' clipboard history, newest first. D-128: their texts are read
+ * all at once (each a short call, then waiting on Windows with the main thread free).
+ */
 export async function readClipboardHistory(limit = 25): Promise<ClipboardHistoryRead> {
   let clipboard: unknown = null;
   let result: unknown = null;
@@ -241,11 +285,20 @@ export async function readClipboardHistory(limit = 25): Promise<ClipboardHistory
     items = getObject(result, AT.resultItems, 'ClipboardHistoryItemsResult.Items');
     const size = [0];
     check(vcall(items, AT.vectorSize, GetUint32, size), 'Items.Size');
-    const read: ClipboardHistoryItem[] = [];
-    for (let index = 0; index < Math.min(size[0] ?? 0, limit); index++) {
-      read.push(await readItem(items, index, textFormat));
+    const count = Math.min(size[0] ?? 0, limit);
+    // Started five at a time, the main thread free in between (each start is a few calls).
+    const started: Promise<ClipboardHistoryItem>[] = [];
+    for (let index = 0; index < count; index++) {
+      if (index > 0 && index % 5 === 0) await new Promise((resolve) => setImmediate(resolve));
+      started.push(readItem(items, index, textFormat));
     }
-    return { kind: 'ok', items: read };
+    const reads = await Promise.allSettled(started);
+    const failure = reads.find((each) => each.status === 'rejected');
+    if (failure) throw failure.reason;
+    return {
+      kind: 'ok',
+      items: reads.flatMap((each) => (each.status === 'fulfilled' ? [each.value] : [])),
+    };
   } catch (error) {
     return { kind: 'unavailable', reason: error instanceof Error ? error.message : String(error) };
   } finally {
@@ -253,6 +306,17 @@ export async function readClipboardHistory(limit = 25): Promise<ClipboardHistory
     release(result);
     release(clipboard);
     windowsDeleteString(textFormat);
+  }
+}
+
+/** An HSTRING given by `self`'s method `index`, as text (the string freed). */
+function getString(self: unknown, index: number, what: string): string {
+  const string: unknown[] = [null];
+  check(vcall(self, index, GetObject, string), what);
+  try {
+    return readHstring(string[0]);
+  } finally {
+    if (string[0]) windowsDeleteString(string[0]);
   }
 }
 
@@ -265,6 +329,7 @@ async function readItem(
   let content: unknown = null;
   check(vcall(items, AT.vectorGetAt, GetAt, index, item), `Items.GetAt(${index})`);
   try {
+    const id = getString(item[0], AT.itemId, 'Item.Id');
     const ticks: (bigint | number)[] = [0];
     check(vcall(item[0], AT.itemTimestamp, GetInt64, ticks), 'Item.Timestamp');
     content = getObject(item[0], AT.itemContent, 'Item.Content');
@@ -273,17 +338,11 @@ async function readItem(
     let text: string | null = null;
     if (isText[0] !== 0) {
       const operation = getObject(content, AT.viewGetTextAsync, 'GetTextAsync');
-      text = await awaitOperation(operation, 'GetTextAsync', (done) => {
-        const string: unknown[] = [null];
-        check(vcall(done, AT.asyncGetResults, GetObject, string), 'GetTextAsync: results');
-        try {
-          return readHstring(string[0]);
-        } finally {
-          if (string[0]) windowsDeleteString(string[0]);
-        }
-      });
+      text = await awaitOperation(operation, 'GetTextAsync', (done) =>
+        getString(done, AT.asyncGetResults, 'GetTextAsync: results'),
+      );
     }
-    return { at: fromDateTime(ticks[0] ?? 0), text };
+    return { id: id || `${index}`, at: fromDateTime(ticks[0] ?? 0), text };
   } finally {
     release(content);
     release(item[0]);

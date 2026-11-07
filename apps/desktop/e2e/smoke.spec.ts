@@ -3146,9 +3146,9 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   // The Settings row above Trash opens the page; its index sits in the panel's place.
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
   await expect(main.locator('.settings-header h1')).toHaveText('Settings');
-  // D-109: Mini mode is the tenth section.
-  await expect(main.locator('.settings-section')).toHaveCount(10);
-  await expect(main.locator('.settings-index-item')).toHaveCount(10);
+  // D-109: Mini mode is the tenth section; D-128: Clipboard the eleventh.
+  await expect(main.locator('.settings-section')).toHaveCount(11);
+  await expect(main.locator('.settings-index-item')).toHaveCount(11);
   await main.locator('.settings-index-item', { hasText: 'Keyboard shortcuts' }).click();
   await expect(main.locator('#settings-shortcuts')).toBeInViewport();
   await expect(main.locator('#settings-shortcuts')).toContainText('Ctrl+Shift+J');
@@ -3271,7 +3271,7 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(main.locator('.settings-section')).toHaveCount(1);
   await expect(main.locator('.settings-section')).toHaveAttribute('aria-label', 'Reminders');
   await main.keyboard.press('Escape');
-  await expect(main.locator('.settings-section')).toHaveCount(10);
+  await expect(main.locator('.settings-section')).toHaveCount(11);
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('main-window'),

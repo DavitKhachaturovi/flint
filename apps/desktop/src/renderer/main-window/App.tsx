@@ -18,7 +18,15 @@ import {
   type ListInfo,
 } from '@flint/core/shorthand';
 import { parseLocalDateTime, type LocalDateTime } from '@flint/core/time';
-import { openListPicker, openPriorityPicker, openTimePicker } from '../pickers/pickers.js';
+import {
+  openClipboardPicker,
+  openListPicker,
+  openPriorityPicker,
+  openTimePicker,
+} from '../pickers/pickers.js';
+import { clipAge, clipPreview } from '../../shared/clipboard.js';
+import { ClipboardSection, clipboardChanged, clipboardNote } from './ClipboardSection.js';
+import { currentField, pasteInto, trackFields } from './clipboard-paste.js';
 import flintIcon from '../../../../../assets/icon/flint-icon-512.svg';
 import type {
   ChangeOutcome,
@@ -77,6 +85,7 @@ import {
   TRASH_ID,
   type RestoredItem,
   type SnapshotDiff,
+  type ClipboardItemView,
   type TrashPreview,
   type TrashView,
 } from '../../shared/ipc.js';
@@ -1156,33 +1165,126 @@ export function App(): ReactElement {
   }, []);
   const startTourRef = useRef(startTour);
   startTourRef.current = startTour;
-  /**
-   * NAV-08, D-127: reads Windows' clipboard history once and says how it went (the first part of
-   * M8 step 5, before the section: proof that the reading works on this machine). A read that
-   * never finished last time leaves reading off until Retry.
-   */
-  const checkClipboardHistory = useCallback((retry: boolean): void => {
-    void window.flintMain.clipboardHistory(retry).then((check) => {
-      const say = showToastRef.current;
-      if (check.kind === 'ok')
-        say(
-          `Clipboard history works: ${check.count} ${check.count === 1 ? 'item' : 'items'} (${check.texts} text), read in ${check.ms} ms` +
-            (check.newest === null ? '' : `. Newest: “${check.newest}”`),
-          false,
-        );
-      else if (check.kind === 'off')
-        say('Clipboard history is off in Windows (Settings → System → Clipboard)', false);
-      else if (check.kind === 'denied') say('Windows refused: Flint wasn’t in front', false);
-      else if (check.kind === 'crashed')
-        say('The last clipboard history read never finished, so reading is off', false, {
-          label: 'Retry',
-          run: () => checkClipboardHistoryRef.current(true),
-        });
-      else say('Clipboard history couldn’t be read (the log says why)', false);
+  // NAV-08, D-128: Windows' clipboard history: an item into the field that has the keyboard (or
+  // had it before the palette or the picker took it), captured as a task, or copied again.
+  useEffect(() => trackFields(), []);
+  const insertClipboard = useCallback((text: string, field: HTMLElement | null): void => {
+    if (!field) {
+      showToastRef.current('Click where it should go, then pick it again', false);
+      return;
+    }
+    pasteInto(field, text);
+  }, []);
+  const captureClipboard = useCallback((text: string): void => {
+    void window.flintMain.clipboardCapture(text);
+  }, []);
+  const copyClipboard = useCallback((text: string): void => {
+    void window.flintMain.clipboardCopy(text).then(() => showToastRef.current('Copied', false));
+  }, []);
+  const clipboardMenu = useCallback(
+    (item: ClipboardItemView, at: { x: number; y: number }): void => {
+      // The menu keeps the keyboard where it is: Insert goes there.
+      const field = currentField();
+      openMenu(
+        [
+          { label: 'Insert', action: () => insertClipboard(item.text, field) },
+          { label: 'Capture as task', action: () => captureClipboard(item.text) },
+          { label: 'Copy', action: () => copyClipboard(item.text) },
+        ],
+        at,
+      );
+    },
+    [insertClipboard, captureClipboard, copyClipboard],
+  );
+  /** D-128 Q3: Always show contents; turned on, it says once that a screen share shows them. */
+  const showClipboardContents = useCallback((show: boolean): void => {
+    void window.flintMain.setSetting({ key: 'clipboardShowContents', value: show }).then(() => {
+      clipboardChanged();
+      if (!show) return;
+      void window.flintMain.tipDue('clipboardContentsShown', 1).then((due) => {
+        if (due)
+          showToastRef.current(
+            'Clipboard contents will be visible when you share your screen',
+            false,
+          );
+      });
     });
   }, []);
-  const checkClipboardHistoryRef = useRef(checkClipboardHistory);
-  checkClipboardHistoryRef.current = checkClipboardHistory;
+  /**
+   * D-128 Q6: Paste from clipboard history… (Ctrl+Shift+H): the picker, with the items' text (it
+   * was opened on purpose); the keyboard goes back to `field` before an item goes in.
+   */
+  const pasteFromHistory = useCallback(
+    (field: HTMLElement | null): void => {
+      void window.flintMain.clipboard().then((view) => {
+        if (!view) return;
+        const byId = new Map(view.items.map((item) => [item.id, item]));
+        const note =
+          view.state === 'disabled'
+            ? {
+                text: 'Clipboard history is off in Flint.',
+                action: {
+                  label: 'Turn on',
+                  run: () =>
+                    void window.flintMain
+                      .setSetting({ key: 'clipboardHistory', value: true })
+                      .then(() => clipboardChanged()),
+                },
+              }
+            : (() => {
+                const said = clipboardNote(view);
+                if (!said) return null;
+                return {
+                  text: said.text,
+                  action:
+                    said.action === 'settings'
+                      ? {
+                          label: 'Open clipboard settings',
+                          run: () => void window.flintMain.clipboardSettings(),
+                        }
+                      : said.action === 'retry'
+                        ? {
+                            label: 'Try again',
+                            run: () =>
+                              void window.flintMain.clipboard(true).then(() => clipboardChanged()),
+                          }
+                        : null,
+                };
+              })();
+        const width = Math.min(460, window.innerWidth - 32);
+        openClipboardPicker(
+          {
+            anchor: new DOMRect((window.innerWidth - width) / 2, 72, width, 0),
+            returnFocus: field,
+            width,
+          },
+          view.items.map((item) => ({
+            id: item.id,
+            label: clipPreview(item.text),
+            hint: clipAge(item.at, Date.now()),
+          })),
+          note,
+          {
+            insert: (id) => {
+              const item = byId.get(id);
+              if (item) insertClipboard(item.text, field);
+            },
+            capture: (id) => {
+              const item = byId.get(id);
+              if (item) captureClipboard(item.text);
+            },
+            copy: (id) => {
+              const item = byId.get(id);
+              if (item) copyClipboard(item.text);
+            },
+          },
+        );
+      });
+    },
+    [insertClipboard, captureClipboard, copyClipboard],
+  );
+  const pasteFromHistoryRef = useRef(pasteFromHistory);
+  pasteFromHistoryRef.current = pasteFromHistory;
   useEffect(() => {
     let begun = false;
     void onboardingOnce().then((state) => {
@@ -2651,6 +2753,12 @@ export function App(): ReactElement {
         setPalette(true);
         return;
       }
+      // NAV-08, D-128: Ctrl+Shift+H: Paste from clipboard history… (in the main window).
+      if (key === 'h' && event.ctrlKey && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        pasteFromHistoryRef.current(currentField());
+        return;
+      }
       // Ctrl+Shift+N works anywhere in the window (LIST-01, D-52).
       if (key === 'n' && event.ctrlKey && event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -4045,12 +4153,25 @@ export function App(): ReactElement {
         keywords: 'tips hints show again',
         run: () => void window.flintMain.resetTips().then(() => showToast('Tips reset', false)),
       },
-      // NAV-08, D-127: the check that Windows' clipboard history can be read (step 5's first part).
+      // NAV-08, D-128: Windows' clipboard history.
       {
-        id: 'app:check-clipboard',
-        label: 'Check clipboard history',
-        keywords: 'clipboard history win+v paste diagnostic',
-        run: () => checkClipboardHistory(false),
+        id: 'app:clipboard-paste',
+        label: 'Paste from clipboard history…',
+        keywords: 'clipboard history win+v paste copied insert',
+        hint: 'Ctrl+Shift+H',
+        run: () => pasteFromHistory(currentField()),
+      },
+      {
+        id: 'app:clipboard-show',
+        label: 'Show clipboard contents',
+        keywords: 'clipboard history always show contents reveal screen sharing',
+        run: () => showClipboardContents(true),
+      },
+      {
+        id: 'app:clipboard-hide',
+        label: 'Hide clipboard contents',
+        keywords: 'clipboard history hide contents private screen sharing',
+        run: () => showClipboardContents(false),
       },
       {
         id: 'app:whats-new',
@@ -5131,6 +5252,14 @@ export function App(): ReactElement {
                 current={outlineCurrent}
                 back={panelBack}
                 handlers={panelHandlers}
+                foot={
+                  <ClipboardSection
+                    onInsert={(item) => insertClipboard(item.text, currentField())}
+                    onMenu={clipboardMenu}
+                    onSettings={() => void window.flintMain.clipboardSettings()}
+                    onShowContents={showClipboardContents}
+                  />
+                }
               />
             )}
             {todayColumn && view?.today && (

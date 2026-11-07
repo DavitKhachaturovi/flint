@@ -15,7 +15,7 @@ describe('the clipboard history guard (NAV-08, D-127)', () => {
   });
   afterEach(() => rm(directory, { recursive: true, force: true }));
 
-  const items: ClipboardHistoryRead = { kind: 'ok', items: [{ at: 1, text: 'hello' }] };
+  const items: ClipboardHistoryRead = { kind: 'ok', items: [{ id: 'a', at: 1, text: 'hello' }] };
 
   it('the marker is there during a read and gone after it, also when the read fails', async () => {
     let seen = false;

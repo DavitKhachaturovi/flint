@@ -104,8 +104,10 @@ export function ContextPanel(props: {
   /** D-85: the header's back arrow shows (a task reached from a link in the panel). */
   readonly back: boolean;
   readonly handlers: PanelHandlers;
+  /** NAV-08, D-128: docked at the panel's foot in every state (the Clipboard section). */
+  readonly foot?: ReactNode;
 }): ReactElement {
-  const { state, upNext, current, handlers } = props;
+  const { state, upNext, current, handlers, foot } = props;
   const card = useRef<HTMLElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   useScrollsWhenTaller(card);
@@ -231,6 +233,7 @@ export function ContextPanel(props: {
           </div>
         )}
       </div>
+      {foot}
     </aside>
   );
 }

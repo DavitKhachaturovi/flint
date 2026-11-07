@@ -35,7 +35,8 @@ import {
   type TourEvent,
   type MiniAlert,
   type SettingsView,
-  type ClipboardHistoryCheck,
+  type ClipboardItemView,
+  type ClipboardView,
 } from '../shared/ipc.js';
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
@@ -93,7 +94,7 @@ import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import { TourFile } from './onboarding.js';
 import { ClipboardGuard } from './clipboard-guard.js';
-import { readClipboardHistory } from './clipboard-history.js';
+import { clipboardHistoryPolicyOff, readClipboardHistory } from './clipboard-history.js';
 import { isTipId, TIP_GAP_MS, tipAllowed, TIPS } from '../shared/tips.js';
 import {
   appIcon,
@@ -115,7 +116,8 @@ import {
   type ReminderActivation,
   type ToastOptions,
 } from './toast.js';
-import { VirtualKey } from './win32.js';
+import { clipboardSequence, VirtualKey } from './win32.js';
+import { classifyPaste } from '@flint/core/shorthand';
 
 /**
  * Who this build is (D-33). The installed AppUserModelID must match the installer's Start Menu
@@ -492,7 +494,7 @@ async function start(): Promise<void> {
     tipHooks.tipGapPassed = () => {
       tipsThisSession = tipsThisSession.map((at) => at - TIP_GAP_MS);
     };
-  // NAV-08, D-127: Windows' clipboard history, read-only, behind the crash marker. End-to-end
+  // NAV-08, D-127, D-128: Windows' clipboard history, read-only, behind the crash marker. End-to-end
   // runs never read the real history: they set what it holds (D-93).
   const clipboardGuard = new ClipboardGuard(
     join(app.getPath('userData'), 'clipboard-reading'),
@@ -506,30 +508,106 @@ async function start(): Promise<void> {
   if (clipboardGuard.crashed)
     log('clipboard history: the last read never finished; reads are off until retried');
   app.on('before-quit', () => clipboardGuard.quitting());
-  ipcMain.handle(
-    Channels.mainClipboardHistory,
-    async (event, retry: unknown): Promise<ClipboardHistoryCheck> => {
-      if (!owns(event.sender))
-        return { kind: 'unavailable', ms: 0, count: 0, texts: 0, newest: null };
+  // D-128: what the section shows. The last items stay while a read runs; Windows' clipboard
+  // sequence number says when something new was copied (only then is it read again); a state other
+  // than the items (off, policy, an error) is looked at again at most every 5 s or on a new copy.
+  // Windows answers only while Flint is in front, so a read waits for the main window's focus.
+  let clipboardItems: { readonly sequence: number; readonly items: ClipboardItemView[] } | null =
+    null;
+  let clipboardOther: {
+    readonly state: ClipboardView['state'];
+    readonly sequence: number;
+    readonly at: number;
+  } | null = null;
+  let clipboardReading: Promise<ClipboardView> | null = null;
+  let clipboardLogged = '';
+  const clipboardKind = (text: string): ClipboardItemView['kind'] =>
+    /^\s*https?:\/\/\S+\s*$/i.test(text)
+      ? 'link'
+      : classifyPaste(text) === 'text'
+        ? 'text'
+        : 'code';
+  const clipboardView = (retry: boolean): Promise<ClipboardView> => {
+    const settings = settingsFile.current;
+    const view = (
+      state: ClipboardView['state'],
+      items: readonly ClipboardItemView[] = clipboardItems?.items ?? [],
+    ): ClipboardView => ({ state, items, showContents: settings.clipboardShowContents });
+    if (!settings.clipboardHistory) return Promise.resolve(view('disabled', []));
+    if (clipboardGuard.crashed && !retry) return Promise.resolve(view('paused'));
+    const fake = e2eHooks();
+    const sequence = fake ? (fake.clipboardSequence ?? 0) : clipboardSequence();
+    if (!retry && clipboardOther?.sequence === sequence && Date.now() - clipboardOther.at < 5000)
+      return Promise.resolve(view(clipboardOther.state));
+    if (!retry && !clipboardOther && clipboardItems?.sequence === sequence)
+      return Promise.resolve(view('ok'));
+    // Tests: the window is never focused.
+    if (!fake && !mainWindow.isFocused())
+      return Promise.resolve(view(clipboardOther?.state ?? (clipboardItems ? 'ok' : 'loading')));
+    clipboardReading ??= (async (): Promise<ClipboardView> => {
       const started = performance.now();
-      const read = await clipboardGuard.read(25, retry === true);
+      const read = await clipboardGuard.read(25, retry);
       const ms = Math.round(performance.now() - started);
-      const texts = read.kind === 'ok' ? read.items.filter((item) => item.text !== null) : [];
-      log(
-        `clipboard history: ${read.kind}` +
-          (read.kind === 'ok' ? `, ${read.items.length} items (${texts.length} text)` : '') +
-          (read.kind === 'unavailable' ? `: ${read.reason}` : '') +
-          `, ${ms} ms`,
-      );
-      return {
-        kind: read.kind,
-        ms,
-        count: read.kind === 'ok' ? read.items.length : 0,
-        texts: texts.length,
-        newest: texts[0]?.text?.replace(/\s+/g, ' ').trim().slice(0, 40) ?? null,
-      };
-    },
+      let result: ClipboardView;
+      if (read.kind === 'ok') {
+        const items = read.items.flatMap((item): ClipboardItemView[] =>
+          item.text === null || item.text.trim() === ''
+            ? []
+            : [{ id: item.id, at: item.at, text: item.text, kind: clipboardKind(item.text) }],
+        );
+        clipboardItems = { sequence, items };
+        clipboardOther = null;
+        result = view('ok', items);
+      } else if (read.kind === 'denied') {
+        // Not in front after all: the last items stay; read again next time.
+        result = view(clipboardOther?.state ?? (clipboardItems ? 'ok' : 'loading'));
+      } else {
+        const state =
+          read.kind === 'crashed'
+            ? 'paused'
+            : read.kind === 'off'
+              ? (fake ? fake.clipboardPolicyOff === true : clipboardHistoryPolicyOff())
+                ? 'policy'
+                : 'off'
+              : 'error';
+        if (state === 'off' || state === 'policy') clipboardItems = null;
+        clipboardOther = { state, sequence, at: Date.now() };
+        result = view(state, state === 'error' ? (clipboardItems?.items ?? []) : []);
+      }
+      // The log says when the state changes (and every error), not every read.
+      const said = read.kind === 'ok' ? `ok, ${result.items.length} text items` : `${read.kind}`;
+      if (said !== clipboardLogged || read.kind === 'unavailable') {
+        clipboardLogged = said;
+        log(
+          `clipboard history: ${said}` +
+            (read.kind === 'unavailable' ? ` (${read.reason})` : '') +
+            `, ${ms} ms`,
+        );
+      }
+      return result;
+    })().finally(() => {
+      clipboardReading = null;
+    });
+    return clipboardReading;
+  };
+  ipcMain.handle(Channels.mainClipboard, (event, retry: unknown): Promise<ClipboardView> | null =>
+    owns(event.sender) ? clipboardView(retry === true) : null,
   );
+  ipcMain.handle(Channels.mainClipboardCopy, async (event, text: unknown) => {
+    if (!owns(event.sender) || typeof text !== 'string') return;
+    // D-128: the only time Flint writes the clipboard, on that choice. Tests never touch the real
+    // one (D-93): they see what would have been copied.
+    const hooks = e2eHooks();
+    if (hooks) hooks.copied = [...(hooks.copied ?? []), text];
+    else await clipboard.writeText(text);
+    log('clipboard: an item copied again');
+  });
+  ipcMain.handle(Channels.mainClipboardSettings, (event) => {
+    if (!owns(event.sender)) return;
+    const hooks = e2eHooks();
+    if (hooks) hooks.opened.push('ms-settings:clipboard');
+    else void shell.openExternal('ms-settings:clipboard');
+  });
   ipcMain.handle(Channels.mainResetTips, async (event) => {
     if (!owns(event.sender)) return;
     tips.reset();
@@ -981,6 +1059,8 @@ async function start(): Promise<void> {
       miniReminders: current.miniReminders,
       version: app.getVersion(),
       tipsOff: current.tipsOff,
+      clipboardHistory: current.clipboardHistory,
+      clipboardShowContents: current.clipboardShowContents,
     };
   };
   // APP-10, APP-15, D-117, D-119: what onboarding shows on this start, and the tour's progress.
@@ -1400,6 +1480,23 @@ async function start(): Promise<void> {
     else popup.show(epochNow());
   };
 
+  // D-39: the popup with text to capture: a closed popup starts fresh (its draft is set aside as
+  // the previous draft); an open one collects the text below what it already has.
+  const capturePrefilled = (text: string, at: number): Promise<void> => {
+    const fresh = !popup.window.isVisible();
+    const ready = fresh ? drafts.setAside() : Promise.resolve();
+    return ready.then(() => {
+      if (fresh) popupHasContent = false;
+      popup.show(at, { prefill: text, replaceDraft: fresh });
+    });
+  };
+  // NAV-08, D-128: a clipboard history item captured as a task: as Ctrl+Shift+X would (D-45).
+  ipcMain.handle(Channels.mainClipboardCapture, async (event, text: unknown) => {
+    if (!owns(event.sender) || typeof text !== 'string' || text.trim() === '') return;
+    log('clipboard: an item captured');
+    await capturePrefilled(text, epochNow());
+  });
+
   // CAP-07, R-2: copy what is selected in the app in front, then open the popup with it.
   let selecting = false;
   const onSelectionHotkey = (): void => {
@@ -1410,16 +1507,7 @@ async function start(): Promise<void> {
     captureSelection(keys)
       .then((selection) => {
         log(`capture-selection: ${selection.kind}`);
-        if (selection.kind === 'text') {
-          // D-39: a closed popup starts fresh (its draft is set aside as the previous draft);
-          // an open one collects the selection below what it already has.
-          const fresh = !popup.window.isVisible();
-          const ready = fresh ? drafts.setAside() : Promise.resolve();
-          return ready.then(() => {
-            if (fresh) popupHasContent = false;
-            popup.show(hotkeyAt, { prefill: selection.text, replaceDraft: fresh });
-          });
-        }
+        if (selection.kind === 'text') return capturePrefilled(selection.text, hotkeyAt);
         if (selection.kind === 'elevated') {
           popup.show(hotkeyAt, {
             hint: "Couldn't read selection from an admin window; paste with Ctrl+V",

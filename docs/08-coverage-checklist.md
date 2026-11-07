@@ -938,5 +938,19 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 |---|---|---|---|
 | 1 | Reading Windows' clipboard history through koffi (WinRT), read-only, text first | NAV-08 · Done (0.8.22) | 05, D-127 |
 | 2 | The crash marker: a read that never finished keeps reading off until Retry | NAV-08 · Done (0.8.22) | 02, D-127 |
-| 3 | Ctrl+K → Check clipboard history (the proof, before the section) | NAV-08 · Done (0.8.22); Davit's check on his machine pending | 02, D-127 |
-| 4 | The Clipboard section in the side panel | NAV-08 · v1 · after the check | 02, D-86, D-127 |
+| 3 | Ctrl+K → Check clipboard history (the proof, before the section) | NAV-08 · Done (0.8.22; checked by Davit; removed in 0.8.23) | 02, D-127 |
+| 4 | The Clipboard section in the side panel | NAV-08 · Done (0.8.23) | 02, D-86, D-128 |
+
+## BH. M8 step 5: the Clipboard section (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Docked at the panel's foot in every state; folded with the newest 3, open up to 45 %; remembered; text items only | NAV-08 · Done (0.8.23) | 02, 09, D-128 |
+| 2 | Placeholder bars with kind and age at rest; the text after a ~300 ms rest of the pointer; Always show contents with its one-time note | NAV-08 · Done (0.8.23) | 02, 09, D-128 |
+| 3 | A click pastes into the field with the keyboard (its paste rules, one undo); no field: the toast; press flash | NAV-08 · Done (0.8.23) | 02, D-128 |
+| 4 | Right-click: Insert, Capture as task (the popup as by Ctrl+Shift+X), Copy (the only clipboard write) | NAV-08 · Done (0.8.23) | 02, D-128 |
+| 5 | Paste from clipboard history… (Ctrl+Shift+H): Enter, Shift+Enter, Ctrl+C; Show / Hide clipboard contents in the palette | NAV-08, NAV-01 · Done (0.8.23) | 02, 03, D-128 |
+| 6 | The six states: off, policy, paused, error, no text, refused | NAV-08 · Done (0.8.23) | 02, D-128 |
+| 7 | Settings → Clipboard: Clipboard history, Always show contents | NAV-08, APP-11 · Done (0.8.23) | 02, D-128 |
+| 8 | Reads in the background: texts at once (~40 ms), the last items kept, re-read on a new sequence number | NAV-08 · Done (0.8.23) | 05, D-128 |
+| 9 | Whether Win+V lists a copied item twice after Copy | NAV-08 · Davit's look | D-128 |

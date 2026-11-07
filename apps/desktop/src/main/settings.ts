@@ -63,6 +63,10 @@ export interface Settings {
   readonly lastSeenVersion: string | null;
   /** APP-14, D-118: Don't show tips (off by default: tips show). */
   readonly tipsOff: boolean;
+  /** NAV-08, D-128: Windows' clipboard history in the side panel and the picker (on by default). */
+  readonly clipboardHistory: boolean;
+  /** D-128: its contents shown at rest, not only on a resting pointer (off by default). */
+  readonly clipboardShowContents: boolean;
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -99,6 +103,8 @@ export function defaultSettings(development = false): Settings {
     miniOnTop: true,
     lastSeenVersion: null,
     tipsOff: false,
+    clipboardHistory: true,
+    clipboardShowContents: false,
   };
 }
 
@@ -188,6 +194,13 @@ export function readSettings(stored: Stored, development = false): Settings {
     miniOnTop: pick(stored, 'miniOnTop', isBoolean, defaults.miniOnTop),
     lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
     tipsOff: pick(stored, 'tipsOff', isBoolean, defaults.tipsOff),
+    clipboardHistory: pick(stored, 'clipboardHistory', isBoolean, defaults.clipboardHistory),
+    clipboardShowContents: pick(
+      stored,
+      'clipboardShowContents',
+      isBoolean,
+      defaults.clipboardShowContents,
+    ),
   };
 }
 

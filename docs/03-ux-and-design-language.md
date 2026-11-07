@@ -141,6 +141,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Back / forward on a precision touchpad (NAV-04) | Two-finger horizontal swipe | Decided (D-79) |
 | Interface size (UI-12) | Ctrl+= (Ctrl++) / Ctrl+− / Ctrl+0, remembered per display | Decided (D-81) |
 | Hide / show the context panel (NAV-07) | Ctrl+\, remembered per display | Decided (D-83) |
+| Paste from clipboard history (NAV-08) | Ctrl+Shift+H in the main window: a picker; Enter inserts, Shift+Enter captures as a task, Ctrl+C copies | Decided (D-128) |
 
 ### All text fields
 - Auto-closing brackets and quotes with overtype (UI-09, D-57): `()`, `[]`, `{}`, `""`, `''`, ``` `` ```; quotes don't pair right after a letter.

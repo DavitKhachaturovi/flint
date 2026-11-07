@@ -36,7 +36,7 @@ import {
   type OnboardingState,
   type TourAction,
   type TourEvent,
-  type ClipboardHistoryCheck,
+  type ClipboardView,
 } from '../shared/ipc.js';
 
 /**
@@ -171,9 +171,21 @@ export const main = {
   resetTips(): Promise<void> {
     return invoke(Channels.mainResetTips) as Promise<void>;
   },
-  /** NAV-08, D-127: read Windows' clipboard history (`retry`: after a read that never finished). */
-  clipboardHistory(retry: boolean): Promise<ClipboardHistoryCheck> {
-    return invoke(Channels.mainClipboardHistory, retry) as Promise<ClipboardHistoryCheck>;
+  /** NAV-08, D-128: Windows' clipboard history (`retry`: read now, also after a crash marker). */
+  clipboard(retry = false): Promise<ClipboardView> {
+    return invoke(Channels.mainClipboard, retry) as Promise<ClipboardView>;
+  },
+  /** D-128: Copy: the item becomes the clipboard's content again. */
+  clipboardCopy(text: string): Promise<void> {
+    return invoke(Channels.mainClipboardCopy, text) as Promise<void>;
+  },
+  /** D-128: Capture as task: the capture popup, prefilled as by Ctrl+Shift+X. */
+  clipboardCapture(text: string): Promise<void> {
+    return invoke(Channels.mainClipboardCapture, text) as Promise<void>;
+  },
+  /** D-128: Windows' clipboard settings. */
+  clipboardSettings(): Promise<void> {
+    return invoke(Channels.mainClipboardSettings) as Promise<void>;
   },
   /** The main window came on screen. */
   onShown(listener: () => void): void {

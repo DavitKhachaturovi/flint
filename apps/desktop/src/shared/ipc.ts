@@ -193,8 +193,18 @@ export const Channels = {
   mainTipShown: 'main:tip-shown',
   /** Main window → main: Reset tips (D-118, D-119). */
   mainResetTips: 'main:reset-tips',
-  /** NAV-08, D-127: main window → main: read Windows' clipboard history (`true`: retry after a crash). */
-  mainClipboardHistory: 'main:clipboard-history',
+  /**
+   * NAV-08, D-127, D-128: main window → main: Windows' clipboard history as the section shows it
+   * (`true`: retry, also after a read that never finished); read again only when something new was
+   * copied.
+   */
+  mainClipboard: 'main:clipboard',
+  /** D-128: an item copied again (the only time Flint writes the clipboard, on that choice). */
+  mainClipboardCopy: 'main:clipboard-copy',
+  /** D-128: an item captured as a task: the capture popup, prefilled as by Ctrl+Shift+X. */
+  mainClipboardCapture: 'main:clipboard-capture',
+  /** D-128: Windows' clipboard settings (`ms-settings:clipboard`). */
+  mainClipboardSettings: 'main:clipboard-settings',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
@@ -493,6 +503,9 @@ export interface SettingsView {
   readonly version: string;
   /** APP-14, D-118: Don't show tips. */
   readonly tipsOff: boolean;
+  /** NAV-08, D-128: clipboard history on in Flint; its contents shown at rest. */
+  readonly clipboardHistory: boolean;
+  readonly clipboardShowContents: boolean;
 }
 
 /** The settings the Settings view can change, and the values they take. */
@@ -502,7 +515,12 @@ export type SettingChange =
       readonly value: boolean;
     }
   | {
-      readonly key: 'hideNotificationText' | 'rolloverPrompt' | 'tipsOff';
+      readonly key:
+        | 'hideNotificationText'
+        | 'rolloverPrompt'
+        | 'tipsOff'
+        | 'clipboardHistory'
+        | 'clipboardShowContents';
       readonly value: boolean;
     }
   | { readonly key: 'autoArchiveDays'; readonly value: number | null }
@@ -927,15 +945,26 @@ export interface NoteEditorState {
   readonly editor: 'main' | 'mini' | null;
 }
 
+/** NAV-08, D-128: one text item of Windows' clipboard history. */
+export interface ClipboardItemView {
+  /** Windows' id for it. */
+  readonly id: string;
+  /** When it was copied (ms since 1970). */
+  readonly at: number;
+  readonly text: string;
+  /** "Link" (one URL), "Code" (as pasting into the capture popup judges it, CAP-06) or "Text". */
+  readonly kind: 'text' | 'link' | 'code';
+}
+
 /**
- * NAV-08, D-127: a check of Windows' clipboard history: how it went (`crashed`: the last read
- * never finished, reads are off until retried), how long it took, how many items and text items,
- * and the start of the newest text (the check shows it, so the reading can be seen to work).
+ * NAV-08, D-128: what the Clipboard section and its picker show. `ok`: the items (text only, newest
+ * first); `off`: history is off in Windows; `policy`: turned off on this PC (a group policy);
+ * `paused`: the last read never finished (D-127), reads wait for Try again; `error`: it couldn't be
+ * read (the last items stay); `disabled`: off in Flint's settings; `loading`: not read yet.
  */
-export interface ClipboardHistoryCheck {
-  readonly kind: 'ok' | 'off' | 'denied' | 'unavailable' | 'crashed';
-  readonly ms: number;
-  readonly count: number;
-  readonly texts: number;
-  readonly newest: string | null;
+export interface ClipboardView {
+  readonly state: 'ok' | 'off' | 'policy' | 'paused' | 'error' | 'disabled' | 'loading';
+  readonly items: readonly ClipboardItemView[];
+  /** Its contents shown at rest (Always show contents). */
+  readonly showContents: boolean;
 }

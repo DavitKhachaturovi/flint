@@ -174,3 +174,17 @@ export const TrashIcon = ({ size = 14 }: IconProps): ReactElement =>
 /** DATA-02, D-97: a task in the Trash view (an empty checkbox). */
 export const TaskIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <rect x="4" y="4" width="16" height="16" rx="5" />);
+
+/** NAV-08, D-128: the Clipboard section's Always show contents (on: an open eye). */
+export const EyeIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />,
+    <circle key="b" cx="12" cy="12" r="3" />,
+  ]);
+
+export const EyeOffIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.2 3.1" />,
+    <path key="b" d="M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.4-1.6" />,
+    <path key="c" d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />,
+  ]);

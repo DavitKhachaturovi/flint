@@ -7031,3 +7031,173 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-ground-tile);
   color: var(--fl-text-primary);
 }
+
+/* NAV-08, D-128 (09 §8): the Clipboard section, docked at the side panel's foot in every state: it
+   stays in place while the panel's content scrolls behind it. Folded, its newest three rows; open,
+   all of them, scrolling, up to about 45 % of the panel. At rest a row is a placeholder bar with
+   its kind and age (never the text); the text fades in while the pointer rests on the section. */
+.clip-section {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 8px 14px 12px 20px;
+  border-top: 1px solid var(--fl-edge-divider);
+  border-radius: 0 0 var(--fl-radius-card) var(--fl-radius-card);
+  background: var(--fl-ground-card);
+  --clip-row: 30px;
+}
+
+.clip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clip-fold {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+  text-align: left;
+  color: var(--fl-text-faint);
+}
+
+.clip-fold:hover,
+.clip-fold:hover .panel-label {
+  color: var(--fl-text-muted);
+}
+
+.clip-fold .chev {
+  display: flex;
+  transition: transform var(--fl-dur-base) var(--fl-ease-spring);
+}
+
+.clip-section.open .clip-fold .chev {
+  transform: rotate(90deg);
+}
+
+.clip-count {
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+}
+
+.clip-eye {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--fl-radius-button);
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.clip-eye:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-muted);
+}
+
+.clip-eye.on {
+  color: var(--fl-text-secondary);
+}
+
+.clip-rows {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(3 * var(--clip-row));
+  margin-top: 2px;
+  overflow: hidden;
+  transition: max-height var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.clip-section.open .clip-rows {
+  max-height: calc(0.45 * (100vh - 72px));
+  overflow-y: auto;
+}
+
+.clip-row {
+  display: flex;
+  flex: 0 0 var(--clip-row);
+  align-items: center;
+  gap: 10px;
+  width: calc(100% + 8px);
+  height: var(--clip-row);
+  padding: 0 8px;
+  margin-left: -8px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--fl-text-heading-soft);
+  transition: background-color var(--fl-dur-fast);
+  animation: clip-in var(--fl-dur-state) ease-out;
+}
+
+.clip-row:hover {
+  background: var(--fl-ground-hover);
+}
+
+/* A click: a brief press flash as the item goes in. */
+.clip-row.pressed {
+  animation: clip-press calc(var(--fl-dur-state) * 1.4) ease-out;
+}
+
+@keyframes clip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes clip-press {
+  from {
+    background: var(--fl-ground-tile);
+  }
+}
+
+.clip-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: clip-reveal var(--fl-dur-fast) ease-out;
+}
+
+.clip-bar {
+  flex: 0 0 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fl-ground-tile);
+  animation: clip-reveal var(--fl-dur-fast) ease-out;
+}
+
+.clip-kind {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+
+.clip-age {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+@keyframes clip-reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+.clip-note p {
+  margin: 4px 0 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-muted);
+}

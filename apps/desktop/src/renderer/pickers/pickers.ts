@@ -34,6 +34,8 @@ export interface PickerHost {
   readonly room?: MenuOptions['room'];
   /** D-76: the button that opens it; pressing it again closes the picker. */
   readonly trigger?: HTMLElement;
+  /** D-128: wider than the usual 280 px (the clipboard picker's lines). */
+  readonly width?: number;
 }
 
 /** Picker buttons: a press on one doesn't close the open picker, so the next can morph from it. */
@@ -98,6 +100,8 @@ function openPanel(
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', label);
   panel.style.visibility = 'hidden';
+  const width = host.width ?? WIDTH;
+  if (host.width) panel.style.width = `${width}px`;
   // The picker owns the keyboard while it has the focus: Tab, digits and arrows are its own, never
   // the list's Navigate keys (docs/03 §2).
   panel.addEventListener('keydown', (event) => event.stopPropagation());
@@ -107,7 +111,7 @@ function openPanel(
     const { height } = panel.getBoundingClientRect();
     // D-115: within the window's visible part (mini's window reaches past the screen's edge).
     const area = floatingArea();
-    const x = Math.max(area.left + GAP, Math.min(host.anchor.left, area.right - WIDTH - GAP));
+    const x = Math.max(area.left + GAP, Math.min(host.anchor.left, area.right - width - GAP));
     let y = host.anchor.bottom + GAP;
     if (y + height > area.bottom - GAP) {
       if (host.anchor.top - GAP - height >= area.top + GAP) y = host.anchor.top - GAP - height;
@@ -278,6 +282,8 @@ interface RowList {
   readonly set: (rows: readonly Row[], index?: number, shown?: boolean) => void;
   /** ↑/↓ reveal or move the highlight, Enter picks it if visible; true if the key was used. */
   readonly keys: (event: KeyboardEvent) => boolean;
+  /** D-128: the row Enter would pick now (the highlighted one; the first when something is typed). */
+  readonly current: (typed: boolean) => Row | null;
 }
 
 /**
@@ -333,6 +339,9 @@ function rowList(area: HTMLElement): RowList {
         return true;
       }
       return false;
+    },
+    current(typed) {
+      return shown || typed ? (rows[index] ?? null) : null;
     },
   };
 }
@@ -1008,4 +1017,119 @@ export function openTimePicker(
   renderRows();
   renderGrid();
   show(text);
+}
+
+/** NAV-08, D-128: an item of the clipboard picker. */
+export interface ClipPick {
+  readonly id: string;
+  /** Its first line (the picker shows the text: it was opened on purpose, D-128 Q3). */
+  readonly label: string;
+  /** Its age. */
+  readonly hint: string;
+}
+
+/** What the clipboard picker shows instead of items (D-128 Q7), with its one action. */
+export interface ClipNote {
+  readonly text: string;
+  readonly action: { readonly label: string; readonly run: () => void } | null;
+}
+
+/**
+ * NAV-08, D-128: Paste from clipboard history… (Ctrl+Shift+H): a search field, then Windows'
+ * clipboard history, newest first, five in view and the rest scrolling. Enter inserts the item
+ * (the keyboard goes back where it was first), Shift+Enter captures it as a task, Ctrl+C copies it
+ * (or the search field's selected text, as any field would).
+ */
+export function openClipboardPicker(
+  host: PickerHost,
+  items: readonly ClipPick[],
+  note: ClipNote | null,
+  on: {
+    readonly insert: (id: string) => void;
+    readonly capture: (id: string) => void;
+    readonly copy: (id: string) => void;
+  },
+): void {
+  const opened = openPanel(host, 'Paste from clipboard history');
+  if (!opened) return;
+  const { panel, close, show } = opened;
+  const search = element('input', 'fl-picker-search');
+  search.placeholder = 'Paste from clipboard history…';
+  search.spellcheck = false;
+  const box = element('div', 'fl-picker-rows five');
+  const foot = element('div', 'fl-picker-foot');
+  for (const [key, what] of [
+    ['Enter', 'insert'],
+    ['Shift+Enter', 'task'],
+    ['Ctrl+C', 'copy'],
+  ] as const) {
+    const hint = element('span', 'fl-picker-foot-hint');
+    hint.append(element('kbd', 'fl-picker-key', key), ` ${what}`);
+    foot.append(hint);
+  }
+  panel.append(search, box);
+  if (!note) panel.append(foot);
+  const highlight = rowList(box);
+  const picks = new Map<HTMLButtonElement, string>();
+  const render = (): void => {
+    picks.clear();
+    if (note) {
+      const rows = note.action
+        ? [
+            makeRow(note.action.label, null, () => {
+              close();
+              note.action?.run();
+            }),
+          ]
+        : [];
+      box.replaceChildren(
+        element('p', 'fl-picker-empty', note.text),
+        ...rows.map((row) => row.button),
+      );
+      highlight.set(rows, 0, false);
+      return;
+    }
+    const typed = search.value.trim().toLowerCase();
+    const found = items.filter((item) => typed === '' || item.label.toLowerCase().includes(typed));
+    const rows = found.map((item) => {
+      const row = makeRow(item.label, item.hint, () => {
+        close();
+        on.insert(item.id);
+      });
+      picks.set(row.button, item.id);
+      return row;
+    });
+    box.replaceChildren(...rows.map((row) => row.button));
+    if (rows.length === 0)
+      box.append(element('p', 'fl-picker-empty', typed === '' ? 'Nothing copied yet' : 'No match'));
+    highlight.set(rows, 0, typed !== '');
+  };
+  const chosen = (): string | null => {
+    const row = highlight.current(search.value.trim() !== '');
+    return row ? (picks.get(row.button) ?? null) : null;
+  };
+  search.addEventListener('input', render);
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.shiftKey) {
+      event.preventDefault();
+      const id = chosen();
+      if (id === null) return;
+      close();
+      on.capture(id);
+      return;
+    }
+    // Ctrl+C: the search field's selected text, as any field; else the highlighted item.
+    if (event.key.toLowerCase() === 'c' && event.ctrlKey && !event.shiftKey && !event.altKey) {
+      if (search.selectionStart !== search.selectionEnd) return;
+      event.preventDefault();
+      const id = chosen();
+      if (id === null) return;
+      close();
+      on.copy(id);
+      return;
+    }
+    if (highlight.keys(event)) event.preventDefault();
+  });
+  render();
+  show(search);
 }
