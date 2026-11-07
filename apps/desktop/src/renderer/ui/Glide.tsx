@@ -121,6 +121,8 @@ export function Glide(props: {
       const follow = measured.current.target === target && settled;
       if (measured.current.target !== target) measured.current = { target, at: now };
       // D-80: a list inside a group card is placed within the card: offsets add up to ours.
+      // D-131: without a group card's own offset while it slides (D-102 moves it by `top` and
+      // `left`): where the row will rest, not where it is mid-slide (the highlight stayed there).
       let x = 0;
       let y = 0;
       for (
@@ -130,6 +132,11 @@ export function Glide(props: {
       ) {
         x += node.offsetLeft;
         y += node.offsetTop;
+        const style = getComputedStyle(node);
+        if (style.position === 'relative') {
+          x -= parseFloat(style.left) || 0;
+          y -= parseFloat(style.top) || 0;
+        }
       }
       setBox(
         row

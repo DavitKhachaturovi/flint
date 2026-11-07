@@ -28,6 +28,7 @@ const MINI_PLATFORM = [
   'quickNote',
   'keepQuickNote',
   'discardQuickNote',
+  'quickNoteOpened',
   'listAction',
   'linkPatterns',
   'builtInLinksOff',

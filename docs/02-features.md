@@ -639,7 +639,8 @@ Without sync, the local disk is the only copy, so this matters more.
 - **D-104 (0.8.2), changing it:** Settings → General → Flint folder → **Change…**: Windows' folder picker, then Flint asks in the row, depending on the chosen folder: an empty one: **Move my lists here** (copied and checked file by file; the old folder stays as a backup) or **Start fresh here**; one with Flint lists: **Open these lists** (merging is Later); another non-empty one: **Use a Flint subfolder inside it** or **Use this folder directly**, then Move or Start fresh. The OneDrive warning shows when it applies; a failed copy leaves everything as it was and says why. Flint restarts on the new folder, back on Settings.
 - **Proposed (D-24):** a list that can't be read because it is cloud-only or locked shows that plainly instead of an empty list; a OneDrive conflict copy shows a notice saying so instead of appearing as a normal extra list.
 
-### DATA-08 — Import from Obsidian (late v1, low priority)
+### DATA-08 — Import from Obsidian (Later, after v1; D-131)
+- **D-131: moved to Later (after v1).** For then: import at the top level of the sidebar or into a group ("Obsidian" by default, renamable); the vault's folders and subfolders need a decision (Flint's groups are one level: flatten them, or sub-groups then).
 - **Recorded (D-116), details to be grilled when it comes up.** The first-run welcome offers it, skippable ("you can import later from Settings → Data"); Settings → Data has it too.
 - Pick a vault: Flint **copies** all its notes into the Flint folder as plain notes (no checklist-to-task conversion; notes often mix text and checklists). It never moves or changes the vault.
 - Notes are copied flat; a duplicate name gets " (2)". To consider: the vault's top-level folders as sidebar groups.
@@ -707,7 +708,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 - Flint folder location.
 - Global hotkeys (capture, capture-selection).
 - Start with Windows.
-- Theme: **dark only in v1** (light mode Later; the setting may be omitted until then), density (comfortable / compact), monospace toggle.
+- Theme: **dark only in v1** (light mode Later; the setting may be omitted until then), density (comfortable / compact; **D-131: Later**, v1 keeps one density), monospace toggle.
 - ~~Priority palette (default / color-blind-safe)~~: not needed in v1, priority is grayscale by lightness and thickness (D-17).
 - Notifications on/off, sound on/off and sound choice, Focus Assist explanation, "Hide task text in notifications" (REM-10).
 - Today rollover prompt on/off.

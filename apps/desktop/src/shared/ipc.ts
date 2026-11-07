@@ -140,6 +140,8 @@ export const Channels = {
   /** NOTE-08, D-99: a new quick note; an empty one left behind goes. */
   mainQuickNote: 'main:quick-note',
   mainDiscardQuickNote: 'main:discard-quick-note',
+  /** D-131: a window opened a quick note: a removal waiting since it was left is called off. */
+  mainQuickNoteOpened: 'main:quick-note-opened',
   mainKeepQuickNote: 'main:keep-quick-note',
   /** Main window → main: open a link from a title in the browser (LIST-02). */
   mainOpenLink: 'main:open-link',

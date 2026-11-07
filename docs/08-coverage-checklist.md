@@ -856,7 +856,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | Settings saved by an older version work at once after an update (the pages' calls wait for main) | NOTE-07, APP-11 · Done (0.8.15) | D-116, `e2e/startup.spec.ts` |
 | 2 | The walkthrough's rings and what moves each step on; the title bar's mini button for step 8 | APP-10, APP-13 · Decided · M8 step 4b | 02, D-116 |
 | 3 | You're set: Remove what I created during the tour (one undoable step) | APP-10 · Decided · M8 step 4b | 02, D-116 |
-| 4 | Import from Obsidian (copy notes and images, never change the vault) | DATA-08 · Recorded · late v1 | 02, D-116 |
+| 4 | Import from Obsidian (copy notes and images, never change the vault) | DATA-08 · Later (after v1, D-131) | 02, D-116, D-131 |
 
 ## AY. Fresh install or update; What's new in plain language (6 Nov 2026)
 
@@ -968,3 +968,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Always show contents only in the section and the palette; the setting's new description | NAV-08, APP-11 · Done (0.8.24) | 02, D-129 |
 | 8 | A place's scroll position restored on a slow machine too; nothing scrolls under the Clipboard section | NAV-04, NAV-08 · Done (0.8.25) | D-130 |
 | 9 | Pictures saved without a temporary folder inside attachments/ | MEDIA-01 · Done (0.8.26) | D-130 |
+
+## BJ. After 0.8.24–0.8.26 (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The sidebar highlight lands exactly on its row after a deletion, in a group too | UI-04 · Done (0.8.27) | D-131 |
+| 2 | An empty quick note gone back to isn't removed; each leave waits anew | NOTE-08 · Done (0.8.27) | D-131 |
+| 3 | Density (comfortable / compact) | APP-11 · Later (D-131) | 02, D-131 |
+| 4 | Import from Obsidian: top level or a group, the vault's folders decided then | DATA-08 · Later (D-131) | 02, D-131 |

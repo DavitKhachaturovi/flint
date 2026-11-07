@@ -297,6 +297,10 @@ export const main = {
   discardQuickNote(id: string): Promise<boolean> {
     return invoke(Channels.mainDiscardQuickNote, id) as Promise<boolean>;
   },
+  /** D-131: a quick note opened (again): its removal, if one is waiting, is called off. */
+  quickNoteOpened(id: string): void {
+    send(Channels.mainQuickNoteOpened, id);
+  },
   /** DATA-05, D-99: Export Flint folder… (a save dialog in the main process). */
   exportFolder(): Promise<void> {
     return invoke(Channels.mainExport) as Promise<void>;

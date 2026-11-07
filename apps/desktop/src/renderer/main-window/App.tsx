@@ -1970,6 +1970,9 @@ export function App(): ReactElement {
   useEffect(() => {
     const before = lastPlace.current;
     lastPlace.current = listId;
+    // D-131: back in a quick note before its removal: it stays (the next leave waits anew).
+    if (before !== listId && lists.find((list) => list.id === listId)?.quick)
+      window.flintMain.quickNoteOpened(listId);
     if (before !== listId && lists.find((list) => list.id === before)?.quick)
       void window.flintMain.discardQuickNote(before).then(async (removed) => {
         if (removed && (await window.flintMain.tipDue('emptyQuickNote', 3)))

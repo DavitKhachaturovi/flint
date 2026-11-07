@@ -1395,8 +1395,14 @@ async function start(): Promise<void> {
       ? workspace.keepQuickNote(id, null, new Date())
       : null,
   );
+  ipcMain.on(Channels.mainQuickNoteOpened, (event, id: unknown) => {
+    if (owns(event.sender) && typeof id === 'string') workspace.quickNoteOpened(id);
+  });
   ipcMain.handle(Channels.mainDiscardQuickNote, (event, id: unknown) =>
-    owns(event.sender) && typeof id === 'string' ? workspace.discardQuickNote(id) : false,
+    // D-131: kept when a window has it open again by then (the main window went back, or mini).
+    owns(event.sender) && typeof id === 'string'
+      ? workspace.discardQuickNote(id, () => noteEditors.owner(id) === null)
+      : false,
   );
   // D-99: Export, from Trash's header until Settings → Data (M8).
   ipcMain.handle(Channels.mainExport, (event) => (owns(event.sender) ? exportFolder() : undefined));

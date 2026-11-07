@@ -129,6 +129,10 @@ export function MiniApp(): ReactElement {
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
   // The Note tab: the note shown ('' a new one, not made yet; null: to be chosen), its view.
   const [noteId, setNoteId] = useState<string | null>(null);
+  // D-131: a quick note shown here isn't removed for having been left empty in the main window.
+  useEffect(() => {
+    if (noteId) window.flintMain.quickNoteOpened(noteId);
+  }, [noteId]);
   const [noteView, setNoteView] = useState<ListView | null>(null);
   const [kept, setKept] = useState(false);
   // Notes made here (the lists may not have them yet), and notes removed (the lists may still).

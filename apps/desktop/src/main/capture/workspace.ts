@@ -669,12 +669,27 @@ export class Workspace {
     });
   }
 
+  /** D-131: the latest leave of each quick note (an earlier wait gives way to it). */
+  private readonly discards = new Map<string, number>();
+
+  /** D-131: a quick note opened again: the removal waiting since it was left is called off. */
+  quickNoteOpened(id: string): void {
+    if (this.discards.has(id)) this.discards.set(id, (this.discards.get(id) ?? 0) + 1);
+  }
+
   /**
    * NOTE-08, D-99: a quick note left empty goes (for good: nothing was in it). Checked after a
-   * moment, so an edit still being saved as the note was left keeps it.
+   * moment, so an edit still being saved as the note was left keeps it. D-131: not if it was opened
+   * again meanwhile (`stillLeft` says, when the moment is over), and each leave starts the moment
+   * anew (returning and leaving again doesn't inherit the first one's).
    */
-  async discardQuickNote(id: string): Promise<boolean> {
+  async discardQuickNote(id: string, stillLeft: () => boolean = () => true): Promise<boolean> {
+    const leave = (this.discards.get(id) ?? 0) + 1;
+    this.discards.set(id, leave);
     await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (this.discards.get(id) !== leave) return false;
+    this.discards.delete(id);
+    if (!stillLeft()) return false;
     return this.serial(async () => {
       const list = this.find(id);
       // D-102: only an untitled one (a title is something to keep).

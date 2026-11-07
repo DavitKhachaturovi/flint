@@ -188,3 +188,50 @@ test('in a group: Move to top of group, and Move to top (of Lists, out of the gr
   await main.keyboard.press('Enter');
   await expect.poll(groupLists).toEqual(['errand-two', 'errand-one']);
 });
+
+test('deleting a quick note: the highlight lands exactly on the list opened instead, in a group too (UI-04, D-131)', async () => {
+  const errand = main.locator('.nav:not(.flip-ghost)', { hasText: 'Errand one' });
+  await errand.scrollIntoViewIfNeeded();
+  await errand.click();
+  await expect(main.locator('.nav.on:not(.flip-ghost)')).toContainText('Errand one');
+  // A quick note with something in it (an empty one goes by itself), then deleted.
+  await main.keyboard.press('Control+Shift+j');
+  const editor = main.locator('.main .note-card .cm-content');
+  await editor.click();
+  await main.keyboard.type('something to delete');
+  const quick = main.locator('.quick-notes .nav:not(.flip-ghost)').first();
+  await expect(quick).toBeVisible();
+  await quick.click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Delete' }).last().click();
+  await expect(main.locator('.nav.on:not(.flip-ghost)')).toContainText('Errand one');
+  // Once the sidebar has settled, the highlight sits exactly on the open list.
+  const offset = (): Promise<number | null> =>
+    main.evaluate(() => {
+      const on = document.querySelector('.nav.on:not(.flip-ghost)')?.getBoundingClientRect();
+      const glide = document.querySelector('.nav-glide')?.getBoundingClientRect();
+      return on && glide
+        ? Math.round(Math.abs(on.top - glide.top) + Math.abs(on.left - glide.left))
+        : null;
+    });
+  await main.waitForTimeout(800);
+  expect(await offset()).toBe(0);
+});
+
+test('an empty quick note gone back to is kept; left again, it goes (NOTE-08, D-131)', async () => {
+  const quickRows = main.locator('.quick-notes .nav:not(.flip-ghost)');
+  const before = await quickRows.count();
+  await main.keyboard.press('Control+Shift+j');
+  await expect(quickRows).toHaveCount(before + 1);
+  const label = (await quickRows.first().locator('.nav-name').textContent()) ?? '';
+  // Left empty, then back within the moment it waits: it stays, also after the moment.
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await main.waitForTimeout(500);
+  await quickRows.first().click();
+  await expect(main.locator('.nav.on:not(.flip-ghost)')).toContainText(label);
+  await main.waitForTimeout(3000);
+  await expect(quickRows).toHaveCount(before + 1);
+  await expect(main.locator('.nav.on:not(.flip-ghost)')).toContainText(label);
+  // Left again (still empty): it goes.
+  await main.locator('.nav', { hasText: 'Inbox' }).click();
+  await expect(quickRows).toHaveCount(before, { timeout: 6000 });
+});
