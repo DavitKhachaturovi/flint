@@ -3,6 +3,7 @@ import type { ArchivedList, TrashItem, TrashPreview, TrashView } from '../../sha
 import { BodyBlock } from './Body.js';
 import { BackIcon, CheckIcon, CloseIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
 import { usePresence } from '../ui/presence.js';
+import { durationMs } from '../ui/motion.js';
 
 /**
  * The Trash view (DATA-02, TASK-06, D-97): what was deleted, by day, newest first, with Restore
@@ -49,6 +50,26 @@ function shortDate(stamp: string): string {
 
 /** D-99: how long "Restore to edit" stays after a try to edit. */
 const LOCKED_MS = 4000;
+
+/**
+ * D-133 (UI-10, D-89): a card that went folds away from its own height (CSS can't ease a height
+ * from auto), then `gone` takes it out.
+ */
+function foldAway(gone: () => void): (node: HTMLElement | null) => void {
+  return (node) => {
+    if (!node || node.dataset['folding']) return;
+    node.dataset['folding'] = '1';
+    node
+      .animate(
+        [
+          { height: `${node.offsetHeight}px`, opacity: 1 },
+          { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', marginTop: '0px' },
+        ],
+        { duration: durationMs('--fl-dur-state', 260), easing: 'ease-in', fill: 'forwards' },
+      )
+      .finished.then(gone, gone);
+  };
+}
 
 /** An action asked inline before it happens ("Delete forever?" Delete · Cancel). */
 function Confirm(props: {
@@ -336,6 +357,9 @@ export function TrashScreen(props: {
     if (last?.label === label) last.items.push(item);
     else days.push({ label, items: [item] });
   }
+  // D-133 (UI-10, D-89): a day or a list whose last item went (restored, deleted) folds away.
+  const dayCards = usePresence(days, (day) => day.label);
+  const listCards = usePresence(archived, (list) => list.listId);
   if (open && asPage)
     return (
       <TrashPreviewView
@@ -404,11 +428,17 @@ export function TrashScreen(props: {
       </div>
       <div className="trash-panel" key={tab}>
         {tab === 'deleted' ? (
-          days.length === 0 ? (
+          dayCards.entries.length === 0 ? (
             <p className="empty trash-empty">Trash is empty.</p>
           ) : (
-            days.map((day) => (
-              <section key={day.label} className="card trash-group" aria-label={day.label}>
+            dayCards.entries.map(({ item: day, key, leaving }) => (
+              <section
+                key={key}
+                className={leaving ? 'card trash-group leaving' : 'card trash-group'}
+                aria-label={day.label}
+                inert={leaving}
+                ref={leaving ? foldAway(() => dayCards.gone(key)) : undefined}
+              >
                 <div className="panel-label trash-group-label">{day.label}</div>
                 <DeletedRows
                   items={day.items}
@@ -421,13 +451,19 @@ export function TrashScreen(props: {
               </section>
             ))
           )
-        ) : archived.length === 0 ? (
+        ) : listCards.entries.length === 0 ? (
           <p className="empty trash-empty">
             Nothing archived. With auto-archive on, completed tasks move here after 14 days.
           </p>
         ) : (
-          archived.map((list) => (
-            <section key={list.listId} className="card trash-group" aria-label={list.listName}>
+          listCards.entries.map(({ item: list, key, leaving }) => (
+            <section
+              key={key}
+              className={leaving ? 'card trash-group leaving' : 'card trash-group'}
+              aria-label={list.listName}
+              inert={leaving}
+              ref={leaving ? foldAway(() => listCards.gone(key)) : undefined}
+            >
               <div className="panel-label trash-group-label">
                 {list.listName} · {list.tasks.length}
               </div>

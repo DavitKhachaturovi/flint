@@ -4683,6 +4683,17 @@ body[data-tour-step='5'] .main .row .pin-hover {
   padding: 2px 10px 6px;
 }
 
+/* D-133: a day or list whose last item went folds away (Trash.tsx animates its height); "Trash is
+   empty." fades in after it. */
+.trash-group.leaving {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.trash-empty {
+  animation: fade-in var(--fl-dur-state) ease-out;
+}
+
 .trash-rows {
   display: flex;
   flex-direction: column;
@@ -4743,7 +4754,10 @@ body[data-tour-step='5'] .main .row .pin-hover {
   gap: 2px;
 }
 
-.trash-confirm {
+/* D-133: the question and the buttons it stands in for fade in, either way. */
+.trash-confirm,
+.trash-actions,
+.link-pattern-actions {
   animation: fade-in var(--fl-dur-fast) ease-out;
 }
 
@@ -5575,6 +5589,19 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-ground-well);
   box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
   animation: today-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* D-133: a panel that goes (Cancel, Save) fades out where it is. */
+.settings-panel.leaving {
+  pointer-events: none;
+  animation: settings-panel-out var(--fl-dur-fast) ease-in forwards;
+}
+
+@keyframes settings-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .settings-panel p {

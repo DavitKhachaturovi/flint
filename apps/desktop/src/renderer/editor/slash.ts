@@ -7,7 +7,7 @@ import {
   type CompletionResult,
 } from '@codemirror/autocomplete';
 import { Prec, type Extension } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, ViewPlugin } from '@codemirror/view';
 import { EDITOR_COMMANDS, inCode, type CommandHost } from './commands.js';
 
 /**
@@ -17,6 +17,50 @@ import { EDITOR_COMMANDS, inCode, type CommandHost } from './commands.js';
  * each with its tile and `/word` (mockup 04). The menu is CodeMirror's completion list, styled in
  * editor.css.
  */
+/**
+ * D-133 (UI-10, D-89): the menu fades out where it was when it closes (CodeMirror removes it at
+ * once): a copy of it, no longer the menu (`fl-slash-ghost`), fades and goes.
+ */
+const fadeOnClose = ViewPlugin.fromClass(
+  class {
+    private readonly observer: MutationObserver;
+
+    constructor(view: EditorView) {
+      this.observer = new MutationObserver((records) => {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        for (const record of records)
+          for (const node of record.removedNodes) {
+            if (!(node instanceof HTMLElement) || !node.classList.contains('fl-slash-menu'))
+              continue;
+            const ghost = node.cloneNode(true) as HTMLElement;
+            ghost.classList.replace('fl-slash-menu', 'fl-slash-ghost');
+            ghost.setAttribute('aria-hidden', 'true');
+            ghost.removeAttribute('id');
+            for (const inner of ghost.querySelectorAll('[id]')) inner.removeAttribute('id');
+            record.target.appendChild(ghost);
+            ghost
+              .animate(
+                [
+                  { opacity: 1, transform: 'none' },
+                  { opacity: 0, transform: 'translateY(-3px) scale(0.98)' },
+                ],
+                { duration: 160, easing: 'ease-in', fill: 'forwards' },
+              )
+              .finished.then(
+                () => ghost.remove(),
+                () => ghost.remove(),
+              );
+          }
+      });
+      this.observer.observe(view.dom, { childList: true });
+    }
+
+    destroy(): void {
+      this.observer.disconnect();
+    }
+  },
+);
+
 export function slashCommands(host: () => CommandHost): Extension {
   const source = (context: CompletionContext): CompletionResult | null => {
     const typed = context.matchBefore(/(?:^|\s)\/[\w-]*$/);
@@ -59,6 +103,7 @@ export function slashCommands(host: () => CommandHost): Extension {
     window.setTimeout(() => startCompletion(update.view), 0);
   });
   return [
+    fadeOnClose,
     // Tab applies the item too (D-82); without the menu it indents as usual.
     Prec.highest(keymap.of([{ key: 'Tab', run: acceptCompletion }])),
     opener,

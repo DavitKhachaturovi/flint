@@ -844,6 +844,7 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 - Milestones: the composer, the capture popup and task editing in M4; the note editor (CodeMirror) in M5.
 
 ### UI-10 — A motion pass over everything (v1, D-67)
+- **D-133 (done, 0.8.29):** a motion census (`e2e/motion.spec.ts`) drives every kind of action and fails on one that should move and doesn't; the gaps it found are fixed (the pin pop for P and the menu, the slash menu, Settings' panels closing, Trash's question and emptied groups). Instant by decision: reduce-motion, typing, the popup's first frame, opening a list's rows.
 - Smooth, minimal opening, closing and state transitions for every button, menu, picker, popup and row action, following the motion rule of 03 §5 (D-75: motion never delays input; fuller default durations). No gimmicks; off with reduce-motion and scaled by the animation-speed setting (APP-11).
 - Milestone: M8 at the latest; done earlier wherever it is cheap, as items are touched.
 

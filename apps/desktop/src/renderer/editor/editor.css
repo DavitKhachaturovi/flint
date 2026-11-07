@@ -276,8 +276,24 @@
   color: var(--fl-text-primary);
 }
 
-/* NOTE-03, D-82 (mockup 04): the slash menu, a floating panel of tiles, names and `/words`. */
+/* NOTE-03, D-82 (mockup 04): the slash menu, a floating panel of tiles, names and `/words`. D-133: it
+   fades in, and its copy (`fl-slash-ghost`) fades out where it was when it closes. */
 .md-editor .cm-tooltip.cm-tooltip-autocomplete.fl-slash-menu {
+  animation: fl-slash-in var(--fl-dur-fast) ease-out;
+}
+
+@keyframes fl-slash-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+}
+
+.md-editor .cm-tooltip.cm-tooltip-autocomplete.fl-slash-ghost {
+  pointer-events: none;
+}
+
+.md-editor .cm-tooltip.cm-tooltip-autocomplete:is(.fl-slash-menu, .fl-slash-ghost) {
   padding: 6px;
   border: 0;
   border-radius: 16px;
@@ -288,14 +304,14 @@
   font-family: var(--fl-font-ui);
 }
 
-.md-editor .cm-tooltip.cm-tooltip-autocomplete.fl-slash-menu > ul {
+.md-editor .cm-tooltip.cm-tooltip-autocomplete:is(.fl-slash-menu, .fl-slash-ghost) > ul {
   max-height: 320px;
   font-size: 14px;
   min-width: 280px;
   font-family: var(--fl-font-ui);
 }
 
-.md-editor .cm-tooltip.cm-tooltip-autocomplete.fl-slash-menu > ul > li {
+.md-editor .cm-tooltip.cm-tooltip-autocomplete:is(.fl-slash-menu, .fl-slash-ghost) > ul > li {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -306,7 +322,10 @@
   color: var(--fl-text-heading-soft);
 }
 
-.md-editor .cm-tooltip.cm-tooltip-autocomplete.fl-slash-menu > ul > li[aria-selected] {
+.md-editor
+  .cm-tooltip.cm-tooltip-autocomplete:is(.fl-slash-menu, .fl-slash-ghost)
+  > ul
+  > li[aria-selected] {
   background: var(--fl-ground-hover);
   color: var(--fl-text-primary);
 }
@@ -328,7 +347,7 @@
 }
 
 .md-editor
-  .cm-tooltip.cm-tooltip-autocomplete.fl-slash-menu
+  .cm-tooltip.cm-tooltip-autocomplete:is(.fl-slash-menu, .fl-slash-ghost)
   > ul
   > li[aria-selected]
   .fl-slash-tile {
@@ -337,11 +356,11 @@
   color: var(--fl-strong-fg);
 }
 
-.md-editor .fl-slash-menu .cm-completionLabel {
+.md-editor :is(.fl-slash-menu, .fl-slash-ghost) .cm-completionLabel {
   flex: 1;
 }
 
-.md-editor .fl-slash-menu .cm-completionDetail {
+.md-editor :is(.fl-slash-menu, .fl-slash-ghost) .cm-completionDetail {
   margin-left: 12px;
   font-family: var(--fl-font-mono);
   font-size: 11px;

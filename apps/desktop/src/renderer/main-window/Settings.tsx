@@ -926,6 +926,37 @@ export function SettingsIndex(props: {
 }
 
 /**
+ * D-133 (UI-10, D-89, D-75): a panel that goes (Cancel, Save): what was asked happens at once, and a
+ * copy of the panel fades out where it was (as a menu's does), so the motion never delays it.
+ */
+function leaveWithFade(panel: Element | null, then: () => void): void {
+  if (
+    panel instanceof HTMLElement &&
+    panel.offsetParent instanceof HTMLElement &&
+    !reducedMotion()
+  ) {
+    const ghost = panel.cloneNode(true) as HTMLElement;
+    // Only its look: nothing looks it up as the panel any more.
+    ghost.className = 'settings-panel leaving';
+    ghost.removeAttribute('role');
+    ghost.removeAttribute('aria-label');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.inert = true;
+    Object.assign(ghost.style, {
+      position: 'absolute',
+      top: `${panel.offsetTop}px`,
+      left: `${panel.offsetLeft}px`,
+      width: `${panel.offsetWidth}px`,
+      margin: '0',
+    });
+    panel.offsetParent.append(ghost);
+    ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+    window.setTimeout(() => ghost.remove(), 1000);
+  }
+  then();
+}
+
+/**
  * DATA-07, D-104: a chosen folder becoming the Flint folder, asked in the folder's row: what it
  * holds decides the choices (the likeliest one preselected), and the confirmation says exactly what
  * will happen. Flint restarts on the new folder once it is ready.
@@ -1058,7 +1089,14 @@ export function FolderChangePanel(props: {
             <button type="button" className="trash-action" onClick={onChooseAgain} disabled={busy}>
               Choose another…
             </button>
-            <button type="button" className="trash-action" onClick={onCancel} disabled={busy}>
+            <button
+              type="button"
+              className="trash-action"
+              onClick={(event) =>
+                leaveWithFade(event.currentTarget.closest('.settings-panel'), onCancel)
+              }
+              disabled={busy}
+            >
               Cancel
             </button>
             {!refused && (
@@ -1458,15 +1496,22 @@ function LinkPatternEditor(props: {
         >
           {advanced ? 'Hide pattern' : 'Advanced'}
         </button>
-        <button type="button" className="trash-action" onClick={onCancel}>
+        <button
+          type="button"
+          className="trash-action"
+          onClick={(event) =>
+            leaveWithFade(event.currentTarget.closest('.settings-panel'), onCancel)
+          }
+        >
           Cancel
         </button>
         <button
           type="button"
           className="primary-button"
           disabled={!ready}
-          onClick={() => {
-            if (pattern && ready) onSave(pattern);
+          onClick={(event) => {
+            if (pattern && ready)
+              leaveWithFade(event.currentTarget.closest('.settings-panel'), () => onSave(pattern));
           }}
         >
           Save pattern

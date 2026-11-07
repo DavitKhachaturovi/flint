@@ -171,6 +171,11 @@ export function Row(
   const reminder = live?.reminder ?? task.reminder;
   // One chip: it arrives and leaves once; its text changes in place as the name is typed.
   const chips = usePresence(live?.list ? [live.list] : [], () => 'list');
+  // D-133: pinned however it was (P, the menu, the panel's chip, the faint pin), the pin settles in
+  // with its pop; a row that shows up already pinned doesn't pop.
+  const wasPinned = useRef(task.pinned);
+  if (task.pinned && !wasPinned.current) justPinned.set(task.key, Date.now());
+  wasPinned.current = task.pinned;
   const classes = ['row'];
   if (!ghost && task.key === selected && editing?.kind !== 'new') classes.push('sel');
   if (subtask) classes.push('subtask');

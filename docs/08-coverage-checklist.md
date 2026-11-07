@@ -268,7 +268,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 14b | No "Nothing was selected" message (admin hint stays) | CAP-07 · v1 · M4 step 6 (start) | D-68 |
 | 14c | Focus returns to the window active right before the popup last got focus; none if it had none | CAP-01 · v1 · M4 step 6 (start) | D-41, D-68 |
 | 14d | Date/time picker: day, then a time-of-day view (common times + custom field), back to the calendar | CAP-11 · v1 · M4 step 6 (start) | D-68 |
-| 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · v1 · M8, the step after D-132 | D-67, D-89 |
+| 15 | Motion pass over every button, menu, picker, popup and row action | UI-10 · Done (0.8.29, the census kept as a test) | D-67, D-89, D-133 |
 
 ## J. Feedback on 0.4.5 (1 Nov 2026)
 
@@ -988,4 +988,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | After v1: GitHub, internal references removed, GitHub Releases with auto-update, signing (SignPath Foundation or Certum) | — · Plan (06 §5) | 06, D-132 |
 | 5 | 1.0.0 only for the first release on GitHub Releases; M9 stays 0.9.x | Q-22 · Decided (D-132) | 06, D-101, D-132 |
 | 6 | The checklist's older M8 rows marked with where they were built | — · Done (0.8.28) | D-132 |
+
+## BL. The motion pass (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The motion census: every kind of action, what animated, a test that fails on a step without motion | UI-10 · Done (0.8.29) | D-133 |
+| 2 | The pin pop for P, the menu and the panel's chip | TODAY-01, UI-10 · Done (0.8.29) | D-133 |
+| 3 | The slash menu fades in and out | NOTE-03, UI-10 · Done (0.8.29) | 09, D-133 |
+| 4 | Settings' link pattern editor and folder panel fade out on Cancel or Save (a copy; the save isn't delayed) | APP-11, UI-10 · Done (0.8.29) | 09, D-133 |
+| 5 | Trash: the buttons fade back after the question; an emptied day or list folds away; "Trash is empty." fades in | DATA-02, UI-10 · Done (0.8.29) | 09, D-133 |
+| 6 | Instant by decision: reduce-motion, typing, the popup's first frame, opening a list's rows | UI-10 · Recorded | D-133 |
 
