@@ -98,13 +98,13 @@ flint/
 | Global hotkey → popup visible **with a focused cursor** | **< 50 ms** (hard limit 100 ms) |
 | Keypress → character on screen | One frame (~16 ms) |
 | Enter in popup → popup hidden and focus returned (after the main process acknowledges the capture over IPC) | **< 50 ms** (D-27) |
-| Enter in popup → capture durably on disk | **< 100 ms at p95** (D-27) |
-| Switching lists, opening a note | < 100 ms (Proposed) |
+| Enter in popup → capture durably on disk | **< 100 ms at p95** (D-27); recorded on every run, not failing a test (D-137: it is the disk's flush time) |
+| Switching lists, opening a note | < 100 ms (Proposed); a 1,000-task list takes longer (a known issue, D-137) |
 | Ctrl+K results update per keystroke | < 50 ms for typical data (Proposed) |
 | Idle CPU (tray, nothing happening) | ~0% (Proposed) |
-| Idle RAM | ~150–200 MB accepted |
+| Memory after start (private, all processes) | ~300–350 MB (D-137; was "~150–200 MB", D-04, which left out the GPU process) |
 
-**Test conditions:** an average laptop (not a developer workstation) **with a Teams call running**, including a full-screen Teams call.
+**Test conditions:** an average laptop (not a developer workstation) **with a Teams call running**, including a full-screen Teams call. **Checked on every run (D-137):** `e2e/performance.spec.ts` measures each budget on the development build, windows off-screen, and fails only past its hard limit (keypress two frames; Enter → popup hidden and focus back 50 ms; switching a list and opening a note 200 ms; Ctrl+K per keystroke and the search 100 ms; idle CPU 2 %; memory after start 400 MB); Enter → durably on disk is recorded only. On CI a check listed in its `ADVISORY_ON_CI` only logs (none so far); locally every check is strict. The numbers go to `apps/desktop/test-results/performance.md` and 06's Measurements.
 
 **Capture save path (D-27):** the popup never waits for the disk. On Enter it hands the capture to the main process, waits for the IPC acknowledgement, and hides; the main process owns the pending capture until the write is confirmed, and the draft (CAP-08) is cleared only then. **Accepted risk:** if the main process itself crashes between the acknowledgement and the write, the fallback is the last persisted draft, which can lag the final keystrokes by one draft-save debounce (~300 ms).
 

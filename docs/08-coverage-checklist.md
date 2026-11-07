@@ -1029,3 +1029,15 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | GitHub Actions: CI on every push and PR; release on v* tags with What's new as the text | — · Done (0.9.1) | 05 §6, D-136 |
 | 10 | Motion: the status line and button fade, the toast rises and goes (in the census) | UI-10 · Done (0.9.1) | D-89, D-136 |
 
+## BO. Performance checked, a clean quit (8 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The performance budgets measured on every run, failing only past their hard limits; advisory on CI only if proved flaky there | M9 · Done (0.9.2) | 05 §4, 06 §1, D-137 |
+| 2 | Memory after start ~300–350 MB private, hard limit 400 MB | M9 · Decided (Q5) | 05 §4, D-137 |
+| 3 | A 1,000-task list over the 100 ms budget: a known issue, virtualised lists after 1.0 | LIST-01 · Later | 06 §0, D-137 |
+| 4 | Enter → durably on disk recorded only; Enter → popup hidden and focus back strict < 50 ms | CAP-01 · Done (0.9.2) | 05 §4, D-27, D-137 |
+| 5 | A quit during the popup's or mini mode's fade exits cleanly; quit stages logged | APP-03 · Done (0.9.2) | D-138 |
+| 6 | Tests: quit inside the popup's fade with a draft; Restart to update with a draft | APP-06, CAP-08 · Done (0.9.2) | e2e/quit.spec.ts, D-138 |
+| 7 | The walkthrough's test waits for real triggers (slower machines) | APP-10 · Done (0.9.2) | D-138 |
+

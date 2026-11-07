@@ -107,6 +107,8 @@ export interface E2EHooks {
   updater?: TestUpdaterRecord;
   /** D-137: Enter → capture durably on disk (ms), per capture, once a test asks for them. */
   captureDiskMs?: number[];
+  /** D-137: Enter → popup hidden and focus back (ms), per capture, once a test asks for them. */
+  captureHiddenMs?: number[];
   /** D-136: the tray menu's labels, as they are now. */
   trayLabels?: () => string[];
 }

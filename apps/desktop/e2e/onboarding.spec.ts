@@ -194,11 +194,17 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
 
   // 6: the composer's bell; a reminder set moves it on.
   await expect(card).toContainText('6 / 8');
+  // Each step waits for what it acts on (a slower machine opens the picker later, D-138).
   await main.getByRole('button', { name: 'Set reminder' }).click();
+  await expect(main.locator('.fl-picker')).toHaveCount(1);
   await main.keyboard.type('tomorrow 10');
+  await expect(main.locator('.fl-picker .fl-picker-row.active')).toContainText('Tomorrow 10:00');
   await main.keyboard.press('Enter');
+  await expect(main.locator('.fl-picker')).toHaveCount(0);
+  await expect(main.locator('.main .composer-input')).toHaveValue(/@\d{4}-\d{2}-\d{2} 10:00$/);
   await main.keyboard.type(' pay the rent');
   await main.keyboard.press('Enter');
+  await expect.poll(inbox).toMatch(/- \[ \] pay the rent \[reminder:: \d{4}-\d{2}-\d{2}T10:00\]/);
 
   // 7: the palette's button; the palette opening moves it on. Esc then closes the palette only.
   await expect(card).toContainText('7 / 8');

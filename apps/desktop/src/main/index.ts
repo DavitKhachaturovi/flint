@@ -398,7 +398,10 @@ async function start(): Promise<void> {
   });
   app.on('before-quit', () => {
     quitting = true;
+    // D-138: each stage of a quit, so one that stops says where.
+    log('quitting');
   });
+  app.on('will-quit', () => log('quitting: windows closed'));
   recoverFromCrashes(mainWindow, 'main window', log);
   // APP-10, APP-15, D-117: the tour and What's new wait for the window to be on screen.
   mainWindow.on('show', () => mainWindow.webContents.send(Channels.mainShown));
@@ -1581,6 +1584,8 @@ async function start(): Promise<void> {
       log(
         `capture handed over; Enter → hidden and focus returned ${(capture.returnedAt - capture.keyAt).toFixed(1)} ms`,
       );
+      // D-137: the performance check's strict half of D-27 (< 50 ms).
+      e2eHooks()?.captureHiddenMs?.push(capture.returnedAt - capture.keyAt);
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
       void saveCapture(capture);
     },
@@ -1757,7 +1762,7 @@ async function start(): Promise<void> {
   };
   const updaterForBuild = async (): Promise<UpdaterLike | null> => {
     if (updateHooks) {
-      const fake = testUpdater();
+      const fake = testUpdater(() => app.quit());
       updateHooks.updater = fake.record;
       updateHooks.trayLabels = () => tray.labels();
       return fake.updater;
@@ -1781,7 +1786,7 @@ async function start(): Promise<void> {
         log,
         changed: sendUpdates,
         beforeInstall: () => {
-          if (!updateHooks) quitting = true;
+          quitting = true;
         },
       });
       sendUpdates(updates.view());

@@ -111,7 +111,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await app?.close();
+  if (app && app.process().exitCode === null) await app.close();
   app = undefined;
   await rm(dataDirectory, { recursive: true, force: true });
 });
@@ -199,8 +199,15 @@ test('an update downloads, then "Update ready" once; Restart now, the palette an
   ).toBeVisible();
   await main.keyboard.press('Escape');
 
-  await version.getByRole('button', { name: 'Restart now' }).click();
-  await expect.poll(async () => (await record(running)).installs).toBe(1);
+  const child = running.process();
+  // Like electron-updater, the install quits Flint (D-138: cleanly); the page may close under the
+  // click.
+  await version
+    .getByRole('button', { name: 'Restart now' })
+    .click()
+    .catch(() => undefined);
+  await expect.poll(() => child.exitCode !== null, { timeout: 10_000 }).toBe(true);
+  app = undefined;
 });
 
 test("the palette's Check for updates opens About and checks; nothing is contacted (APP-06, D-136)", async () => {

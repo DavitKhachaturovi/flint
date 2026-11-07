@@ -184,10 +184,17 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     window.webContents.send(Channels.popupHiding);
     fading = setTimeout(() => {
       fading = undefined;
+      // D-138: a quit can close the window during the fade; touching it then would throw, and the
+      // error left Flint unable to exit.
+      if (window.isDestroyed()) return;
       window.hide();
       window.webContents.send(Channels.popupHidden);
     }, FADE_MS);
   };
+  window.on('closed', () => {
+    if (fading) clearTimeout(fading);
+    fading = undefined;
+  });
 
   /**
    * Hides the popup (CAP-01). With the focus, it goes back to the window in front right before

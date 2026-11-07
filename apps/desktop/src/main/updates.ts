@@ -61,8 +61,11 @@ export interface TestUpdaterRecord {
   installs: number;
 }
 
-/** A fake electron-updater for the end-to-end tests: a test emits its events. */
-export function testUpdater(): { updater: UpdaterLike; record: TestUpdaterRecord } {
+/**
+ * A fake electron-updater for the end-to-end tests: a test emits its events. Like the real one,
+ * quitAndInstall quits Flint (`quit`), so a test sees Restart to update end the app.
+ */
+export function testUpdater(quit: () => void): { updater: UpdaterLike; record: TestUpdaterRecord } {
   const listeners = new Map<string, ((arg?: unknown) => void)[]>();
   const record: TestUpdaterRecord = {
     checks: 0,
@@ -83,6 +86,7 @@ export function testUpdater(): { updater: UpdaterLike; record: TestUpdaterRecord
     },
     quitAndInstall: () => {
       record.installs++;
+      setTimeout(quit, 0);
     },
     on: (event: string, listener: (arg?: unknown) => void) => {
       listeners.set(event, [...(listeners.get(event) ?? []), listener]);

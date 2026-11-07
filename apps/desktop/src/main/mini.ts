@@ -367,7 +367,10 @@ export function createMini(options: {
       };
       pending.set(id, go);
       sendLayout(layoutFor(place, stage, id));
-      setTimeout(go, 160);
+      // D-138: not after the window is gone (a quit in between).
+      setTimeout(() => {
+        if (!made.isDestroyed()) go();
+      }, 160);
     });
     recoverFromCrashes(made, 'mini mode', options.log);
     void made.loadURL(options.url);
@@ -491,6 +494,8 @@ export function createMini(options: {
     hiding = setTimeout(() => {
       hiding = undefined;
       lastOther = 0n;
+      // D-138: closed meanwhile by a quit: nothing to hide.
+      if (target.isDestroyed()) return;
       target.hide();
       send(Channels.miniHidden);
     }, HIDE_MS);

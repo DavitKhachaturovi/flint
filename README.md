@@ -50,7 +50,7 @@ npm run e2e                                  # build, then the Electron end-to-e
 npm run dist -w @flint/desktop               # the installer: apps/desktop/dist-installer/Flint-Setup-<version>.exe
 ```
 
-The end-to-end tests keep their windows off-screen and never take the focus, so you can keep working while they run. `docs/` is the spec (start with [`docs/README.md`](docs/README.md)); [`CLAUDE.md`](CLAUDE.md) has the working rules. Releases are built by GitHub Actions from a `v*` tag.
+The end-to-end tests keep their windows off-screen and never touch your clipboard; the capture popup's tests bring it to the front for a moment, as the hotkey does, so avoid typing while they run. `docs/` is the spec (start with [`docs/README.md`](docs/README.md)); [`CLAUDE.md`](CLAUDE.md) has the working rules. Releases are built by GitHub Actions from a `v*` tag.
 
 ## License
 

@@ -328,7 +328,14 @@ export function Palette(props: {
             }}
           />
         </div>
-        <div ref={list} className="palette-results" role="listbox" aria-label="Results">
+        {/* D-137: data-query says which keystroke's results are on screen (the performance check). */}
+        <div
+          ref={list}
+          className="palette-results"
+          role="listbox"
+          aria-label="Results"
+          data-query={query}
+        >
           {flat.length === 0 && (
             <p className="palette-empty">
               {scope === 'trash' ? 'Nothing in Trash or the archive matches.' : 'Nothing matches.'}
