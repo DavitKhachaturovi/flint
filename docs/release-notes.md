@@ -2,6 +2,10 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.29 (7 Nov 2026)
+
+- **The motion pass (UI-10, D-133):** a census drives every kind of action in Flint and checks that it moves; it stays as a test. What it found is fixed: pinning with P or the menu now pops the pin, the slash menu fades in and out, Settings' link pattern editor and folder panel fade away when closed, and Trash fades its buttons back after its question and folds away a day whose last item goes. M8 is complete.
+
 ## 0.8.28 (7 Nov 2026)
 
 - **Privacy, stated plainly (D-132):** Settings → About starts with "Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own."
