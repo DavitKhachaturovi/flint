@@ -70,9 +70,23 @@ jobs:
         env:
           FLINT_CI: '1'
 
-      # electron-builder uploads the installer, its .blockmap and latest.yml to a draft release for
-      # the tag; the release is published only after every file is there.
-      - name: Build the installer and upload it to a draft release
+      # D-139: the draft release exists before electron-builder uploads: its uploads run in parallel,
+      # and with no release yet each made its own draft (1.0.0's blockmap landed in a second one).
+      - name: Create the draft release for the tag
+        shell: bash
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --draft \
+            --title "Flint ${TAG#v}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+
+      # electron-builder uploads the installer, its .blockmap and latest.yml to that draft; the
+      # release is published only after every file is there.
+      - name: Build the installer and upload it to the draft release
         run: npm run release -w @flint/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
