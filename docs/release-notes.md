@@ -2,6 +2,15 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.24 (7 Nov 2026)
+
+- **Pictures in the Clipboard section (D-129):** pictures you copied show as thumbnails (a blank tile until the pointer rests on the section). Click one to paste it into a note or the composer (saved to attachments/); Capture as task puts it in the capture popup.
+- **Delete and Clear all:** right-click → Delete (also from Win+V) removes an item from Windows' history too; Undo adds it back as the newest. Clear all (next to the eye) asks first and can't be undone; Win+V's pinned items are kept.
+- **Copy** now works like picking an item in Win+V: no duplicate.
+- **Motion:** items slide in and fold away; with contents hidden, they fade in and out as the pointer comes and goes.
+- **Settings → Clipboard:** one switch, with a clearer description; the eye in the section shows contents always.
+- Windows doesn't tell apps which Win+V items are pinned, so Flint can't mark them.
+
 ## 0.8.23 (7 Nov 2026)
 
 - **The Clipboard section (M8 step 5, D-128):** Windows' clipboard history (Win+V) at the foot of the side panel, in every panel state: folded, the newest three items; open, all of them. For screen sharing, the rows are blank bars with their kind (Text, Link, Code) and age until the pointer rests on the section; the eye in its header (or Settings, or the palette) shows them always. Click an item to paste it where your cursor is (one Ctrl+Z undoes it); right-click for Insert, Capture as task (opens the capture popup with it) and Copy.

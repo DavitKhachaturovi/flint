@@ -2,6 +2,12 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.24 (7 Nov 2026)
+
+- **Pictures too:** pictures you copied show in the Clipboard section. Click one to paste it into a note.
+- **Delete and Clear all:** right-click an item to delete it (from Win+V too, with Undo), or use Clear all next to the eye.
+- **Copy without duplicates:** Copy now works like picking an item in Win+V.
+
 ## 0.8.23 (7 Nov 2026)
 
 - **Your clipboard history, in Flint:** the side panel's Clipboard section lists what you copied (Windows' Win+V history). Click an item to paste it where your cursor is; right-click to make it a task or copy it again.
