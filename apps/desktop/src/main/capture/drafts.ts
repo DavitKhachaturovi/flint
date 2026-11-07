@@ -168,6 +168,11 @@ export class DraftFile {
     return this.writing;
   }
 
+  /** D-138: resolves once no draft write is in flight (a quit waits for it). */
+  settled(): Promise<void> {
+    return this.writing.catch(() => undefined);
+  }
+
   /** Writes are queued, so the last one always wins. */
   set(draft: CaptureDraft): Promise<void> {
     this.current.draft = readDraft(draft);

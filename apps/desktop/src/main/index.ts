@@ -201,6 +201,31 @@ schemes.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, stream: true } },
 ]);
 
+/**
+ * D-138: an error nothing caught in the main process. Logged always. While Flint quits it changes
+ * nothing (the quit goes on: an error box then would keep Flint from exiting); in a test run it is
+ * recorded, never shown as a box on the screen (the tests fail on it); otherwise the box Electron
+ * would show, as before.
+ */
+let quittingApp = false;
+app.on('before-quit', () => {
+  quittingApp = true;
+});
+process.on('uncaughtException', (error) => {
+  const text = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  log(`main process error${quittingApp ? ' while quitting' : ''}: ${text}`);
+  const hooks = e2eHooks();
+  if (hooks) {
+    (hooks.mainErrors ??= []).push(text);
+    return;
+  }
+  if (quittingApp) return;
+  dialog.showErrorBox(
+    'A JavaScript error occurred in the main process',
+    `Uncaught Exception:\n${text}`,
+  );
+});
+
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -1536,6 +1561,20 @@ async function start(): Promise<void> {
     builtInLinksOff: settingsFile.current.builtInLinksOff,
   });
 
+  // D-138: a quit waits (at most 3 s) for what is still being written: a capture handed over a
+  // moment ago, the draft Esc just sent, a list change, the pins and Today's order.
+  const capturesInFlight = new Set<Promise<void>>();
+  let savedForQuit = false;
+  app.on('before-quit', (event) => {
+    if (savedForQuit) return;
+    savedForQuit = true;
+    event.preventDefault();
+    log('quitting: saving what is still being written');
+    const saved = Promise.allSettled([drafts.settled(), workspace.settled(), ...capturesInFlight]);
+    const cap = new Promise((resolve) => setTimeout(resolve, 3000));
+    void Promise.race([saved, cap]).then(() => app.quit());
+  });
+
   const saveCapture = async (capture: PopupSubmit): Promise<void> => {
     // The images on the draft when Enter was pressed go with this capture (CAP-06).
     const attachments = [...drafts.attachments];
@@ -1587,7 +1626,9 @@ async function start(): Promise<void> {
       // D-137: the performance check's strict half of D-27 (< 50 ms).
       e2eHooks()?.captureHiddenMs?.push(capture.returnedAt - capture.keyAt);
       capturedWaiters.splice(0).forEach((resolve) => resolve(capture));
-      void saveCapture(capture);
+      const saving = saveCapture(capture);
+      capturesInFlight.add(saving);
+      void saving.finally(() => capturesInFlight.delete(saving));
     },
     state: popupState,
     onDraft: (draft) => {

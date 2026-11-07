@@ -1040,4 +1040,6 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | A quit during the popup's or mini mode's fade exits cleanly; quit stages logged | APP-03 · Done (0.9.2) | D-138 |
 | 6 | Tests: quit inside the popup's fade with a draft; Restart to update with a draft | APP-06, CAP-08 · Done (0.9.2) | e2e/quit.spec.ts, D-138 |
 | 7 | The walkthrough's test waits for real triggers (slower machines) | APP-10 · Done (0.9.2) | D-138 |
+| 8 | Main-process errors: always logged; never a box while quitting or in a test run; the box as before otherwise | APP-07 · Done (0.9.3) | 05 §4, D-138 |
+| 9 | A quit waits (at most 3 s) for pending writes: a capture, the draft, list changes, pins and Today's order | DATA-01, CAP-08 · Done (0.9.3) | 05 §4, D-138 |
 

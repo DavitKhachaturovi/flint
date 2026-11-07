@@ -437,7 +437,10 @@ export function createMini(options: {
 
   const send = (channel: string, ...args: unknown[]): void => {
     if (!window || window.isDestroyed()) return;
-    const go = (): void => window?.webContents.send(channel, ...args);
+    const go = (): void => {
+      // D-138: never to a window a quit has closed.
+      if (window && !window.isDestroyed()) window.webContents.send(channel, ...args);
+    };
     if (window.webContents.isLoading()) window.webContents.once('did-finish-load', go);
     else go();
   };

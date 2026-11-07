@@ -261,7 +261,8 @@ export function createCapturePopup(url: string, events: PopupEvents): CapturePop
     const start = screen.getCursorScreenPoint();
     const [x = 0, y = 0] = window.getPosition();
     dragging = setInterval(() => {
-      if (!isKeyDown(VirtualKey.leftButton)) {
+      // D-138: also when a quit closed the window mid-drag.
+      if (window.isDestroyed() || !isKeyDown(VirtualKey.leftButton)) {
         clearInterval(dragging);
         dragging = undefined;
         return;

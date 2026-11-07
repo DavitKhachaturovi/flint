@@ -96,7 +96,20 @@ export class TodayFile {
     this.timer = setTimeout(() => void this.flush(), 400);
   }
 
+  /** D-138: what is waiting to be written, written now; resolves once nothing is in flight. */
+  settled(): Promise<void> {
+    return this.timer === undefined ? this.writing : this.flush();
+  }
+
+  private writing: Promise<void> = Promise.resolve();
+
   async flush(): Promise<void> {
+    const write = this.write();
+    this.writing = write;
+    return write;
+  }
+
+  private async write(): Promise<void> {
     clearTimeout(this.timer);
     this.timer = undefined;
     const pinnedOn = Object.fromEntries([...this.pinned].sort(([a], [b]) => a.localeCompare(b)));

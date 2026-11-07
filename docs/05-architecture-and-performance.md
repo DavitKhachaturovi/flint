@@ -120,7 +120,8 @@ flint/
 5. **Only main window + popup alive at idle**; mini mode on demand (then kept hidden).
 6. **Rendering discipline:** memoized rows, update only changed rows, animate with transforms/opacity only, virtualize very long lists (Proposed: above a few hundred rows).
 7. **Main-process work never blocks the UI**: file I/O is async; parsing large files off the hot path.
-8. **Updates never mid-session** (APP-06, D-136): downloaded in the background, installed when Flint quits or on the user's Restart now; the first check waits 30 s after start, off the startup path.
+8. **A quit loses nothing and never sticks (D-138):** it waits, at most 3 s, for what is still being written (a capture just handed over, the draft, a list change, the pins and Today's order); an error nothing caught while quitting is logged and the quit goes on.
+9. **Updates never mid-session** (APP-06, D-136): downloaded in the background, installed when Flint quits or on the user's Restart now; the first check waits 30 s after start, off the startup path.
 
 ---
 

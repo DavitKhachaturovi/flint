@@ -537,6 +537,15 @@ export class Workspace {
     return this.serial(() => this.refresh(path));
   }
 
+  /**
+   * D-138: resolves once every queued change is written, and the pins and Today's order that wait
+   * a moment before they are written are too (a quit waits for it).
+   */
+  async settled(): Promise<void> {
+    await this.queue.catch(() => undefined);
+    await Promise.allSettled([this.meta.settled(), this.today.settled()]);
+  }
+
   /** Changes run one at a time: watcher refreshes, captures and undos never interleave. */
   private queue: Promise<unknown> = Promise.resolve();
   private serial<T>(work: () => Promise<T>): Promise<T> {

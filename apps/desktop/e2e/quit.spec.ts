@@ -134,6 +134,10 @@ test('a quit while the popup fades out (opened from clipboard history, Esc keeps
   expect(await exitsWithin(10_000), 'Flint exits').toBe(true);
   const drafts = await readFile(join(dataDirectory, 'appdata', 'drafts.json'), 'utf8');
   expect(drafts).toContain('deploy the hotfix tonight');
+  // Nothing threw on the way out (D-138: the closed popup's fade timer used to).
+  expect(await readFile(join(dataDirectory, 'logs', 'flint.log'), 'utf8')).not.toContain(
+    'main process error',
+  );
 });
 
 test('Restart to update quits cleanly with a draft in the popup (APP-06, CAP-08, D-136, D-138)', async () => {
@@ -170,6 +174,27 @@ test('Restart to update quits cleanly with a draft in the popup (APP-06, CAP-08,
   expect(await exitsWithin(10_000), 'Flint exits').toBe(true);
   const log = await readFile(join(dataDirectory, 'logs', 'flint.log'), 'utf8');
   expect(log).toContain('restarting to install 9.9.9');
+  expect(log).not.toContain('main process error');
   const drafts = await readFile(join(dataDirectory, 'appdata', 'drafts.json'), 'utf8');
   expect(drafts).toContain('call the bank about the card');
+});
+
+test('an error while quitting is logged and Flint still exits, with no error box (D-138)', async () => {
+  const { app: running } = await launch();
+  // An error nothing catches, thrown from a timer in the middle of the quit.
+  void running
+    .evaluate(({ app: electronApp }) => {
+      electronApp.once('before-quit', () => {
+        setTimeout(() => {
+          throw new Error('thrown while quitting, on purpose');
+        }, 0);
+      });
+      setTimeout(() => electronApp.quit(), 0);
+    })
+    .catch(() => undefined);
+  expect(await exitsWithin(10_000), 'Flint exits').toBe(true);
+  const log = await readFile(join(dataDirectory, 'logs', 'flint.log'), 'utf8');
+  expect(log).toContain('main process error');
+  expect(log).toContain('thrown while quitting, on purpose');
+  expect(log).toContain('quitting');
 });

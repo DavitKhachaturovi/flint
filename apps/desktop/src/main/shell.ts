@@ -105,6 +105,8 @@ export interface E2EHooks {
    * electron-updater's events through it; checks and "installs" are counted, nothing is contacted.
    */
   updater?: TestUpdaterRecord;
+  /** D-138: main-process errors nothing caught (each also logged); a test fails on any. */
+  mainErrors?: string[];
   /** D-137: Enter → capture durably on disk (ms), per capture, once a test asks for them. */
   captureDiskMs?: number[];
   /** D-137: Enter → popup hidden and focus back (ms), per capture, once a test asks for them. */
