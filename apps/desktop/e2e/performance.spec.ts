@@ -21,8 +21,10 @@ test.describe.configure({ mode: 'serial' });
 
 /** Checks that proved flaky on CI agents despite their hard limits (Davit, Q4 of M9). */
 const ADVISORY_ON_CI: ReadonlySet<string> = new Set<string>([
-  // A hosted Windows agent opened it in p50 373, p95 520 ms (8 Nov 2026), 2.5–3× this machine.
+  // A hosted Windows agent (8 Nov 2026), 2.5–3× slower than the developer laptop: the list
+  // p50 373–378, p95 474–520 ms; the note p50 150, p95 470 ms.
   'Switch to a 1,000-task list',
+  'Open a 400-line note',
 ]);
 const ON_CI = process.env.FLINT_CI === '1';
 const FRAME_MS = 1000 / 60;
