@@ -2,6 +2,10 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.22 (7 Nov 2026)
+
+- **Clipboard history, first part (M8 step 5, D-127):** Flint can read Windows' own clipboard history (Win+V), read-only and text only for now, through koffi with no new dependency. Ctrl+K → **Check clipboard history** reads it once and says how it went (items, text items, time, the start of the newest). A marker file around every read means a read that crashed Flint is never repeated by itself: reading stays off until you press Retry.
+
 ## 0.8.21 (7 Nov 2026)
 
 - **What's new (D-126):** the card sits a little lower, its middle at the window's optical centre (45 % of its height).

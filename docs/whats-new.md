@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.22 (7 Nov 2026)
+
+- **Getting ready for clipboard history:** press Ctrl+K and run "Check clipboard history" to see whether Flint can read Windows' clipboard history (the Win+V list). Flint only reads it; it never changes or records your clipboard.
+
 ## 0.8.21 (7 Nov 2026)
 
 - **What's new** sits comfortably in the middle of the window.
