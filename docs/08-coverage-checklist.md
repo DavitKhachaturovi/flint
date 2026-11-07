@@ -1043,3 +1043,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 8 | Main-process errors: always logged; never a box while quitting or in a test run; the box as before otherwise | APP-07 · Done (0.9.3) | 05 §4, D-138 |
 | 9 | A quit waits (at most 3 s) for pending writes: a capture, the draft, list changes, pins and Today's order | DATA-01, CAP-08 · Done (0.9.3) | 05 §4, D-138 |
 
+## BP. On GitHub, 1.0.0 (8 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | History rewritten and verified; pushed to GitHub; public | — · Done | 06 §5, D-135, D-139 |
+| 2 | Repository settings, Actions pinned by SHA, read-only token, secret scanning with push protection, rulesets (main, main CI, releases) | — · Done | D-139 |
+| 3 | The logo at the top of the README; the social preview | — · Done (upload by Davit) | D-139 |
+| 4 | 1.0.0 on GitHub Releases with latest.yml; installed copies update themselves | APP-06 · Done (1.0.0) | D-136, D-139 |
+| 5 | Versions after 1.0.0: 1.0.x fixes, 1.x.0 features | — · Proposed | D-139 |
+

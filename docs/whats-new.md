@@ -2,6 +2,12 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.0.0 (8 Nov 2026)
+
+- **Flint 1.0:** the first public release. Flint is open source now, at github.com/DavitKhachaturovi/flint.
+- **Updates come by themselves:** a new version downloads in the background, and a small note offers Restart now or Later. Turn it off in Settings → About.
+- **Everything so far, in one place:** quick capture over any app (Ctrl+Shift+Space), mini mode for calls (Ctrl+Alt+Space), your clipboard history beside your tasks (Ctrl+Shift+H), and Ctrl+K for every list, task and command.
+
 ## 0.9.3 (8 Nov 2026)
 
 - **Safer quitting:** if you quit or restart for an update right after closing the capture popup, Flint first finishes saving your draft.

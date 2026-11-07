@@ -2,6 +2,11 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.0.0 (8 Nov 2026)
+
+- **The first release on GitHub Releases (D-139):** Flint is open source (MIT) at github.com/DavitKhachaturovi/flint, its history rewritten once and verified before it was published (D-135). The installer, `Flint-Setup-1.0.0.exe`, comes with `latest.yml`, so installed copies (0.9.1 and later) update themselves.
+- Nothing changes in the app since 0.9.3; 1.0.0 marks the end of M9 and of the v1 scope.
+
 ## 0.9.3 (8 Nov 2026)
 
 - **Nothing lost on a quick quit (D-138):** quitting (or Restart to update) right after closing the capture popup waits a moment for what is still being saved: the draft, a capture, a list change, pins and Today's order.
