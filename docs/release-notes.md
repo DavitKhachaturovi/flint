@@ -2,6 +2,11 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.27 (7 Nov 2026)
+
+- **Sidebar highlight (D-131):** after deleting a quick note, the highlight lands exactly on the list or note that opens instead, also inside a group.
+- **Empty quick notes:** going back to an empty quick note before it's removed keeps it; it's removed only after you leave it again (2 s later).
+
 ## 0.8.26 (7 Nov 2026)
 
 - **Attachments folder (D-130):** pasting a picture no longer leaves a temporary `.flint` folder inside `attachments/`; it uses the Flint folder's own.
