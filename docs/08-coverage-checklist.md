@@ -953,4 +953,16 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | The six states: off, policy, paused, error, no text, refused | NAV-08 · Done (0.8.23) | 02, D-128 |
 | 7 | Settings → Clipboard: Clipboard history, Always show contents | NAV-08, APP-11 · Done (0.8.23) | 02, D-128 |
 | 8 | Reads in the background: texts at once (~40 ms), the last items kept, re-read on a new sequence number | NAV-08 · Done (0.8.23) | 05, D-128 |
-| 9 | Whether Win+V lists a copied item twice after Copy | NAV-08 · Davit's look | D-128 |
+| 9 | Whether Win+V lists a copied item twice after Copy | NAV-08 · It did; Copy is Win+V's pick since 0.8.24 | D-128, D-129 |
+
+## BI. The Clipboard section after 0.8.23 (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Pictures: thumbnails (a tile at rest), inserted as a pasted picture, captured as a chip, counted | NAV-08 · Done (0.8.24) | 02, 09, D-129 |
+| 2 | Motion: items slide in and fold away; content crossfades both ways | NAV-08, UI-10 · Done (0.8.24) | 09, D-129 |
+| 3 | Delete (also from Win+V) with Undo (adds it back as the newest; memory only while offered) | NAV-08 · Done (0.8.24) | 02, D-129 |
+| 4 | Clear all, asked inline, no undo (Win+V's pinned items kept) | NAV-08 · Done (0.8.24) | 02, 09, D-129 |
+| 5 | Win+V's pins: not reported by Windows' API; no marker | NAV-08 · Checked (D-129) | D-129 |
+| 6 | Copy as Win+V's pick (no duplicate) | NAV-08 · Done (0.8.24) | D-129 |
+| 7 | Always show contents only in the section and the palette; the setting's new description | NAV-08, APP-11 · Done (0.8.24) | 02, D-129 |

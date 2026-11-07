@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, stat } from 'node:fs/promises';
@@ -94,7 +95,15 @@ import type { ToastPlan } from './reminders.js';
 import { watchListFolder } from './storage/watcher.js';
 import { TourFile } from './onboarding.js';
 import { ClipboardGuard } from './clipboard-guard.js';
-import { clipboardHistoryPolicyOff, readClipboardHistory } from './clipboard-history.js';
+import {
+  clearHistory,
+  clipboardHistoryPolicyOff,
+  deleteHistoryItem,
+  makeHistoryItemCurrent,
+  readClipboardHistory,
+  readHistoryImage,
+} from './clipboard-history.js';
+import { decodeBmp, shrink } from '../shared/bmp.js';
 import { isTipId, TIP_GAP_MS, tipAllowed, TIPS } from '../shared/tips.js';
 import {
   appIcon,
@@ -508,6 +517,44 @@ async function start(): Promise<void> {
   if (clipboardGuard.crashed)
     log('clipboard history: the last read never finished; reads are off until retried');
   app.on('before-quit', () => clipboardGuard.quitting());
+  // D-129: a picture's bytes (a BMP as Windows hands it over; tests set them), read behind the
+  // crash marker.
+  const clipboardBmp = async (id: string): Promise<Uint8Array | null> => {
+    const fake = e2eHooks();
+    if (fake) {
+      const base64 = fake.clipboardImages?.[id];
+      return base64 ? Buffer.from(base64, 'base64') : null;
+    }
+    return clipboardGuard.act(() => readHistoryImage(id));
+  };
+  /** D-129: thumbnails by item id, made once and kept while the item is in the history. */
+  const clipboardThumbs = new Map<string, string>();
+  const clipboardThumb = async (id: string): Promise<string | null> => {
+    const known = clipboardThumbs.get(id);
+    if (known) return known;
+    const bytes = await clipboardBmp(id);
+    const picture = bytes ? decodeBmp(bytes) : null;
+    if (!picture) return null;
+    // Twice the 56 px it shows at (crisp at 200 %), at most 400 px wide.
+    const small = shrink(picture, 400, 112);
+    const thumb = nativeImage
+      .createFromBitmap(Buffer.from(small.data), { width: small.width, height: small.height })
+      .toDataURL();
+    clipboardThumbs.set(id, thumb);
+    return thumb;
+  };
+  const clipboardPng = async (id: string): Promise<Buffer | null> => {
+    const bytes = await clipboardBmp(id);
+    const picture = bytes ? decodeBmp(bytes) : null;
+    return picture
+      ? nativeImage
+          .createFromBitmap(Buffer.from(picture.data), {
+            width: picture.width,
+            height: picture.height,
+          })
+          .toPNG()
+      : null;
+  };
   // D-128: what the section shows. The last items stay while a read runs; Windows' clipboard
   // sequence number says when something new was copied (only then is it read again); a state other
   // than the items (off, policy, an error) is looked at again at most every 5 s or on a new copy.
@@ -550,11 +597,23 @@ async function start(): Promise<void> {
       const ms = Math.round(performance.now() - started);
       let result: ClipboardView;
       if (read.kind === 'ok') {
-        const items = read.items.flatMap((item): ClipboardItemView[] =>
-          item.text === null || item.text.trim() === ''
-            ? []
-            : [{ id: item.id, at: item.at, text: item.text, kind: clipboardKind(item.text) }],
-        );
+        const items: ClipboardItemView[] = [];
+        for (const item of read.items) {
+          if (item.text !== null && item.text.trim() !== '')
+            items.push({
+              id: item.id,
+              at: item.at,
+              text: item.text,
+              kind: clipboardKind(item.text),
+            });
+          else if (item.image) {
+            // D-129: pictures as thumbnails (made once per item, kept while it is in the history).
+            const thumb = await clipboardThumb(item.id);
+            if (thumb) items.push({ id: item.id, at: item.at, text: '', kind: 'image', thumb });
+          }
+        }
+        for (const id of clipboardThumbs.keys())
+          if (!read.items.some((item) => item.id === id)) clipboardThumbs.delete(id);
         clipboardItems = { sequence, items };
         clipboardOther = null;
         result = view('ok', items);
@@ -575,7 +634,7 @@ async function start(): Promise<void> {
         result = view(state, state === 'error' ? (clipboardItems?.items ?? []) : []);
       }
       // The log says when the state changes (and every error), not every read.
-      const said = read.kind === 'ok' ? `ok, ${result.items.length} text items` : `${read.kind}`;
+      const said = read.kind === 'ok' ? `ok, ${result.items.length} items` : `${read.kind}`;
       if (said !== clipboardLogged || read.kind === 'unavailable') {
         clipboardLogged = said;
         log(
@@ -593,14 +652,97 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.mainClipboard, (event, retry: unknown): Promise<ClipboardView> | null =>
     owns(event.sender) ? clipboardView(retry === true) : null,
   );
-  ipcMain.handle(Channels.mainClipboardCopy, async (event, text: unknown) => {
-    if (!owns(event.sender) || typeof text !== 'string') return;
-    // D-128: the only time Flint writes the clipboard, on that choice. Tests never touch the real
-    // one (D-93): they see what would have been copied.
+  /** D-129: after a write the history is read again at the next ask (a delete keeps the number). */
+  const clipboardStale = (): void => {
+    clipboardItems = null;
+    clipboardOther = null;
+  };
+  const clipboardItem = (id: unknown): ClipboardItemView | null =>
+    typeof id === 'string' ? (clipboardItems?.items.find((item) => item.id === id) ?? null) : null;
+  // D-129: a picture whole, as PNG (inserted as a pasted picture, captured, kept for Undo).
+  ipcMain.handle(Channels.mainClipboardImage, async (event, id: unknown) => {
+    if (!owns(event.sender) || clipboardItem(id)?.kind !== 'image') return null;
+    const png = await clipboardPng(id as string);
+    return png ? new Uint8Array(png) : null;
+  });
+  // D-129: Copy: the item becomes the clipboard's content again as Win+V's pick does (no new
+  // entry); the only clipboard writes are on the user's explicit actions. Tests see the call.
+  ipcMain.handle(Channels.mainClipboardCopy, async (event, id: unknown) => {
+    if (!owns(event.sender) || !clipboardItem(id)) return 'gone';
     const hooks = e2eHooks();
-    if (hooks) hooks.copied = [...(hooks.copied ?? []), text];
-    else await clipboard.writeText(text);
-    log('clipboard: an item copied again');
+    let done: 'ok' | 'gone' | 'failed' | null;
+    if (hooks) {
+      hooks.madeCurrent = [...(hooks.madeCurrent ?? []), id as string];
+      done = 'ok';
+    } else done = await clipboardGuard.act(() => makeHistoryItemCurrent(id as string));
+    log(`clipboard: an item made current (${done ?? 'paused'})`);
+    clipboardStale();
+    return done ?? 'failed';
+  });
+  // D-129: Delete, also from Win+V (pinned or not); Undo adds it back as the newest item. What
+  // Undo needs is kept in memory only, and only while it is offered.
+  const clipboardUndo = new Map<
+    string,
+    { readonly text?: string; readonly png?: Buffer; readonly timer: NodeJS.Timeout }
+  >();
+  const UNDO_KEPT_MS = 10_000;
+  ipcMain.handle(Channels.mainClipboardDelete, async (event, id: unknown) => {
+    const item = owns(event.sender) ? clipboardItem(id) : null;
+    if (!item) return null;
+    const png = item.kind === 'image' ? await clipboardPng(item.id) : null;
+    if (item.kind === 'image' && !png) return null;
+    const hooks = e2eHooks();
+    let deleted: boolean | null;
+    if (hooks) {
+      const held = hooks.clipboardHistory;
+      deleted = held?.kind === 'ok' && held.items.some((each) => each.id === item.id);
+      if (held?.kind === 'ok' && deleted) {
+        hooks.clipboardHistory = {
+          kind: 'ok',
+          items: held.items.filter((each) => each.id !== item.id),
+        };
+        hooks.clipboardSequence = (hooks.clipboardSequence ?? 0) + 1;
+      }
+    } else deleted = await clipboardGuard.act(() => deleteHistoryItem(item.id));
+    log(`clipboard: an item deleted (${deleted === true ? 'done' : 'not there'})`);
+    clipboardStale();
+    if (deleted !== true) return null;
+    const token = randomUUID();
+    const timer = setTimeout(() => clipboardUndo.delete(token), UNDO_KEPT_MS);
+    clipboardUndo.set(token, png ? { png, timer } : { text: item.text, timer });
+    return token;
+  });
+  ipcMain.handle(Channels.mainClipboardRestore, async (event, token: unknown) => {
+    const kept = owns(event.sender) && typeof token === 'string' ? clipboardUndo.get(token) : null;
+    if (!kept) return false;
+    clipboardUndo.delete(token as string);
+    clearTimeout(kept.timer);
+    const hooks = e2eHooks();
+    if (hooks) hooks.restored = [...(hooks.restored ?? []), kept.text ?? 'picture'];
+    else if (kept.png)
+      await clipboard.write([
+        new ClipboardItem({
+          'image/png': new Blob([new Uint8Array(kept.png)], { type: 'image/png' }),
+        }),
+      ]);
+    else if (kept.text !== undefined) await clipboard.writeText(kept.text);
+    log('clipboard: a deleted item added back');
+    clipboardStale();
+    return true;
+  });
+  // D-129: Clear all, as Win+V's (pinned items are kept); no undo, confirmed in the section.
+  ipcMain.handle(Channels.mainClipboardClear, async (event) => {
+    if (!owns(event.sender)) return false;
+    const hooks = e2eHooks();
+    let cleared: boolean | null;
+    if (hooks) {
+      hooks.clipboardHistory = { kind: 'ok', items: [] };
+      hooks.clipboardSequence = (hooks.clipboardSequence ?? 0) + 1;
+      cleared = true;
+    } else cleared = await clipboardGuard.act(() => clearHistory());
+    log(`clipboard: history cleared (${cleared === true ? 'done' : 'not done'})`);
+    clipboardStale();
+    return cleared === true;
   });
   ipcMain.handle(Channels.mainClipboardSettings, (event) => {
     if (!owns(event.sender)) return;
@@ -1482,19 +1624,27 @@ async function start(): Promise<void> {
 
   // D-39: the popup with text to capture: a closed popup starts fresh (its draft is set aside as
   // the previous draft); an open one collects the text below what it already has.
-  const capturePrefilled = (text: string, at: number): Promise<void> => {
+  const capturePrefilled = (text: string | null, at: number, png?: Buffer): Promise<void> => {
     const fresh = !popup.window.isVisible();
     const ready = fresh ? drafts.setAside() : Promise.resolve();
-    return ready.then(() => {
+    return ready.then(async () => {
       if (fresh) popupHasContent = false;
-      popup.show(at, { prefill: text, replaceDraft: fresh });
+      // D-129: a picture goes in as a pasted one would: an attachment chip.
+      if (png) await drafts.attach(new Uint8Array(png), 'image/png');
+      popup.show(at, { ...(text !== null && { prefill: text }), replaceDraft: fresh });
     });
   };
   // NAV-08, D-128: a clipboard history item captured as a task: as Ctrl+Shift+X would (D-45).
-  ipcMain.handle(Channels.mainClipboardCapture, async (event, text: unknown) => {
-    if (!owns(event.sender) || typeof text !== 'string' || text.trim() === '') return;
+  ipcMain.handle(Channels.mainClipboardCapture, async (event, id: unknown) => {
+    const item = owns(event.sender) ? clipboardItem(id) : null;
+    if (!item) return;
     log('clipboard: an item captured');
-    await capturePrefilled(text, epochNow());
+    if (item.kind !== 'image') {
+      await capturePrefilled(item.text, epochNow());
+      return;
+    }
+    const png = await clipboardPng(item.id);
+    if (png) await capturePrefilled(null, epochNow(), png);
   });
 
   // CAP-07, R-2: copy what is selected in the app in front, then open the popup with it.

@@ -37,5 +37,10 @@ export function clipBarWidth(text: string): number {
   return Math.round(Math.min(78, Math.max(14, 10 + length * 1.1)));
 }
 
-/** "Text", "Link", "Code": what the row says at rest. */
-export const CLIP_KIND_LABEL = { text: 'Text', link: 'Link', code: 'Code' } as const;
+/** "Text", "Link", "Code", "Image" (D-129): what the row says at rest. */
+export const CLIP_KIND_LABEL = {
+  text: 'Text',
+  link: 'Link',
+  code: 'Code',
+  image: 'Image',
+} as const;

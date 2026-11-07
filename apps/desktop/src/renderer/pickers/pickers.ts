@@ -1026,6 +1026,8 @@ export interface ClipPick {
   readonly label: string;
   /** Its age. */
   readonly hint: string;
+  /** D-129: a picture's thumbnail. */
+  readonly thumb?: string;
 }
 
 /** What the clipboard picker shows instead of items (D-128 Q7), with its one action. */
@@ -1092,10 +1094,20 @@ export function openClipboardPicker(
     const typed = search.value.trim().toLowerCase();
     const found = items.filter((item) => typed === '' || item.label.toLowerCase().includes(typed));
     const rows = found.map((item) => {
-      const row = makeRow(item.label, item.hint, () => {
-        close();
-        on.insert(item.id);
-      });
+      const lead = item.thumb ? element('img', 'fl-picker-thumb') : undefined;
+      if (lead) {
+        lead.src = item.thumb ?? '';
+        lead.alt = '';
+      }
+      const row = makeRow(
+        item.label,
+        item.hint,
+        () => {
+          close();
+          on.insert(item.id);
+        },
+        lead,
+      );
       picks.set(row.button, item.id);
       return row;
     });

@@ -1,24 +1,35 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import type { ClipboardItemView, ClipboardView } from '../../shared/ipc.js';
 import { CLIP_KIND_LABEL, clipAge, clipBarWidth, clipPreview } from '../../shared/clipboard.js';
+import { usePresence } from '../ui/presence.js';
 import { ChevronIcon, EyeIcon, EyeOffIcon } from './icons.js';
 
 /**
- * NAV-08 (D-86, D-127, D-128): the Clipboard section, docked at the foot of the side panel in
+ * NAV-08 (D-86, D-127 to D-129): the Clipboard section, docked at the foot of the side panel in
  * every state (it stays in place while the panel's content scrolls behind it). Windows' own
- * clipboard history, text items only, newest first: collapsed, its newest three; open, all of them,
- * scrolling (up to about 45 % of the panel); open or not is remembered on this machine.
+ * clipboard history, newest first, text and pictures (thumbnails, D-129): folded, its newest three;
+ * open, all of them, scrolling (up to about 45 % of the panel); open or not is remembered here.
  *
- * Screen sharing (D-128): at rest a row is a placeholder bar with its kind and age, never the text;
- * the text shows while the pointer rests on the section (300 ms without moving) and goes the moment
- * it leaves, or always with Always show contents (the eye). A click acts as a paste in the field
- * that has the keyboard (nothing here takes the focus); the right-click menu has Insert, Capture as
- * task and Copy.
+ * Screen sharing (D-128): at rest a row is a placeholder (a bar sized to the text, a tile for a
+ * picture) with its kind and age, never the content; the content crossfades in once the pointer
+ * rests on the section (300 ms without moving) and out the moment it leaves, or shows always with
+ * the eye. A click acts as a paste in the field that has the keyboard (nothing here takes the
+ * focus); right-click: Insert, Capture as task, Copy, Delete. Items arriving slide in, items going
+ * fold away (D-89, D-129). Clear all asks first, inline.
  */
 
 const OPEN_KEY = 'flint.clipboard.open';
 /** D-128: how long the pointer rests on the section before its contents show. */
 const REST_MS = 300;
+/** D-129: how long the content takes to fade out (the page's fast duration). */
+const FADE_MS = 140;
 
 function storedOpen(): boolean {
   try {
@@ -60,7 +71,7 @@ export function clipboardNote(view: ClipboardView): {
     case 'ok':
       return view.items.length > 0
         ? null
-        : { text: 'Copy some text and it shows here.', word: null, action: null };
+        : { text: 'Copy something and it shows here.', word: null, action: null };
     default:
       return null;
   }
@@ -73,7 +84,10 @@ const sameView = (a: ClipboardView | null, b: ClipboardView): boolean =>
   a.showContents === b.showContents &&
   a.items.length === b.items.length &&
   a.items.every(
-    (item, index) => item.id === b.items[index]?.id && item.text === b.items[index]?.text,
+    (item, index) =>
+      item.id === b.items[index]?.id &&
+      item.text === b.items[index]?.text &&
+      item.thumb === b.items[index]?.thumb,
   );
 
 /** D-128: how often the section asks main (main reads only when something new was copied). */
@@ -118,26 +132,64 @@ export function clipboardChanged(): void {
   window.dispatchEvent(new Event('flint:clipboard'));
 }
 
+/**
+ * D-129: shown and fading: content stays drawn while it fades out (FADE_MS) after `shown` turns
+ * off, then leaves the page (D-128: no content in the page at rest).
+ */
+function useFading(shown: boolean): boolean {
+  const [fading, setFading] = useState(false);
+  const was = useRef(shown);
+  useEffect(() => {
+    const before = was.current;
+    was.current = shown;
+    if (before && !shown) {
+      setFading(true);
+      const timer = window.setTimeout(() => setFading(false), FADE_MS);
+      return () => window.clearTimeout(timer);
+    }
+    if (shown) setFading(false);
+    return undefined;
+  }, [shown]);
+  return fading;
+}
+
 export function ClipboardSection(props: {
   /** A click: the item into the field that has the keyboard (D-128 Q4). */
   readonly onInsert: (item: ClipboardItemView) => void;
   readonly onMenu: (item: ClipboardItemView, at: { x: number; y: number }) => void;
   readonly onSettings: () => void;
   readonly onShowContents: (show: boolean) => void;
+  /** D-129: Clear all, confirmed; resolves once Windows cleared it. */
+  readonly onClear: () => Promise<void>;
 }): ReactElement | null {
-  const { onInsert, onMenu, onSettings, onShowContents } = props;
+  const { onInsert, onMenu, onSettings, onShowContents, onClear } = props;
   const { view, now, refresh } = useClipboardView();
   const onRetry = (): void => refresh(true);
   const [open, setOpen] = useState(storedOpen);
   const [revealed, setRevealed] = useState(false);
   const [pressed, setPressed] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const resting = useRef<number | undefined>(undefined);
+  const rowsBox = useRef<HTMLDivElement>(null);
   useEffect(() => () => window.clearTimeout(resting.current), []);
   useEffect(() => {
     if (pressed === null) return;
     const timer = window.setTimeout(() => setPressed(null), 320);
     return () => window.clearTimeout(timer);
   }, [pressed]);
+  const shown = (view?.showContents ?? false) || revealed;
+  const fading = useFading(shown);
+  // D-89, D-129: an item that went (deleted, cleared, fallen off) folds away where it was.
+  const { entries: rows, gone } = usePresence(view?.items ?? [], (item) => item.id);
+  // Folded, the section is as high as its first three rows (pictures make rows taller).
+  useLayoutEffect(() => {
+    const box = rowsBox.current;
+    if (!box) return;
+    const heights = [...box.querySelectorAll<HTMLElement>('.clip-row:not(.leaving)')]
+      .slice(0, 3)
+      .map((row) => row.offsetHeight);
+    box.style.setProperty('--clip-folded', `${heights.reduce((sum, each) => sum + each, 0)}px`);
+  });
 
   const flip = (): void => {
     const next = !open;
@@ -160,13 +212,11 @@ export function ClipboardSection(props: {
   };
 
   if (!view || view.state === 'disabled') return null;
-  const shown = view.showContents || revealed;
   const note = clipboardNote(view);
   const count = view.state === 'ok' || view.state === 'error' ? view.items.length : null;
   const word = note?.word ?? null;
-  // Every row is there; folded, the section is three rows high (so it folds both ways smoothly).
-  const rows = view.items;
   const keep = (event: React.MouseEvent): void => event.preventDefault();
+  const canClear = (view.state === 'ok' || view.state === 'error') && view.items.length > 0;
 
   return (
     <section
@@ -195,6 +245,17 @@ export function ClipboardSection(props: {
             count !== null && <span className="clip-count">{count}</span>
           )}
         </button>
+        {canClear && (
+          <button
+            type="button"
+            tabIndex={-1}
+            className="clip-clear"
+            onMouseDown={keep}
+            onClick={() => setConfirming((now) => !now)}
+          >
+            Clear all
+          </button>
+        )}
         <button
           type="button"
           tabIndex={-1}
@@ -208,6 +269,37 @@ export function ClipboardSection(props: {
           {view.showContents ? <EyeIcon size={13} /> : <EyeOffIcon size={13} />}
         </button>
       </div>
+      {confirming && canClear && (
+        <div className="clip-confirm" role="alertdialog" aria-label="Clear clipboard history">
+          <p>
+            Clear clipboard history? This also clears Win+V and can’t be undone. Pinned items in
+            Win+V are kept.
+          </p>
+          <div className="clip-confirm-actions">
+            <button
+              type="button"
+              tabIndex={-1}
+              className="trash-action danger"
+              onMouseDown={keep}
+              onClick={() => {
+                setConfirming(false);
+                void onClear().then(() => refresh());
+              }}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              tabIndex={-1}
+              className="trash-action"
+              onMouseDown={keep}
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {note
         ? open && (
             <div className="clip-note">
@@ -226,14 +318,18 @@ export function ClipboardSection(props: {
             </div>
           )
         : rows.length > 0 && (
-            <div className="clip-rows">
-              {rows.map((item) => (
+            <div className="clip-rows" ref={rowsBox}>
+              {rows.map(({ item, key, leaving }) => (
                 <button
-                  key={item.id}
+                  key={key}
                   type="button"
                   tabIndex={-1}
-                  className={pressed === item.id ? 'clip-row pressed' : 'clip-row'}
+                  className={`clip-row${item.kind === 'image' ? ' image' : ''}${pressed === item.id ? ' pressed' : ''}${leaving ? ' leaving' : ''}`}
                   data-kind={item.kind}
+                  inert={leaving}
+                  onAnimationEnd={(event) => {
+                    if (leaving && event.target === event.currentTarget) gone(key);
+                  }}
                   onMouseDown={keep}
                   onClick={() => {
                     setPressed(item.id);
@@ -245,18 +341,32 @@ export function ClipboardSection(props: {
                     onMenu(item, { x: event.clientX, y: event.clientY });
                   }}
                 >
-                  {shown ? (
-                    <span className="clip-text">{clipPreview(item.text)}</span>
-                  ) : (
-                    <>
-                      <span
-                        className="clip-bar"
-                        aria-hidden="true"
-                        style={{ width: `${clipBarWidth(item.text)}%` }}
-                      />
+                  <span className="clip-face">
+                    <span className={shown ? 'clip-rest out' : 'clip-rest'} aria-hidden={shown}>
+                      {item.kind === 'image' ? (
+                        <span className="clip-tile" />
+                      ) : (
+                        <span
+                          className="clip-bar"
+                          style={{ width: `${clipBarWidth(item.text)}%` }}
+                        />
+                      )}
                       <span className="clip-kind">{CLIP_KIND_LABEL[item.kind]}</span>
-                    </>
-                  )}
+                    </span>
+                    {(shown || fading) &&
+                      (item.kind === 'image' ? (
+                        <img
+                          className={shown ? 'clip-thumb' : 'clip-thumb out'}
+                          src={item.thumb}
+                          alt="Picture"
+                          draggable={false}
+                        />
+                      ) : (
+                        <span className={shown ? 'clip-text' : 'clip-text out'}>
+                          {clipPreview(item.text)}
+                        </span>
+                      ))}
+                  </span>
                   <span className="clip-age">{clipAge(item.at, now)}</span>
                 </button>
               ))}

@@ -1165,36 +1165,95 @@ export function App(): ReactElement {
   }, []);
   const startTourRef = useRef(startTour);
   startTourRef.current = startTour;
-  // NAV-08, D-128: Windows' clipboard history: an item into the field that has the keyboard (or
-  // had it before the palette or the picker took it), captured as a task, or copied again.
+  // NAV-08, D-128, D-129: Windows' clipboard history: an item into the field that has the keyboard
+  // (or had it before the palette or the picker took it), captured as a task, copied again (as
+  // Win+V's pick), deleted (Undo adds it back as the newest), or all of it cleared.
   useEffect(() => trackFields(), []);
-  const insertClipboard = useCallback((text: string, field: HTMLElement | null): void => {
-    if (!field) {
-      showToastRef.current('Click where it should go, then pick it again', false);
-      return;
-    }
-    pasteInto(field, text);
+  const insertClipboard = useCallback(
+    (item: ClipboardItemView, field: HTMLElement | null): void => {
+      if (!field) {
+        showToastRef.current('Click where it should go, then pick it again', false);
+        return;
+      }
+      if (item.kind !== 'image') {
+        pasteInto(field, item.text);
+        return;
+      }
+      // D-129: a picture goes in as a pasted one: a note or the composer saves it to attachments/.
+      void window.flintMain.clipboardImage(item.id).then((png) => {
+        if (!png) {
+          showToastRef.current('That picture is no longer in Win+V', false);
+          return;
+        }
+        const file = new File([new Uint8Array(png)], 'clipboard.png', { type: 'image/png' });
+        if (!pasteInto(field, file))
+          showToastRef.current('A picture goes into a note or the composer', false);
+      });
+    },
+    [],
+  );
+  const captureClipboard = useCallback((item: ClipboardItemView): void => {
+    void window.flintMain.clipboardCapture(item.id);
   }, []);
-  const captureClipboard = useCallback((text: string): void => {
-    void window.flintMain.clipboardCapture(text);
+  const copyClipboard = useCallback((item: ClipboardItemView): void => {
+    void window.flintMain.clipboardCopy(item.id).then((done) => {
+      showToastRef.current(
+        done === 'ok'
+          ? 'Copied'
+          : done === 'gone'
+            ? 'That item is no longer in Win+V'
+            : 'Couldn’t copy it (the log says why)',
+        false,
+      );
+      clipboardChanged();
+    });
   }, []);
-  const copyClipboard = useCallback((text: string): void => {
-    void window.flintMain.clipboardCopy(text).then(() => showToastRef.current('Copied', false));
+  const deleteClipboard = useCallback((item: ClipboardItemView): void => {
+    void window.flintMain.clipboardDelete(item.id).then((token) => {
+      clipboardChanged();
+      if (!token) {
+        showToastRef.current('That item is no longer in Win+V', false);
+        return;
+      }
+      // D-129: Windows can't put it back in place: Undo adds it back as the newest.
+      showToastRef.current(
+        'Deleted, also from Win+V (pinned or not). Undo adds it back as the newest',
+        false,
+        {
+          label: 'Undo',
+          run: () =>
+            void window.flintMain.clipboardRestore(token).then((done) => {
+              clipboardChanged();
+              if (!done) showToastRef.current('Too late to undo that', false);
+            }),
+        },
+      );
+    });
   }, []);
+  const clearClipboard = useCallback(
+    (): Promise<void> =>
+      window.flintMain.clipboardClear().then((done) => {
+        clipboardChanged();
+        if (!done) showToastRef.current('Clipboard history couldn’t be cleared', false);
+      }),
+    [],
+  );
   const clipboardMenu = useCallback(
     (item: ClipboardItemView, at: { x: number; y: number }): void => {
       // The menu keeps the keyboard where it is: Insert goes there.
       const field = currentField();
       openMenu(
         [
-          { label: 'Insert', action: () => insertClipboard(item.text, field) },
-          { label: 'Capture as task', action: () => captureClipboard(item.text) },
-          { label: 'Copy', action: () => copyClipboard(item.text) },
+          { label: 'Insert', action: () => insertClipboard(item, field) },
+          { label: 'Capture as task', action: () => captureClipboard(item) },
+          { label: 'Copy', action: () => copyClipboard(item) },
+          'divider',
+          { label: 'Delete (also from Win+V)', action: () => deleteClipboard(item) },
         ],
         at,
       );
     },
-    [insertClipboard, captureClipboard, copyClipboard],
+    [insertClipboard, captureClipboard, copyClipboard, deleteClipboard],
   );
   /** D-128 Q3: Always show contents; turned on, it says once that a screen share shows them. */
   const showClipboardContents = useCallback((show: boolean): void => {
@@ -1211,8 +1270,8 @@ export function App(): ReactElement {
     });
   }, []);
   /**
-   * D-128 Q6: Paste from clipboard history… (Ctrl+Shift+H): the picker, with the items' text (it
-   * was opened on purpose); the keyboard goes back to `field` before an item goes in.
+   * D-128 Q6: Paste from clipboard history… (Ctrl+Shift+H): the picker, with the items' text and
+   * pictures (it was opened on purpose); the keyboard goes back to `field` before an item goes in.
    */
   const pasteFromHistory = useCallback(
     (field: HTMLElement | null): void => {
@@ -1252,6 +1311,10 @@ export function App(): ReactElement {
                 };
               })();
         const width = Math.min(460, window.innerWidth - 32);
+        const on = (act: (item: ClipboardItemView) => void) => (id: string) => {
+          const item = byId.get(id);
+          if (item) act(item);
+        };
         openClipboardPicker(
           {
             anchor: new DOMRect((window.innerWidth - width) / 2, 72, width, 0),
@@ -1260,23 +1323,15 @@ export function App(): ReactElement {
           },
           view.items.map((item) => ({
             id: item.id,
-            label: clipPreview(item.text),
+            label: item.kind === 'image' ? 'Picture' : clipPreview(item.text),
             hint: clipAge(item.at, Date.now()),
+            ...(item.thumb !== undefined && { thumb: item.thumb }),
           })),
           note,
           {
-            insert: (id) => {
-              const item = byId.get(id);
-              if (item) insertClipboard(item.text, field);
-            },
-            capture: (id) => {
-              const item = byId.get(id);
-              if (item) captureClipboard(item.text);
-            },
-            copy: (id) => {
-              const item = byId.get(id);
-              if (item) copyClipboard(item.text);
-            },
+            insert: on((item) => insertClipboard(item, field)),
+            capture: on(captureClipboard),
+            copy: on(copyClipboard),
           },
         );
       });
@@ -5254,10 +5309,11 @@ export function App(): ReactElement {
                 handlers={panelHandlers}
                 foot={
                   <ClipboardSection
-                    onInsert={(item) => insertClipboard(item.text, currentField())}
+                    onInsert={(item) => insertClipboard(item, currentField())}
                     onMenu={clipboardMenu}
                     onSettings={() => void window.flintMain.clipboardSettings()}
                     onShowContents={showClipboardContents}
+                    onClear={clearClipboard}
                   />
                 }
               />

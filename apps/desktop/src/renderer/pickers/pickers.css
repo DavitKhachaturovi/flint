@@ -432,3 +432,12 @@
   font-family: var(--fl-font-mono);
   color: var(--fl-text-muted);
 }
+
+/* D-129: a picture in the clipboard picker: its thumbnail before the word Picture. */
+.fl-picker-thumb {
+  flex: 0 0 auto;
+  max-width: 64px;
+  max-height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+}

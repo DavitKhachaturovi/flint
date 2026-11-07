@@ -57,19 +57,27 @@ export function trackFields(): () => void {
   };
 }
 
-/** Puts `text` into `field` as a paste (one undo step). */
-export function pasteInto(field: HTMLElement, text: string): void {
+/**
+ * Puts `content` into `field` as a paste (one undo step): text, or (D-129) a picture as a pasted
+ * image file, which a note or the composer saves to attachments/. False when the field doesn't take
+ * a picture.
+ */
+export function pasteInto(field: HTMLElement, content: string | File): boolean {
   if (document.activeElement !== field) field.focus({ preventScroll: true });
   const data = new DataTransfer();
-  data.setData('text/plain', text);
+  if (typeof content === 'string') data.setData('text/plain', content);
+  else data.items.add(content);
   const paste = new ClipboardEvent('paste', {
     clipboardData: data,
     bubbles: true,
     cancelable: true,
   });
   field.dispatchEvent(paste);
-  if (paste.defaultPrevented) return;
+  if (paste.defaultPrevented) return true;
+  if (typeof content !== 'string') return false;
   // Nothing took it (a plain field): typed in, as the field's own undo step.
-  const typed = field instanceof HTMLInputElement ? text.replace(/\s*[\r\n]+\s*/g, ' ') : text;
+  const typed =
+    field instanceof HTMLInputElement ? content.replace(/\s*[\r\n]+\s*/g, ' ') : content;
   document.execCommand('insertText', false, typed);
+  return true;
 }

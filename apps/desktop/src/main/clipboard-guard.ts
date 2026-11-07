@@ -29,10 +29,23 @@ export class ClipboardGuard {
   /** The newest `limit` items; `retry` reads even after a crash (the user asked for it). */
   async read(limit: number, retry = false): Promise<GuardedRead> {
     if (this.crashed && !retry) return { kind: 'crashed' };
+    return this.marked(() => this.reader(limit));
+  }
+
+  /**
+   * D-129: any other call into Windows' clipboard history (a picture, Delete, Clear all, Copy),
+   * behind the same marker; null after a crash (reads are paused until Try again).
+   */
+  async act<T>(call: () => Promise<T> | T): Promise<T | null> {
+    if (this.crashed) return null;
+    return this.marked(call);
+  }
+
+  private async marked<T>(call: () => Promise<T> | T): Promise<T> {
     if (this.reading === 0) writeFileSync(this.marker, `${new Date().toISOString()}\n`);
     this.reading++;
     try {
-      return await this.reader(limit);
+      return await call();
     } finally {
       this.reading--;
       if (this.reading === 0) rmSync(this.marker, { force: true });

@@ -2,14 +2,13 @@ import koffi, { type TypeObject } from 'koffi';
 
 /**
  * NAV-08, D-127: Windows' own clipboard history (Win+V), read through its WinRT interfaces with
- * koffi (no compiled add-on, D-30). Read-only: Flint never writes, clears or deletes anything here,
- * and never records the clipboard itself. Text items only for now. Windows answers only while
- * Flint is in the foreground (else "access denied").
+ * koffi (no compiled add-on, D-30). It reads text and pictures; it writes only on the user's
+ * explicit action (D-129: Delete, Clear all, Copy as Win+V's pick) and never records the clipboard
+ * itself. Windows answers only while Flint is in the foreground (else "access denied").
  *
  * The method positions are Windows' own (from `C:\Windows\System32\WinMetadata`, 7 Nov 2026): a
- * wrong one would call a different method, so only the reads below are ever called, each by its
- * checked position. Every call goes through `vcall`, every result is checked, every object
- * released.
+ * wrong one would call a different method, so each is called only by its checked position below.
+ * Every call goes through `vcall`, every result is checked, every object released.
  */
 
 const combase = koffi.load('combase.dll');
@@ -41,14 +40,19 @@ const GetUint32 = koffi.proto('int ComGetUint32(void *self, _Out_ uint32_t *out)
 const GetInt64 = koffi.proto('int ComGetInt64(void *self, _Out_ int64_t *out)');
 const ContainsFormat = koffi.proto('int ComContains(void *self, void *format, _Out_ uint8_t *out)');
 const Close = koffi.proto('int ComClose(void *self)');
+const ItemAndBool = koffi.proto('int ComItemBool(void *self, void *item, _Out_ uint8_t *out)');
+const ItemAndInt32 = koffi.proto('int ComItemInt32(void *self, void *item, _Out_ int32_t *out)');
 
 /** Method positions (IInspectable's six come first). */
 const AT = {
   queryInterface: 0,
   release: 2,
-  // IClipboardStatics2 {D2AC1B6A-D29F-554B-B303-F0452345FE02}. 7 (ClearHistory), 8
-  // (DeleteItemFromHistory) and 9 (SetHistoryItemAsContent) are never called.
+  // IClipboardStatics2 {D2AC1B6A-D29F-554B-B303-F0452345FE02}; 7 to 9 only on the user's explicit
+  // action (D-129).
   getHistoryItemsAsync: 6,
+  clearHistory: 7,
+  deleteItemFromHistory: 8,
+  setHistoryItemAsContent: 9,
   isHistoryEnabled: 10,
   // IClipboardHistoryItemsResult
   resultStatus: 6,
@@ -63,6 +67,13 @@ const AT = {
   // IDataPackageView
   viewContains: 10,
   viewGetTextAsync: 12,
+  viewGetBitmapAsync: 18,
+  // IRandomAccessStreamReference {33EE3134-1DD6-4E3A-8067-D1C162E8642B}
+  referenceOpenReadAsync: 6,
+  // IRandomAccessStream {905A0FE1-BC53-11DF-8C49-001E4FC686DA}
+  streamSize: 6,
+  // IStream (classic COM: IUnknown's 3, then ISequentialStream::Read)
+  istreamRead: 3,
   // IAsyncInfo {00000036-0000-0000-C000-000000000046}
   asyncStatus: 7,
   asyncClose: 10,
@@ -186,13 +197,15 @@ async function awaitOperation<T>(
   }
 }
 
-/** One item of the history: its text, or null when it isn't text (a picture, files). */
+/** One item of the history: its text, or null when it isn't text; `image`: a picture (Bitmap). */
 export interface ClipboardHistoryItem {
   /** Windows' id for it (stays the same while it is in the history). */
   readonly id: string;
   /** When it was copied (ms since 1970). */
   readonly at: number;
   readonly text: string | null;
+  /** D-129: a picture (no text); its bytes come with `readHistoryImage`. */
+  readonly image?: boolean;
 }
 
 export type ClipboardHistoryRead =
@@ -261,28 +274,56 @@ export function clipboardHistoryPolicyOff(): boolean {
 const fromDateTime = (ticks: bigint | number): number =>
   Number(BigInt(ticks) / 10_000n - 11_644_473_600_000n);
 
+/** ClipboardHistoryItemsResultStatus: Success, AccessDenied, ClipboardHistoryDisabled. */
+type ResultStatus = 'ok' | 'denied' | 'off' | 'other';
+
+/**
+ * The history's items (an IVectorView the caller releases), or why there are none. The statics
+ * come from the caller (released by it).
+ */
+async function historyItems(
+  clipboard: unknown,
+): Promise<{ readonly status: ResultStatus; readonly items: unknown; readonly code: number }> {
+  const operation = getObject(clipboard, AT.getHistoryItemsAsync, 'GetHistoryItemsAsync');
+  const result = await awaitOperation(operation, 'GetHistoryItemsAsync', (done) =>
+    getObject(done, AT.asyncGetResults, 'GetHistoryItemsAsync: results'),
+  );
+  try {
+    const status = [0];
+    check(vcall(result, AT.resultStatus, GetInt32, status), 'ClipboardHistoryItemsResult.Status');
+    const code = status[0] ?? -1;
+    if (code !== 0)
+      return {
+        status: code === 1 ? 'denied' : code === 2 ? 'off' : 'other',
+        items: null,
+        code,
+      };
+    return {
+      status: 'ok',
+      items: getObject(result, AT.resultItems, 'ClipboardHistoryItemsResult.Items'),
+      code,
+    };
+  } finally {
+    release(result);
+  }
+}
+
 /**
  * The newest `limit` items of Windows' clipboard history, newest first. D-128: their texts are read
  * all at once (each a short call, then waiting on Windows with the main thread free).
  */
 export async function readClipboardHistory(limit = 25): Promise<ClipboardHistoryRead> {
   let clipboard: unknown = null;
-  let result: unknown = null;
   let items: unknown = null;
   const textFormat = hstring('Text');
+  const bitmapFormat = hstring('Bitmap');
   try {
     clipboard = statics();
-    const operation = getObject(clipboard, AT.getHistoryItemsAsync, 'GetHistoryItemsAsync');
-    result = await awaitOperation(operation, 'GetHistoryItemsAsync', (done) =>
-      getObject(done, AT.asyncGetResults, 'GetHistoryItemsAsync: results'),
-    );
-    const status = [0];
-    check(vcall(result, AT.resultStatus, GetInt32, status), 'ClipboardHistoryItemsResult.Status');
-    // ClipboardHistoryItemsResultStatus: Success, AccessDenied, ClipboardHistoryDisabled.
-    if (status[0] === 1) return { kind: 'denied' };
-    if (status[0] === 2) return { kind: 'off' };
-    if (status[0] !== 0) return { kind: 'unavailable', reason: `status ${status[0]}` };
-    items = getObject(result, AT.resultItems, 'ClipboardHistoryItemsResult.Items');
+    const found = await historyItems(clipboard);
+    if (found.status === 'denied') return { kind: 'denied' };
+    if (found.status === 'off') return { kind: 'off' };
+    if (found.status !== 'ok') return { kind: 'unavailable', reason: `status ${found.code}` };
+    items = found.items;
     const size = [0];
     check(vcall(items, AT.vectorSize, GetUint32, size), 'Items.Size');
     const count = Math.min(size[0] ?? 0, limit);
@@ -290,7 +331,7 @@ export async function readClipboardHistory(limit = 25): Promise<ClipboardHistory
     const started: Promise<ClipboardHistoryItem>[] = [];
     for (let index = 0; index < count; index++) {
       if (index > 0 && index % 5 === 0) await new Promise((resolve) => setImmediate(resolve));
-      started.push(readItem(items, index, textFormat));
+      started.push(readItem(items, index, textFormat, bitmapFormat));
     }
     const reads = await Promise.allSettled(started);
     const failure = reads.find((each) => each.status === 'rejected');
@@ -303,9 +344,9 @@ export async function readClipboardHistory(limit = 25): Promise<ClipboardHistory
     return { kind: 'unavailable', reason: error instanceof Error ? error.message : String(error) };
   } finally {
     release(items);
-    release(result);
     release(clipboard);
     windowsDeleteString(textFormat);
+    windowsDeleteString(bitmapFormat);
   }
 }
 
@@ -320,10 +361,17 @@ function getString(self: unknown, index: number, what: string): string {
   }
 }
 
+function contains(content: unknown, format: unknown): boolean {
+  const has = [0];
+  check(vcall(content, AT.viewContains, ContainsFormat, format, has), 'Content.Contains');
+  return has[0] !== 0;
+}
+
 async function readItem(
   items: unknown,
   index: number,
   textFormat: unknown,
+  bitmapFormat: unknown,
 ): Promise<ClipboardHistoryItem> {
   const item: unknown[] = [null];
   let content: unknown = null;
@@ -333,18 +381,171 @@ async function readItem(
     const ticks: (bigint | number)[] = [0];
     check(vcall(item[0], AT.itemTimestamp, GetInt64, ticks), 'Item.Timestamp');
     content = getObject(item[0], AT.itemContent, 'Item.Content');
-    const isText = [0];
-    check(vcall(content, AT.viewContains, ContainsFormat, textFormat, isText), 'Content.Contains');
     let text: string | null = null;
-    if (isText[0] !== 0) {
+    let image = false;
+    if (contains(content, textFormat)) {
       const operation = getObject(content, AT.viewGetTextAsync, 'GetTextAsync');
       text = await awaitOperation(operation, 'GetTextAsync', (done) =>
         getString(done, AT.asyncGetResults, 'GetTextAsync: results'),
       );
-    }
-    return { id: id || `${index}`, at: fromDateTime(ticks[0] ?? 0), text };
+    } else image = contains(content, bitmapFormat);
+    return { id: id || `${index}`, at: fromDateTime(ticks[0] ?? 0), text, image };
   } finally {
     release(content);
     release(item[0]);
+  }
+}
+
+/**
+ * D-129: runs `act` on the history item with Windows' id `id` (found in a fresh read of the
+ * history), with the Clipboard statics; null when it isn't there any more (or history can't be
+ * read now).
+ */
+async function withItem<T>(
+  id: string,
+  act: (clipboard: unknown, item: unknown) => Promise<T> | T,
+): Promise<T | null> {
+  let clipboard: unknown = null;
+  let items: unknown = null;
+  try {
+    clipboard = statics();
+    const found = await historyItems(clipboard);
+    if (found.status !== 'ok') return null;
+    items = found.items;
+    const size = [0];
+    check(vcall(items, AT.vectorSize, GetUint32, size), 'Items.Size');
+    for (let index = 0; index < (size[0] ?? 0); index++) {
+      const item: unknown[] = [null];
+      check(vcall(items, AT.vectorGetAt, GetAt, index, item), `Items.GetAt(${index})`);
+      try {
+        if (getString(item[0], AT.itemId, 'Item.Id') === id) return await act(clipboard, item[0]);
+      } finally {
+        release(item[0]);
+      }
+    }
+    return null;
+  } finally {
+    release(items);
+    release(clipboard);
+  }
+}
+
+const IID_STREAM_WITH_SIZE = guid('905A0FE1-BC53-11DF-8C49-001E4FC686DA'); // IRandomAccessStream
+const IID_ISTREAM = guid('0000000C-0000-0000-C000-000000000046');
+const shcore = koffi.load('shcore.dll');
+const createStreamOverRandomAccessStream = shcore.func(
+  'int CreateStreamOverRandomAccessStream(void *stream, void *iid, _Out_ void **out)',
+) as (stream: unknown, iid: Buffer, out: unknown[]) => number;
+const GetUint64 = koffi.proto('int ComGetUint64(void *self, _Out_ uint64_t *out)');
+const ReadBytes = koffi.proto(
+  'int ComRead(void *self, _Out_ uint8_t *buffer, uint32 count, _Out_ uint32_t *read)',
+);
+/** Windows keeps pictures of up to 4 MB in the history; anything far larger isn't read. */
+const IMAGE_LIMIT = 64 * 1024 * 1024;
+
+/**
+ * D-129: the picture of history item `id` as Windows hands it over (a BMP file's bytes), or null
+ * (not there any more, not a picture).
+ */
+export async function readHistoryImage(id: string): Promise<Buffer | null> {
+  return withItem(id, async (_, item) => {
+    const content = getObject(item, AT.itemContent, 'Item.Content');
+    let reference: unknown = null;
+    let stream: unknown = null;
+    const sized: unknown[] = [null];
+    const classic: unknown[] = [null];
+    try {
+      const operation = getObject(content, AT.viewGetBitmapAsync, 'GetBitmapAsync');
+      reference = await awaitOperation(operation, 'GetBitmapAsync', (done) =>
+        getObject(done, AT.asyncGetResults, 'GetBitmapAsync: results'),
+      );
+      const opening = getObject(reference, AT.referenceOpenReadAsync, 'OpenReadAsync');
+      stream = await awaitOperation(opening, 'OpenReadAsync', (done) =>
+        getObject(done, AT.asyncGetResults, 'OpenReadAsync: results'),
+      );
+      check(
+        vcall(stream, AT.queryInterface, QueryInterface, IID_STREAM_WITH_SIZE, sized),
+        'IRandomAccessStream',
+      );
+      const size: (bigint | number)[] = [0];
+      check(vcall(sized[0], AT.streamSize, GetUint64, size), 'Stream.Size');
+      const total = Number(size[0] ?? 0);
+      if (total <= 0 || total > IMAGE_LIMIT) return null;
+      check(
+        createStreamOverRandomAccessStream(sized[0], IID_ISTREAM, classic),
+        'CreateStreamOverRandomAccessStream',
+      );
+      const bytes = Buffer.alloc(total);
+      let got = 0;
+      while (got < total) {
+        const chunk = new Uint8Array(Math.min(1 << 20, total - got));
+        const read = [0];
+        check(vcall(classic[0], AT.istreamRead, ReadBytes, chunk, chunk.length, read), 'Read');
+        const count = read[0] ?? 0;
+        if (count === 0) break;
+        bytes.set(chunk.subarray(0, count), got);
+        got += count;
+      }
+      return got === total ? bytes : null;
+    } finally {
+      release(classic[0]);
+      release(sized[0]);
+      release(stream);
+      release(reference);
+      release(content);
+    }
+  });
+}
+
+/**
+ * D-129: deletes history item `id` from Windows' clipboard history (Win+V's Delete: a pinned item
+ * goes too); whether it was there to delete.
+ */
+export async function deleteHistoryItem(id: string): Promise<boolean> {
+  const done = await withItem(id, (clipboard, item) => {
+    const deleted = [0];
+    check(
+      vcall(clipboard, AT.deleteItemFromHistory, ItemAndBool, item, deleted),
+      'DeleteItemFromHistory',
+    );
+    return deleted[0] !== 0;
+  });
+  return done === true;
+}
+
+/**
+ * D-129: makes history item `id` the clipboard's content again, as picking it in Win+V does (no
+ * new entry). `gone`: not in the history any more.
+ */
+export async function makeHistoryItemCurrent(id: string): Promise<'ok' | 'gone' | 'failed'> {
+  const done = await withItem(id, (clipboard, item) => {
+    // SetHistoryItemAsContentStatus: Success, AccessDenied, ItemDeleted.
+    const status = [0];
+    check(
+      vcall(clipboard, AT.setHistoryItemAsContent, ItemAndInt32, item, status),
+      'SetHistoryItemAsContent',
+    );
+    return status[0] === 0
+      ? ('ok' as const)
+      : status[0] === 2
+        ? ('gone' as const)
+        : ('failed' as const);
+  });
+  return done ?? 'gone';
+}
+
+/**
+ * D-129: Clear all: Windows' ClearHistory, as Win+V's Clear all (pinned items are kept: "ClearHistory
+ * doesn't clear pinned items from the clipboard history", Microsoft Learn).
+ */
+export function clearHistory(): boolean {
+  let clipboard: unknown = null;
+  try {
+    clipboard = statics();
+    const cleared = [0];
+    check(vcall(clipboard, AT.clearHistory, GetBool, cleared), 'ClearHistory');
+    return cleared[0] !== 0;
+  } finally {
+    release(clipboard);
   }
 }

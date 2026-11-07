@@ -175,13 +175,29 @@ export const main = {
   clipboard(retry = false): Promise<ClipboardView> {
     return invoke(Channels.mainClipboard, retry) as Promise<ClipboardView>;
   },
-  /** D-128: Copy: the item becomes the clipboard's content again. */
-  clipboardCopy(text: string): Promise<void> {
-    return invoke(Channels.mainClipboardCopy, text) as Promise<void>;
+  /** D-129: Copy: the item becomes the clipboard's content again, as Win+V's pick. */
+  clipboardCopy(id: string): Promise<'ok' | 'gone' | 'failed'> {
+    return invoke(Channels.mainClipboardCopy, id) as Promise<'ok' | 'gone' | 'failed'>;
   },
   /** D-128: Capture as task: the capture popup, prefilled as by Ctrl+Shift+X. */
-  clipboardCapture(text: string): Promise<void> {
-    return invoke(Channels.mainClipboardCapture, text) as Promise<void>;
+  clipboardCapture(id: string): Promise<void> {
+    return invoke(Channels.mainClipboardCapture, id) as Promise<void>;
+  },
+  /** D-129: a picture item whole, as PNG bytes (null: not there any more). */
+  clipboardImage(id: string): Promise<Uint8Array | null> {
+    return invoke(Channels.mainClipboardImage, id) as Promise<Uint8Array | null>;
+  },
+  /** D-129: Delete (also from Win+V); the Undo token, or null when it wasn't deleted. */
+  clipboardDelete(id: string): Promise<string | null> {
+    return invoke(Channels.mainClipboardDelete, id) as Promise<string | null>;
+  },
+  /** D-129: Undo of a delete: adds the item back as the newest. */
+  clipboardRestore(token: string): Promise<boolean> {
+    return invoke(Channels.mainClipboardRestore, token) as Promise<boolean>;
+  },
+  /** D-129: Clear all. */
+  clipboardClear(): Promise<boolean> {
+    return invoke(Channels.mainClipboardClear) as Promise<boolean>;
   },
   /** D-128: Windows' clipboard settings. */
   clipboardSettings(): Promise<void> {

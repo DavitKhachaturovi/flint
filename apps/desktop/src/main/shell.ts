@@ -93,8 +93,12 @@ export interface E2EHooks {
   clipboardSequence?: number;
   /** D-128: history turned off by a group policy. */
   clipboardPolicyOff?: boolean;
-  /** D-128: what Copy would have put on the clipboard. */
-  copied?: string[];
+  /** D-129: the pictures the history "holds", by item id (a BMP, base64). */
+  clipboardImages?: Record<string, string>;
+  /** D-129: the items Copy made current (as Win+V's pick). */
+  madeCurrent?: string[];
+  /** D-129: what Undo of a delete added back. */
+  restored?: string[];
 }
 
 export function e2eHooks(): E2EHooks | undefined {

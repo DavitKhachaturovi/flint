@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -119,9 +119,52 @@ const ITEMS = {
       text: 'const total = items.reduce((sum, x) => sum + x, 0);',
     },
     { id: 'c4', at: NOW - 2 * 3_600_000, text: 'fourth thing\nwith a second line' },
-    { id: 'c5', at: NOW - 3 * 3_600_000, text: null },
+    { id: 'c5', at: NOW - 3 * 3_600_000, text: null, image: true },
   ],
 };
+
+/** A 6 × 4 BMP (32-bit, bottom-up), as Windows hands a picture over: red, its top row blue. */
+function bmpBase64(): string {
+  const width = 6;
+  const height = 4;
+  const header = 14 + 40;
+  const bytes = Buffer.alloc(header + width * height * 4);
+  bytes.write('BM', 0);
+  bytes.writeUInt32LE(bytes.length, 2);
+  bytes.writeUInt32LE(header, 10);
+  bytes.writeUInt32LE(40, 14);
+  bytes.writeInt32LE(width, 18);
+  bytes.writeInt32LE(height, 22);
+  bytes.writeUInt16LE(1, 26);
+  bytes.writeUInt16LE(32, 28);
+  for (let row = 0; row < height; row++)
+    for (let x = 0; x < width; x++) {
+      const at = header + (row * width + x) * 4;
+      // Bottom-up: the last row in the file is the top one.
+      bytes[at] = row === height - 1 ? 255 : 0;
+      bytes[at + 2] = row === height - 1 ? 0 : 255;
+    }
+  return bytes.toString('base64');
+}
+
+/** The pictures the history holds, by item id. */
+async function pictures(running: ElectronApplication): Promise<void> {
+  await running.evaluate((_, base64) => {
+    const hooks = (globalThis as { __flintE2E?: { clipboardImages?: Record<string, string> } })
+      .__flintE2E;
+    if (hooks) hooks.clipboardImages = { c5: base64 };
+  }, bmpBase64());
+}
+
+/** What a hook recorded. */
+async function recorded(running: ElectronApplication, name: string): Promise<unknown[]> {
+  return running.evaluate(
+    (_, key) =>
+      ((globalThis as { __flintE2E?: Record<string, unknown> }).__flintE2E?.[key] ??
+        []) as unknown[],
+    name,
+  );
+}
 
 async function toInbox(main: Page): Promise<void> {
   await main.locator('.nav', { hasText: 'Inbox' }).click();
@@ -130,13 +173,17 @@ async function toInbox(main: Page): Promise<void> {
 
 test('the Clipboard section: placeholder bars at rest, contents only after the pointer rests; Always show contents (NAV-08, D-128)', async () => {
   const { app: running, main } = await launch();
+  await pictures(running);
   await holds(running, ITEMS);
   await toInbox(main);
   const section = main.locator('.context-panel .clip-section');
-  // Text items only, newest first; folded, three rows in view.
-  await expect(section.locator('.clip-count')).toHaveText('4');
-  await expect(section.locator('.clip-row')).toHaveCount(4);
-  await expect(section.locator('.clip-kind')).toHaveText(['Text', 'Link', 'Code', 'Text']);
+  // Text and pictures, newest first; folded, three rows in view.
+  await expect(section.locator('.clip-count')).toHaveText('5');
+  await expect(section.locator('.clip-row')).toHaveCount(5);
+  await expect(section.locator('.clip-kind')).toHaveText(['Text', 'Link', 'Code', 'Text', 'Image']);
+  // D-129: a picture at rest is a tile, never its thumbnail.
+  await expect(section.locator('.clip-row.image .clip-tile')).toHaveCount(1);
+  await expect(section.locator('img.clip-thumb')).toHaveCount(0);
   await expect(section.locator('.clip-age').first()).toHaveText('1m');
   // At rest none of the text is drawn (D-128 Q3): not even in the page.
   expect(await section.textContent()).not.toContain('hotfix');
@@ -154,7 +201,9 @@ test('the Clipboard section: placeholder bars at rest, contents only after the p
   expect(await section.textContent()).not.toContain('hotfix');
   await main.waitForTimeout(450);
   await expect(section.locator('.clip-text').first()).toHaveText('deploy the hotfix tonight');
+  // D-129: leaving, the text fades out (still drawn a moment), then leaves the page.
   await main.mouse.move(box.x + box.width / 2, box.y - 200);
+  await expect(section.locator('.clip-text.out').first()).toBeAttached();
   await expect(section.locator('.clip-text')).toHaveCount(0);
 
   // Open: every row; remembered.
@@ -168,6 +217,8 @@ test('the Clipboard section: placeholder bars at rest, contents only after the p
     'Clipboard contents will be visible when you share your screen',
   );
   await expect(section.locator('.clip-text').first()).toHaveText('deploy the hotfix tonight');
+  // D-129: the picture as its thumbnail.
+  await expect(section.locator('.clip-row.image img.clip-thumb')).toBeVisible();
   await section.locator('.clip-eye').click();
   await expect(section.locator('.clip-text')).toHaveCount(0);
 });
@@ -199,13 +250,8 @@ test('a click pastes into the field with the keyboard, one undo; the menu: Inser
   // Copy: the only write to the clipboard (tests see what it would have been).
   await section.locator('.clip-row').nth(1).click({ button: 'right' });
   await main.locator('.fl-menu .fl-menu-item', { hasText: 'Copy' }).click();
-  await expect
-    .poll(() =>
-      running.evaluate(
-        () => (globalThis as { __flintE2E?: { copied?: string[] } }).__flintE2E?.copied ?? [],
-      ),
-    )
-    .toEqual(['https://dev.azure.com/acme/web/_git/flint']);
+  // D-129: as Win+V's pick (no new entry).
+  await expect.poll(() => recorded(running, 'madeCurrent')).toEqual(['c2']);
 
   // Capture as task: the capture popup, prefilled as by Ctrl+Shift+X.
   await section.locator('.clip-row').first().click({ button: 'right' });
@@ -232,13 +278,14 @@ test('a click pastes into the field with the keyboard, one undo; the menu: Inser
 
 test('Paste from clipboard history… (Ctrl+Shift+H): the text, Enter inserts, Ctrl+C copies, Shift+Enter captures (NAV-08, D-128)', async () => {
   const { app: running, main } = await launch();
+  await pictures(running);
   await holds(running, ITEMS);
   await main.locator('.nav', { hasText: 'Inbox' }).click();
   const composer = main.locator('.main .composer-input');
   await composer.click();
   await main.keyboard.press('Control+Shift+h');
   const picker = main.locator('.fl-picker');
-  await expect(picker.locator('.fl-picker-row')).toHaveCount(4);
+  await expect(picker.locator('.fl-picker-row')).toHaveCount(5);
   // Opened on purpose: the real text.
   await expect(picker.locator('.fl-picker-label').first()).toHaveText('deploy the hotfix tonight');
   await expect(picker.locator('.fl-picker-foot')).toContainText('Shift+Enter');
@@ -254,19 +301,13 @@ test('Paste from clipboard history… (Ctrl+Shift+H): the text, Enter inserts, C
   await main.keyboard.press('ArrowDown');
   await main.keyboard.press('Control+c');
   await expect(picker).toHaveCount(0);
-  await expect
-    .poll(() =>
-      running.evaluate(
-        () => (globalThis as { __flintE2E?: { copied?: string[] } }).__flintE2E?.copied ?? [],
-      ),
-    )
-    .toEqual(['deploy the hotfix tonight']);
+  await expect.poll(() => recorded(running, 'madeCurrent')).toEqual(['c1']);
 
   // The palette has it too; Shift+Enter captures as a task.
   await main.keyboard.press('Control+k');
   await main.keyboard.type('paste from clipboard');
   await main.locator('.palette-layer').getByText('Paste from clipboard history…').first().click();
-  await expect(picker.locator('.fl-picker-row')).toHaveCount(4);
+  await expect(picker.locator('.fl-picker-row')).toHaveCount(5);
   await main.keyboard.type('hotfix');
   await main.keyboard.press('Shift+Enter');
   const popupPage = (): Page | undefined =>
@@ -320,6 +361,9 @@ test('the section says why when there is nothing to show: off, a policy, a read 
     'aria-checked',
     'false',
   );
+  // D-129: the eye in the section is the only control for showing contents.
+  await expect(row.getByRole('switch', { name: 'Always show contents' })).toHaveCount(0);
+  await expect(row).toContainText('Win+V must be on');
   await toInboxWithoutSection(main);
   await main.keyboard.press('Control+Shift+h');
   const picker = main.locator('.fl-picker');
@@ -333,3 +377,58 @@ async function toInboxWithoutSection(main: Page): Promise<void> {
   await expect(main.locator('.context-panel')).toBeVisible();
   await expect(main.locator('.context-panel .clip-section')).toHaveCount(0);
 }
+
+test('pictures: thumbnails, inserted as a pasted picture, captured as a chip; Delete with Undo; Clear all (NAV-08, D-129)', async () => {
+  const { app: running, main } = await launch();
+  await pictures(running);
+  await holds(running, ITEMS);
+  await toInbox(main);
+  const section = main.locator('.context-panel .clip-section');
+  await section.locator('.clip-fold').click();
+  await section.locator('.clip-eye').click();
+  await expect(section.locator('.clip-row.image img.clip-thumb')).toBeVisible();
+
+  // A picture into a note: saved to attachments/ as a pasted one is.
+  await main.keyboard.press('Control+Shift+j');
+  const editor = main.locator('.main .note-card .cm-content');
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await section.locator('.clip-row.image').click();
+  await expect
+    .poll(
+      async () =>
+        (await readdir(join(dataDirectory, 'Flint', 'attachments')).catch(() => [])).length,
+    )
+    .toBe(1);
+  await expect(editor.locator('img').first()).toBeAttached();
+
+  // Captured as a task: the popup with the picture as its chip.
+  await section.locator('.clip-row.image').click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Capture as task' }).click();
+  const popupPage = (): Page | undefined =>
+    running.windows().find((page) => page.url().includes('capture-popup'));
+  await expect.poll(() => popupPage() !== undefined, { timeout: 15_000 }).toBe(true);
+  await expect((popupPage() as Page).locator('.chip')).toHaveCount(1);
+  await expect((popupPage() as Page).locator('.chip')).toContainText('.png');
+  await (popupPage() as Page).keyboard.press('Shift+Escape');
+
+  // Delete: also from Win+V; the row folds away; Undo adds it back as the newest.
+  await section.locator('.clip-row').first().click({ button: 'right' });
+  await main.locator('.fl-menu .fl-menu-item', { hasText: 'Delete (also from Win+V)' }).click();
+  await expect(section.locator('.clip-row.leaving')).toHaveCount(1);
+  await expect(section.locator('.clip-row')).toHaveCount(4);
+  await expect(section.locator('.clip-count')).toHaveText('4');
+  const toast = main.locator('.toast');
+  await expect(toast).toContainText('Undo adds it back as the newest');
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => recorded(running, 'restored')).toEqual(['deploy the hotfix tonight']);
+
+  // Clear all: asked inline, no undo; pinned items in Win+V are kept.
+  await section.locator('.clip-clear').click();
+  const confirm = section.locator('.clip-confirm');
+  await expect(confirm).toContainText('This also clears Win+V and can’t be undone');
+  await expect(confirm).toContainText('Pinned items in Win+V are kept');
+  await confirm.getByRole('button', { name: 'Clear' }).click();
+  await expect(section.locator('.clip-row')).toHaveCount(0);
+  await expect(section.locator('.clip-note')).toContainText('Copy something and it shows here');
+});

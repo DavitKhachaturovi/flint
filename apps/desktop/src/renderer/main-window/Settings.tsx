@@ -615,7 +615,7 @@ export function SettingsScreen(props: {
       <Section id="clipboard" filter={filter}>
         <Row
           name="Clipboard history"
-          note="Shows Windows' clipboard history in the side panel and in Paste from clipboard history… (Ctrl+Shift+H). Flint only reads it, and only while its window is active."
+          note="Shows Windows' clipboard history (Win+V must be on) in the side panel and in Paste from clipboard history… (Ctrl+Shift+H). Windows only lets Flint read it while Flint's window is in front, so new copies appear when you switch back to Flint. Flint never stores or sends it."
           filter={filter}
           words="clipboard history win+v paste copied"
         >
@@ -624,24 +624,6 @@ export function SettingsScreen(props: {
             label="Clipboard history"
             onChange={(on) => {
               set({ key: 'clipboardHistory', value: on }, clipboardChanged);
-            }}
-          />
-        </Row>
-        <Row
-          name="Always show contents"
-          note="Off: the side panel shows what you copied only while the pointer rests on it, so a screen share doesn't show it."
-          filter={filter}
-          words="clipboard contents show hide screen sharing private win+v paste"
-        >
-          <Switch
-            on={view.clipboardShowContents}
-            label="Always show contents"
-            onChange={(on) => {
-              set({ key: 'clipboardShowContents', value: on }, clipboardChanged);
-              if (on)
-                void window.flintMain.tipDue('clipboardContentsShown', 1).then((due) => {
-                  if (due) onToast('Clipboard contents will be visible when you share your screen');
-                });
             }}
           />
         </Row>

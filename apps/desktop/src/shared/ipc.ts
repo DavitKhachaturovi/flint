@@ -199,10 +199,18 @@ export const Channels = {
    * copied.
    */
   mainClipboard: 'main:clipboard',
-  /** D-128: an item copied again (the only time Flint writes the clipboard, on that choice). */
+  /** D-129: an item made the clipboard's content again, as Win+V's pick (no new entry). */
   mainClipboardCopy: 'main:clipboard-copy',
   /** D-128: an item captured as a task: the capture popup, prefilled as by Ctrl+Shift+X. */
   mainClipboardCapture: 'main:clipboard-capture',
+  /** D-129: a picture item whole, as PNG bytes. */
+  mainClipboardImage: 'main:clipboard-image',
+  /** D-129: an item deleted (also from Win+V); resolves to the Undo token. */
+  mainClipboardDelete: 'main:clipboard-delete',
+  /** D-129: Undo of a delete: the item added back as the newest. */
+  mainClipboardRestore: 'main:clipboard-restore',
+  /** D-129: Clear all (Win+V too; its pinned items are kept). */
+  mainClipboardClear: 'main:clipboard-clear',
   /** D-128: Windows' clipboard settings (`ms-settings:clipboard`). */
   mainClipboardSettings: 'main:clipboard-settings',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
@@ -951,9 +959,15 @@ export interface ClipboardItemView {
   readonly id: string;
   /** When it was copied (ms since 1970). */
   readonly at: number;
+  /** Its text (empty for a picture). */
   readonly text: string;
-  /** "Link" (one URL), "Code" (as pasting into the capture popup judges it, CAP-06) or "Text". */
-  readonly kind: 'text' | 'link' | 'code';
+  /**
+   * "Link" (one URL), "Code" (as pasting into the capture popup judges it, CAP-06), "Text", or a
+   * picture (D-129).
+   */
+  readonly kind: 'text' | 'link' | 'code' | 'image';
+  /** D-129: a picture's thumbnail (a PNG data URL, at most 400 × 112). */
+  readonly thumb?: string;
 }
 
 /**

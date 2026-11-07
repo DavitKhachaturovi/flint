@@ -7032,10 +7032,12 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-primary);
 }
 
-/* NAV-08, D-128 (09 §8): the Clipboard section, docked at the side panel's foot in every state: it
-   stays in place while the panel's content scrolls behind it. Folded, its newest three rows; open,
-   all of them, scrolling, up to about 45 % of the panel. At rest a row is a placeholder bar with
-   its kind and age (never the text); the text fades in while the pointer rests on the section. */
+/* NAV-08, D-128, D-129 (09 §8): the Clipboard section, docked at the side panel's foot in every
+   state: it stays in place while the panel's content scrolls behind it. Folded, its newest three
+   rows (as high as they are: pictures are taller); open, all of them, scrolling, up to about 45 % of
+   the panel. At rest a row is a placeholder (a bar, a tile for a picture) with its kind and age;
+   the content crossfades in while the pointer rests on the section and out when it leaves. Rows
+   arriving slide in, rows going fold away. */
 .clip-section {
   position: sticky;
   bottom: 0;
@@ -7045,6 +7047,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
   border-radius: 0 0 var(--fl-radius-card) var(--fl-radius-card);
   background: var(--fl-ground-card);
   --clip-row: 30px;
+  --clip-picture: 64px;
 }
 
 .clip-head {
@@ -7083,6 +7086,23 @@ body[data-tour-step='5'] .main .row .pin-hover {
   font-size: 11px;
 }
 
+/* D-129: Clear all, quiet, left of the eye. */
+.clip-clear {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--fl-radius-button);
+  font-size: 12px;
+  color: var(--fl-text-faint);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast);
+}
+
+.clip-clear:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-muted);
+}
+
 .clip-eye {
   display: grid;
   place-items: center;
@@ -7104,10 +7124,31 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-secondary);
 }
 
+/* D-129: Clear all's question, inline, under the header. */
+.clip-confirm {
+  margin: 6px 0 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--fl-ground-float);
+  animation: clip-in var(--fl-dur-state) ease-out;
+}
+
+.clip-confirm p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-secondary);
+}
+
+.clip-confirm-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .clip-rows {
   display: flex;
   flex-direction: column;
-  max-height: calc(3 * var(--clip-row));
+  max-height: var(--clip-folded, calc(3 * var(--clip-row)));
   margin-top: 2px;
   overflow: hidden;
   transition: max-height var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
@@ -7128,11 +7169,17 @@ body[data-tour-step='5'] .main .row .pin-hover {
   padding: 0 8px;
   margin-left: -8px;
   border-radius: 8px;
+  overflow: hidden;
   font-size: 13px;
   text-align: left;
   color: var(--fl-text-heading-soft);
   transition: background-color var(--fl-dur-fast);
   animation: clip-in var(--fl-dur-state) ease-out;
+}
+
+.clip-row.image {
+  flex-basis: var(--clip-picture);
+  height: var(--clip-picture);
 }
 
 .clip-row:hover {
@@ -7144,10 +7191,25 @@ body[data-tour-step='5'] .main .row .pin-hover {
   animation: clip-press calc(var(--fl-dur-state) * 1.4) ease-out;
 }
 
+/* D-129: a row that went (deleted, cleared, fallen off the history) folds away where it was. */
+.clip-row.leaving {
+  pointer-events: none;
+  animation: clip-out var(--fl-dur-state) ease-in forwards;
+}
+
 @keyframes clip-in {
   from {
     opacity: 0;
     transform: translateY(-4px);
+  }
+}
+
+@keyframes clip-out {
+  to {
+    flex-basis: 0;
+    height: 0;
+    opacity: 0;
+    transform: translateX(8px);
   }
 }
 
@@ -7157,13 +7219,53 @@ body[data-tour-step='5'] .main .row .pin-hover {
   }
 }
 
-.clip-text {
+/* The placeholder and the content share one place and crossfade (D-129). */
+.clip-face {
+  display: grid;
   flex: 1;
+  align-items: center;
   min-width: 0;
+}
+
+.clip-face > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.clip-rest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  transition: opacity var(--fl-dur-fast) ease;
+}
+
+.clip-rest.out {
+  opacity: 0;
+}
+
+.clip-text,
+.clip-thumb {
+  animation: clip-reveal var(--fl-dur-fast) ease-out;
+}
+
+.clip-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  animation: clip-reveal var(--fl-dur-fast) ease-out;
+}
+
+.clip-thumb {
+  justify-self: start;
+  max-width: min(200px, 100%);
+  max-height: calc(var(--clip-picture) - 8px);
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.clip-text.out,
+.clip-thumb.out {
+  animation: clip-hide var(--fl-dur-fast) ease-in forwards;
 }
 
 .clip-bar {
@@ -7171,7 +7273,15 @@ body[data-tour-step='5'] .main .row .pin-hover {
   height: 6px;
   border-radius: 3px;
   background: var(--fl-ground-tile);
-  animation: clip-reveal var(--fl-dur-fast) ease-out;
+}
+
+/* D-129: a picture at rest: a tile its size would fill. */
+.clip-tile {
+  flex: 0 0 auto;
+  width: 72px;
+  height: calc(var(--clip-picture) - 16px);
+  border-radius: 6px;
+  background: var(--fl-ground-tile);
 }
 
 .clip-kind {
@@ -7191,6 +7301,12 @@ body[data-tour-step='5'] .main .row .pin-hover {
 
 @keyframes clip-reveal {
   from {
+    opacity: 0;
+  }
+}
+
+@keyframes clip-hide {
+  to {
     opacity: 0;
   }
 }
