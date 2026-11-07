@@ -339,13 +339,19 @@ export class Workspace {
    * D-79: an image pasted into the main window (the composer), saved to `attachments/` (MEDIA-02);
    * resolves to its relative link, or null for a type Flint doesn't attach.
    */
+  /** D-130: the Flint folder's temporary folder (`.flint/tmp`), for files in its subfolders too. */
+  private get folderTemp(): string {
+    return tempDirectoryFor(join(this.folder, 'x.md'));
+  }
+
   async saveImage(bytes: Uint8Array, type: string, now: Date): Promise<string | null> {
     const extension = IMAGE_TYPES[type];
     if (!extension || bytes.byteLength > MAX_IMAGE_BYTES) return null;
     await mkdir(join(this.folder, 'attachments'), { recursive: true });
     const name = `${stamp(now)}-${generateId(this.isTaken)}.${extension}`;
     const path = join(this.folder, 'attachments', name);
-    await writeFileAtomic(path, bytes, { tempDirectory: tempDirectoryFor(path) });
+    // D-130: the Flint folder's own temporary folder, never one inside attachments/.
+    await writeFileAtomic(path, bytes, { tempDirectory: this.folderTemp });
     return `attachments/${name}`;
   }
 
@@ -2066,7 +2072,7 @@ export class Workspace {
           if (!content) continue;
           const target = join(this.folder, ...file.split('/'));
           await mkdir(dirname(target), { recursive: true });
-          await writeFileAtomic(target, content, { tempDirectory: tempDirectoryFor(target) });
+          await writeFileAtomic(target, content, { tempDirectory: this.folderTemp });
         }
         if (only === null) {
           for (const file of Object.keys(current))
@@ -2105,7 +2111,7 @@ export class Workspace {
         if (!content) continue;
         const target = join(this.folder, ...file.split('/'));
         await mkdir(dirname(target), { recursive: true });
-        await writeFileAtomic(target, content, { tempDirectory: tempDirectoryFor(target) });
+        await writeFileAtomic(target, content, { tempDirectory: this.folderTemp });
       }
       await apply(snapshot.files, path);
       const step = (

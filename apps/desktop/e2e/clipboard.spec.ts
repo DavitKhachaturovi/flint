@@ -396,12 +396,13 @@ test('pictures: thumbnails, inserted as a pasted picture, captured as a chip; De
   await expect(editor).toBeVisible();
   await editor.click();
   await section.locator('.clip-row.image').click();
+  // Saved to attachments/: the picture, and (D-130) no temporary folder of Flint's inside it.
+  const attachments = (): Promise<string[]> =>
+    readdir(join(dataDirectory, 'Flint', 'attachments')).catch(() => []);
   await expect
-    .poll(
-      async () =>
-        (await readdir(join(dataDirectory, 'Flint', 'attachments')).catch(() => [])).length,
-    )
+    .poll(async () => (await attachments()).filter((name) => name.endsWith('.png')).length)
     .toBe(1);
+  expect(await attachments()).not.toContain('.flint');
   await expect(editor.locator('img').first()).toBeAttached();
 
   // Captured as a task: the popup with the picture as its chip.
