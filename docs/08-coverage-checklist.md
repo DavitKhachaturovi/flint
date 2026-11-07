@@ -1011,7 +1011,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | The history rewritten once from a kit outside the repository (replacements, noreply author, internal-only files, older screenshots), verified, secrets-scanned | — · Kit ready; Davit runs it | 06 §5, D-135 |
 | 5 | One branch `main`; no tags until v1.0.0; work continues in a fresh clone | — · Decided | 06 §5, D-135 |
 | 6 | Q-07: the CLI's name `flint` | CLI-01 · Proposed | 02, 06, D-135 |
-| 7 | Q-11: trademark an accepted risk; WIPO check by Davit before the first push | — · Accepted risk | 06, D-135 |
+| 7 | Q-11: trademark an accepted risk; WIPO check by Davit before the first push | — · Settled (8 Nov 2026: 58 software records, several active in unrelated markets; name kept) | 06, D-135 |
 | 8 | README at the root: why Flint exists, what makes it different (each claim checked against what is built), install, privacy, development, licence; a screenshot of the real app (`docs/readme/flint.png`, the development build in test mode on neutral demo data, 2x) | — · Done (before the move) | README.md |
 
 ## BN. Auto-update and GitHub Actions (7 Nov 2026)

@@ -119,7 +119,7 @@ Each has a proposed default that is used until decided. Record decisions in [07]
 | Q-08 | Enter semantics in Navigate state and the "new task" key. "Enter adds a task" is decided for Edit state. | Navigate: Enter = edit selected task; N / Ctrl+N = new task. Edit: Enter = save + new task below. |
 | Q-09 | ~~Confirm the on-disk format.~~ **Resolved (D-20):** Dataview inline fields `[key:: value]` (`id`, `priority`, `reminder`, `today`, `completion`), `.flint/meta.json`, `.flint/today.json`, as in 04 §3. | — |
 | Q-10 | ~~Where to host the auto-update feed and installers.~~ **Resolved (D-135):** GitHub Releases of `DavitKhachaturovi/flint` (D-19 had the `.exe` handed out by hand). | — |
-| Q-11 | ~~Trademark clearance for the name "Flint".~~ **Accepted risk (D-135):** Davit checks WIPO's Global Brand Database for "Flint" in class 9 before the first push. | — |
+| Q-11 | ~~Trademark clearance for the name "Flint".~~ **Settled (D-135, 8 Nov 2026):** Davit checked WIPO's Global Brand Database: 58 "Flint" records for software, several active, in unrelated markets. The name stays, an accepted risk. | — |
 | Q-12 | Exact capabilities of mini mode. | Add task, complete task, toggle Today/Inbox, see reminders; everything else opens the main window. |
 | Q-13 | Auto-archive default and trigger. | Off by default; Flint offers it when a Completed section grows large (e.g. 50+ items); N = 14 days when enabled. |
 | Q-14 | ~~Where new captures land inside Inbox.~~ **Resolved (D-22):** top of Inbox, meaning just before the first task (not above a heading or paragraph the file starts with). | — |
@@ -142,6 +142,6 @@ Flint is Davit Khachaturovi's personal project, open source under MIT, public at
 4. **Releases (built in 0.9.1, D-136):** GitHub Releases with auto-update (APP-06), GitHub Actions for CI and releases; the Privacy sentence in Settings → About says Flint only contacts GitHub to check for updates. What to set up on GitHub (permissions, rulesets, 2FA) is in the kit's notes and the report of D-136.
 5. **Code signing:** later, through the SignPath Foundation (open source) or a Certum certificate.
 6. **1.0.0** is the first release on GitHub Releases; until then builds stay 0.9.x.
-7. **Trademark (Q-11):** accepted risk; Davit checks WIPO's Global Brand Database for "Flint" in class 9 before the first push.
+7. **Trademark (Q-11), settled 8 Nov 2026:** WIPO's Global Brand Database has 58 "Flint" records for software, several active, in unrelated markets; the name stays, an accepted risk.
 
 **From now on:** nothing private enters the repository (CLAUDE.md), and the build stays plain npm scripts that run anywhere.
