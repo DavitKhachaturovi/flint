@@ -920,4 +920,5 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 2 | When and where a tip shows; seen after 3 s or closed; back after a hidden window | APP-14 · Done (0.8.18) | 09, D-123 |
 | 3 | Don't show tips (card, Settings → About), Reset tips (Settings, palette) | APP-14, APP-11 · Done (0.8.18) | 02, D-123 |
 | 4 | The tips' words | APP-14 · Proposed (0.8.18) | D-123 |
+| 5 | Pickers: Enter takes what was typed for, under a resting pointer too | UI-08 · Done (0.8.19) | D-124 |
 

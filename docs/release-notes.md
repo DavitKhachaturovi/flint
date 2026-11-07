@@ -2,6 +2,10 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.19 (7 Nov 2026)
+
+- **Pickers:** typing to narrow a list (Move to, Open a note…) and pressing Enter always takes the top match, even with the mouse resting over the list.
+
 ## 0.8.18 (7 Nov 2026)
 
 - **Tips (M8 step 4b):** now and then, a one-line hint in the bottom-right corner about a quicker way to do what you just did (shorthand instead of the buttons, Ctrl+K, capturing from any app, the keyboard, `/` in notes, Trash, short links, triage, the side panel). Each shows once, at most one a session, never while you type. "Don't show tips" turns them off; Settings → About has Show tips and Reset tips.

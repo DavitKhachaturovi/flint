@@ -292,7 +292,11 @@ function rowList(area: HTMLElement): RowList {
   let shown = false;
   const paint = (): void =>
     rows.forEach((row, at) => row.button.classList.toggle('active', shown && at === index));
-  area.addEventListener('mouseleave', () => {
+  area.addEventListener('mouseleave', (event) => {
+    // D-122: only a pointer that really moves away. Rows shrinking under a resting pointer (typing
+    // narrows them) give Chromium's synthetic leave, without movement: the highlight stays, so
+    // Enter still picks what was typed for (it didn't on CI's machine).
+    if (event.movementX === 0 && event.movementY === 0) return;
     shown = false;
     paint();
   });
@@ -323,7 +327,9 @@ function rowList(area: HTMLElement): RowList {
         return true;
       }
       if (event.key === 'Enter') {
-        if (shown) rows[index]?.pick();
+        // Something typed: Enter takes the highlighted match, the first if none shows.
+        const typed = event.target instanceof HTMLInputElement && event.target.value.trim() !== '';
+        if (shown || typed) rows[index]?.pick();
         return true;
       }
       return false;

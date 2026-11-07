@@ -613,9 +613,14 @@ ${name} text here.
   }));
   expect(sizes.scroll).toBeGreaterThan(sizes.client);
   expect(Math.round(sizes.client / sizes.row)).toBe(5);
-  // Typing narrows it; Enter opens the note in the Note tab, as a note (not a quick note).
+  // Typing narrows it; Enter opens the note in the Note tab, as a note (not a quick note). The
+  // pointer resting over the rows (as on CI) doesn't take the highlight when they shrink under it.
+  const third = await picker.locator('.fl-picker-row').nth(2).boundingBox();
+  if (third) await mini.mouse.move(third.x + third.width / 2, third.y + third.height / 2);
   await mini.keyboard.type('plan');
   await expect(picker.locator('.fl-picker-label')).toHaveText(['Plan']);
+  await mini.waitForTimeout(400);
+  await expect(picker.locator('.fl-picker-row.active')).toHaveCount(1);
   await mini.keyboard.press('Enter');
   await expect(mini.locator('.mini-editor .cm-content')).toContainText('Plan text here.');
   await expect(mini.locator('.quick-title .subtitle')).toContainText('Note ·');
