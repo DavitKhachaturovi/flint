@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.8.26 (7 Nov 2026)
+
+- **Tidier attachments folder:** pasted pictures no longer leave a stray folder next to them.
+
 ## 0.8.25 (7 Nov 2026)
 
 - **Back where you were:** a list you open again returns to where you left it, also on a slower PC.

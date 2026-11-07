@@ -2,6 +2,10 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.8.26 (7 Nov 2026)
+
+- **Attachments folder (D-130):** pasting a picture no longer leaves a temporary `.flint` folder inside `attachments/`; it uses the Flint folder's own.
+
 ## 0.8.25 (7 Nov 2026)
 
 - **Back where you were (D-130):** a list opened again returns to its scroll position on a slow PC too (it could land at the top while its rows were still being drawn).
