@@ -8,6 +8,8 @@ export interface Toast {
   readonly id: number;
   /** TASK-09, D-88: another way out ("Keep as one"), next to Undo. */
   readonly action?: { readonly label: string; readonly run: () => void };
+  /** APP-06, D-136: a button that only closes it ("Later"), after the action. */
+  readonly dismiss?: { readonly label: string; readonly run?: () => void };
   /** D-77: playing its way out. */
   readonly leaving?: boolean;
 }
@@ -15,7 +17,12 @@ export interface Toast {
 /** A toast shown for `ms`, then playing its way out (D-77). */
 export function useToast(ms: number): {
   readonly toast: Toast | null;
-  readonly showToast: (text: string, undo: boolean, action?: Toast['action']) => void;
+  readonly showToast: (
+    text: string,
+    undo: boolean,
+    action?: Toast['action'],
+    options?: { readonly dismiss?: Toast['dismiss']; readonly ms?: number },
+  ) => void;
   readonly hideToast: () => void;
 } {
   const [toast, setToast] = useState<Toast | null>(null);
@@ -29,10 +36,21 @@ export function useToast(ms: number): {
     );
   }, []);
   const showToast = useCallback(
-    (text: string, undo: boolean, action?: Toast['action']): void => {
+    (
+      text: string,
+      undo: boolean,
+      action?: Toast['action'],
+      options?: { readonly dismiss?: Toast['dismiss']; readonly ms?: number },
+    ): void => {
       window.clearTimeout(toastTimer.current);
-      setToast({ text, undo, id: Date.now(), ...(action && { action }) });
-      toastTimer.current = window.setTimeout(hideToast, ms);
+      setToast({
+        text,
+        undo,
+        id: Date.now(),
+        ...(action && { action }),
+        ...(options?.dismiss && { dismiss: options.dismiss }),
+      });
+      toastTimer.current = window.setTimeout(hideToast, options?.ms ?? ms);
     },
     [hideToast, ms],
   );
@@ -63,6 +81,18 @@ export function ToastView(props: {
           }}
         >
           {toast.action.label}
+        </button>
+      )}
+      {toast.dismiss && (
+        <button
+          type="button"
+          className="toast-dismiss"
+          onClick={() => {
+            toast.dismiss?.run?.();
+            onHide();
+          }}
+        >
+          {toast.dismiss.label}
         </button>
       )}
       {toast.undo && (

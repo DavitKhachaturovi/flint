@@ -183,8 +183,8 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Un-checking a subtask reopens its completed parent (Proposed) | TASK-04 |
 | A task moved to another list lands at its top (Proposed) | TASK-11 |
 | M1 measurements and `npm run measure` | 06 §1 |
-| Azure DevOps CI for M1: lint, format, typecheck, tests (10k fuzz runs), build | `azure-pipelines.yml`, 05 §6 |
-| Node 24.22.1+ (CVE-2026-111497), engines + engine-strict, CI pins Node | D-30, 05 §1, `.node-version`, `azure-pipelines.yml` |
+| CI: lint, format, typecheck, tests (10k fuzz runs), build, e2e; GitHub Actions since D-136 | `.github/workflows/ci.yml`, 05 §6 |
+| Node 24.22.1+ (CVE-2026-111497), engines + engine-strict, CI pins Node | D-30, 05 §1, `.node-version`, `.github/workflows/ci.yml` |
 | Electron 45.1.0 and the embedded-Node guard test | D-30, 05 §1 (added with Electron in M2) |
 | Dependency policy: latest supported stable, exact pins, 7-day cooldown, npm audit in CI | D-30, 05 §1, CLAUDE.md, `.npmrc`, `scripts/check-release-age.mjs` |
 | Zero network requests enforced by the e2e smoke test; a network feature allowlists exactly its endpoint | D-31, APP-09, `apps/desktop/e2e/smoke.spec.ts` |
@@ -1012,4 +1012,19 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | One branch `main`; no tags until v1.0.0; work continues in a fresh clone | — · Decided | 06 §5, D-135 |
 | 6 | Q-07: the CLI's name `flint` | CLI-01 · Proposed | 02, 06, D-135 |
 | 7 | Q-11: trademark an accepted risk; WIPO check by Davit before the first push | — · Accepted risk | 06, D-135 |
+
+## BN. Auto-update and GitHub Actions (7 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | electron-updater from GitHub Releases: 30 s after start, every 4 h, on waking when due; background download; install on quit or Restart now; stable only, no downgrade | APP-06 · Done (0.9.1) | 02, 05 §5, D-136 |
+| 2 | "Update ready · Flint x · Restart now / Later" once a session, main window only; Later installs on quit | APP-06 · Done (0.9.1) | 02, D-136 |
+| 3 | Settings → About: status line, Check for updates / Restart now, the switch "Check for updates automatically" (on) | APP-06, APP-11 · Done (0.9.1) | 02, D-136 |
+| 4 | Palette: Check for updates; Restart to update while ready | APP-06, NAV-01 · Done (0.9.1) | D-106, D-136 |
+| 5 | Tray: Restart to update only while ready (an exception to the five items) | APP-06 · Done (0.9.1) | D-136 |
+| 6 | Privacy row: "…Flint only contacts GitHub to check for updates, which you can turn off." | APP-09 · Done (0.9.1) | 02, D-136 |
+| 7 | Network guard: only GitHub's release hosts, HTTPS, the updater's own session, installed builds only; tests use a fake updater (zero endpoints) | APP-09 · Done (0.9.1) | 05, D-31, D-136 |
+| 8 | Unsigned updates: verifyUpdateCodeSignature false; HTTPS + SHA-512; signed manifests and code signing as follow-ups | APP-06 · Recorded | 05 §6, D-136 |
+| 9 | GitHub Actions: CI on every push and PR; release on v* tags with What's new as the text | — · Done (0.9.1) | 05 §6, D-136 |
+| 10 | Motion: the status line and button fade, the toast rises and goes (in the census) | UI-10 · Done (0.9.1) | D-89, D-136 |
 

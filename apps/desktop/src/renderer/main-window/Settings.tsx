@@ -1,3 +1,4 @@
+import { updateStatus, type UpdateView } from '../../shared/updates.js';
 import {
   Children,
   cloneElement,
@@ -286,9 +287,11 @@ export function SettingsScreen(props: {
   readonly onReplayTour: () => void;
   /** APP-15, D-117: What's new, every version's. */
   readonly onWhatsNew: () => void;
+  /** APP-06, D-136: what the updater is doing (About's status line and button). */
+  readonly updates: UpdateView;
 }): ReactElement {
   const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
-  const { onReplayTour, onWhatsNew } = props;
+  const { onReplayTour, onWhatsNew, updates } = props;
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
   const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
   // NOTE-07, D-104: the link-pattern editor open.
@@ -799,14 +802,61 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="about" filter={filter}>
-        {/* APP-09, D-16, D-132: stated plainly, first in About (update it if auto-update comes). */}
+        {/* APP-09, D-16, D-132, D-136: stated plainly, first in About. */}
         <Row
           name="Privacy"
-          note="Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own."
+          note="Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off."
           filter={filter}
-          words="privacy telemetry network data account offline"
+          words="privacy telemetry network data account offline github updates"
         />
-        <Row name={`Flint ${view.version}`} filter={filter} words="version about" />
+        {/* APP-06, D-136: the version, what the updater is doing, and its one action. */}
+        <Row
+          name={`Flint ${view.version}`}
+          note={
+            <span key={updateStatus(updates, Date.now())} className="update-status">
+              {updateStatus(updates, Date.now())}
+            </span>
+          }
+          filter={filter}
+          words="version about update check github download restart"
+        >
+          {updates.phase === 'ready' ? (
+            <button
+              key="restart"
+              type="button"
+              className="trash-action update-action"
+              onClick={() => void window.flintMain.updatesRestart()}
+            >
+              Restart now
+            </button>
+          ) : (
+            <button
+              key="check"
+              type="button"
+              className="trash-action update-action"
+              disabled={
+                updates.phase === 'off' ||
+                updates.phase === 'checking' ||
+                updates.phase === 'downloading'
+              }
+              onClick={() => void window.flintMain.updatesCheck()}
+            >
+              Check for updates
+            </button>
+          )}
+        </Row>
+        <Row
+          name="Automatic updates"
+          note="Checks GitHub when Flint starts and every few hours, downloads a new version in the background and installs it when you restart Flint. Off: Flint checks only when you press Check for updates."
+          filter={filter}
+          words="update automatic github download background check"
+        >
+          <Switch
+            on={view.checkForUpdates}
+            label="Check for updates automatically"
+            onChange={(on) => set({ key: 'checkForUpdates', value: on })}
+          />
+        </Row>
         <Row
           name="What’s new"
           note="What changed in each version, in a few lines."

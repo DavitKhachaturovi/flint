@@ -215,6 +215,16 @@ export const Channels = {
   mainClipboardClear: 'main:clipboard-clear',
   /** D-128: Windows' clipboard settings (`ms-settings:clipboard`). */
   mainClipboardSettings: 'main:clipboard-settings',
+  /** APP-06, D-136: what the updater is doing (an UpdateView). */
+  mainUpdates: 'main:updates',
+  /** D-136: "Check for updates" (also when the automatic checks are off). */
+  mainUpdatesCheck: 'main:updates-check',
+  /** D-136: "Restart now" / "Restart to update": the downloaded update installs, Flint starts again. */
+  mainUpdatesRestart: 'main:updates-restart',
+  /** D-136: the "Update ready" toast was shown, or Later pressed (not shown again this session). */
+  mainUpdatesToastSeen: 'main:updates-toast-seen',
+  /** Main → main window: the updater's view changed. */
+  mainUpdatesChanged: 'main:updates-changed',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
@@ -516,6 +526,8 @@ export interface SettingsView {
   /** NAV-08, D-128: clipboard history on in Flint; its contents shown at rest. */
   readonly clipboardHistory: boolean;
   readonly clipboardShowContents: boolean;
+  /** APP-06, D-136: check for updates automatically (on by default). */
+  readonly checkForUpdates: boolean;
 }
 
 /** The settings the Settings view can change, and the values they take. */
@@ -530,7 +542,8 @@ export type SettingChange =
         | 'rolloverPrompt'
         | 'tipsOff'
         | 'clipboardHistory'
-        | 'clipboardShowContents';
+        | 'clipboardShowContents'
+        | 'checkForUpdates';
       readonly value: boolean;
     }
   | { readonly key: 'autoArchiveDays'; readonly value: number | null }

@@ -1,6 +1,7 @@
 import { ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
 import type { TipId } from '../shared/tips.js';
+import type { UpdateView } from '../shared/updates.js';
 import {
   Channels,
   type AttachFileOutcome,
@@ -202,6 +203,25 @@ export const main = {
   /** D-128: Windows' clipboard settings. */
   clipboardSettings(): Promise<void> {
     return invoke(Channels.mainClipboardSettings) as Promise<void>;
+  },
+  /** APP-06, D-136: what the updater is doing. */
+  updates(): Promise<UpdateView> {
+    return invoke(Channels.mainUpdates) as Promise<UpdateView>;
+  },
+  /** D-136: Check for updates; resolves when the check has started (the view follows). */
+  updatesCheck(): Promise<void> {
+    return invoke(Channels.mainUpdatesCheck) as Promise<void>;
+  },
+  /** D-136: install the downloaded update and start again. */
+  updatesRestart(): Promise<void> {
+    return invoke(Channels.mainUpdatesRestart) as Promise<void>;
+  },
+  /** D-136: the "Update ready" toast was shown or dismissed. */
+  updatesToastSeen(): Promise<void> {
+    return invoke(Channels.mainUpdatesToastSeen) as Promise<void>;
+  },
+  onUpdatesChanged(listener: (view: UpdateView) => void): void {
+    ipcRenderer.on(Channels.mainUpdatesChanged, (_event, view: UpdateView) => listener(view));
   },
   /** The main window came on screen. */
   onShown(listener: () => void): void {

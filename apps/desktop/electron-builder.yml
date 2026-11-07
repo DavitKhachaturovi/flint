@@ -47,10 +47,24 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
+  # APP-06, D-136: the installer is unsigned for now (D-19, D-135), so there is no publisher name to
+  # check updates against; said explicitly (electron-builder 28 refuses a missing name otherwise).
+  # Integrity: HTTPS from GitHub and the SHA-512 in latest.yml. Signed update manifests (Ed25519,
+  # electron-updater 7) and code signing are the follow-ups.
+  verifyUpdateCodeSignature: false
+# APP-06, D-136: GitHub Releases is the update feed (public repository, no token in the app).
+# The release workflow uploads to a draft release for the tag and publishes it with its text.
+publish:
+  provider: github
+  owner: DavitKhachaturovi
+  repo: flint
+  releaseType: draft
 nsis:
   # APP-16, D-68: one click, per user, no wizard pages; Flint starts when it is done (also when an
   # update is installed over a running Flint).
   oneClick: true
+  # A name without spaces: the same on GitHub Releases as in latest.yml.
+  artifactName: Flint-Setup-${version}.${ext}
   runAfterFinish: true
   perMachine: false
   allowElevation: false

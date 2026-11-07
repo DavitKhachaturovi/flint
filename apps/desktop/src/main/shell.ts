@@ -1,3 +1,4 @@
+import type { TestUpdaterRecord } from './updates.js';
 import dns from 'node:dns';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -99,6 +100,15 @@ export interface E2EHooks {
   madeCurrent?: string[];
   /** D-129: what Undo of a delete added back. */
   restored?: string[];
+  /**
+   * APP-06, D-136: a fake updater in test runs (development builds never update): a test emits
+   * electron-updater's events through it; checks and "installs" are counted, nothing is contacted.
+   */
+  updater?: TestUpdaterRecord;
+  /** D-137: Enter → capture durably on disk (ms), per capture, once a test asks for them. */
+  captureDiskMs?: number[];
+  /** D-136: the tray menu's labels, as they are now. */
+  trayLabels?: () => string[];
 }
 
 export function e2eHooks(): E2EHooks | undefined {
@@ -187,12 +197,21 @@ export interface TrayActions {
   /** APP-11, D-100: the main window on Settings (D-102: on a section, e.g. a taken hotkey's). */
   readonly settings: (section?: string) => void;
   readonly quit: () => void;
+  /** APP-06, D-136: install the downloaded update and start again. */
+  readonly restartToUpdate: () => void;
 }
 
 export interface TrayHandle {
   readonly tray: Tray;
   /** A problem the user must see, e.g. a hotkey another app owns (APP-08); null clears it. */
   setWarning(warning: string | null): void;
+  /**
+   * D-136: "Restart to update" while an update is ready (null: none). The one exception to the
+   * five-item tray, there only until the update is installed.
+   */
+  setUpdateReady(version: string | null): void;
+  /** The menu's labels (tests). */
+  labels(): string[];
 }
 
 /** A file in `apps/desktop/resources` (icons), wherever the build keeps it. */
@@ -213,33 +232,60 @@ export function createTray(actions: TrayActions): TrayHandle {
     buffer: nativeImage.createFromPath(resourcePath('tray-16.png')).toPNG(),
   });
   const tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  const menu = (warning: string | null): Menu =>
-    Menu.buildFromTemplate([
-      ...(warning
-        ? ([
-            { label: warning, click: () => actions.settings('capture') },
-            { type: 'separator' },
-          ] as const)
-        : []),
-      { label: 'Open Flint', click: actions.open },
-      { label: 'Quick capture', click: actions.capture },
-      // MINI-01, D-109: shows mini mode, or hides it.
-      { label: 'Mini mode', click: actions.mini },
-      // D-99, D-102: Open, Quick capture, Mini mode, Settings, Quit; the hotkeys, snapshots and
-      // export are in Settings.
-      { label: 'Settings', click: () => actions.settings() },
-      { type: 'separator' },
-      { label: 'Quit Flint', click: actions.quit },
-    ]);
-  tray.setToolTip(app.getName());
-  tray.setContextMenu(menu(null));
+  let warning: string | null = null;
+  let update: string | null = null;
+  const template = (): Electron.MenuItemConstructorOptions[] => [
+    ...(warning
+      ? ([
+          { label: warning, click: () => actions.settings('capture') },
+          { type: 'separator' },
+        ] as const)
+      : []),
+    { label: 'Open Flint', click: actions.open },
+    { label: 'Quick capture', click: actions.capture },
+    // MINI-01, D-109: shows mini mode, or hides it.
+    { label: 'Mini mode', click: actions.mini },
+    // D-99, D-102: Open, Quick capture, Mini mode, Settings, Quit; the hotkeys, snapshots and
+    // export are in Settings.
+    { label: 'Settings', click: () => actions.settings() },
+    { type: 'separator' },
+    // APP-06, D-136: only while an update is ready, gone once it is installed.
+    ...(update
+      ? ([
+          { type: 'separator' },
+          { label: 'Restart to update', click: actions.restartToUpdate },
+        ] as const)
+      : []),
+    { type: 'separator' },
+    { label: 'Quit Flint', click: actions.quit },
+  ];
+  const refresh = (): void => {
+    tray.setContextMenu(Menu.buildFromTemplate(template()));
+    tray.setToolTip(
+      warning
+        ? `${app.getName()}: ${warning}`
+        : update
+          ? `${app.getName()}: ${update} is ready to install`
+          : app.getName(),
+    );
+  };
+  refresh();
   tray.on('click', actions.open);
   return {
     tray,
-    setWarning(warning) {
-      tray.setContextMenu(menu(warning));
-      tray.setToolTip(warning ? `${app.getName()}: ${warning}` : app.getName());
+    setWarning(next) {
+      warning = next;
+      refresh();
     },
+    setUpdateReady(version) {
+      if (version === update) return;
+      update = version;
+      refresh();
+    },
+    labels: () =>
+      template()
+        .map((item) => item.label)
+        .filter((label): label is string => typeof label === 'string'),
   };
 }
 

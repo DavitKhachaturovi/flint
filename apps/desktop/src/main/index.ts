@@ -46,6 +46,8 @@ import { closeReminderToast, showMissedSummary, showReminderToast } from './noti
 import { createMini } from './mini.js';
 import { NoteEditors, type EditorWindow } from './note-editors.js';
 import { TipsFile } from './tips.js';
+import { UPDATE_VIEW_OFF, type UpdateView } from '../shared/updates.js';
+import { UpdateService, isUpdateRequest, testUpdater, type UpdaterLike } from './updates.js';
 import { DraftFile } from './capture/drafts.js';
 import { captureSelection, restoreClipboard, saveClipboard } from './capture/selection.js';
 import { SnapshotStore } from './storage/snapshots.js';
@@ -138,6 +140,10 @@ const BUILD: BuildKind = __FLINT_BENCH_BUILD__
     ? 'installed'
     : 'development';
 const IDENTITY = IDENTITIES[BUILD];
+/** APP-06, D-136: only the installed build updates (never development, tests or the benchmark). */
+const UPDATES = BUILD === 'installed';
+/** electron-updater's own session (its `NET_SESSION_NAME`): the only one that may reach GitHub. */
+const UPDATER_SESSION = 'electron-updater';
 /**
  * R-1 test hotkey; the default is decided with Q-03 and made rebindable with APP-08 (M3). No Alt:
  * Alt is a common push-to-talk key (Discord), so an Alt hotkey would key the user's microphone.
@@ -244,9 +250,15 @@ function serveRenderer(): void {
   });
 }
 
-/** Defense in depth for "no network requests at all in v1" (APP-09): only local content loads. */
-function blockNetwork(): void {
+/**
+ * The only network use is the updater's (APP-09, D-136); everything else is blocked, as a defense in
+ * depth: only local content loads. `updates`: this build updates (installed builds only), so its
+ * updater's own session (electron-updater's) may reach GitHub's release hosts over HTTPS, and only
+ * that session.
+ */
+function blockNetwork(updates: boolean): void {
   const devServer = devServerUrl ? new URL(devServerUrl).origin : null;
+  let updaterSession: Electron.Session | null = null;
   const guard = (target: Electron.Session): void => {
     target.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, respond) => {
       const url = new URL(details.url);
@@ -255,6 +267,10 @@ function blockNetwork(): void {
         devServer !== null &&
         (url.origin === devServer || url.origin === devServer.replace(/^http/, 'ws'));
       if (local || dev) return respond({});
+      if (updates && isUpdateRequest(details.url)) {
+        updaterSession ??= session.fromPartition(UPDATER_SESSION, { cache: false });
+        if (target === updaterSession) return respond({});
+      }
       log(`blocked network request: ${details.url}`);
       e2eHooks()?.blockedRequests.push(details.url);
       respond({ cancel: true });
@@ -288,7 +304,7 @@ async function start(): Promise<void> {
   if (!testDataDirectory()) {
     log(`notifications supported: ${String(Notification.isSupported())} (${IDENTITY.appId})`);
   }
-  blockNetwork();
+  blockNetwork(UPDATES);
   serveRenderer();
   // No window ever navigates away from Flint's own pages or opens another window: links in titles
   // go to the browser through mainOpenLink (LIST-02), never into a Flint window.
@@ -1203,6 +1219,7 @@ async function start(): Promise<void> {
       tipsOff: current.tipsOff,
       clipboardHistory: current.clipboardHistory,
       clipboardShowContents: current.clipboardShowContents,
+      checkForUpdates: current.checkForUpdates,
     };
   };
   // APP-10, APP-15, D-117, D-119: what onboarding shows on this start, and the tour's progress.
@@ -1278,6 +1295,8 @@ async function start(): Promise<void> {
       if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
     }
     if (key === 'snapshotEveryMinutes') reschedule();
+    // D-136: the automatic checks stop, or start again from the last check.
+    if (key === 'checkForUpdates') updates?.automaticChanged();
     // D-109: left out of screen shares, or not, at once.
     if (key === 'miniHideFromSharing') mini.setHideFromSharing(after.miniHideFromSharing);
     if (key === 'popupHideFromSharing') hideFromSharing(after.popupHideFromSharing);
@@ -1523,9 +1542,12 @@ async function start(): Promise<void> {
     try {
       const outcome = await workspace.capture({ ...capture, attachments }, new Date());
       if (outcome.kind === 'saved') {
+        const diskMs = epochNow() - capture.keyAt;
         log(
-          `capture saved to ${outcome.listName}; Enter → durably on disk ${(epochNow() - capture.keyAt).toFixed(1)} ms`,
+          `capture saved to ${outcome.listName}; Enter → durably on disk ${diskMs.toFixed(1)} ms`,
         );
+        // D-137: the performance check reads it (05 §4: < 100 ms at p95).
+        e2eHooks()?.captureDiskMs?.push(diskMs);
         notice = outcome.createdList
           ? {
               popup: { kind: 'created-list', name: outcome.createdList.name },
@@ -1723,6 +1745,62 @@ async function start(): Promise<void> {
       else send();
     },
     quit: () => app.quit(),
+    restartToUpdate: () => updates?.restart(),
+  });
+  // APP-06, D-136: updates from GitHub Releases. Installed builds only; test runs get a fake that
+  // contacts nothing; development and benchmark builds have none (Settings says so).
+  let updates: UpdateService | null = null;
+  const updateHooks = e2eHooks();
+  const sendUpdates = (view: UpdateView): void => {
+    tray.setUpdateReady(view.phase === 'ready' ? view.version : null);
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainUpdatesChanged, view);
+  };
+  const updaterForBuild = async (): Promise<UpdaterLike | null> => {
+    if (updateHooks) {
+      const fake = testUpdater();
+      updateHooks.updater = fake.record;
+      updateHooks.trayLabels = () => tray.labels();
+      return fake.updater;
+    }
+    if (!UPDATES) return null;
+    const { autoUpdater } = (await import('electron-updater')).default;
+    autoUpdater.logger = {
+      info: (message: unknown) => log(`updater: ${String(message)}`),
+      warn: (message: unknown) => log(`updater warning: ${String(message)}`),
+      error: (message: unknown) => log(`updater error: ${String(message)}`),
+      debug: () => {},
+    };
+    return autoUpdater;
+  };
+  void updaterForBuild()
+    .then((updater) => {
+      updates = new UpdateService({
+        updater,
+        automatic: () => settingsFile.current.checkForUpdates,
+        now: () => Date.now(),
+        log,
+        changed: sendUpdates,
+        beforeInstall: () => {
+          if (!updateHooks) quitting = true;
+        },
+      });
+      sendUpdates(updates.view());
+      // Test runs check only when a test asks.
+      if (!updateHooks) updates.start();
+    })
+    .catch((error: unknown) => log(`updater not set up: ${String(error)}`));
+  powerMonitor.on('resume', () => updates?.resumed());
+  ipcMain.handle(Channels.mainUpdates, (event) =>
+    owns(event.sender) ? (updates?.view() ?? UPDATE_VIEW_OFF) : UPDATE_VIEW_OFF,
+  );
+  ipcMain.handle(Channels.mainUpdatesCheck, (event) => {
+    if (owns(event.sender)) void updates?.check();
+  });
+  ipcMain.handle(Channels.mainUpdatesRestart, (event) => {
+    if (owns(event.sender)) updates?.restart();
+  });
+  ipcMain.handle(Channels.mainUpdatesToastSeen, (event) => {
+    if (owns(event.sender)) updates?.toastSeen();
   });
   // APP-08, D-102: the global hotkeys, recorded in Settings → Capture & hotkeys. Flint tries a
   // new combination at once; one another app owns is refused and the old one stays.

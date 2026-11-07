@@ -1,0 +1,90 @@
+# Flint release (docs/05 §6, D-136): a version tag v* builds, tests and publishes the installer to
+# GitHub Releases with latest.yml for the updater. The release text is the version's section of
+# docs/whats-new.md. Actions are pinned by commit SHA (the tag in the comment).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      # Creating the release and uploading its files.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          # No cache on releases: every dependency comes fresh from the lockfile.
+
+      - name: Install
+        run: npm ci
+
+      - name: The tag matches the app's version, and What's new has its section
+        shell: bash
+        run: node scripts/release-notes.mjs "$TAG" > "$RUNNER_TEMP/release-notes.md"
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: npm audit (fails on high or critical)
+        run: npm run audit
+
+      - name: Release-age check (7-day cooldown, D-30)
+        run: node scripts/check-release-age.mjs
+
+      - name: Embedded-Node check (Electron must embed Node >= 24.22.1, D-30)
+        run: npm run check:electron-node
+
+      - name: Lint, format, typecheck
+        run: |
+          npm run lint
+          npm run format:check
+          npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+        env:
+          FLINT_FUZZ_RUNS: '10000'
+
+      - name: Build
+        run: npm run build
+
+      - name: End-to-end tests
+        run: npm run test:e2e -w @flint/desktop
+        env:
+          FLINT_CI: '1'
+
+      # electron-builder uploads the installer, its .blockmap and latest.yml to a draft release for
+      # the tag; the release is published only after every file is there.
+      - name: Build the installer and upload it to a draft release
+        run: npm run release -w @flint/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the release with What's new as its text
+        shell: bash
+        run: |
+          gh release edit "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Flint ${TAG#v}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --draft=false --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}

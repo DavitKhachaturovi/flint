@@ -389,6 +389,35 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'It closes (Cancel)', 'motion', () =>
     main.locator('#settings-links .link-editor').getByRole('button', { name: 'Cancel' }).click(),
   );
+  // APP-06, D-136: the update status line and the "Update ready" toast (the fake updater).
+  const emitUpdate = (event: string, arg?: unknown): Promise<void> =>
+    running.evaluate(
+      (_, { name, value }) =>
+        (
+          globalThis as {
+            __flintE2E?: { updater?: { emit: (event: string, arg?: unknown) => void } };
+          }
+        ).__flintE2E?.updater?.emit(name, value ?? undefined),
+      { name: event, value: arg ?? null },
+    );
+  await step(main, 'About: Check for updates (the status line changes)', 'motion', async () => {
+    await main.locator('.settings-index-item', { hasText: 'About' }).click();
+    await main
+      .locator('#settings-about')
+      .getByRole('button', { name: 'Check for updates' })
+      .click();
+    await expect(main.locator('#settings-about .update-status')).toHaveText(
+      'Checking for updates…',
+    );
+  });
+  await step(main, 'An update is ready (the toast rises)', 'motion', async () => {
+    await emitUpdate('update-downloaded', { version: '9.9.9' });
+    await expect(main.locator('.toast')).toContainText('Update ready');
+  });
+  await step(main, 'Later (the toast goes)', 'motion', async () => {
+    await main.locator('.toast').getByRole('button', { name: 'Later' }).click();
+    await expect(main.locator('.toast')).toHaveCount(0);
+  });
   await step(main, 'Trash opens', 'motion', () => nav('Trash').click());
   const trashed = main.locator('.trash-row', { hasText: 'Buy stamps' });
   await step(main, 'Trash: Delete now asks inline', 'motion', () =>

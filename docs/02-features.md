@@ -670,10 +670,10 @@ Without sync, the local disk is the only copy, so this matters more.
 - Each window (main, mini mode) remembers its size and position **per monitor setup**.
 - **D-96 (0.4.29):** also whether it was **maximized** (its normal size and position kept underneath), and it comes back that way from every entry point: a reminder, the tray, the Start menu, a second launch, a manual start.
 
-### APP-06 — Auto-update, applied safely (Later, D-19)
-- v1 is distributed manually; users update by running the newer installer over the old one.
-- When added: Flint updates itself; nobody reinstalls by hand.
-- Updates are **applied on quit or at idle, never mid-session**. An update restart must never happen during a call.
+### APP-06 — Auto-update, applied safely (v1, D-136; was Later in D-19)
+- Flint updates itself from **GitHub Releases**; nobody reinstalls by hand.
+- Updates are **applied on quit, or on Restart now, never mid-session by themselves**. An update restart must never happen during a call.
+- **D-136 (built, 0.9.1):** electron-updater, GitHub provider (`DavitKhachaturovi/flint`), stable releases only, never a downgrade. Checks 30 s after start, then every 4 hours while Flint runs, and on waking when a check is due; downloads in the background. When ready, a quiet toast in the main window: "Update ready · Flint 1.0.1 · Restart now / Later" (once a session; if the window is hidden it waits until it is opened; never in mini or the popup, never a Windows notification). Later: installs when Flint quits; "Restart to update" stays in Settings → About, the palette and the tray (the tray's one exception to its five items, there only while an update is ready). **Settings → About:** the version with one status line (Up to date · checked 14:02 / Checking… / Downloading 1.0.2 · 42% / 1.0.2 is ready / Couldn't check (offline)), the button **Check for updates** (or **Restart now**) and the switch **Check for updates automatically** (on by default; off: Flint checks only when asked). Errors show only in that status line. Palette: **Check for updates** (opens About and checks) and, while one is ready, **Restart to update**. Development, test and benchmark builds never update.
 
 ### APP-07 — Silent crash recovery (v1)
 - If the UI (renderer) process crashes, Flint detects it and reloads the window automatically. The tray and global hotkeys keep working.
@@ -685,9 +685,9 @@ Without sync, the local disk is the only copy, so this matters more.
 
 ### APP-09 — No telemetry, stated plainly (v1)
 - Flint sends no telemetry and no analytics. The app and installer state plainly: **"Your notes never leave your machine."**
-- The only network access is checking for and downloading updates (APP-06), and that is Later: **v1 makes no network requests at all.**
-- **Enforced (D-31):** an end-to-end test fails on any network request the app attempts. A future network feature allowlists exactly its own endpoint there; the check is never loosened.
-- **D-132 (built, 0.8.28):** stated first in Settings → About, a **Privacy** row: "Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own." The walkthrough's step 1 says "Nothing leaves your computer." The installer doesn't state it in v1 (one-click, no page). If auto-update comes after v1 (06 §5), the sentence changes with it.
+- The only network access is checking for and downloading updates (APP-06, D-136), from GitHub, which Settings → About can turn off (then Flint contacts GitHub only when asked).
+- **Enforced (D-31):** an end-to-end test fails on any network request the app attempts. Test runs use a fake updater, so that test still allows no endpoint at all (D-136). In the installed build Flint's network guard lets through only HTTPS to GitHub's release hosts, and only from the updater's own session.
+- **D-132 (built, 0.8.28):** stated first in Settings → About, a **Privacy** row: "Your notes never leave your machine. Flint sends no telemetry, needs no account and makes no network requests of its own." The walkthrough's step 1 says "Nothing leaves your computer." The installer doesn't state it in v1 (one-click, no page). **D-136 (0.9.1):** with auto-update the row says: "Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off."
 
 ### APP-10 — First-run walkthrough (v1, D-61)
 - First launch asks for the Flint folder location (DATA-07: default `%USERPROFILE%\Flint`, with the OneDrive warning and the vault-root suggestion) and confirms the capture hotkey.

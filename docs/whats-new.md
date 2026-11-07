@@ -2,6 +2,11 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 0.9.1 (7 Nov 2026)
+
+- **Flint updates itself:** new versions download in the background and install when you restart Flint. When one is ready, a small note offers Restart now or Later.
+- **Your choice:** Settings → About shows what's happening and has Check for updates; turn off "Check for updates automatically" and Flint only checks when you ask.
+
 ## 0.9.0 (7 Nov 2026)
 
 - **Flint is open source:** it is now a personal project under the MIT licence, with its home on GitHub. Nothing changes in how you use it.

@@ -2,6 +2,13 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 0.9.1 (7 Nov 2026)
+
+- **Auto-update (APP-06, D-136):** installed copies check GitHub Releases 30 s after start and every 4 hours, download a new version in the background and install it when Flint quits, or at once with Restart now. A quiet toast says "Update ready · Restart now / Later"; Restart to update is also in the palette and the tray while an update waits.
+- **Settings → About:** the version with what the updater is doing, Check for updates, and the switch "Check for updates automatically" (on). The Privacy row now says Flint only contacts GitHub to check for updates, which you can turn off.
+- **GitHub Actions:** CI on every push and pull request, and releases built and published from a version tag, with What's new as the release text.
+- The installer is now named `Flint-Setup-<version>.exe`.
+
 ## 0.9.0 (7 Nov 2026)
 
 - **Open source (D-135):** Flint is Davit Khachaturovi's personal project, open source under the MIT licence, moving to github.com/DavitKhachaturovi/flint. M9 begins.

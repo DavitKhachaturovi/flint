@@ -8,3 +8,5 @@ extraMetadata:
 directories:
   output: dist-bench
 artifactName: Flint-R1-benchmark-${version}-win-x64.${ext}
+# Never updates (D-136): no update feed in the benchmark build.
+publish: null

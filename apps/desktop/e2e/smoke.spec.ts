@@ -28,8 +28,9 @@ import {
  *    miss short-lived connections, which layer 1 cannot). Only Playwright's own channel is exempt.
  * Renderers are also limited by their Content Security Policy, which stops requests even earlier.
  *
- * A future network feature (e.g. auto-update, APP-06) must add exactly its own endpoint to
- * ALLOWED_ENDPOINTS, with a decision-log entry, never loosen these checks (D-31).
+ * Auto-update (APP-06, D-136) is the only network use, in installed builds only: a test run gets a
+ * fake updater, so nothing here is allowed. A future network feature must add exactly its own
+ * endpoint to ALLOWED_ENDPOINTS, with a decision-log entry, never loosen these checks (D-31).
  */
 const ALLOWED_ENDPOINTS: readonly string[] = [];
 

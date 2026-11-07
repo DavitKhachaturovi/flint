@@ -121,6 +121,7 @@ import { Composer, listInfos } from '../ui/Composer.js';
 import { QuickTitle } from '../ui/QuickTitle.js';
 import { Glide } from '../ui/Glide.js';
 import { ToastView, useToast } from '../ui/Toast.js';
+import { UPDATE_VIEW_OFF, type UpdateView } from '../../shared/updates.js';
 
 /**
  * The main window (M4, D-48 daily-use slice): the sidebar with the lists, a list's tasks with the
@@ -138,6 +139,8 @@ const INBOX_SUBTITLE = 'Everything you captured, waiting to be sorted.';
 const PAIR_FULL = 820 + 28 + 440 + 48;
 const PAIR_COMPACT = 780 + 24 + 380 + 48;
 const TOAST_MS = 5000;
+/** APP-06, D-136: "Update ready" stays a little longer than an undo toast; gone, it counts as Later. */
+const UPDATE_TOAST_MS = 12000;
 
 /** Navigate state: 1 / 2 / 3 / 0 set low / medium / high / none (TASK-03). */
 const PRIORITY_KEYS: Readonly<Record<string, TaskRow['priority']>> = {
@@ -438,6 +441,27 @@ export function App(): ReactElement {
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
+  // APP-06, D-136: what the updater is doing; "Update ready" once a session, with the window on
+  // screen (it waits for the window to be opened when Flint sits in the tray).
+  const [updates, setUpdates] = useState<UpdateView>(UPDATE_VIEW_OFF);
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    void window.flintMain.updates().then(setUpdates);
+    window.flintMain.onUpdatesChanged(setUpdates);
+    void onboardingOnce().then((state) => setOnScreen(state?.visible ?? true));
+    window.flintMain.onShown(() => setOnScreen(true));
+    window.flintMain.onHidden(() => setOnScreen(false));
+  }, []);
+  useEffect(() => {
+    if (updates.phase !== 'ready' || updates.toastSeen || !onScreen) return;
+    void window.flintMain.updatesToastSeen();
+    showToast(
+      `Update ready · Flint ${updates.version ?? ''}`.trim(),
+      false,
+      { label: 'Restart now', run: () => void window.flintMain.updatesRestart() },
+      { dismiss: { label: 'Later' }, ms: UPDATE_TOAST_MS },
+    );
+  }, [updates, onScreen, showToast]);
   /** APP-14, D-113: the capture tip's pattern (a task added right after coming to the front). */
   const frontAdd = useFrontAdds();
   /**
@@ -4267,6 +4291,26 @@ export function App(): ReactElement {
         keywords: 'clipboard history hide contents private screen sharing',
         run: () => showClipboardContents(false),
       },
+      // APP-06, D-136: the check shows its progress in Settings → About (errors never as a toast).
+      {
+        id: 'app:check-updates',
+        label: 'Check for updates',
+        keywords: 'update upgrade new version github release download',
+        run: () => {
+          openSettings('about');
+          void window.flintMain.updatesCheck();
+        },
+      },
+      ...(updates.phase === 'ready'
+        ? [
+            {
+              id: 'app:restart-update',
+              label: `Restart to update (Flint ${updates.version ?? ''})`.replace(' ()', ''),
+              keywords: 'update install restart new version',
+              run: () => void window.flintMain.updatesRestart(),
+            },
+          ]
+        : []),
       {
         id: 'app:whats-new',
         label: 'What’s new',
@@ -4939,6 +4983,7 @@ export function App(): ReactElement {
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
                   onReplayTour={() => startTour(0)}
                   onWhatsNew={() => setWhatsNew({ since: undefined })}
+                  updates={updates}
                   onLinkPatterns={(patterns) => {
                     setLinkPatterns(patterns);
                     setPatternsLoaded((count) => count + 1);

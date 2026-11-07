@@ -67,6 +67,8 @@ export interface Settings {
   readonly clipboardHistory: boolean;
   /** D-128: its contents shown at rest, not only on a resting pointer (off by default). */
   readonly clipboardShowContents: boolean;
+  /** APP-06, D-136: check GitHub Releases for updates automatically (on by default). */
+  readonly checkForUpdates: boolean;
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -105,6 +107,7 @@ export function defaultSettings(development = false): Settings {
     tipsOff: false,
     clipboardHistory: true,
     clipboardShowContents: false,
+    checkForUpdates: true,
   };
 }
 
@@ -195,6 +198,7 @@ export function readSettings(stored: Stored, development = false): Settings {
     lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
     tipsOff: pick(stored, 'tipsOff', isBoolean, defaults.tipsOff),
     clipboardHistory: pick(stored, 'clipboardHistory', isBoolean, defaults.clipboardHistory),
+    checkForUpdates: pick(stored, 'checkForUpdates', isBoolean, defaults.checkForUpdates),
     clipboardShowContents: pick(
       stored,
       'clipboardShowContents',

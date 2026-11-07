@@ -1,7 +1,7 @@
 {
   "name": "@flint/desktop",
   "productName": "Flint",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Flint desktop app: Electron main process, preload bridge and renderers (docs/05).",
   "author": "Davit Khachaturovi",
@@ -15,7 +15,8 @@
     "install-electron": "install-electron",
     "check:electron-node": "node scripts/check-electron-node.mjs",
     "test:e2e": "playwright test",
-    "dist": "electron-vite build && electron-builder --win nsis --x64 && node scripts/check-fuses.mjs",
+    "dist": "electron-vite build && electron-builder --win nsis --x64 --publish never && node scripts/check-fuses.mjs",
+    "release": "electron-vite build && electron-builder --win nsis --x64 --publish always && node scripts/check-fuses.mjs",
     "dist:bench": "electron-vite build --mode bench && electron-builder --config electron-builder.bench.yml --win zip --x64 && node scripts/check-fuses.mjs \"dist-bench/win-unpacked/Flint R-1 benchmark.exe\" && electron-vite build"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "@lezer/common": "1.5.4",
     "@lezer/highlight": "1.2.5",
     "@lezer/markdown": "1.8.1",
+    "electron-updater": "6.8.12",
     "koffi": "3.3.3"
   },
   "devDependencies": {
@@ -40,7 +42,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "electron": "45.1.0",
-    "electron-builder": "26.18.0",
+    "electron-builder": "26.18.1",
     "electron-vite": "6.0.0",
     "markdown-it": "15.0.3",
     "react": "19.3.1",
