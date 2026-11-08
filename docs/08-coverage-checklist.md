@@ -1085,5 +1085,6 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 17 | A click before a hidden line prefix puts the caret after it; a bullet click places the caret | NOTE-01 · Built (1.1.0 step 2) | D-141 |
 | 18 | Source mode and Monospace in the palette while a note is open | NOTE-09, NOTE-06 · Built (1.1.0 step 5; Monospace's: Proposed) | 02, D-141 |
 | 19 | Text formatting (Bold, Italic, Code…) as palette commands | NOTE-02 · Not doing: a deliberate exception to D-106 | 02, D-142 |
-| 20 | One caret beside a drawn picture (the browser's hidden there, Flint's at the real position) | NOTE-01, MEDIA-01 · Built (1.1.0) | 02, D-142 |
+| 20 | One caret beside a drawn picture (the browser's hidden there, Flint's at the real position, the text caret's size) | NOTE-01, MEDIA-01 · Built (1.1.0) | 02, D-142 |
 | 21 | The colleague's first name in the published history left as is; the fix in the next push; the local hooks widened (with a local test) | — · Decided | D-142 |
+| 22 | A checked item in a note: dimmed and struck through from its text on (chips unstruck); task rows unchanged | NOTE-01 · Built (1.1.0) | 02, D-142 |

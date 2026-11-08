@@ -152,6 +152,20 @@ test('a picture stays drawn beside the caret; ← steps into its markdown (D-141
   const image = await picture.locator('.cm-fl-image img').boundingBox();
   expect(caret && image).toBeTruthy();
   if (caret && image) expect(Math.abs(caret.x - (image.x + image.width))).toBeLessThanOrEqual(8);
+  // As tall as a text caret (a body character's box), on the picture's first text line, not the
+  // picture's height (D-142).
+  const textHeight = await line('After the picture.').evaluate((element) => {
+    const text = element.firstChild as Text;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    return range.getBoundingClientRect().height;
+  });
+  if (caret && image) {
+    expect(Math.abs(caret.height - textHeight)).toBeLessThanOrEqual(2);
+    expect(caret.y).toBeGreaterThanOrEqual(image.y - 8);
+    expect(caret.y + caret.height).toBeLessThanOrEqual(image.y + 40);
+  }
   // Right before it, likewise; away from it, the browser's own caret again.
   await main.keyboard.press('Home');
   await expect(carets).toHaveCount(1);
@@ -197,6 +211,12 @@ test("the checkbox is the task row's in its compact size, its tick centred; a cl
     .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
     .toContain('\n- [x] A task\n');
   await expect(box).toHaveClass(/\bon\b/);
+  // Checked: the text dimmed and struck through, from the text on (D-142).
+  const done = line('A task').locator('.cm-fl-done');
+  await expect(done).toHaveText('A task');
+  expect(await done.evaluate((element) => getComputedStyle(element).textDecorationLine)).toBe(
+    'line-through',
+  );
   // The tick fills the box as the task row's does: its 12 px tick (D-141, after Davit's test).
   expect(Math.round((await box.locator('svg').boundingBox())?.width ?? 0)).toBe(12);
   // The tick sits in the box's centre (by geometry, not margins).

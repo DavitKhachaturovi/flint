@@ -344,6 +344,26 @@ function caretBesidePicture(view: EditorView): number | null {
   return null;
 }
 
+/** The height of the browser's caret in this note's body text: a body character's box (headings
+ * and code cards skipped), else the font size's usual box. */
+function textCaretHeight(view: EditorView): number {
+  const walker = document.createTreeWalker(view.contentDOM, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const line = node.parentElement?.closest('.cm-line');
+    if (!line || /cm-fl-(h[1-3]|code)/.test(line.className)) continue;
+    const text = node.textContent ?? '';
+    const at = text.search(/\S/);
+    if (at < 0) continue;
+    const range = document.createRange();
+    range.setStart(node, at);
+    range.setEnd(node, at + 1);
+    const height = range.getBoundingClientRect().height / (view.scaleY || 1);
+    if (height > 0) return height;
+  }
+  const size = parseFloat(getComputedStyle(view.contentDOM).fontSize);
+  return Math.round((Number.isFinite(size) ? size : 15) * 1.25);
+}
+
 const pictureCaret: Extension = [
   layer({
     above: true,
@@ -351,11 +371,17 @@ const pictureCaret: Extension = [
     markers: (view) => {
       const at = caretBesidePicture(view);
       if (at === null) return [];
-      return RectangleMarker.forRange(
+      // Where CodeMirror would put the cursor (the picture's edge), but as tall as a text caret
+      // (D-142: not the picture's height), on the line's first text line, where typing goes.
+      const [edge] = RectangleMarker.forRange(
         view,
         'cm-fl-caret',
         EditorSelection.cursor(at, view.state.selection.main.assoc || 1),
       );
+      if (!edge) return [];
+      const height = textCaretHeight(view);
+      const top = edge.top + Math.max(0, (view.defaultLineHeight - height) / 2);
+      return [new RectangleMarker('cm-fl-caret', edge.left, top, null, height)];
     },
     update: (update) =>
       update.selectionSet ||
@@ -681,9 +707,16 @@ function tickMotion(view: EditorView, at: number, ticking: boolean): void {
   const timing = { duration: durationMs('--fl-dur-state', 260), easing: 'ease-out' };
   const body = 'var(--fl-text-body)';
   const muted = 'var(--fl-text-muted)';
+  // The strike fades in with the dimming (D-142).
   if (ticking)
     for (const done of line.querySelectorAll('.cm-fl-done'))
-      done.animate([{ color: body }, { color: muted }], timing);
+      done.animate(
+        [
+          { color: body, textDecorationColor: 'transparent' },
+          { color: muted, textDecorationColor: muted },
+        ],
+        timing,
+      );
   else line.animate([{ color: muted }, { color: body }], timing);
 }
 

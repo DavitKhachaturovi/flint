@@ -194,8 +194,16 @@
   height: 12px;
 }
 
+/* A checked item: dimmed and struck through (D-142; task rows stay unstruck, 03 §3). */
 .cm-fl-done {
   color: var(--fl-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--fl-text-muted);
+}
+
+/* Its task-field chips aren't struck (an inline-block doesn't take the line's decoration). */
+.cm-fl-done .cm-fl-field {
+  display: inline-block;
 }
 
 /* D-141: beside a drawn picture, one caret where the cursor is (the browser's own is hidden there). */

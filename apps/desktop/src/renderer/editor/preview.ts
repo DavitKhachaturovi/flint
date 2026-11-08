@@ -332,8 +332,12 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
             return;
           }
           case 'TaskMarker': {
-            if (/x/i.test(doc.sliceString(node.from, node.to)))
-              mark(node.to, node.node.parent?.to ?? node.to, 'cm-fl-done');
+            // Dimmed and struck through from the text on (D-142), not the space before it.
+            if (/x/i.test(doc.sliceString(node.from, node.to))) {
+              const end = node.node.parent?.to ?? node.to;
+              const gap = /^\s*/.exec(doc.sliceString(node.to, end))?.[0].length ?? 0;
+              if (node.to + gap < end) mark(node.to + gap, end, 'cm-fl-done');
+            }
             return;
           }
           case 'Link':
