@@ -49,11 +49,16 @@ export interface ParsedTable {
 /**
  * A line's container prefix: its indentation and, in a quote, the quote's marks (`> `, `>> `). A
  * table's rows start after it (a line starting with `>` is never a row of a table outside a quote).
+ * One pass, no regular expression (a nested quantifier would be flagged as polynomial, D-143).
  */
-const CONTAINER = /^(?:[ \t]*>)*[ \t]*/;
-
-/** A line's container prefix (see `CONTAINER`). */
-export const containerPrefix = (line: string): string => CONTAINER.exec(line)?.[0] ?? '';
+export function containerPrefix(line: string): string {
+  let at = 0;
+  for (;;) {
+    while (line[at] === ' ' || line[at] === '\t') at++;
+    if (line[at] !== '>') return line.slice(0, at);
+    at++;
+  }
+}
 
 /** A table row's line split into cells at its unescaped pipes. */
 function readRow(doc: Text, lineNumber: number): TableRow {

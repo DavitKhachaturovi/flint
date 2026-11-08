@@ -10,6 +10,7 @@ import {
   cellsMarkdown,
   cellTexts,
   clearCells,
+  containerPrefix,
   deleteColumn,
   deleteRow,
   deleteTable,
@@ -63,6 +64,27 @@ describe('reading a table (NOTE-10)', () => {
       ['a', 'b'],
       ['1', '2'],
     ]);
+  });
+
+  it('reads a line’s container prefix (indent and quote marks) in one pass, as the old pattern did', () => {
+    expect(containerPrefix('> | a |')).toBe('> ');
+    expect(containerPrefix('  >> > | a')).toBe('  >> > ');
+    expect(containerPrefix('\t| a |')).toBe('\t');
+    expect(containerPrefix('a > b')).toBe('');
+    const old = /^(?:[ \t]*>)*[ \t]*/;
+    fc.assert(
+      fc.property(
+        fc.string({ unit: fc.constantFrom(' ', '\t', '>', 'a', '|'), maxLength: 12 }),
+        (line) => {
+          expect(containerPrefix(line)).toBe(old.exec(line)?.[0] ?? '');
+        },
+      ),
+      { numRuns: 2000 },
+    );
+    const started = performance.now();
+    containerPrefix(`${' \t>'.repeat(100_000)}x`);
+    containerPrefix(' '.repeat(200_000));
+    expect(performance.now() - started).toBeLessThan(500);
   });
 
   it('finds the table around a position, and none outside it', () => {
