@@ -11,9 +11,13 @@ export const reducedMotion = (): boolean =>
 
 /** D-87: a move that can't happen (the first task's indent, say): the row nudges that way. */
 export function nudge(key: string, direction: 'left' | 'right' | 'up' | 'down'): void {
-  if (reducedMotion()) return;
   const row = document.querySelector<HTMLElement>(`.row[data-key="${CSS.escape(key)}"]`);
-  if (!row) return;
+  if (row) nudgeElement(row, direction);
+}
+
+/** D-87, NOTE-10: the same nudge for any element (a table cell that can't take a line break). */
+export function nudgeElement(row: HTMLElement, direction: 'left' | 'right' | 'up' | 'down'): void {
+  if (reducedMotion()) return;
   const moves: Record<typeof direction, readonly [number, number]> = {
     left: [-6, 0],
     right: [6, 0],

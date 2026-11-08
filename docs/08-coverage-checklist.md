@@ -1088,4 +1088,5 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 20 | One caret beside a drawn picture (the browser's hidden there, Flint's at the real position, the text caret's size) | NOTE-01, MEDIA-01 · Built (1.1.0) | 02, D-142 |
 | 21 | The colleague's first name in the published history left as is; the fix in the next push; the local hooks widened (with a local test) | — · Decided | D-142 |
 | 22 | A checked item in a note: dimmed and struck through from its text on (chips unstruck); task rows unchanged | NOTE-01 · Built (1.1.0) | 02, D-142 |
-| 23 | The table model: rows and cells with exact ranges; setCell, addRow, addColumn, deleteRow, deleteColumn, deleteTable, alignTable; the edge pipe written where GFM needs it (Proposed) | NOTE-10 · Built (1.2.0 step 1) | 04 §4, D-141 |
+| 23 | The table model: rows and cells with exact ranges; setCell, addRow, addColumn, deleteRow, deleteColumn, deleteTable, alignTable; the edge pipe written where GFM needs it (Proposed) | NOTE-10 · Built (1.2.0 step 1; the edge-pipe detail accepted) | 04 §4, D-141 |
+| 24 | Tables drawn in the editor (block widget, the rendered body's look, sideways scroll) and cells edited in place with the Q9 keys, the note's own undo, whole-table selections | NOTE-10 · Built (1.2.0 steps 2–3) | D-141 |

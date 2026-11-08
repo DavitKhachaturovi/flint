@@ -229,6 +229,53 @@
   }
 }
 
+/* NOTE-10 (D-141 Q9): a table, as the rendered body draws one (`.body-view table`); wider than the
+   note, it scrolls sideways in its own frame. The active cell holds a small editor and a ring. */
+.cm-fl-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 2px 0 8px;
+}
+
+.cm-fl-table {
+  border-collapse: collapse;
+}
+
+.cm-fl-table th,
+.cm-fl-table td {
+  min-width: 48px;
+  height: 1.6em;
+  padding: 4px 10px;
+  border: 1px solid var(--fl-edge-card);
+  vertical-align: top;
+  cursor: text;
+}
+
+.cm-fl-table th {
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+  text-align: left;
+}
+
+.cm-fl-table .cm-fl-cell-active {
+  box-shadow: inset 0 0 0 1.5px var(--fl-accent);
+}
+
+.cm-fl-cell-active .cm-editor,
+.cm-fl-cell-active .cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-fl-cell-active .cm-content {
+  padding: 0;
+  font: inherit;
+  caret-color: var(--fl-accent);
+}
+
+.cm-fl-cell-active .cm-line {
+  padding: 0;
+}
+
 /* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */
 .cm-fl-image {
   display: inline-block;

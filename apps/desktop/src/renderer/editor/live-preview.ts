@@ -50,6 +50,7 @@ import {
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
 import { blockMarkers, buildPreview } from './preview.js';
+import { tables } from './table-view.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
 import { checkSvg } from '../ui/check.js';
 import { NOTE_SYNTAX } from './syntax.js';
@@ -476,7 +477,7 @@ export const previewMode = new Compartment();
 
 /** The live preview's parts: none in Source mode, where every line is its raw markdown. */
 export const sourceMode = (on: boolean): Extension =>
-  on ? [] : [livePreview, previewClicks, clicksDontReveal, pictureCaret];
+  on ? [] : [livePreview, previewClicks, clicksDontReveal, pictureCaret, tables()];
 
 /** Everything the note editor is made of, for a new editor state. */
 export function editorExtensions(options: EditorOptions): Extension[] {
