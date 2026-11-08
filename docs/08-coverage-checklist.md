@@ -1108,6 +1108,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 40 | The caret beside a picture redrawn on any change of its size (loaded, "File not found", a player), not only on its load | NOTE-10, MEDIA-01 · Fixed (1.2.0, second preview) | D-144 |
 | 41 | The editing fuzz again checks that plain text typed outside every table never changes a table's bytes (a table under a fence, or right under a line, excepted) | NOTE-10 · Done (1.2.0, second preview) | D-144 |
 | 42 | The table rows' container prefix read in one pass, without a nested quantifier (CodeQL) | NOTE-10 · Fixed (1.2.0, second preview) | D-143, D-144 |
+| 43 | A paste from a cell a short row hasn't got selects what it filled (the caret in a corner its row has); an edge drag gives the note's editor the focus, so Ctrl+Z undoes it | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 

@@ -333,15 +333,33 @@ function pasteCells(view: EditorView, here: CellAt, text: string): boolean {
       ...(wider ? { columns: { first: table.columns, last: after.columns - 1 } } : {}),
     };
   else if (wider) added = { from, axis: 'columns', first: table.columns, last: after.columns - 1 };
-  const head = {
+  const end = {
     row: Math.min(after.rows.length - 1, start.row + grid.length - 1),
     column: Math.min(after.columns - 1, start.column + width - 1),
   };
-  const cell = after.rows[start.row]?.cells[start.column];
+  // The caret goes into a corner of the filled cells that its row has (a short row gets only the
+  // cells it needs for text, D-144): the top left one if it can, the far corner the selection's
+  // head, so the same cells are selected.
+  const corners: [CellPlace, CellPlace][] = [
+    [start, end],
+    [
+      { row: start.row, column: end.column },
+      { row: end.row, column: start.column },
+    ],
+    [
+      { row: end.row, column: start.column },
+      { row: start.row, column: end.column },
+    ],
+    [end, start],
+  ];
+  const [anchor, head] = corners.find(
+    ([place]) => after.rows[place.row]?.cells[place.column] !== undefined,
+  ) ?? [start, end];
+  const cell = after.rows[anchor.row]?.cells[anchor.column];
   view.dispatch({
     changes: set,
-    selection: { anchor: cellPosition({ doc }, cell, start.row, after, 'end') },
-    effects: setCellRange.of(samePlace(start, head) ? null : { from, anchor: start, head }),
+    selection: { anchor: cellPosition({ doc }, cell, anchor.row, after, 'end') },
+    effects: setCellRange.of(samePlace(anchor, head) ? null : { from, anchor, head }),
     // One undo step of its own, never joined with typing before or after it.
     annotations: [onRange.of(true), isolateHistory.of('full')],
     userEvent: 'input.table',
@@ -1024,6 +1042,9 @@ function dragEdge(
     handle.removeEventListener('pointercancel', cancel);
     window.removeEventListener('keydown', escape, true);
     wrap.classList.remove('cm-fl-table-dragging');
+    // D-144: the drag's press takes no focus; the note's editor gets it, so Ctrl+Z undoes the
+    // drag (a note just opened from the sidebar had it on the sidebar). A cell keeps it.
+    if (!view.dom.contains(document.activeElement)) view.focus();
     if (!apply || target === count) {
       clear();
       return;

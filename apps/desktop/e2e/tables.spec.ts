@@ -55,6 +55,8 @@ const ENDING = `---\nflint: 1\nid: ending\nmode: note\n---\nIntro.\n\n${INSERTED
 const TAIL = `---\nflint: 1\nid: tail\nmode: note\n---\nFirst line here.\n\nSecond line.\n\n| a | b |\n| - | - |\n| c | d |`;
 /** D-144: a table right above a heading (no blank line between). */
 const HEADING = `---\nflint: 1\nid: heading\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |\n# Heading\n`;
+/** D-144: a table with a short row (only its first cell). */
+const SHORT = `---\nflint: 1\nid: short\nmode: note\n---\nShort.\n\n| a | b | c |\n| - | - | - |\n| 1 |\n| 2 | 3 | 4 |\n\nEnd.\n`;
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
 
 let dataDirectory: string;
@@ -102,6 +104,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Plain.md'), PLAIN);
   await writeFile(join(flint, 'Ending.md'), ENDING);
   await writeFile(join(flint, 'Tail.md'), TAIL);
+  await writeFile(join(flint, 'Short.md'), SHORT);
   await writeFile(join(flint, 'Heading.md'), HEADING);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
@@ -1063,4 +1066,39 @@ test('a click under a table at the note’s end, in a quote or over a heading: t
       await expect.poll(read).toBe(source);
     }
   }
+});
+
+test('a paste from a cell a short row hasn’t got selects what it filled, the caret in a cell it has (D-144)', async () => {
+  const short = (): Promise<string> => readFile(join(flint, 'Short.md'), 'utf8');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Short' }).first().click();
+  await expect(cell(2, 2)).toHaveText('4');
+  await cell(2, 2).click();
+  await cell(1, 1).click({ modifiers: ['Shift'] });
+  await expect(selected()).toHaveCount(3);
+  await clipboard(activeCell(), 'paste', { 'text/plain': '\t\nx\ty' });
+  // The short row stays as it is (nothing to write there); the row below gets x and y.
+  await expect.poll(short).toBe(SHORT.replace('| 2 | 3 | 4 |', '| 2 | x | y |'));
+  await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
+  await expect(selected()).toHaveCount(3);
+  for (const [row, column] of [
+    [1, 1],
+    [1, 2],
+    [2, 2],
+  ] as const)
+    await expect(cell(row, column)).toHaveClass(/cm-fl-cell-selected/);
+  await main.keyboard.press('Control+z');
+  await expect.poll(short).toBe(SHORT);
+});
+
+test('an edge drag in a note just opened from the sidebar: Ctrl+Z undoes it (D-144)', async () => {
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Tables' }).first().click();
+  await expect(cell(1, 0)).toHaveText('Alex');
+  await expect.poll(file).toBe(NOTE);
+  await drag('right', 1);
+  await expect.poll(file).toContain('| Name    | Age |  |');
+  await expect
+    .poll(() => main.evaluate(() => document.activeElement?.closest('.note-editor') !== null))
+    .toBe(true);
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
 });
