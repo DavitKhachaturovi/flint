@@ -725,6 +725,52 @@ test('Delete clears selected cells at once, in one undo step, with an Undo toast
   await expect.poll(grid).toBe(GRID_NOTE);
 });
 
+test('Delete or a paste right after typing is its own undo step: the typing stays (D-144)', async () => {
+  await openGrid();
+  // Typed, then at once (well within history's 500 ms) b1 selected and cleared.
+  await cell(1, 0).click();
+  await main.keyboard.press('End');
+  await main.keyboard.type('x');
+  await main.keyboard.press('Shift+ArrowRight');
+  await main.keyboard.press('Delete');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a1 | b1 | c1 |', '|  |  | c1 |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a1 |', '| a1x |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // Typed, then a block pasted at once: Ctrl+Z takes back the paste only.
+  await cell(2, 0).click();
+  await main.keyboard.press('End');
+  await main.keyboard.type('y');
+  await clipboard(activeCell(), 'paste', { 'text/plain': 'p\tq' });
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a2 | b2 |', '| p | q |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a2 |', '| a2y |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+});
+
+test('Shift+↑ in the header and Shift+↓ in the last row select the cell’s text (D-144)', async () => {
+  await openGrid();
+  // No row above the header, none below the last: the keys select text, no cells.
+  await cell(0, 0).click();
+  await main.keyboard.press('End');
+  await main.keyboard.press('Shift+ArrowUp');
+  await expect(selected()).toHaveCount(0);
+  await main.keyboard.type('Z');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| A  |', '| Z  |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+  await cell(2, 1).click();
+  await main.keyboard.press('Home');
+  await main.keyboard.press('Shift+ArrowDown');
+  await expect(selected()).toHaveCount(0);
+  await main.keyboard.type('W');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| b2 |', '| W |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+});
+
 test('pasting tab-separated text fills cells from the active one, growing the table (D-144)', async () => {
   await openGrid();
   // A 2 × 2 block from Excel (\r\n, a line break at the end) into b1.
@@ -743,8 +789,24 @@ test('pasting tab-separated text fills cells from the active one, growing the ta
   await expect(selected()).toHaveCount(3);
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
-  // Larger than the table from c2: a column and a row added in its style, in the same step.
+  // Larger than the table from c2: a column and a row added in its style, in the same step. Both
+  // fade in (Q12): the new row's cells and the new column's (every `animate` on a cell recorded).
   await cell(2, 2).click();
+  await main.evaluate(() => {
+    const spy = window as unknown as { faded: string[]; animate: PropertyDescriptor };
+    spy.faded = [];
+    spy.animate = Object.getOwnPropertyDescriptor(Element.prototype, 'animate') ?? {};
+    const original = spy.animate.value as (
+      this: Element,
+      ...args: Parameters<Element['animate']>
+    ) => Animation;
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const row = this.getAttribute('data-row');
+      if (row !== null && JSON.stringify(frames).includes('opacity'))
+        spy.faded.push(`${row}:${this.getAttribute('data-column') ?? ''}`);
+      return original.call(this, frames, options);
+    };
+  });
   await clipboard(activeCell(), 'paste', { 'text/plain': '1\t2\n3\t4' });
   await expect
     .poll(grid)
@@ -756,6 +818,13 @@ test('pasting tab-separated text fills cells from the active one, growing the ta
     );
   await expect(table().locator('tr')).toHaveCount(4);
   await expect(cell(3, 3)).toHaveText('4');
+  const faded = await main.evaluate(() => {
+    const spy = window as unknown as { faded: string[]; animate: PropertyDescriptor };
+    Object.defineProperty(Element.prototype, 'animate', spy.animate);
+    return spy.faded;
+  });
+  expect(faded).toEqual(expect.arrayContaining(['0:3', '1:3', '2:3', '3:0', '3:3']));
+  expect(faded).not.toContain('1:1');
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
   // Text without a tab or a line break goes into the cell, as before.

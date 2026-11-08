@@ -1,4 +1,4 @@
-import { history, redo, undo } from '@codemirror/commands';
+import { history, isolateHistory, redo, undo } from '@codemirror/commands';
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
 import {
   Annotation,
@@ -246,7 +246,12 @@ export function clearSelectedCells(view: EditorView): boolean {
   if (!selected) return false;
   const changes = clearCells(view.state, selected.table, rectOf(selected.range));
   if (changes.length === 0) return true;
-  view.dispatch({ changes, userEvent: 'delete.table', annotations: onRange.of(true) });
+  // Its own undo step: never joined with typing just before (a `delete` event would be).
+  view.dispatch({
+    changes,
+    userEvent: 'delete.table',
+    annotations: [onRange.of(true), isolateHistory.of('full')],
+  });
   announceUndo('Cells cleared', () => undo(view));
   return true;
 }
@@ -289,10 +294,16 @@ function pasteCells(view: EditorView, here: CellAt, text: string): boolean {
   const doc = set.apply(view.state.doc);
   const after = parseTable(doc, from, set.mapPos(table.to, 1));
   if (!after) return true;
+  const wider = after.columns > table.columns;
   if (after.rows.length > table.rows.length)
-    added = { from, axis: 'rows', first: table.rows.length, last: after.rows.length - 1 };
-  else if (after.columns > table.columns)
-    added = { from, axis: 'columns', first: table.columns, last: after.columns - 1 };
+    added = {
+      from,
+      axis: 'rows',
+      first: table.rows.length,
+      last: after.rows.length - 1,
+      ...(wider ? { columns: { first: table.columns, last: after.columns - 1 } } : {}),
+    };
+  else if (wider) added = { from, axis: 'columns', first: table.columns, last: after.columns - 1 };
   const head = {
     row: Math.min(after.rows.length - 1, start.row + grid.length - 1),
     column: Math.min(after.columns - 1, start.column + width - 1),
@@ -302,7 +313,8 @@ function pasteCells(view: EditorView, here: CellAt, text: string): boolean {
     changes: set,
     selection: { anchor: cellPosition({ doc }, cell, start.row, after, 'end') },
     effects: setCellRange.of(samePlace(start, head) ? null : { from, anchor: start, head }),
-    annotations: onRange.of(true),
+    // One undo step of its own, never joined with typing before or after it.
+    annotations: [onRange.of(true), isolateHistory.of('full')],
     userEvent: 'input.table',
     scrollIntoView: true,
   });
@@ -469,7 +481,6 @@ class TableWidget extends WidgetType {
         column <= range.right;
       element.classList.toggle('cm-fl-cell-selected', inside);
     }
-    wrap.classList.toggle('cm-fl-table-ranged', range !== null);
     // A range starting in a cell being edited: its text selection collapses to the caret.
     if (range && holder.editor && holder.key === key && !holder.editor.state.selection.main.empty)
       holder.editor.dispatch({
@@ -651,8 +662,15 @@ function edgeHandle(edge: 'right' | 'bottom', title: string): HTMLElement {
   return handle;
 }
 
-/** Rows or columns just added (Q12: they fade in), set by the edit that adds them. */
-let added: { from: number; axis: 'rows' | 'columns'; first: number; last: number } | null = null;
+/** Rows or columns just added (Q12: they fade in), set by the edit that adds them; `columns`, the
+ * columns too when a paste grew the table both ways (D-144). */
+let added: {
+  from: number;
+  axis: 'rows' | 'columns';
+  first: number;
+  last: number;
+  columns?: { first: number; last: number };
+} | null = null;
 
 /** Q12: a table that changed shape eases from its old size to its new one; new rows or columns
  * fade in. Off with reduce-motion; nothing waits for it (D-75). */
@@ -668,7 +686,11 @@ function reshaped(wrap: HTMLElement, holder: Holder, table: ParsedTable, before:
     for (const [key, cell] of holder.cells) {
       const [row, column] = key.split(':').map(Number) as [number, number];
       const index = hint.axis === 'rows' ? row : column;
-      if (index >= hint.first && index <= hint.last)
+      const also = hint.columns;
+      if (
+        (index >= hint.first && index <= hint.last) ||
+        (also && column >= also.first && column <= also.last)
+      )
         cell.animate([{ opacity: 0 }, { opacity: 1 }], timing);
     }
   requestAnimationFrame(() => {
@@ -1135,6 +1157,9 @@ function cellEditor(
         column: Math.max(0, Math.min(here.table.columns - 1, from.column + columns)),
       };
       if (!samePlace(head, from)) selectCells(view, here.table.from, anchor, head);
+      // No cell that way (Shift+↑ in the header, Shift+↓ in the last row…) and none selected:
+      // the key selects the cell's text, as before.
+      else if (!range) return false;
       return true;
     };
   const below = (here: CellAt): boolean => {
@@ -1549,7 +1574,9 @@ export function tableCommands(view: EditorView, here: CellAt): TableCommand[] {
   const { table, row, column } = here;
   const change = (changes: ReturnType<typeof addRow>, event: string, notice?: string): void => {
     if (changes.length === 0) return;
-    view.dispatch({ changes, userEvent: event, scrollIntoView: true });
+    // A delete with an Undo toast is its own undo step: the toast's Undo takes back only it.
+    const annotations = notice ? isolateHistory.of('full') : [];
+    view.dispatch({ changes, userEvent: event, scrollIntoView: true, annotations });
     if (notice) announceUndo(notice, () => undo(view));
   };
   const live = (): ParsedTable => tableAt(view.state, table.from) ?? table;

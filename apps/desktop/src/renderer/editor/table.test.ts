@@ -217,6 +217,54 @@ describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
     ]);
   });
 
+  it('gives a short row only the cells it needs for text: clearing never lengthens it', () => {
+    const { state: s, table: t } = table('| a | b | c |\n| - | - | - |\n| 1 |\n| 2 | 3 |');
+    expect(apply(s, clearCells(s, t, { top: 1, left: 0, bottom: 2, right: 2 }))).toBe(
+      '| a | b | c |\n| - | - | - |\n|  |\n|  |  |',
+    );
+    expect(
+      apply(
+        s,
+        setCells(s, t, 1, 0, [
+          ['x', '', 'z'],
+          ['', ''],
+        ]),
+      ),
+    ).toBe('| a | b | c |\n| - | - | - |\n| x |  | z |\n|  |  |');
+  });
+
+  it('adds several columns in one pass, as adding them one at a time would', () => {
+    const docs = [DOC, 'a | b\n--- | ---\n1 | 2\n3 |', '| a |\n|---|\n| 1 | extra |\n| 2 |'];
+    for (const doc of docs) {
+      const { state: s, table: t } = table(doc);
+      for (const at of [1, t.columns]) {
+        let one = doc;
+        for (let step = 0; step < 3; step++) {
+          const now = table(one);
+          one = apply(now.state, addColumn(now.table, at));
+        }
+        expect(apply(s, addColumn(t, at, 3))).toBe(one);
+      }
+    }
+  });
+
+  it('sets, grows and clears thousands of rows in linear time (an Excel paste)', () => {
+    const { state: s, table: t } = table('| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |');
+    const block = Array.from({ length: 5000 }, (_, at) => [`r${at}`, 'x', 'y']);
+    let started = performance.now();
+    const grown = apply(s, setCells(s, t, 1, 0, block, true));
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(grown.split('\n')).toHaveLength(5002);
+    const wide = Array.from({ length: 3000 }, () => ['p', 'q', 'r', 's', 't']);
+    started = performance.now();
+    apply(s, setCells(s, t, 1, 1, wide, true));
+    expect(performance.now() - started).toBeLessThan(500);
+    const big = table(grown);
+    started = performance.now();
+    clearCells(big.state, big.table, { top: 1, left: 0, bottom: 5000, right: 2 });
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it('reads and writes tab-separated text as Excel and Sheets do', () => {
     expect(
       toTsv([
@@ -285,8 +333,10 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       rows: fc.integer({ min: 0, max: 4 }),
       edges: fc.boolean(),
       cells: fc.array(fc.tuple(padding, cellText, padding), { minLength: 30, maxLength: 30 }),
+      // How many cells each body row lacks (a short row; only with edge pipes, D-144).
+      short: fc.array(fc.nat({ max: 3 }), { minLength: 4, maxLength: 4 }),
     })
-    .map(({ columns, rows, edges, cells }) => {
+    .map(({ columns, rows, edges, cells, short }) => {
       let next = 0;
       const cell = (): string => {
         const [before, text, after] = cells[next++ % cells.length] ?? ['', '', ''];
@@ -298,10 +348,11 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       const line = (parts: string[]): string => (piped ? `|${parts.join('|')}|` : parts.join('|'));
       const header = line(Array.from({ length: columns }, () => ` h${cell()}`));
       const delimiter = line(Array.from({ length: columns }, () => ' --- '));
-      const body = Array.from({ length: rows }, () =>
+      const body = Array.from({ length: rows }, (_, at) => {
+        const count = piped ? columns - ((short[at] ?? 0) % columns) : columns;
         // A letter first, so no generated row starts like a block (the table would end there).
-        line(Array.from({ length: columns }, () => ` b${cell()}`)),
-      );
+        return line(Array.from({ length: count }, () => ` b${cell()}`));
+      });
       return [header, delimiter, ...body].join('\n');
     });
 
@@ -351,6 +402,15 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
                 expect(now.text).toBe(wanted.trim());
             }),
           );
+          // A short row gets only the cells it needs for text: clearing never lengthens it.
+          t.rows.forEach((before, r) => {
+            let needs = before.cells.length;
+            for (let c = before.cells.length; c < t.columns; c++) {
+              const wanted = clear || !inside(r, c) ? '' : (block[r - row]?.[c - column] ?? '');
+              if (wanted.trim() !== '') needs = c + 1;
+            }
+            expect(after.rows[r]?.cells.length).toBe(needs);
+          });
           // The delimiter row as it was.
           expect(result.slice(after.delimiter.from, after.delimiter.to)).toBe(
             doc.slice(t.delimiter.from, t.delimiter.to),

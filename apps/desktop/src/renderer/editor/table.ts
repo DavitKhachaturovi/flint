@@ -1,5 +1,5 @@
 import { syntaxTree } from '@codemirror/language';
-import { ChangeSet, type ChangeSpec, type EditorState, type Text } from '@codemirror/state';
+import { ChangeSet, type ChangeSpec, type EditorState, Text } from '@codemirror/state';
 import type { SyntaxNode } from '@lezer/common';
 
 /**
@@ -232,9 +232,12 @@ export function deleteRow(table: ParsedTable, row: number): ChangeSpec[] {
   return [{ from: target.from - 1, to: target.to }];
 }
 
-/** Q11: a new column before column `at` (`columns`: at the end), in the table's style. */
-export function addColumn(table: ParsedTable, at: number): ChangeSpec[] {
-  if (at < 0 || at > table.columns) return [];
+/**
+ * Q11: a new column before column `at` (`columns`: at the end), in the table's style. With `count`,
+ * that many (D-144: a pasted block's), in one pass: the same bytes as adding them one at a time.
+ */
+export function addColumn(table: ParsedTable, at: number, count = 1): ChangeSpec[] {
+  if (at < 0 || at > table.columns || count < 1) return [];
   // The delimiter row's style: `| --- |` or `|---|`.
   const spaced = table.delimiter.cells.some((cell) => cell.textFrom > cell.from);
   const changes: ChangeSpec[] = [];
@@ -242,13 +245,10 @@ export function addColumn(table: ParsedTable, at: number): ChangeSpec[] {
     if (!row) continue;
     const content = row === table.delimiter ? (spaced ? ' --- ' : '---') : '  ';
     const cell = row.cells[at];
-    if (cell) changes.push({ from: cell.from, insert: `${content}|` });
+    const more = `${content}|`.repeat(count);
+    if (cell) changes.push({ from: cell.from, insert: more });
     else if (at === row.cells.length)
-      changes.push(
-        row.trailing
-          ? { from: row.to, insert: `${content}|` }
-          : { from: row.to, insert: ` |${content}|` },
-      );
+      changes.push({ from: row.to, insert: row.trailing ? more : ` |${more}` });
   }
   return changes;
 }
@@ -282,12 +282,54 @@ export interface CellRect {
 }
 
 /**
+ * D-144: one row's cells from `column` on set to `cells` (up to the table's `columns`), worked out
+ * on the row's line alone: the changes, from the line's start. The cells the row hasn't got come
+ * first, left to right, and only for text (an empty one would add bytes for nothing); then the
+ * cells it has, right to left, so each change leaves the cells before it where they were and one
+ * reading of the line serves them all.
+ */
+function rowCells(
+  table: ParsedTable,
+  line: string,
+  column: number,
+  cells: readonly string[],
+  columns: number,
+): { from: number; to: number; insert: string }[] {
+  let doc = Text.of([line]);
+  let set = ChangeSet.empty(doc.length);
+  const write = (row: TableRow, at: number, text: string): void => {
+    const specs = setCell({ doc }, { ...table, rows: [row] }, 0, at, text);
+    if (specs.length === 0) return;
+    const next = ChangeSet.of(specs, doc.length);
+    set = set.compose(next);
+    doc = next.apply(doc);
+  };
+  const end = Math.min(cells.length, columns - column);
+  let read = readRow(doc, 1);
+  const had = read.cells.length;
+  for (let dx = Math.max(0, had - column); dx < end; dx++) {
+    const text = cells[dx] ?? '';
+    if (text.trim() === '') continue;
+    write(read, column + dx, text);
+    read = readRow(doc, 1);
+  }
+  for (let dx = Math.min(end, had - column) - 1; dx >= 0; dx--)
+    write(read, column + dx, cells[dx] ?? '');
+  const changes: { from: number; to: number; insert: string }[] = [];
+  set.iterChanges((from, to, _fromB, _toB, inserted) =>
+    changes.push({ from, to, insert: inserted.toString() }),
+  );
+  return changes;
+}
+
+/**
  * D-144: cells from (`row`, `column`) on set to `values` (rows of cells), as one change: each cell
- * written as `setCell` writes it, so only those cells' bytes change. With `grow` (a pasted block
- * larger than the table, Proposed), the columns and rows it needs are added at the end first, each
- * in the table's style (`addColumn`, `addRow`); without it, what falls outside the table is left
- * out. Each row is read again after each of its cells (a short row grows), never the whole table:
- * linear in the size of what is written.
+ * written as `setCell` writes it, so only those cells' bytes change (a cell a short row hasn't got
+ * is written only for text). With `grow` (a pasted block larger than the table, Proposed), the
+ * columns and rows it needs are added at the end first, each in the table's style (`addColumn`,
+ * `addRow`), in one pass each; without it, what falls outside the table is left out. Each row is
+ * worked out on its own line and the rows' changes are put together once, in order: linear in
+ * the number of rows (a large paste from Excel), whatever the table's length.
  */
 export function setCells(
   state: { readonly doc: Text },
@@ -313,10 +355,10 @@ export function setCells(
   };
   const width = Math.max(0, ...values.map((cells) => cells.length));
   if (grow) {
-    for (let added = 0; current && current.columns < column + width && added < width; added++) {
-      const specs = addColumn(current, current.columns);
-      if (specs.length === 0) break;
-      apply(specs);
+    const more = current ? column + width - current.columns : 0;
+    if (current && more > 0) {
+      const specs = addColumn(current, current.columns, more);
+      if (specs.length > 0) apply(specs);
     }
     const missing = current ? row + values.length - current.rows.length : 0;
     if (current && missing > 0) {
@@ -327,31 +369,20 @@ export function setCells(
   }
   const base: ParsedTable | null = current;
   if (!base) return set.empty ? [] : [set];
-  // Rows touch their own lines only: each row's changes are made on `base`'s text and joined.
-  const start = doc;
-  let rows = ChangeSet.empty(start.length);
+  // Rows touch their own lines only: each row's changes, in order, then one change set of them.
+  const specs: ChangeSpec[] = [];
   values.forEach((cells, dy) => {
     const target = base.rows[row + dy];
     if (!target) return;
-    const lineNumber = start.lineAt(target.from).number;
-    let rowDoc = start;
-    let rowSet = ChangeSet.empty(start.length);
-    cells.forEach((text, dx) => {
-      if (column + dx >= base.columns) return;
-      const read = readRow(rowDoc, lineNumber);
-      const shaped = {
-        ...base,
-        rows: base.rows.map((each, at) => (at === row + dy ? read : each)),
-      };
-      const specs = setCell({ doc: rowDoc }, shaped, row + dy, column + dx, text);
-      if (specs.length === 0) return;
-      const next = ChangeSet.of(specs, rowDoc.length);
-      rowSet = rowSet.compose(next);
-      rowDoc = next.apply(rowDoc);
-    });
-    rows = rows.compose(rowSet.map(rows));
+    const line = doc.sliceString(target.from, target.to);
+    for (const change of rowCells(base, line, column, cells, base.columns))
+      specs.push({
+        from: target.from + change.from,
+        to: target.from + change.to,
+        insert: change.insert,
+      });
   });
-  set = set.compose(rows);
+  if (specs.length > 0) set = set.compose(ChangeSet.of(specs, doc.length));
   return set.empty ? [] : [set];
 }
 
