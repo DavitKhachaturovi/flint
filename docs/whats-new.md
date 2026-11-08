@@ -2,6 +2,14 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.2.0 (9 Nov 2026)
+
+- **Tables in your notes:** a markdown table now shows as a real table. Click a cell to edit it; Tab, Enter and the arrow keys move between cells, and Esc leaves the table.
+- **Grow or shrink a table by dragging:** hover a table and drag the small + beside its right or bottom edge to add or remove columns and rows. Right-click a table for Add row, Delete column, Align table and more.
+- **Work with several cells:** drag across cells (or Shift+click, Shift+arrows) to select them; Ctrl+C copies them, Delete clears them, and pasting from a spreadsheet fills them.
+- **Go to the list you just added to:** when a task you add from Inbox goes to another list with ##list, the toast now has Go to, which opens that list with the task selected.
+- **Sharper icons:** the taskbar and tray icons keep their detail at small sizes.
+
 ## 1.1.1 (8 Nov 2026)
 
 - **No more freezes on long pastes:** pasting a very long line (a log line, minified JSON) into the capture popup or a list no longer makes Flint stop responding.
