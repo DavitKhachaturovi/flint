@@ -48,6 +48,7 @@
     "electron-winstaller": false
   },
   "overrides": {
-    "@electron-internal/extract-zip": "1.0.6"
+    "@electron-internal/extract-zip": "1.0.6",
+    "minimatch@>=7.0.0 <11.0.1": "11.0.3"
   }
 }
