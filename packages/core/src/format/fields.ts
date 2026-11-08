@@ -115,13 +115,148 @@ function isValidFlintValue(key: FlintKey, value: string): boolean {
 }
 
 /**
+ * What one scan of a line for field candidates keeps, so that each opening bracket costs a
+ * bounded amount of work however long the line (D-146). Before, each one searched and read the
+ * rest of the line, so a long line of unclosed fields took time quadratic in its length.
+ */
+interface Scan {
+  readonly text: string;
+  /** Candidates end before this index (the block ID's caret, or the text's length). */
+  readonly end: number;
+  readonly code: readonly Range[];
+  /** `text.indexOf('::', separatorFrom)`, kept while the searches move forward. */
+  separatorFrom: number;
+  separatorAt: number;
+  /** The first bracket of any kind at or after `bracketFrom` (`text.length` if none). */
+  bracketFrom: number;
+  bracketAt: number;
+  /** Made when first needed (see `closings`): where values opened by `[` or by `(` close. */
+  square: Int32Array | null;
+  round: Int32Array | null;
+}
+
+function startScan(text: string, end: number, code: readonly Range[]): Scan {
+  return {
+    text,
+    end,
+    code,
+    separatorFrom: -1,
+    separatorAt: -1,
+    bracketFrom: -1,
+    bracketAt: -1,
+    square: null,
+    round: null,
+  };
+}
+
+/** `text.indexOf('::', from)`; while `from` only grows, each part of the text is searched once. */
+function separatorAfter(scan: Scan, from: number): number {
+  const known =
+    scan.separatorFrom >= 0 &&
+    from >= scan.separatorFrom &&
+    (scan.separatorAt < 0 || scan.separatorAt >= from);
+  if (!known) scan.separatorAt = scan.text.indexOf('::', from);
+  scan.separatorFrom = from;
+  return scan.separatorAt;
+}
+
+function isBracket(char: string | undefined): boolean {
+  return char === '[' || char === ']' || char === '(' || char === ')';
+}
+
+/** The first `[`, `]`, `(` or `)` at or after `from`, or the text's length; as `separatorAfter`. */
+function bracketAfter(scan: Scan, from: number): number {
+  const known = scan.bracketFrom >= 0 && from >= scan.bracketFrom && scan.bracketAt >= from;
+  if (!known) {
+    let index = from;
+    while (index < scan.text.length && !isBracket(scan.text[index])) index++;
+    scan.bracketAt = index;
+  }
+  scan.bracketFrom = from;
+  return scan.bracketAt;
+}
+
+/** The index of the first code span starting after `index` (`code.length` if none). */
+function firstSpanAfter(code: readonly Range[], index: number): number {
+  let low = 0;
+  let high = code.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if ((code[middle]?.[0] ?? Infinity) > index) high = middle;
+    else low = middle + 1;
+  }
+  return low;
+}
+
+/** `rangeContaining` by binary search (the spans are in order and don't overlap). */
+function spanAt(code: readonly Range[], index: number): Range | undefined {
+  const span = code[firstSpanAfter(code, index) - 1];
+  return span && index < span[1] ? span : undefined;
+}
+
+/**
+ * Where the values opened by `open` close, worked out for the whole line at once (D-146). The
+ * line is read once from its start the way a value is read: code spans skipped, a backslash
+ * escaping the next character, `open` a level deeper and `close` a level out; `depth[j]` is the
+ * level before index `j`. A value read from index `j` (not escaping, at its own level 0) ends at
+ * the first `close` that takes the level below `depth[j]`. The returned `next[j]` is the index
+ * just after that `close`, or -1: the first `k > j` with `depth[k] === depth[j] - 1`, since the
+ * level moves one step at a time.
+ */
+function closings(scan: Scan, open: string, close: string): Int32Array {
+  const { text, end, code } = scan;
+  const depth = new Int32Array(end + 1);
+  let level = 0;
+  let lowest = 0;
+  let highest = 0;
+  let escaped = false;
+  let spanIndex = 0;
+  let index = 0;
+  while (index < end) {
+    while ((code[spanIndex]?.[1] ?? Infinity) <= index) spanIndex++;
+    const span = code[spanIndex];
+    if (span && span[0] <= index) {
+      const stop = Math.min(span[1], end);
+      for (; index < stop; index++) depth[index] = level;
+      escaped = false;
+      continue;
+    }
+    depth[index] = level;
+    const char = text[index];
+    if (char === '\\') escaped = !escaped;
+    else if (escaped) escaped = false;
+    else if (char === open) highest = Math.max(highest, ++level);
+    else if (char === close) lowest = Math.min(lowest, --level);
+    index++;
+  }
+  depth[end] = level;
+
+  // From the end back, the index last seen at a level is the first one after `j` at that level.
+  // `next[j]` replaces `depth[j]` in place: the indexes still to do are all before `j`.
+  const next = depth;
+  const offset = 1 - lowest;
+  const seen = new Int32Array(highest + offset + 1).fill(-1);
+  for (let j = end; j >= 0; j--) {
+    const at = (depth[j] ?? 0) + offset;
+    next[j] = seen[at - 1] ?? -1;
+    seen[at] = j;
+  }
+  return next;
+}
+
+/**
  * Finds `[key:: value]` / `(key:: value)` candidates the way Dataview does: the first `::` after
  * the bracket separates the key (which may not contain brackets), and the value runs to the
  * matching closing bracket, respecting nesting and backslash escapes. Brackets that are escaped or
  * inside inline code never open a field.
+ *
+ * Linear in the line's length (D-146): the code spans are walked with a pointer that only moves
+ * forward, and `readCandidate` does a bounded amount of work for each bracket.
  */
 function findCandidates(text: string, end: number, code: readonly Range[]): Candidate[] {
+  const scan = startScan(text, end, code);
   const candidates: Candidate[] = [];
+  let spanIndex = 0;
   let index = 0;
   while (index < end) {
     const char = text[index];
@@ -129,13 +264,14 @@ function findCandidates(text: string, end: number, code: readonly Range[]): Cand
       index += 2;
       continue;
     }
-    const span = rangeContaining(index, code);
-    if (span) {
+    while ((code[spanIndex]?.[1] ?? Infinity) <= index) spanIndex++;
+    const span = code[spanIndex];
+    if (span && span[0] <= index) {
       index = span[1];
       continue;
     }
     if (char === '[' || char === '(') {
-      const candidate = readCandidate(text, index, end, code);
+      const candidate = readCandidate(scan, index);
       if (candidate) {
         candidates.push(candidate);
         index = candidate.end;
@@ -147,54 +283,67 @@ function findCandidates(text: string, end: number, code: readonly Range[]): Cand
   return candidates;
 }
 
-function readCandidate(
-  text: string,
-  start: number,
-  end: number,
-  code: readonly Range[],
-): Candidate | null {
+/**
+ * Reads the candidate a bracket at `start` opens (one that isn't escaped or in a code span). Apart
+ * from text no later bracket reads again, its work is bounded (D-146): the key is read only when
+ * it holds no bracket (then the next bracket comes after its `::`), a run of backslashes at the
+ * start of the value is this value's alone, and where the value ends comes from `closings`.
+ */
+function readCandidate(scan: Scan, start: number): Candidate | null {
+  const { text, end, code } = scan;
   const open = text[start];
   const close = open === '[' ? ']' : ')';
-  const separator = text.indexOf('::', start + 1);
+  const separator = separatorAfter(scan, start + 1);
   if (separator < 0 || separator >= end) return null;
+  if (bracketAfter(scan, start + 1) < separator) return null;
   const key = text.slice(start + 1, separator).trim();
-  if (key === '' || /[[\]()]/.test(key)) return null;
-  if (code.some(([codeStart]) => codeStart > start && codeStart <= separator + 1)) return null;
+  if (key === '') return null;
+  if ((code[firstSpanAfter(code, start)]?.[0] ?? Infinity) <= separator + 1) return null;
 
+  // The value is read character by character only until the read stops escaping: after its
+  // first character that isn't a backslash, or at a code span. From there on, its read and the
+  // line-wide one in `closings` see the same levels.
   let nesting = 0;
   let escaped = false;
-  for (let index = separator + 2; index < end; index++) {
-    const span = rangeContaining(index, code);
+  let index = separator + 2;
+  let closeAt = -1;
+  while (index < end) {
+    const span = spanAt(code, index);
     if (span) {
-      index = span[1] - 1;
-      escaped = false;
-      continue;
+      index = span[1];
+      break;
     }
     const char = text[index];
+    index++;
     if (char === '\\') {
       escaped = !escaped;
       continue;
     }
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === open) nesting++;
-    else if (char === close) {
-      if (nesting === 0) {
-        const rawValue = text.slice(separator + 2, index);
-        return {
-          start,
-          end: index + 1,
-          key,
-          value: rawValue.trim(),
-          spaced: /^[ \t]/.test(rawValue),
-        };
-      }
-      nesting--;
-    }
+    if (escaped) break;
+    if (char === open) nesting = 1;
+    else if (char === close) closeAt = index - 1;
+    break;
   }
-  return null;
+  if (closeAt < 0) {
+    if (index >= end) return null;
+    const next =
+      open === '['
+        ? (scan.square ??= closings(scan, '[', ']'))
+        : (scan.round ??= closings(scan, '(', ')'));
+    let after = index;
+    for (let level = 0; level <= nesting && after >= 0; level++) after = next[after] ?? -1;
+    if (after < 0) return null;
+    closeAt = after - 1;
+  }
+
+  const rawValue = text.slice(separator + 2, closeAt);
+  return {
+    start,
+    end: closeAt + 1,
+    key,
+    value: rawValue.trim(),
+    spaced: /^[ \t]/.test(rawValue),
+  };
 }
 
 type Classified = Candidate & { readonly kind: 'flint' | 'unknown' | 'text' };
@@ -220,6 +369,10 @@ function isWhitespace(text: string): boolean {
   return /^[ \t]*$/.test(text);
 }
 
+function isSpaceOrTab(char: string | undefined): boolean {
+  return char === ' ' || char === '\t';
+}
+
 /** Appends a piece of title text, collapsing the gap a removed field leaves behind. */
 function appendPiece(title: string, piece: string): string {
   if (piece === '') return title;
@@ -229,6 +382,18 @@ function appendPiece(title: string, piece: string): string {
   if (titleEndsWithSpace && pieceStartsWithSpace) return title + piece.replace(/^[ \t]+/, '');
   if (!titleEndsWithSpace && !pieceStartsWithSpace) return `${title} ${piece}`;
   return title + piece;
+}
+
+/**
+ * Removes spaces and tabs at both ends. `replace(/^[ \t]+|[ \t]+$/g, '')` did the same in time
+ * quadratic in a long run of spaces inside the text (D-146).
+ */
+function trimSpacesAndTabs(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && isSpaceOrTab(text[start])) start++;
+  while (end > start && isSpaceOrTab(text[end - 1])) end--;
+  return text.slice(start, end);
 }
 
 function buildField<T>(candidate: Candidate, value: T): FieldValue<T> {
@@ -278,8 +443,7 @@ export function parseTaskContent(text: string): TaskContent {
     title = appendPiece(title, text.slice(position, candidate.start));
     position = candidate.end;
   }
-  title = appendPiece(title, text.slice(position, end));
-  title = title.replace(/^[ \t]+|[ \t]+$/g, '');
+  title = trimSpacesAndTabs(appendPiece(title, text.slice(position, end)));
 
   const fields: {
     reminder?: FieldValue<ParsedLocalDateTime>;
@@ -403,12 +567,15 @@ function readsBackAs(text: string, title: string, content: TaskContent): boolean
   );
 }
 
+/** Puts a backslash before the character at each index, in one pass over the text (D-146). */
 function insertBackslashes(text: string, indexes: readonly number[]): string {
-  let escaped = text;
-  for (const index of [...indexes].sort((a, b) => b - a)) {
-    escaped = `${escaped.slice(0, index)}\\${escaped.slice(index)}`;
+  let escaped = '';
+  let position = 0;
+  for (const index of [...indexes].sort((a, b) => a - b)) {
+    escaped += `${text.slice(position, index)}\\`;
+    position = index;
   }
-  return escaped;
+  return escaped + text.slice(position);
 }
 
 /** Escapes the opening bracket of field-like text in a title (Markdown renders `\[` as `[`). */
@@ -445,19 +612,23 @@ function escapeFieldOpenersFully(title: string, flintOnly: boolean): string {
 function escapeEverything(title: string): string {
   const code = codeSpanRanges(title);
   const indexes: number[] = [];
+  // A bracket has `::` after it when the last `::` starts after it (D-146: not a search each).
+  const lastSeparator = title.lastIndexOf('::');
+  let spanIndex = 0;
   for (let index = 0; index < title.length; index++) {
     const char = title[index];
     if (char === '\\') {
       index++;
       continue;
     }
-    const span = rangeContaining(index, code);
-    if (span) {
+    while ((code[spanIndex]?.[1] ?? Infinity) <= index) spanIndex++;
+    const span = code[spanIndex];
+    if (span && span[0] <= index) {
       index = span[1] - 1;
       continue;
     }
     if (char === '`') indexes.push(index);
-    else if ((char === '[' || char === '(') && title.includes('::', index + 1)) indexes.push(index);
+    else if ((char === '[' || char === '(') && lastSeparator > index) indexes.push(index);
   }
   const block = BLOCK_ID.exec(title);
   if (block && !rangeContaining(block.index, code))
