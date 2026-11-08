@@ -1052,4 +1052,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | The logo at the top of the README; the social preview | — · Done (upload by Davit) | D-139 |
 | 4 | 1.0.0 on GitHub Releases with latest.yml; installed copies update themselves | APP-06 · Done (1.0.0) | D-136, D-139 |
 | 5 | Versions after 1.0.0: 1.0.x fixes, 1.x.0 features | — · Proposed | D-139 |
-
+| 6 | Restart to update hides Flint at once and says it reopens in about a minute (no frozen window) | APP-06 · Done (1.0.1) | 02, D-140 |

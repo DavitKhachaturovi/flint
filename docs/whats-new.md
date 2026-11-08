@@ -2,6 +2,10 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.0.1 (8 Nov 2026)
+
+- **Smoother updates:** after Restart now, Flint steps out of the way at once and a notification tells you it reopens by itself in about a minute.
+
 ## 1.0.0 (8 Nov 2026)
 
 - **Flint 1.0:** the first public release. Flint is open source now, at github.com/DavitKhachaturovi/flint.

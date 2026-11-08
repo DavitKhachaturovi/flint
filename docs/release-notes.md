@@ -2,6 +2,11 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.0.1 (8 Nov 2026)
+
+- **Restart to update (D-140):** Flint now hides at once and shows a notification that it is updating and reopens by itself in about a minute, instead of a window that stops responding. The minute is Windows checking the new, not yet signed, version the first time it starts.
+- The release workflow creates the release before uploading its files, so every file lands in the one release.
+
 ## 1.0.0 (8 Nov 2026)
 
 - **The first release on GitHub Releases (D-139):** Flint is open source (MIT) at github.com/DavitKhachaturovi/flint, its history rewritten once and verified before it was published (D-135). The installer, `Flint-Setup-1.0.0.exe`, comes with `latest.yml`, so installed copies (0.9.1 and later) update themselves.

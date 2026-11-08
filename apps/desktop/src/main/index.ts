@@ -1826,8 +1826,18 @@ async function start(): Promise<void> {
         now: () => Date.now(),
         log,
         changed: sendUpdates,
-        beforeInstall: () => {
+        beforeInstall: (version) => {
           quitting = true;
+          // D-140: nothing frozen on screen: the windows go at once, and Windows' first check of
+          // the new installer and Flint (half a minute each, unsigned) happens out of sight.
+          if (!mainWindow.isDestroyed()) mainWindow.hide();
+          if (mini.visible()) mini.hide();
+          if (!popup.window.isDestroyed()) popup.window.hide();
+          const body = `Flint reopens by itself in about a minute (Windows checks the new version the first time it runs).`;
+          if (updateHooks) updateHooks.toasts.push(`Updating Flint to ${version} | ${body}`);
+          else if (Notification.isSupported())
+            new Notification({ title: `Updating Flint to ${version}`, body, silent: true }).show();
+          log(`update notice shown: Updating Flint to ${version}, the windows hidden`);
         },
       });
       sendUpdates(updates.view());

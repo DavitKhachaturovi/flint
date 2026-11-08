@@ -98,6 +98,11 @@ export function testUpdater(quit: () => void): { updater: UpdaterLike; record: T
 
 /** The first check waits this long after start, off the startup path (Q2 of M9). */
 export const FIRST_CHECK_MS = 30_000;
+/**
+ * D-140: Restart now hides Flint first, then starts the installer this long after: starting it
+ * blocks Flint while Windows checks the new installer (24 s measured), and nothing frozen may show.
+ */
+export const RESTART_DELAY_MS = 200;
 /** Then one check every this long while Flint runs. */
 export const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
 
@@ -110,8 +115,11 @@ export interface UpdateServiceOptions {
   readonly log: (line: string) => void;
   /** Every change of the view (to the main window and the tray). */
   readonly changed: (view: UpdateView) => void;
-  /** Before quitAndInstall: lets the app's quit go through (windows hide on close otherwise). */
-  readonly beforeInstall: () => void;
+  /**
+   * Before quitAndInstall: lets the app's quit go through (windows hide on close otherwise), and
+   * (D-140) hides every window and says Flint is updating, before the installer starts.
+   */
+  readonly beforeInstall: (version: string) => void;
   readonly setTimer?: (run: () => void, ms: number) => unknown;
   readonly clearTimer?: (timer: unknown) => void;
 }
@@ -224,9 +232,10 @@ export class UpdateService {
   restart(): void {
     const updater = this.options.updater;
     if (!updater || this.state.phase !== 'ready') return;
-    this.options.log(`restarting to install ${this.state.version ?? 'the update'}`);
-    this.options.beforeInstall();
-    updater.quitAndInstall(true, true);
+    const version = this.state.version ?? 'the update';
+    this.options.log(`restarting to install ${version}`);
+    this.options.beforeInstall(version);
+    this.setTimer(() => updater.quitAndInstall(true, true), RESTART_DELAY_MS);
   }
 
   /** The toast was shown, or "Later" pressed: it isn't shown again this session. */

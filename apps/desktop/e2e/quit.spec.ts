@@ -174,6 +174,8 @@ test('Restart to update quits cleanly with a draft in the popup (APP-06, CAP-08,
   expect(await exitsWithin(10_000), 'Flint exits').toBe(true);
   const log = await readFile(join(dataDirectory, 'logs', 'flint.log'), 'utf8');
   expect(log).toContain('restarting to install 9.9.9');
+  // D-140: Flint hid and said so before the installer started.
+  expect(log).toContain('update notice shown: Updating Flint to 9.9.9, the windows hidden');
   expect(log).not.toContain('main process error');
   const drafts = await readFile(join(dataDirectory, 'appdata', 'drafts.json'), 'utf8');
   expect(drafts).toContain('call the bank about the card');

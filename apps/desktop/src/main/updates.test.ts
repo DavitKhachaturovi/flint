@@ -8,6 +8,7 @@ import {
 import {
   CHECK_EVERY_MS,
   FIRST_CHECK_MS,
+  RESTART_DELAY_MS,
   UpdateService,
   isUpdateRequest,
   type UpdaterLike,
@@ -162,7 +163,7 @@ describe('UpdateService (APP-06, D-136)', () => {
   });
 
   it('downloads in the background, then is ready; Restart now installs silently and starts again', async () => {
-    const { updates, updater, views, beforeInstall } = service();
+    const { updates, updater, views, beforeInstall, time } = service();
     updater!.next = () => updater!.emit('update-available', { version: '1.0.1' });
     await updates.check();
     expect(updates.view()).toMatchObject({ phase: 'downloading', version: '1.0.1', percent: 0 });
@@ -175,7 +176,10 @@ describe('UpdateService (APP-06, D-136)', () => {
     await updates.check();
     expect(updater!.checks).toBe(1);
     updates.restart();
-    expect(beforeInstall).toHaveBeenCalledOnce();
+    // D-140: Flint hides and says so first; the installer starts a moment later.
+    expect(beforeInstall).toHaveBeenCalledExactlyOnceWith('1.0.1');
+    expect(updater!.installed).toEqual([]);
+    await time.tick(RESTART_DELAY_MS);
     expect(updater!.installed).toEqual([[true, true]]);
   });
 
