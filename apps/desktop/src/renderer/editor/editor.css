@@ -178,34 +178,13 @@
   vertical-align: middle;
 }
 
-.cm-fl-checkbox {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
+/* D-141 Q8: the note's checkbox is the task row's shared one (`.check` in ui/app.css) in its
+   compact size (`.fl-compact`, 17 px), its tick centred by flex; this holder only places it. */
+.cm-fl-task-box {
+  display: inline-flex;
   margin-right: 8px;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
-  vertical-align: -3px;
+  vertical-align: middle;
   cursor: pointer;
-  transition:
-    background-color var(--fl-dur-fast),
-    box-shadow var(--fl-dur-fast);
-}
-
-.cm-fl-checkbox.on {
-  background: var(--fl-accent);
-  box-shadow: none;
-}
-
-.cm-fl-checkbox.on::after {
-  content: '';
-  display: block;
-  width: 4px;
-  height: 8px;
-  margin: 2px 0 0 5.5px;
-  border: solid var(--fl-ground-window);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
 }
 
 .cm-fl-done {

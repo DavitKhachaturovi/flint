@@ -43,6 +43,7 @@ import { findInNote } from './find.js';
 import { blockMarkers, buildPreview } from './preview.js';
 import { nestItems, renumberAfterEdits } from './lists.js';
 import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
+import { checkSvg } from '../ui/check.js';
 import { NOTE_SYNTAX } from './syntax.js';
 
 /**
@@ -139,11 +140,16 @@ class CheckboxWidget extends WidgetType {
     return other.checked === this.checked;
   }
   toDOM(): HTMLElement {
+    // D-141 Q8: the task row's shared checkbox in its compact size, the same tick.
+    const holder = document.createElement('span');
+    holder.className = 'fl-compact cm-fl-task-box';
     const box = document.createElement('span');
-    box.className = this.checked ? 'cm-fl-checkbox on' : 'cm-fl-checkbox';
+    box.className = this.checked ? 'check on' : 'check';
     box.setAttribute('role', 'checkbox');
     box.setAttribute('aria-checked', String(this.checked));
-    return box;
+    if (this.checked) box.append(checkSvg(10));
+    holder.append(box);
+    return holder;
   }
   override ignoreEvent(): boolean {
     return false;
@@ -340,15 +346,16 @@ const previewClicks = EditorView.domEventHandlers({
       openInViewer(view, image);
       return true;
     }
-    const box = target.closest('.cm-fl-checkbox');
+    const box = target.closest('.cm-fl-task-box');
     if (box && view.state.facet(EditorState.readOnly) === false) {
       event.preventDefault();
       const at = view.posAtDOM(box);
       const marker = view.state.doc.sliceString(at, at + 3);
-      if (/^\[[ xX]\]$/.test(marker))
-        view.dispatch({
-          changes: { from: at + 1, to: at + 2, insert: marker[1] === ' ' ? 'x' : ' ' },
-        });
+      if (/^\[[ xX]\]$/.test(marker)) {
+        const ticking = marker[1] === ' ';
+        view.dispatch({ changes: { from: at + 1, to: at + 2, insert: ticking ? 'x' : ' ' } });
+        tickMotion(view, at, ticking);
+      }
       return true;
     }
     return false;
@@ -577,6 +584,28 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       return true;
     },
   });
+}
+
+/** D-141 Q8, D-89: ticking pops the box (as a task row's) and fades the line's text to muted;
+ * unticking brings the text back. Off with reduce-motion. */
+function tickMotion(view: EditorView, at: number, ticking: boolean): void {
+  if (reducedMotion()) return;
+  const line = lineElement(view, at);
+  if (!line) return;
+  if (ticking)
+    line
+      .querySelector('.cm-fl-task-box .check')
+      ?.animate([{ scale: '1' }, { scale: '1.15' }, { scale: '1' }], {
+        duration: 180,
+        easing: 'cubic-bezier(.2, .9, .3, 1.5)',
+      });
+  const timing = { duration: durationMs('--fl-dur-state', 260), easing: 'ease-out' };
+  const body = 'var(--fl-text-body)';
+  const muted = 'var(--fl-text-muted)';
+  if (ticking)
+    for (const done of line.querySelectorAll('.cm-fl-done'))
+      done.animate([{ color: body }, { color: muted }], timing);
+  else line.animate([{ color: muted }, { color: body }], timing);
 }
 
 /** The `.cm-line` element showing a position. */

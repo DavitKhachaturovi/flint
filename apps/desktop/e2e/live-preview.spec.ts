@@ -118,9 +118,9 @@ test('block markers stay drawn beside the caret; ← steps into one, → back ou
   // A task's checkbox and a heading's marks likewise.
   await caretAtEnd('A task');
   await left('A task'.length);
-  await expect(line('A task').locator('.cm-fl-checkbox')).toHaveCount(1);
+  await expect(line('A task').locator('.cm-fl-task-box')).toHaveCount(1);
   await main.keyboard.press('ArrowLeft');
-  await expect(line('A task').locator('.cm-fl-checkbox')).toHaveCount(0);
+  await expect(line('A task').locator('.cm-fl-task-box')).toHaveCount(0);
   await expect(line('A task')).toContainText('[ ]');
   await caretAtEnd('Heading');
   await left('Heading'.length);
@@ -203,6 +203,35 @@ test('Tab nests a numbered item at its parent’s text column, Shift+Tab takes i
     .toContain('\n1. One\n2. Two\n');
 });
 
+test("the checkbox is the task row's in its compact size, its tick centred; a click ticks it (D-141 Q8)", async () => {
+  await line('First item').click();
+  const box = line('A task').locator('.cm-fl-task-box .check');
+  const size = await box.boundingBox();
+  expect(Math.round(size?.width ?? 0)).toBe(17);
+  expect(Math.round(size?.height ?? 0)).toBe(17);
+  await box.click();
+  await expect
+    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
+    .toContain('\n- [x] A task\n');
+  await expect(box).toHaveClass(/\bon\b/);
+  // The tick sits in the box's centre (by geometry, not margins).
+  const outer = await box.boundingBox();
+  const tick = await box.locator('svg').boundingBox();
+  expect(outer && tick).toBeTruthy();
+  if (outer && tick) {
+    expect(Math.abs(outer.x + outer.width / 2 - (tick.x + tick.width / 2))).toBeLessThanOrEqual(
+      0.5,
+    );
+    expect(Math.abs(outer.y + outer.height / 2 - (tick.y + tick.height / 2))).toBeLessThanOrEqual(
+      0.5,
+    );
+  }
+  await box.click();
+  await expect
+    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
+    .toContain('\n- [ ] A task\n');
+});
+
 test('a click puts the caret after a bullet, and a selection reveals nothing (D-141 Q3)', async () => {
   // A click on the bullet: the caret goes after it, so the bullet stays drawn.
   await line('First item').locator('.cm-fl-bullet').click();
@@ -215,7 +244,7 @@ test('a click puts the caret after a bullet, and a selection reveals nothing (D-
   // Everything selected: every marker stays drawn.
   await main.keyboard.press('Control+a');
   await expect(editor().locator('.cm-fl-bullet')).toHaveCount(1);
-  await expect(editor().locator('.cm-fl-checkbox')).toHaveCount(1);
+  await expect(editor().locator('.cm-fl-task-box')).toHaveCount(1);
   await expect(line('Heading')).toHaveText('Heading');
   await expect(editor()).not.toContainText('![picture]');
 });

@@ -153,7 +153,7 @@ async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
   );
   await writeFile(
     join(flint, 'Plans.md'),
-    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n1. Pack\n2. Travel\n',
+    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n1. Pack\n2. Travel\n\n- [ ] Book the hotel\n',
   );
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(
@@ -374,6 +374,14 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await main.locator('.main .note-card .cm-line', { hasText: 'Pack' }).click();
   await step(main, 'A note: Tab on a list’s first item (a nudge)', 'motion', () =>
     main.keyboard.press('Tab'),
+  );
+  // D-141 Q8: the note's checkbox pops as a task row's, the text fades to muted and back.
+  const hotel = main.locator('.main .note-card .cm-line', { hasText: 'Book the hotel' });
+  await step(main, 'A note: a checkbox ticks (pop, the text fades)', 'motion', () =>
+    hotel.locator('.cm-fl-task-box .check').click(),
+  );
+  await step(main, 'A note: it unticks (the text comes back)', 'motion', () =>
+    hotel.locator('.cm-fl-task-box .check').click(),
   );
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),

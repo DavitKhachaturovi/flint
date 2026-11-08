@@ -1061,7 +1061,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | Rebuild Flint's live-preview layer on the syntax tree (no live-preview library; ProseMirror, Milkdown, Tiptap ruled out) | NOTE-01 · Decided (1.1.0) | D-141 |
 | 2 | Block markers and embedded objects show raw only with the caret strictly inside; inline formatting inside or at its edge; ← / → step in; clicks and selections never reveal | NOTE-01 · Built (1.1.0 step 2) | 02, 03 §3, D-141 |
 | 3 | Numbered markers always in the gray mono look | NOTE-01 · Built (1.1.0 step 2) | D-141 |
-| 4 | The checkbox's tick centred: the shared task-row checkbox in its compact size (17 px), the same tick, hover, press and check-pop | NOTE-01 · Decided (1.1.0) | D-141 |
+| 4 | The checkbox's tick centred: the shared task-row checkbox in its compact size (17 px), the same tick, hover, press and check-pop | NOTE-01 · Built (1.1.0 step 4) | D-141 |
 | 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Built (1.1.0 step 2) | 02, D-141 |
 | 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; Ctrl+Shift+E | NOTE-09 · Decided (1.1.0) | 02, 03 §3, D-141 |
 | 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |

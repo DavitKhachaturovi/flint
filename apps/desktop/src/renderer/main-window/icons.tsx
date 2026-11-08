@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { CHECK_PATH, CHECK_STROKE } from '../ui/check.js';
 
 /** Icons from mockup 01 (Lucide-style strokes); no emoji anywhere (docs/09 §8). */
 
@@ -86,7 +87,7 @@ export const CloseIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M6 6l12 12M18 6 6 18" />);
 
 export const CheckIcon = ({ size = 12 }: IconProps): ReactElement =>
-  svg(size, <path d="m5 12.5 4.5 4.5L19 7.5" />, 2.6);
+  svg(size, <path d={CHECK_PATH} />, CHECK_STROKE);
 
 export const ChevronIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="m9 6 6 6-6 6" />);
