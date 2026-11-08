@@ -55,6 +55,8 @@ const ENDING = `---\nflint: 1\nid: ending\nmode: note\n---\nIntro.\n\n${INSERTED
 const TAIL = `---\nflint: 1\nid: tail\nmode: note\n---\nFirst line here.\n\nSecond line.\n\n| a | b |\n| - | - |\n| c | d |`;
 /** D-144: a table right above a heading (no blank line between). */
 const HEADING = `---\nflint: 1\nid: heading\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |\n# Heading\n`;
+/** D-144: a read-only note (a newer format) that ends with a table, no line break after it. */
+const NEWER = `---\nflint: 2\nid: newer\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |`;
 /** D-144: a table with a short row (only its first cell). */
 const SHORT = `---\nflint: 1\nid: short\nmode: note\n---\nShort.\n\n| a | b | c |\n| - | - | - |\n| 1 |\n| 2 | 3 | 4 |\n\nEnd.\n`;
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
@@ -106,6 +108,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Tail.md'), TAIL);
   await writeFile(join(flint, 'Short.md'), SHORT);
   await writeFile(join(flint, 'Heading.md'), HEADING);
+  await writeFile(join(flint, 'Newer.md'), NEWER);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -1127,4 +1130,35 @@ test('the Undo toast goes with its note’s editor: another note opened (D-144)'
   await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
   await openGrid();
   await expect(cell(1, 0)).toHaveText('a1');
+});
+
+test('a click under a read-only note’s table never changes its text: no line is made (D-144)', async () => {
+  const read = (): Promise<string> => readFile(join(flint, 'Newer.md'), 'utf8');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Newer' }).first().click();
+  await expect(cell(1, 1)).toHaveText('d');
+  await expect(main.locator('.note-editor .cm-content').first()).toHaveAttribute(
+    'aria-readonly',
+    'true',
+  );
+  const under = main.locator('.note-editor .cm-fl-table-wrap ~ .cm-line');
+  await expect(under).toHaveCount(0);
+  // A line would be made in the same press: two frames later it would be drawn.
+  const frames = (): Promise<void> =>
+    main.evaluate(
+      () =>
+        new Promise<void>((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => done())),
+        ),
+    );
+  const edges = await table().boundingBox();
+  if (!edges) throw new Error('no table');
+  await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
+  await frames();
+  expect(await under.count()).toBe(0);
+  // Esc from a cell, the other way out that makes a line at the note's end: none either.
+  await cell(1, 1).click();
+  await main.keyboard.press('Escape');
+  await frames();
+  expect(await under.count()).toBe(0);
+  expect(await read()).toBe(NEWER);
 });

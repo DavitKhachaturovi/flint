@@ -1120,7 +1120,7 @@ function goTo(
  * Below, the caret goes after that line's quote marks and indentation (a table in a quote: the
  * text stays in the quote); where the line under the table isn't empty (a heading right under it)
  * or there is none and `make` is set, an empty line is made for it, in a quote the quote's `>`
- * (D-144, Proposed).
+ * (D-144, Proposed). A read-only note is never written: the caret only moves.
  */
 function leave(
   view: EditorView,
@@ -1140,6 +1140,7 @@ function leave(
     return true;
   }
   const next = table.to < doc.length ? doc.lineAt(table.to + 1) : null;
+  const indent = table.rows[table.rows.length - 1]?.indent ?? '';
   const prefix = next ? containerPrefix(next.text) : '';
   if (next && next.text.slice(prefix.length).trim() === '') {
     view.dispatch({
@@ -1150,7 +1151,13 @@ function leave(
     return true;
   }
   if (!next && !make) return false;
-  const blank = `\n${(table.rows[table.rows.length - 1]?.indent ?? '').trimEnd()}`;
+  if (view.state.readOnly) {
+    // Read-only (a newer format, or another window editing it, D-109): nothing is written. The
+    // caret goes to the line under the table as it is; at the note's end it stays where it was.
+    if (next) view.dispatch({ selection: { anchor: next.from }, scrollIntoView: true });
+    return true;
+  }
+  const blank = `\n${indent.trimEnd()}`;
   view.dispatch({
     changes: { from: table.to, insert: blank },
     selection: { anchor: table.to + blank.length },
