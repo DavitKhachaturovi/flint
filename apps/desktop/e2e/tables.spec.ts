@@ -72,6 +72,11 @@ const editor = (): Locator => main.locator('.note-editor .cm-content').first();
 const table = (): Locator => main.locator('.note-editor .cm-fl-table');
 const cell = (row: number, column: number): Locator =>
   table().locator(`[data-row="${row}"][data-column="${column}"]`);
+/** A click into a cell; its editor takes the keys a moment later, so wait for that before typing. */
+const editCell = async (row: number, column: number): Promise<void> => {
+  await cell(row, column).click();
+  await expect(cell(row, column).locator('.cm-content')).toBeFocused();
+};
 const file = (): Promise<string> => readFile(join(flint, 'Tables.md'), 'utf8');
 const line = (text: string): Locator => editor().locator('.cm-line', { hasText: text }).first();
 
@@ -174,7 +179,7 @@ test('a click edits a cell in place; only its bytes are written; Ctrl+Z undoes (
 });
 
 test('Tab goes to the next cell and, in the last one, adds a row in the table’s style (Q9)', async () => {
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('Tab');
   await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-active/);
   await main.keyboard.press('Tab');
@@ -200,7 +205,7 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await expect(cell(0, 0)).toHaveClass(/cm-fl-cell-active/);
   await main.keyboard.press('ArrowUp');
   await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
-  await cell(1, 1).click();
+  await editCell(1, 1);
   await main.keyboard.press('Escape');
   await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
   await main.keyboard.type('x');
@@ -242,7 +247,7 @@ test("the table's right-click menu: rows, a delete with Undo, Align table, Edit 
 });
 
 test("the palette has the table's commands while the caret is in a table (D-106, Q11)", async () => {
-  await cell(1, 1).click();
+  await editCell(1, 1);
   await main.keyboard.press('Control+k');
   await main.keyboard.type('Add column right');
   await expect(main.locator('.palette-item.on')).toContainText('Add column right');
@@ -250,7 +255,7 @@ test("the palette has the table's commands while the caret is in a table (D-106,
   await expect
     .poll(file)
     .toContain('| Name    | Age |  |\n| ------- | --: | --- |\n| Alex    | 30  |  |');
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
 });
@@ -294,7 +299,7 @@ test('dragging the edges adds and removes columns and rows; text asks first, in 
   await expect.poll(file).toContain('| Name    |\n| ------- |\n| Alex    |');
   await expect(warning).toHaveCount(0);
   await expect(going).toHaveCount(0);
-  await cell(0, 0).click();
+  await editCell(0, 0);
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
   // The bottom edge: a row added, then taken away again without asking (it is empty).
@@ -741,7 +746,7 @@ test('a drag across cells selects a rectangle; a click or Esc clears it (D-144)'
 
 test('Shift+arrows select cells from the text’s edge on; a plain arrow clears them (D-144)', async () => {
   await openGrid();
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('End');
   // Inside the text first: Shift+← selects a character, no cells.
   await main.keyboard.press('Shift+ArrowLeft');
@@ -869,7 +874,7 @@ test('the Undo toast goes once the note is edited again; its Undo gives the note
 test('Delete or a paste right after typing is its own undo step: the typing stays (D-144)', async () => {
   await openGrid();
   // Typed, then at once (well within history's 500 ms) b1 selected and cleared.
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('End');
   await main.keyboard.type('x');
   await main.keyboard.press('Shift+ArrowRight');
@@ -880,7 +885,7 @@ test('Delete or a paste right after typing is its own undo step: the typing stay
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
   // Typed, then a block pasted at once: Ctrl+Z takes back the paste only.
-  await cell(2, 0).click();
+  await editCell(2, 0);
   await main.keyboard.press('End');
   await main.keyboard.type('y');
   await clipboard(activeCell(), 'paste', { 'text/plain': 'p\tq' });
@@ -894,7 +899,7 @@ test('Delete or a paste right after typing is its own undo step: the typing stay
 test('Shift+↑ in the header and Shift+↓ in the last row select the cell’s text (D-144)', async () => {
   await openGrid();
   // No row above the header, none below the last: the keys select text, no cells.
-  await cell(0, 0).click();
+  await editCell(0, 0);
   await main.keyboard.press('End');
   await main.keyboard.press('Shift+ArrowUp');
   await expect(selected()).toHaveCount(0);
@@ -902,7 +907,7 @@ test('Shift+↑ in the header and Shift+↓ in the last row select the cell’s 
   await expect.poll(grid).toBe(GRID_NOTE.replace('| A  |', '| Z  |'));
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
-  await cell(2, 1).click();
+  await editCell(2, 1);
   await main.keyboard.press('Home');
   await main.keyboard.press('Shift+ArrowDown');
   await expect(selected()).toHaveCount(0);
@@ -969,7 +974,7 @@ test('pasting tab-separated text fills cells from the active one, growing the ta
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
   // Text without a tab or a line break goes into the cell, as before.
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('End');
   await clipboard(activeCell(), 'paste', { 'text/plain': 'Q' });
   await expect.poll(grid).toBe(GRID_NOTE.replace('| a1 |', '| a1Q |'));
@@ -993,7 +998,7 @@ test('a table without edge pipes: Enter and Tab add a row that keeps its cells, 
   };
   // Enter on the last row: a new row, written with its edge pipes (an empty first and last cell
   // need them); the keys go into its first cell.
-  await cell(1, 0).click();
+  await editCell(1, 0);
   await main.keyboard.press('Enter');
   await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
   await main.keyboard.type('Zed');
@@ -1058,7 +1063,7 @@ test('a click under a table at the note’s end, in a quote or over a heading: t
         if (!edges) throw new Error('no table');
         await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
       } else {
-        await cell(1, 1).click();
+        await editCell(1, 1);
         await main.keyboard.press('ArrowDown');
       }
       await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
@@ -1158,7 +1163,8 @@ test('a click under a read-only note’s table never changes its text: no line i
   await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
   await frames();
   expect(await under.count()).toBe(0);
-  // Esc from a cell, the other way out that makes a line at the note's end: none either.
+  // Esc from a cell, the other way out that makes a line at the note's end: none either (a
+  // read-only note's cell has no editor to wait for).
   await cell(1, 1).click();
   await main.keyboard.press('Escape');
   await frames();
@@ -1176,7 +1182,7 @@ test('a click under a table, a line of spaces under it: the text starts that lin
       if (!edges) throw new Error('no table');
       await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
     } else {
-      await cell(1, 1).click();
+      await editCell(1, 1);
       await main.keyboard.press('ArrowDown');
     }
     await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
