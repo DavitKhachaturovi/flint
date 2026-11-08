@@ -12,6 +12,7 @@ import {
   Transaction,
   type Extension,
   type Range,
+  type Text,
 } from '@codemirror/state';
 import {
   Decoration,
@@ -29,15 +30,22 @@ import {
   addColumn,
   addRow,
   alignTable,
+  cellsMarkdown,
+  cellTexts,
+  clearCells,
   containerPrefix,
   deleteColumn,
   deleteRow,
   deleteTable,
   hasRowPipe,
   parseTable,
+  parseTsv,
   setCell,
+  setCells,
   tableAt,
   tablesIn,
+  toTsv,
+  type CellRect,
   type ParsedTable,
   type TableCell,
 } from './table.js';
@@ -73,7 +81,7 @@ export function cellAt(state: EditorState, at: number): CellAt | null {
 
 /** The position in the note for an offset into a cell's shown text (`\|` counts as one). */
 export function cellPosition(
-  state: EditorState,
+  state: { readonly doc: Text },
   cell: TableCell | undefined,
   row: number,
   table: ParsedTable,
@@ -135,6 +143,172 @@ const rawTable = StateField.define<number | null>({
   },
 });
 
+/** A cell's place in a table: its row (the header is 0) and column. */
+export interface CellPlace {
+  readonly row: number;
+  readonly column: number;
+}
+
+/**
+ * D-144: a rectangle of cells selected in a table: from its anchor, the active cell (which keeps
+ * the ring and the focus), to its head. `from` is the table's start.
+ */
+export interface CellRange {
+  readonly from: number;
+  readonly anchor: CellPlace;
+  readonly head: CellPlace;
+}
+
+/** Sets (or, with null, clears) the selected cells. */
+const setCellRange = StateEffect.define<CellRange | null>();
+
+/** A change made on the selected cells themselves (cleared, filled by a paste): they stay. */
+const onRange = Annotation.define<boolean>();
+
+const samePlace = (a: CellPlace, b: CellPlace): boolean => a.row === b.row && a.column === b.column;
+
+/** The rectangle a range covers. */
+export const rectOf = (range: CellRange): CellRect => ({
+  top: Math.min(range.anchor.row, range.head.row),
+  bottom: Math.max(range.anchor.row, range.head.row),
+  left: Math.min(range.anchor.column, range.head.column),
+  right: Math.max(range.anchor.column, range.head.column),
+});
+
+/**
+ * D-144: the selected cells. They last while the note's caret stays in the anchor cell and the
+ * note's text changes only through them (Delete, a paste): a click elsewhere, a key that moves the
+ * caret, typing or an undo clears them. A range of one cell is none.
+ */
+const cellRange = StateField.define<CellRange | null>({
+  create: () => null,
+  update(value, tr) {
+    let next = value;
+    let set = false;
+    for (const effect of tr.effects)
+      if (effect.is(setCellRange)) {
+        next = effect.value;
+        set = true;
+      }
+    if (!next) return null;
+    if (!set && tr.docChanged && !tr.annotation(onRange)) return null;
+    if (!set && !tr.docChanged && !tr.selection) return next;
+    const selection = tr.state.selection.main;
+    const here = selection.empty ? cellAt(tr.state, selection.head) : null;
+    const from = set ? next.from : tr.changes.mapPos(next.from, -1);
+    if (!here || here.table.from !== from || !samePlace(here, next.anchor)) return null;
+    const head = {
+      row: Math.max(0, Math.min(next.head.row, here.table.rows.length - 1)),
+      column: Math.max(0, Math.min(next.head.column, here.table.columns - 1)),
+    };
+    if (samePlace(head, next.anchor)) return null;
+    return { from, anchor: next.anchor, head };
+  },
+});
+
+/** The selected cells in a view, with their table as it is now. */
+function selectedCells(view: EditorView): { range: CellRange; table: ParsedTable } | null {
+  const range = view.state.field(cellRange, false) ?? null;
+  const table = range ? tableAt(view.state, range.from) : null;
+  return range && table && table.from === range.from ? { range, table } : null;
+}
+
+/** Selects the cells from the active one (`anchor`) to `head`; the same cell: none. */
+function selectCells(view: EditorView, from: number, anchor: CellPlace, head: CellPlace): void {
+  const now = view.state.field(cellRange, false) ?? null;
+  const next = samePlace(anchor, head) ? null : { from, anchor, head };
+  if (now === null && next === null) return;
+  if (
+    now &&
+    next &&
+    now.from === from &&
+    samePlace(now.anchor, anchor) &&
+    samePlace(now.head, head)
+  )
+    return;
+  view.dispatch({ effects: setCellRange.of(next) });
+}
+
+/** Clears the selection of cells (not their text); false if there was none. */
+function dropCells(view: EditorView): boolean {
+  if (!view.state.field(cellRange, false)) return false;
+  view.dispatch({ effects: setCellRange.of(null) });
+  return true;
+}
+
+/**
+ * D-144: Delete (and Backspace, Ctrl+X, the palette) on selected cells: their text cleared in one
+ * change (one undo step), at once, with an Undo toast as the table's other deletes (Q11). The
+ * cells stay selected. False if no cells are selected.
+ */
+export function clearSelectedCells(view: EditorView): boolean {
+  const selected = selectedCells(view);
+  if (!selected) return false;
+  const changes = clearCells(view.state, selected.table, rectOf(selected.range));
+  if (changes.length === 0) return true;
+  view.dispatch({ changes, userEvent: 'delete.table', annotations: onRange.of(true) });
+  announceUndo('Cells cleared', () => undo(view));
+  return true;
+}
+
+/**
+ * D-144 (Proposed): Ctrl+C on selected cells: tab-separated text as the plain text (Excel and
+ * Sheets paste it as cells; a Flint cell fills cells from it), and the same cells as a GFM table
+ * in `text/markdown` (a Flint note pastes it as a table). No `text/html`: Excel would take it
+ * over the plain text, with its own idea of the look. False if no cells are selected.
+ */
+function copySelectedCells(view: EditorView, data: DataTransfer): boolean {
+  const selected = selectedCells(view);
+  if (!selected) return false;
+  const cells = cellTexts(selected.table, rectOf(selected.range));
+  data.clearData();
+  data.setData('text/plain', toTsv(cells));
+  data.setData('text/markdown', cellsMarkdown(cells));
+  return true;
+}
+
+/**
+ * D-144: tab-separated text (rows by line breaks, cells by tabs) pasted into a cell fills the
+ * cells from there (from the selected cells' top left corner, if any), in one change; a block
+ * larger than the table grows it (Proposed). The filled cells are selected afterwards, the caret
+ * in the first. False for text that isn't a block (no tab, no line break): it goes into the cell.
+ */
+function pasteCells(view: EditorView, here: CellAt, text: string): boolean {
+  const grid = parseTsv(text);
+  if (!grid) return false;
+  const selected = selectedCells(view);
+  const rect = selected ? rectOf(selected.range) : null;
+  const start = rect
+    ? { row: rect.top, column: rect.left }
+    : { row: here.row, column: here.column };
+  const table = selected?.table ?? here.table;
+  const width = Math.max(...grid.map((cells) => cells.length));
+  const changes = setCells(view.state, table, start.row, start.column, grid, true);
+  const set = view.state.changes(changes);
+  const from = set.mapPos(table.from, -1);
+  const doc = set.apply(view.state.doc);
+  const after = parseTable(doc, from, set.mapPos(table.to, 1));
+  if (!after) return true;
+  if (after.rows.length > table.rows.length)
+    added = { from, axis: 'rows', first: table.rows.length, last: after.rows.length - 1 };
+  else if (after.columns > table.columns)
+    added = { from, axis: 'columns', first: table.columns, last: after.columns - 1 };
+  const head = {
+    row: Math.min(after.rows.length - 1, start.row + grid.length - 1),
+    column: Math.min(after.columns - 1, start.column + width - 1),
+  };
+  const cell = after.rows[start.row]?.cells[start.column];
+  view.dispatch({
+    changes: set,
+    selection: { anchor: cellPosition({ doc }, cell, start.row, after, 'end') },
+    effects: setCellRange.of(samePlace(start, head) ? null : { from, anchor: start, head }),
+    annotations: onRange.of(true),
+    userEvent: 'input.table',
+    scrollIntoView: true,
+  });
+  return true;
+}
+
 /** Changes made by the table itself (a cell's editor following the note), not by typing. */
 const fromNote = Annotation.define<boolean>();
 
@@ -146,15 +320,19 @@ class TableWidget extends WidgetType {
   readonly table: ParsedTable;
   readonly source: string;
   readonly active: { readonly row: number; readonly column: number; readonly caret: number } | null;
+  /** D-144: the selected cells, if any (the anchor is the active cell). */
+  readonly range: CellRect | null;
   constructor(
     table: ParsedTable,
     source: string,
     active: { row: number; column: number; caret: number } | null,
+    range: CellRect | null = null,
   ) {
     super();
     this.table = table;
     this.source = source;
     this.active = active;
+    this.range = range;
   }
   override eq(other: TableWidget): boolean {
     return (
@@ -162,7 +340,8 @@ class TableWidget extends WidgetType {
       other.table.from === this.table.from &&
       other.active?.row === this.active?.row &&
       other.active?.column === this.active?.column &&
-      other.active?.caret === this.active?.caret
+      other.active?.caret === this.active?.caret &&
+      JSON.stringify(other.range) === JSON.stringify(this.range)
     );
   }
   override get estimatedHeight(): number {
@@ -221,11 +400,21 @@ class TableWidget extends WidgetType {
     if (!target) return;
     const row = Number(target.dataset['row']);
     const column = Number(target.dataset['column']);
+    const live = tableAt(view.state, holder.from);
+    if (!live) return;
+    // D-144: Shift+click selects the cells from the active one to the one clicked.
+    if (event.shiftKey && holder.key) {
+      event.preventDefault();
+      const [anchorRow, anchorColumn] = holder.key.split(':').map(Number) as [number, number];
+      selectCells(view, live.from, { row: anchorRow, column: anchorColumn }, { row, column });
+      return;
+    }
+    // A plain press clears the selected cells; a drag from it across cells selects them.
+    dropCells(view);
+    dragCells(view, wrap, { row, column });
     if (holder.key === `${row}:${column}`) return;
     event.preventDefault();
     const point = { x: event.clientX, y: event.clientY };
-    const live = tableAt(view.state, holder.from);
-    if (!live) return;
     const cell = live.rows[row]?.cells[column];
     focusNextCell = true;
     pendingClick = point;
@@ -267,6 +456,26 @@ class TableWidget extends WidgetType {
       }
       holder.key = null;
     }
+    // D-144: the selected cells' soft fill (not the anchor's: it has the ring and the caret).
+    const range = this.range;
+    for (const [cellKey, element] of holder.cells) {
+      const [row, column] = cellKey.split(':').map(Number) as [number, number];
+      const inside =
+        range !== null &&
+        cellKey !== key &&
+        row >= range.top &&
+        row <= range.bottom &&
+        column >= range.left &&
+        column <= range.right;
+      element.classList.toggle('cm-fl-cell-selected', inside);
+    }
+    wrap.classList.toggle('cm-fl-table-ranged', range !== null);
+    // A range starting in a cell being edited: its text selection collapses to the caret.
+    if (range && holder.editor && holder.key === key && !holder.editor.state.selection.main.empty)
+      holder.editor.dispatch({
+        selection: { anchor: holder.editor.state.selection.main.head },
+        annotations: fromNote.of(true),
+      });
     for (const [cellKey, element] of holder.cells) {
       if (cellKey === key && holder.editor) continue;
       const [row, column] = cellKey.split(':').map(Number) as [number, number];
@@ -326,6 +535,40 @@ class TableWidget extends WidgetType {
 
 /** Where the last click on an inactive cell was: its editor puts the caret there. */
 let pendingClick: { x: number; y: number } | null = null;
+
+/**
+ * D-144: a press on a cell that moves, with the button held, onto other cells of the table selects
+ * the cells from the pressed one (the active cell) to the one under the pointer. Once it has left
+ * the pressed cell, the moves are the table's: no text selection is drawn in the cell's editor.
+ */
+function dragCells(view: EditorView, wrap: HTMLElement, start: CellPlace): void {
+  let ranging = false;
+  const move = (event: MouseEvent): void => {
+    if ((event.buttons & 1) === 0) {
+      done();
+      return;
+    }
+    const over =
+      event.target instanceof Element ? event.target.closest<HTMLElement>('[data-row]') : null;
+    const inTable = over !== null && wrap.contains(over);
+    const head = inTable
+      ? { row: Number(over.dataset['row']), column: Number(over.dataset['column']) }
+      : null;
+    if (!ranging && (!head || samePlace(head, start))) return;
+    ranging = true;
+    event.preventDefault();
+    event.stopPropagation();
+    const holder = holders.get(wrap);
+    if (!head || !holder) return;
+    selectCells(view, holder.from, start, head);
+  };
+  const done = (): void => {
+    window.removeEventListener('mousemove', move, true);
+    window.removeEventListener('mouseup', done, true);
+  };
+  window.addEventListener('mousemove', move, true);
+  window.addEventListener('mouseup', done, true);
+}
 
 interface Holder {
   from: number;
@@ -861,6 +1104,39 @@ function cellEditor(
     else if (row > 0) goTo(view, table, row - 1, table.columns - 1, 'end');
     return true;
   };
+  /**
+   * D-144: Shift+arrow extends the selected cells by one cell; with none selected, only from the
+   * cell's text edge that way (else it selects text in the cell, as before).
+   */
+  const extend =
+    (rows: number, columns: number) =>
+    (cell: EditorView): boolean => {
+      const here = activeOf(view, wrap);
+      if (!here) return false;
+      const range = view.state.field(cellRange, false) ?? null;
+      if (!range) {
+        const head = cell.state.selection.main.head;
+        const length = cell.state.doc.length;
+        const line = (at: number): number => cell.coordsAtPos(at)?.top ?? 0;
+        const edge =
+          columns < 0
+            ? head === 0
+            : columns > 0
+              ? head === length
+              : rows < 0
+                ? Math.abs(line(head) - line(0)) < 2
+                : Math.abs(line(head) - line(length)) < 2;
+        if (!edge) return false;
+      }
+      const anchor = range?.anchor ?? { row: here.row, column: here.column };
+      const from = range?.head ?? anchor;
+      const head = {
+        row: Math.max(0, Math.min(here.table.rows.length - 1, from.row + rows)),
+        column: Math.max(0, Math.min(here.table.columns - 1, from.column + columns)),
+      };
+      if (!samePlace(head, from)) selectCells(view, here.table.from, anchor, head);
+      return true;
+    };
   const below = (here: CellAt): boolean => {
     const { table, row, column } = here;
     if (row + 1 < table.rows.length) goTo(view, table, row + 1, column, 'end');
@@ -891,9 +1167,17 @@ function cellEditor(
               return true;
             },
           },
+          // D-144: the selected cells: Shift+arrows extend them, Delete and Backspace clear them.
+          { key: 'Shift-ArrowLeft', run: extend(0, -1) },
+          { key: 'Shift-ArrowRight', run: extend(0, 1) },
+          { key: 'Shift-ArrowUp', run: extend(-1, 0) },
+          { key: 'Shift-ArrowDown', run: extend(1, 0) },
+          { key: 'Delete', run: () => clearSelectedCells(view) },
+          { key: 'Backspace', run: () => clearSelectedCells(view) },
           {
             key: 'ArrowUp',
             run: keys((here) => {
+              dropCells(view);
               if (here.row > 0) goTo(view, here.table, here.row - 1, here.column, 'end');
               else leave(view, here.table, 'above');
               return true;
@@ -902,6 +1186,7 @@ function cellEditor(
           {
             key: 'ArrowDown',
             run: keys((here) => {
+              dropCells(view);
               if (here.row + 1 < here.table.rows.length)
                 goTo(view, here.table, here.row + 1, here.column, 'end');
               else leave(view, here.table, 'below');
@@ -911,6 +1196,7 @@ function cellEditor(
           {
             key: 'ArrowLeft',
             run: keys((here, cell) => {
+              dropCells(view);
               const head = cell.state.selection.main;
               if (!head.empty || head.head > 0) return false;
               return previous(here);
@@ -919,12 +1205,17 @@ function cellEditor(
           {
             key: 'ArrowRight',
             run: keys((here, cell) => {
+              dropCells(view);
               const head = cell.state.selection.main;
               if (!head.empty || head.head < cell.state.doc.length) return false;
               return next(here);
             }),
           },
-          { key: 'Escape', run: keys((here) => leave(view, here.table, 'below', true)) },
+          {
+            // Esc clears the selected cells first, then leaves the table.
+            key: 'Escape',
+            run: keys((here) => dropCells(view) || leave(view, here.table, 'below', true)),
+          },
           // The note's own history (Q9): undo and redo there; the cell follows.
           { key: 'Mod-z', run: () => undo(view) },
           { key: 'Mod-y', run: () => redo(view) },
@@ -932,6 +1223,28 @@ function cellEditor(
         ]),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false', 'aria-label': 'Table cell' }),
+        // D-144: Ctrl+C / Ctrl+X on the selected cells copy them (Ctrl+X clears them too); a
+        // block of tab-separated text pasted fills cells.
+        EditorView.domEventHandlers({
+          copy: (event) => {
+            if (!event.clipboardData || !copySelectedCells(view, event.clipboardData)) return false;
+            event.preventDefault();
+            return true;
+          },
+          cut: (event) => {
+            if (!event.clipboardData || !copySelectedCells(view, event.clipboardData)) return false;
+            event.preventDefault();
+            clearSelectedCells(view);
+            return true;
+          },
+          paste: (event) => {
+            const here = activeOf(view, wrap);
+            const text = event.clipboardData?.getData('text/plain') ?? '';
+            if (!here || !pasteCells(view, here, text)) return false;
+            event.preventDefault();
+            return true;
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
           if (update.transactions.every((tr) => tr.annotation(fromNote))) return;
@@ -968,6 +1281,7 @@ function cellEditor(
 /** The tables' widgets for the whole note (block widgets come from a state field). */
 function decorate(state: EditorState): DecorationSet {
   const raw = state.field(rawTable, false) ?? null;
+  const selected = state.field(cellRange, false) ?? null;
   const selection = state.selection.main;
   const at = selection.empty ? cellAt(state, selection.head) : null;
   const ranges: Range<Decoration>[] = [];
@@ -983,11 +1297,12 @@ function decorate(state: EditorState): DecorationSet {
       };
     }
     const source = state.doc.sliceString(table.from, table.to);
+    const range = selected && selected.from === table.from && active ? rectOf(selected) : null;
     ranges.push(
-      Decoration.replace({ widget: new TableWidget(table, source, active), block: true }).range(
-        table.from,
-        table.to,
-      ),
+      Decoration.replace({
+        widget: new TableWidget(table, source, active, range),
+        block: true,
+      }).range(table.from, table.to),
     );
   }
   return Decoration.set(ranges);
@@ -1314,6 +1629,19 @@ export function tableCommands(view: EditorView, here: CellAt): TableCommand[] {
         });
       },
     },
+    // D-144 (D-106): while cells are selected, clearing them (Delete) is a command too.
+    ...(selectedCells(view)?.table.from === table.from
+      ? [
+          {
+            id: 'table:clear-cells',
+            label: 'Clear selected cells',
+            disabled: false,
+            run: () => {
+              clearSelectedCells(view);
+            },
+          },
+        ]
+      : []),
   ];
 }
 
@@ -1325,7 +1653,9 @@ function menuEntries(view: EditorView, here: CellAt): MenuEntry[] {
     disabled: command.disabled,
     action: command.run,
   });
-  const [above, below, left, right, row, column, table, align, markdown] = commands.map(entry) as [
+  const [above, below, left, right, row, column, table, align, markdown, ...more] = commands.map(
+    entry,
+  ) as [
     MenuEntry,
     MenuEntry,
     MenuEntry,
@@ -1335,8 +1665,23 @@ function menuEntries(view: EditorView, here: CellAt): MenuEntry[] {
     MenuEntry,
     MenuEntry,
     MenuEntry,
+    ...MenuEntry[],
   ];
-  return [above, below, left, right, 'divider', row, column, table, 'divider', align, markdown];
+  // D-144: Clear selected cells, while cells are selected, first in the deleting group.
+  return [
+    above,
+    below,
+    left,
+    right,
+    'divider',
+    ...more,
+    row,
+    column,
+    table,
+    'divider',
+    align,
+    markdown,
+  ];
 }
 
 /** The editor and cell the caret was last in a table of (the palette acts there, Q11). */
@@ -1362,6 +1707,7 @@ const trackCaret = EditorView.updateListener.of((update) => {
 export function tables(): Extension {
   return [
     rawTable,
+    cellRange,
     tableDecorations,
     wholeTables,
     keepTextOutOfTables,

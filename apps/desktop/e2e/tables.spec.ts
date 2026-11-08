@@ -41,6 +41,9 @@ const QUOTED = `---\nflint: 1\nid: quoted\nmode: note\n---\nIntro.\n\n> | a | b 
 /** D-144: a table whose cells fill the note's width (their words wrap), so it is exactly as wide. */
 const WIDE_ROW = (word: string): string =>
   `| ${Array.from({ length: 14 }, (_, n) => `${word}${n} lorem ipsum`).join(' | ')} |`;
+/** D-144: a 3 × 3 table for selecting cells. */
+const GRID = '| A  | B  | C  |\n| --- | --- | --- |\n| a1 | b1 | c1 |\n| a2 | b2 | c2 |';
+const GRID_NOTE = `---\nflint: 1\nid: grid\nmode: note\n---\nGrid.\n\n${GRID}\n\nEnd.\n`;
 const WIDE = `---\nflint: 1\nid: wide\nmode: note\n---\nWide.\n\n${WIDE_ROW('h')}\n|${' --- |'.repeat(14)}\n${WIDE_ROW('c')}\n\nEnd.\n`;
 
 let dataDirectory: string;
@@ -83,6 +86,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Pictures.md'), PICTURES);
   await writeFile(join(flint, 'Quoted.md'), QUOTED);
   await writeFile(join(flint, 'Wide.md'), WIDE);
+  await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -568,4 +572,198 @@ test('a table as wide as the note has no scrollbar under it: its handles stay in
   await expect.poll(sizes).toBe('0 0');
   await table().hover();
   await expect.poll(sizes).toBe('0 0');
+});
+
+/** D-144: selecting cells, in the Grid note (3 columns, a header and two rows). */
+const grid = (): Promise<string> => readFile(join(flint, 'Grid.md'), 'utf8');
+const selected = (): Locator => table().locator('.cm-fl-cell-selected');
+const openGrid = async (): Promise<void> => {
+  // Only when another note is open: a click on the open note's own entry moves the focus to its
+  // name, later.
+  if ((await line('Grid.').count()) === 0)
+    await main.locator('.nav:not(.flip-ghost)', { hasText: 'Grid' }).first().click();
+  await expect(cell(2, 2)).toHaveText('c2');
+  await expect.poll(grid).toBe(GRID_NOTE);
+};
+/** A synthetic clipboard event on an editor's text (never the real clipboard, D-93). */
+const clipboard = (
+  target: Locator,
+  type: 'copy' | 'cut' | 'paste',
+  put: Record<string, string> = {},
+): Promise<Record<string, string>> =>
+  target.evaluate(
+    (element, [kind, data]) => {
+      const transfer = new DataTransfer();
+      for (const [format, text] of Object.entries(data)) transfer.setData(format, text);
+      element.dispatchEvent(
+        new ClipboardEvent(kind, { clipboardData: transfer, bubbles: true, cancelable: true }),
+      );
+      return Object.fromEntries(transfer.types.map((format) => [format, transfer.getData(format)]));
+    },
+    [type, put] as const,
+  );
+const activeCell = (): Locator => table().locator('.cm-fl-cell-active .cm-content');
+const center = async (target: Locator): Promise<{ x: number; y: number }> => {
+  const box = await target.boundingBox();
+  if (!box) throw new Error('no box');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+
+test('a drag across cells selects a rectangle; a click or Esc clears it (D-144)', async () => {
+  await openGrid();
+  const from = await center(cell(1, 0));
+  const to = await center(cell(2, 1));
+  await main.mouse.move(from.x, from.y);
+  await main.mouse.down();
+  await main.mouse.move(to.x, to.y, { steps: 6 });
+  await main.mouse.up();
+  // The anchor keeps the ring (no fill); the other three cells of the rectangle are filled.
+  await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(selected()).toHaveCount(3);
+  for (const [row, column] of [
+    [1, 1],
+    [2, 0],
+    [2, 1],
+  ] as const)
+    await expect(cell(row, column)).toHaveClass(/cm-fl-cell-selected/);
+  await expect(cell(1, 0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  // A plain click clears it.
+  await cell(2, 2).click();
+  await expect(selected()).toHaveCount(0);
+  await expect(cell(2, 2)).toHaveClass(/cm-fl-cell-active/);
+  // Shift+click from the active cell selects again; Esc clears it, the cell still being edited.
+  await cell(1, 1).click({ modifiers: ['Shift'] });
+  await expect(selected()).toHaveCount(3);
+  await expect(cell(2, 2)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.press('Escape');
+  await expect(selected()).toHaveCount(0);
+  await expect(cell(2, 2)).toHaveClass(/cm-fl-cell-active/);
+  expect(await grid()).toBe(GRID_NOTE);
+});
+
+test('Shift+arrows select cells from the text’s edge on; a plain arrow clears them (D-144)', async () => {
+  await openGrid();
+  await cell(1, 0).click();
+  await main.keyboard.press('End');
+  // Inside the text first: Shift+← selects a character, no cells.
+  await main.keyboard.press('Shift+ArrowLeft');
+  await expect(selected()).toHaveCount(0);
+  await main.keyboard.press('End');
+  await main.keyboard.press('Shift+ArrowRight');
+  await expect(selected()).toHaveCount(1);
+  await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-selected/);
+  await main.keyboard.press('Shift+ArrowDown');
+  await expect(selected()).toHaveCount(3);
+  await main.keyboard.press('Shift+ArrowRight');
+  await expect(selected()).toHaveCount(5);
+  await main.keyboard.press('Shift+ArrowUp');
+  await main.keyboard.press('Shift+ArrowUp');
+  await expect(selected()).toHaveCount(5);
+  await expect(cell(0, 2)).toHaveClass(/cm-fl-cell-selected/);
+  await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.press('ArrowLeft');
+  await expect(selected()).toHaveCount(0);
+  await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  expect(await grid()).toBe(GRID_NOTE);
+});
+
+test('Ctrl+C copies selected cells as tab-separated text and a markdown table (D-144)', async () => {
+  await openGrid();
+  await cell(1, 0).click();
+  await cell(2, 1).click({ modifiers: ['Shift'] });
+  await expect(selected()).toHaveCount(3);
+  const copied = await clipboard(activeCell(), 'copy');
+  expect(copied['text/plain']).toBe('a1\tb1\na2\tb2');
+  expect(copied['text/markdown']).toBe('| a1 | b1 |\n| --- | --- |\n| a2 | b2 |');
+  expect(await grid()).toBe(GRID_NOTE);
+  // Pasted into the note, outside the table: a table of its own.
+  await line('End.').click();
+  await main.keyboard.press('End');
+  await clipboard(editor(), 'paste', copied);
+  await expect
+    .poll(grid)
+    .toBe(GRID_NOTE.replace('End.\n', `End.\n\n${copied['text/markdown'] ?? ''}\n`));
+  await expect(table()).toHaveCount(2);
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+});
+
+test('Delete clears selected cells at once, in one undo step, with an Undo toast (D-144)', async () => {
+  await openGrid();
+  const cleared = GRID_NOTE.replace('| a1 | b1 | c1 |', '|  |  | c1 |').replace(
+    '| a2 | b2 | c2 |',
+    '|  |  | c2 |',
+  );
+  await cell(1, 0).click();
+  await cell(2, 1).click({ modifiers: ['Shift'] });
+  await main.keyboard.press('Delete');
+  await expect.poll(grid).toBe(cleared);
+  // The cells stay selected; the toast's Undo brings their text back.
+  await expect(selected()).toHaveCount(3);
+  const toast = main.locator('.toast', { hasText: 'Cells cleared' });
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // Backspace too, and Ctrl+Z undoes it in one step.
+  await cell(1, 0).click();
+  await cell(2, 1).click({ modifiers: ['Shift'] });
+  await main.keyboard.press('Backspace');
+  await expect.poll(grid).toBe(cleared);
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // The palette's Clear selected cells, while cells are selected.
+  await cell(1, 0).click();
+  await cell(2, 1).click({ modifiers: ['Shift'] });
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('Clear selected cells');
+  await expect(main.locator('.palette-item.on')).toContainText('Clear selected cells');
+  await main.keyboard.press('Enter');
+  await expect.poll(grid).toBe(cleared);
+  await main
+    .locator('.toast', { hasText: 'Cells cleared' })
+    .getByRole('button', { name: 'Undo' })
+    .click();
+  await expect.poll(grid).toBe(GRID_NOTE);
+});
+
+test('pasting tab-separated text fills cells from the active one, growing the table (D-144)', async () => {
+  await openGrid();
+  // A 2 × 2 block from Excel (\r\n, a line break at the end) into b1.
+  await cell(1, 1).click();
+  await clipboard(activeCell(), 'paste', { 'text/plain': 'x\ty\r\nz\tw\r\n' });
+  await expect
+    .poll(grid)
+    .toBe(
+      GRID_NOTE.replace('| a1 | b1 | c1 |', '| a1 | x | y |').replace(
+        '| a2 | b2 | c2 |',
+        '| a2 | z | w |',
+      ),
+    );
+  // What was pasted is selected, the caret in its first cell.
+  await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-active/);
+  await expect(selected()).toHaveCount(3);
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // Larger than the table from c2: a column and a row added in its style, in the same step.
+  await cell(2, 2).click();
+  await clipboard(activeCell(), 'paste', { 'text/plain': '1\t2\n3\t4' });
+  await expect
+    .poll(grid)
+    .toBe(
+      GRID_NOTE.replace(
+        GRID,
+        '| A  | B  | C  |  |\n| --- | --- | --- | --- |\n| a1 | b1 | c1 |  |\n| a2 | b2 | 1 | 2 |\n|    |    | 3 | 4 |',
+      ),
+    );
+  await expect(table().locator('tr')).toHaveCount(4);
+  await expect(cell(3, 3)).toHaveText('4');
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // Text without a tab or a line break goes into the cell, as before.
+  await cell(1, 0).click();
+  await main.keyboard.press('End');
+  await clipboard(activeCell(), 'paste', { 'text/plain': 'Q' });
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a1 |', '| a1Q |'));
+  await expect(selected()).toHaveCount(0);
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
 });

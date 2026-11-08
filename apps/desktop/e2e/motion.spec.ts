@@ -439,6 +439,17 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   );
   await main.keyboard.press('Escape');
   await main.mouse.up();
+  // D-144: cells selected (Shift+→ from the end of the active cell): their soft fill fades in. By
+  // key, so the pointer isn't over the cell (a colour change under it counts as its hover).
+  await tableCell(1, 0).click();
+  await main.keyboard.press('End');
+  await step(main, 'A table: Shift+→ selects cells (their fill fades in)', 'motion', async () => {
+    await main.keyboard.press('Shift+ArrowRight');
+    await expect(main.locator('.main .note-card .cm-fl-cell-selected')).toHaveCount(1);
+  });
+  // Esc clears the selected cells, the next one leaves the table.
+  await main.keyboard.press('Escape');
+  await main.keyboard.press('Escape');
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),
   );

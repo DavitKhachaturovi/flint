@@ -95,6 +95,10 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Ctrl+Shift+V', action: 'Paste as plain text' },
       { keys: 'Ctrl+Shift+M', action: 'Monospace for this note' },
       { keys: 'Ctrl+Shift+E', action: 'Source mode for this note' },
+      {
+        keys: 'Shift+arrows / Shift+click',
+        action: 'Select cells in a table (Ctrl+C copies them, Delete clears them)',
+      },
     ],
   },
   {

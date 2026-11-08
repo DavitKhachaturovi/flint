@@ -3,6 +3,7 @@ import { Annotation, Compartment, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
 import { insertBlock } from './commands.js';
+import { isCellsMarkdown } from './table.js';
 import {
   announce,
   announceLinked,
@@ -255,6 +256,14 @@ function paste(event: ClipboardEvent, view: EditorView): boolean {
       .then((link) => {
         if (link) insertBlock(view, `![](${link})`);
       });
+    return true;
+  }
+  // D-144 (Proposed): cells copied from a Flint table (their markdown beside the tab-separated
+  // text) paste into a note as a table of their own; Ctrl+Shift+V pastes the plain text.
+  const cells = data.getData('text/markdown');
+  if (cells !== '' && isCellsMarkdown(cells)) {
+    event.preventDefault();
+    insertBlock(view, cells, cells.length, true);
     return true;
   }
   const pasted = data.getData('text/plain');

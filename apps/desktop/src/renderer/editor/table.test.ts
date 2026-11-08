@@ -7,10 +7,16 @@ import {
   addColumn,
   addRow,
   alignTable,
+  cellsMarkdown,
+  cellTexts,
+  clearCells,
   deleteColumn,
   deleteRow,
   deleteTable,
+  parseTsv,
   setCell,
+  setCells,
+  toTsv,
   tableAt,
   tablesIn,
   type ParsedTable,
@@ -146,6 +152,126 @@ describe('writing a table back (D-141 Q10)', () => {
   });
 });
 
+describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
+  const DOC = '| Name    | Age |\n| ------- | --: |\n| Alex    | 30  |\n| Sam     | 41  |';
+
+  it('sets a block of cells, only their bytes changed', () => {
+    const { state: s, table: t } = table(DOC);
+    expect(
+      apply(
+        s,
+        setCells(s, t, 1, 0, [
+          ['Ann', '7'],
+          ['Bo', ''],
+        ]),
+      ),
+    ).toBe('| Name    | Age |\n| ------- | --: |\n| Ann    | 7  |\n| Bo     |   |');
+    // Beyond the table, without growing: left out.
+    expect(apply(s, setCells(s, t, 2, 1, [['x', 'y', 'z'], ['w']]))).toBe(
+      '| Name    | Age |\n| ------- | --: |\n| Alex    | 30  |\n| Sam     | x  |',
+    );
+  });
+
+  it('clears a rectangle of cells in one change', () => {
+    const { state: s, table: t } = table(DOC);
+    expect(apply(s, clearCells(s, t, { top: 1, left: 0, bottom: 2, right: 1 }))).toBe(
+      '| Name    | Age |\n| ------- | --: |\n|     |   |\n|      |   |',
+    );
+    expect(texts(apply(s, clearCells(s, t, { top: 0, left: 1, bottom: 2, right: 1 })))).toEqual([
+      ['Name', ''],
+      ['Alex', ''],
+      ['Sam', ''],
+    ]);
+  });
+
+  it('grows the table for a block larger than it, rows and columns in its style', () => {
+    const { state: s, table: t } = table(DOC);
+    const grown = apply(
+      s,
+      setCells(
+        s,
+        t,
+        2,
+        1,
+        [
+          ['a', 'b', 'c'],
+          ['d', 'e', 'f'],
+        ],
+        true,
+      ),
+    );
+    expect(texts(grown)).toEqual([
+      ['Name', 'Age', '', ''],
+      ['Alex', '30', '', ''],
+      ['Sam', 'a', 'b', 'c'],
+      ['', 'd', 'e', 'f'],
+    ]);
+    expect(grown.split('\n')[1]).toBe('| ------- | --: | --- | --- |');
+    // Without edge pipes, and a short row filled past its end.
+    const plain = table('a | b\n--- | ---\n1');
+    expect(
+      texts(apply(plain.state, setCells(plain.state, plain.table, 1, 0, [['x', 'y', 'z']], true))),
+    ).toEqual([
+      ['a', 'b', ''],
+      ['x', 'y', 'z'],
+    ]);
+  });
+
+  it('reads and writes tab-separated text as Excel and Sheets do', () => {
+    expect(
+      toTsv([
+        ['a', 'b|c'],
+        ['', 'd\te'],
+      ]),
+    ).toBe('a\tb|c\n\td e');
+    expect(toTsv([['"quoted"', 'x']])).toBe('"""quoted"""\tx');
+    expect(parseTsv('a\tb\r\nc\td\r\n')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+    expect(parseTsv('a\t\n\tb')).toEqual([
+      ['a', ''],
+      ['', 'b'],
+    ]);
+    expect(parseTsv('one\ntwo')).toEqual([['one'], ['two']]);
+    // Excel quotes a cell with a line break, a tab or a leading quote.
+    expect(parseTsv('"two\nlines"\t"say ""hi"""\tx')).toEqual([['two\nlines', 'say "hi"', 'x']]);
+    expect(parseTsv(toTsv([['"quoted"', 'x']]))).toEqual([['"quoted"', 'x']]);
+    // No tab and no line break: not a block (a paste into the cell as text).
+    expect(parseTsv('just text')).toBeNull();
+    expect(parseTsv('just text\r\n')).toBeNull();
+  });
+
+  it('reads pathological tab-separated text in linear time', () => {
+    const inputs = [
+      '"'.repeat(200_000),
+      '"\t'.repeat(100_000),
+      `"${'\t""'.repeat(70_000)}x`,
+      `${'"a\t"b\n'.repeat(40_000)}"`,
+      '\t'.repeat(200_000),
+      '\r\n'.repeat(100_000) + 'x',
+    ];
+    for (const input of inputs) {
+      const started = performance.now();
+      parseTsv(input);
+      expect(performance.now() - started).toBeLessThan(500);
+    }
+  });
+
+  it('writes cells as a GFM table, the first row its header', () => {
+    expect(
+      cellsMarkdown([
+        ['a', 'b|c'],
+        ['1', ''],
+      ]),
+    ).toBe('| a | b\\|c |\n| --- | --- |\n| 1 |  |');
+    expect(cellTexts(table(DOC).table, { top: 1, left: 1, bottom: 2, right: 1 })).toEqual([
+      ['30'],
+      ['41'],
+    ]);
+  });
+});
+
 describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
   const RUNS = Number(process.env['FLINT_EDITOR_FUZZ_RUNS'] ?? 300);
   const cellText = fc.string({
@@ -178,6 +304,62 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       );
       return [header, delimiter, ...body].join('\n');
     });
+
+  it('a block of cells set or cleared: only those cells change, the shape stays (D-144)', () => {
+    fc.assert(
+      fc.property(
+        tableDoc,
+        fc.nat(),
+        fc.nat(),
+        fc.array(fc.array(cellText, { minLength: 1, maxLength: 4 }), {
+          minLength: 1,
+          maxLength: 4,
+        }),
+        fc.boolean(),
+        (doc, rowPick, columnPick, block, clear) => {
+          const { state: s, table: t } = table(doc);
+          const row = rowPick % t.rows.length;
+          const column = columnPick % t.columns;
+          const width = Math.max(...block.map((cells) => cells.length));
+          const rect = {
+            top: row,
+            left: column,
+            bottom: Math.min(t.rows.length - 1, row + block.length - 1),
+            right: Math.min(t.columns - 1, column + width - 1),
+          };
+          const inside = (r: number, c: number): boolean =>
+            r >= rect.top && r <= rect.bottom && c >= rect.left && c <= rect.right;
+          const result = apply(
+            s,
+            clear ? clearCells(s, t, rect) : setCells(s, t, row, column, block),
+          );
+          const after = table(result).table;
+          // The shape stays: as many rows and columns.
+          expect(after.columns).toBe(t.columns);
+          expect(after.rows.length).toBe(t.rows.length);
+          t.rows.forEach((before, r) =>
+            before.cells.forEach((cell, c) => {
+              const now = after.rows[r]?.cells[c];
+              if (!now) throw new Error(`cell ${r}:${c} gone`);
+              if (!inside(r, c)) {
+                // Every other cell's bytes exactly as they were.
+                expect(result.slice(now.from, now.to)).toBe(doc.slice(cell.from, cell.to));
+                return;
+              }
+              const wanted = clear ? '' : (block[r - row]?.[c - column] ?? cell.text);
+              if (!wanted.includes('\\') && !cell.text.includes('\\'))
+                expect(now.text).toBe(wanted.trim());
+            }),
+          );
+          // The delimiter row as it was.
+          expect(result.slice(after.delimiter.from, after.delimiter.to)).toBe(
+            doc.slice(t.delimiter.from, t.delimiter.to),
+          );
+        },
+      ),
+      { numRuns: RUNS },
+    );
+  });
 
   it('changes only the edited cell: every other cell and byte stays as it was', () => {
     fc.assert(

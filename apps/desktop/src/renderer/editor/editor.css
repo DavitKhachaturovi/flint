@@ -252,6 +252,17 @@
   cursor: text;
 }
 
+/* D-144 (Proposed): selected cells have a soft fill, the selected text's colour (UI-11); the anchor
+   cell keeps its ring and no fill, as the place typing goes. The fill fades in and out. */
+.cm-fl-table th,
+.cm-fl-table td {
+  transition: background-color var(--fl-dur-fast);
+}
+
+.cm-fl-table .cm-fl-cell-selected {
+  background-color: var(--fl-selection);
+}
+
 .cm-fl-table th {
   font-weight: 600;
   color: var(--fl-text-highlight);
@@ -459,6 +470,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cm-fl-table th,
+  .cm-fl-table td,
   .cm-fl-table-box,
   .cm-fl-table-edge,
   .cm-fl-edge-bar,

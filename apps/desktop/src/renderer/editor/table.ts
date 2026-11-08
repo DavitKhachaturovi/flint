@@ -1,5 +1,5 @@
 import { syntaxTree } from '@codemirror/language';
-import type { ChangeSpec, EditorState, Text } from '@codemirror/state';
+import { ChangeSet, type ChangeSpec, type EditorState, type Text } from '@codemirror/state';
 import type { SyntaxNode } from '@lezer/common';
 
 /**
@@ -171,7 +171,7 @@ const BLOCK_START = /^(?:[*+\->#=]|\d{1,9}[.)]|`{3}|~{3})/;
  * each side; a short row grows up to the cell in its own style. `row` counts the header as 0.
  */
 export function setCell(
-  state: EditorState,
+  state: { readonly doc: Text },
   table: ParsedTable,
   row: number,
   column: number,
@@ -271,6 +271,184 @@ export function deleteColumn(table: ParsedTable, column: number): ChangeSpec[] {
 export function deleteTable(state: EditorState, table: ParsedTable): ChangeSpec[] {
   if (table.to < state.doc.length) return [{ from: table.from, to: table.to + 1 }];
   return [{ from: Math.max(0, table.from - 1), to: table.to }];
+}
+
+/** A rectangle of cells: its first and last row (the header is 0) and column. */
+export interface CellRect {
+  readonly top: number;
+  readonly left: number;
+  readonly bottom: number;
+  readonly right: number;
+}
+
+/**
+ * D-144: cells from (`row`, `column`) on set to `values` (rows of cells), as one change: each cell
+ * written as `setCell` writes it, so only those cells' bytes change. With `grow` (a pasted block
+ * larger than the table, Proposed), the columns and rows it needs are added at the end first, each
+ * in the table's style (`addColumn`, `addRow`); without it, what falls outside the table is left
+ * out. Each row is read again after each of its cells (a short row grows), never the whole table:
+ * linear in the size of what is written.
+ */
+export function setCells(
+  state: { readonly doc: Text },
+  table: ParsedTable,
+  row: number,
+  column: number,
+  values: readonly (readonly string[])[],
+  grow = false,
+): ChangeSpec[] {
+  if (row < 0 || column < 0) return [];
+  let doc = state.doc;
+  let set = ChangeSet.empty(doc.length);
+  let from = table.from;
+  let to = table.to;
+  let current: ParsedTable | null = table;
+  const apply = (specs: readonly ChangeSpec[]): void => {
+    const next = ChangeSet.of(specs, doc.length);
+    set = set.compose(next);
+    from = next.mapPos(from, -1);
+    to = next.mapPos(to, 1);
+    doc = next.apply(doc);
+    current = parseTable(doc, from, to);
+  };
+  const width = Math.max(0, ...values.map((cells) => cells.length));
+  if (grow) {
+    for (let added = 0; current && current.columns < column + width && added < width; added++) {
+      const specs = addColumn(current, current.columns);
+      if (specs.length === 0) break;
+      apply(specs);
+    }
+    const missing = current ? row + values.length - current.rows.length : 0;
+    if (current && missing > 0) {
+      // The new rows in one insertion, each as `addRow` writes one after the last row.
+      const [one] = addRow(current, current.rows.length - 1) as { from: number; insert: string }[];
+      if (one) apply([{ from: one.from, insert: one.insert.repeat(missing) }]);
+    }
+  }
+  const base: ParsedTable | null = current;
+  if (!base) return set.empty ? [] : [set];
+  // Rows touch their own lines only: each row's changes are made on `base`'s text and joined.
+  const start = doc;
+  let rows = ChangeSet.empty(start.length);
+  values.forEach((cells, dy) => {
+    const target = base.rows[row + dy];
+    if (!target) return;
+    const lineNumber = start.lineAt(target.from).number;
+    let rowDoc = start;
+    let rowSet = ChangeSet.empty(start.length);
+    cells.forEach((text, dx) => {
+      if (column + dx >= base.columns) return;
+      const read = readRow(rowDoc, lineNumber);
+      const shaped = {
+        ...base,
+        rows: base.rows.map((each, at) => (at === row + dy ? read : each)),
+      };
+      const specs = setCell({ doc: rowDoc }, shaped, row + dy, column + dx, text);
+      if (specs.length === 0) return;
+      const next = ChangeSet.of(specs, rowDoc.length);
+      rowSet = rowSet.compose(next);
+      rowDoc = next.apply(rowDoc);
+    });
+    rows = rows.compose(rowSet.map(rows));
+  });
+  set = set.compose(rows);
+  return set.empty ? [] : [set];
+}
+
+/** D-144: the cells of a rectangle emptied, as one change (only their bytes change). */
+export function clearCells(
+  state: { readonly doc: Text },
+  table: ParsedTable,
+  rect: CellRect,
+): ChangeSpec[] {
+  const values = Array.from({ length: rect.bottom - rect.top + 1 }, () =>
+    Array.from({ length: rect.right - rect.left + 1 }, () => ''),
+  );
+  return setCells(state, table, rect.top, rect.left, values);
+}
+
+/** The shown text of a rectangle's cells (an empty string for a cell a short row hasn't got). */
+export function cellTexts(table: ParsedTable, rect: CellRect): string[][] {
+  const rows: string[][] = [];
+  for (let row = rect.top; row <= rect.bottom; row++) {
+    const cells: string[] = [];
+    for (let column = rect.left; column <= rect.right; column++)
+      cells.push(table.rows[row]?.cells[column]?.text ?? '');
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/**
+ * D-144: cells as tab-separated text, the clipboard format Excel and Sheets read: rows by `\n`,
+ * cells by `\t`. A tab or line break in a cell is a space; a cell starting with `"` is quoted (its
+ * quotes doubled), since Excel reads a field starting with one as quoted.
+ */
+export function toTsv(rows: readonly (readonly string[])[]): string {
+  const field = (text: string): string => {
+    const flat = text.replace(/[\t\r\n]/g, ' ');
+    return flat.startsWith('"') ? `"${flat.replace(/"/g, '""')}"` : flat;
+  };
+  return rows.map((cells) => cells.map(field).join('\t')).join('\n');
+}
+
+/**
+ * D-144: tab-separated text (copied from Excel, Sheets or a Flint table) read into rows of cells,
+ * or null when the text has neither a tab nor a line break (a paste into one cell, as text). Rows
+ * end at `\n` or `\r\n`, one line break at the end is dropped, cells end at `\t`. A field that
+ * starts with `"` is read as Excel reads one: quoted up to the next lone `"` (`""` is a `"`; tabs
+ * and line breaks inside it are the cell's), then as written up to the next tab or line break.
+ * One pass over the text, never going back: linear time whatever it holds.
+ */
+export function parseTsv(text: string): string[][] | null {
+  let source = text.replace(/\r\n?/g, '\n');
+  if (source.endsWith('\n')) source = source.slice(0, -1);
+  if (!source.includes('\t') && !source.includes('\n')) return null;
+  const rows: string[][] = [[]];
+  let at = 0;
+  for (;;) {
+    let field = '';
+    if (source[at] === '"') {
+      at++;
+      while (at < source.length) {
+        if (source[at] !== '"') field += source.charAt(at++);
+        else if (source[at + 1] === '"') {
+          field += '"';
+          at += 2;
+        } else {
+          at++;
+          break;
+        }
+      }
+    }
+    let end = at;
+    while (end < source.length && source[end] !== '\t' && source[end] !== '\n') end++;
+    field += source.slice(at, end);
+    at = end;
+    rows[rows.length - 1]?.push(field);
+    if (at >= source.length) break;
+    if (source[at] === '\n') rows.push([]);
+    at++;
+  }
+  return rows;
+}
+
+/**
+ * D-144: cells as a GFM table, its first row the header (Ctrl+C's markdown, beside the
+ * tab-separated text): every cell escaped as `setCell` writes one, a `---` under each column.
+ */
+export function cellsMarkdown(rows: readonly (readonly string[])[]): string {
+  const width = Math.max(1, ...rows.map((cells) => cells.length));
+  const line = (cells: readonly string[]): string =>
+    `|${Array.from({ length: width }, (_, at) => ` ${escapeCell((cells[at] ?? '').trim())} `).join('|')}|`;
+  const [header = [], ...body] = rows;
+  return [line(header), `|${' --- |'.repeat(width)}`, ...body.map(line)].join('\n');
+}
+
+/** D-144: markdown that is a table as `cellsMarkdown` writes one (a row, then `| --- |…`). */
+export function isCellsMarkdown(text: string): boolean {
+  const [header = '', delimiter = ''] = text.split('\n', 2);
+  return hasRowPipe(header) && /^[|:\- ]+$/.test(delimiter) && delimiter.includes('-');
 }
 
 /** East Asian wide characters and emoji take two columns in a monospace view. */
