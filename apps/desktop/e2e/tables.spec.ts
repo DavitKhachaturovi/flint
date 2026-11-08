@@ -201,7 +201,7 @@ test("the palette has the table's commands while the caret is in a table (D-106,
   await expect.poll(file).toBe(NOTE);
 });
 
-test('dragging the edges adds and removes columns and rows; text asks first, inline (Q11)', async () => {
+test('dragging the edges adds and removes columns and rows; text asks first, in a toast (Q11, D-144)', async () => {
   const drag = async (edge: 'right' | 'bottom', steps: number, finish = true): Promise<void> => {
     const handle = main.locator(`.note-editor .cm-fl-table-edge-${edge}`);
     const box = await handle.boundingBox();
@@ -225,16 +225,39 @@ test('dragging the edges adds and removes columns and rows; text asks first, inl
   await expect.poll(file).toContain('| Name    | Age |  |');
   await drag('right', -1);
   await expect.poll(file).toBe(NOTE);
-  // Over a column with text: the warning first; Cancel keeps it, Delete takes it, Ctrl+Z undoes.
-  await drag('right', -1);
-  const warning = main.locator('.note-editor .cm-fl-table-warning');
-  await expect(warning).toContainText('This deletes content in 2 cells');
-  await warning.locator('button', { hasText: 'Cancel' }).click();
-  await expect(warning).toHaveCount(0);
-  expect(await file()).toBe(NOTE);
-  await drag('right', -1);
-  await warning.locator('button', { hasText: 'Delete' }).click();
+  // Over a column with text: the warning first, as the window's toast (D-144), never in the note;
+  // the column stays dimmed while it is up. Cancel keeps it, and so do Esc and the time running
+  // out; Delete takes it, Ctrl+Z undoes.
+  const warning = main.locator('.toast', { hasText: 'This deletes content in 2 cells' });
+  const going = table().locator('.cm-fl-cell-going');
+  const asked = async (): Promise<void> => {
+    await drag('right', -1);
+    await expect(warning).toHaveCount(1);
+    await expect(warning).toHaveAttribute('role', 'alert');
+    await expect(going).toHaveCount(2);
+    await expect(main.locator('.note-editor .toast')).toHaveCount(0);
+    await expect(editor()).not.toContainText('This deletes');
+  };
+  const keptAll = async (): Promise<void> => {
+    await expect(warning).toHaveCount(0);
+    await expect(going).toHaveCount(0);
+    expect(await file()).toBe(NOTE);
+  };
+  await asked();
+  await warning.getByRole('button', { name: 'Cancel' }).click();
+  await keptAll();
+  await asked();
+  await main.keyboard.press('Escape');
+  await keptAll();
+  await expect(table()).toHaveCount(1);
+  await asked();
+  await expect(warning).toHaveCount(0, { timeout: 12_000 });
+  await keptAll();
+  await asked();
+  await warning.getByRole('button', { name: 'Delete' }).click();
   await expect.poll(file).toContain('| Name    |\n| ------- |\n| Alex    |');
+  await expect(warning).toHaveCount(0);
+  await expect(going).toHaveCount(0);
   await cell(0, 0).click();
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);

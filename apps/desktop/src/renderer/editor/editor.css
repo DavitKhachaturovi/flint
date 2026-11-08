@@ -373,26 +373,6 @@
   pointer-events: none;
 }
 
-.cm-fl-table-warning {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 0 8px;
-  color: var(--fl-text-body);
-  animation: fl-table-warning-in var(--fl-dur-fast) ease-out;
-}
-
-.cm-fl-table-warning.leaving {
-  opacity: 0;
-  transition: opacity var(--fl-dur-fast);
-}
-
-@keyframes fl-table-warning-in {
-  from {
-    opacity: 0;
-  }
-}
-
 /* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */
 .cm-fl-image {
   display: inline-block;

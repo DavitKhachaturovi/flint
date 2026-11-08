@@ -217,6 +217,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Small, bottom-anchored, short-lived, always with **Undo** where an action is reversible (completion, delete, move, multi-line paste "Keep as one?").
 - A toast always sits **above** the list: rows, hovered rows and their text never cover it (D-65).
 - Never a blocking confirmation dialog for reversible actions.
+- **D-144 (Proposed):** an editor's question is a toast too, never text in the note: a table's edge drag that would take away text asks "This deletes content in 2 cells" with **Delete** and **Cancel**. It stays up longer (8 s); Esc, its time running out and another toast count as Cancel. Its buttons leave the focus in the note.
 
 ### Capture popup look
 - Frameless, centered horizontally on the **active monitor**, in the upper third (Spotlight-like) (**Proposed** position).

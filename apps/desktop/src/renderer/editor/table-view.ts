@@ -16,7 +16,7 @@ import {
 import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
-import { announceUndo } from '../media/media.js';
+import { announceConfirm, announceUndo } from '../media/media.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
   addColumn,
@@ -498,51 +498,39 @@ function resize(
     });
 }
 
-/** Q11: the inline warning before a drag takes away cells with text: Delete / Cancel. */
-function warn(
-  view: EditorView,
-  wrap: HTMLElement,
-  cells: number,
-  done: (apply: boolean) => void,
-): void {
-  wrap.querySelector('.cm-fl-table-warning')?.remove();
-  const warning = document.createElement('div');
-  warning.className = 'cm-fl-table-warning';
-  warning.setAttribute('role', 'alert');
-  const text = document.createElement('span');
-  text.textContent = `This deletes content in ${cells} ${cells === 1 ? 'cell' : 'cells'}`;
-  const close = (apply: boolean): void => {
-    window.removeEventListener('keydown', onKey, true);
-    warning.classList.add('leaving');
-    window.setTimeout(() => warning.remove(), durationMs('--fl-dur-fast', 120));
-    done(apply);
-  };
-  const button = (label: string, apply: boolean): HTMLButtonElement => {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = apply ? 'trash-action danger' : 'trash-action';
-    element.textContent = label;
-    element.addEventListener('mousedown', (event) => event.preventDefault());
-    element.addEventListener('click', () => close(apply));
-    return element;
-  };
+/** D-144: the way to cancel the edge drag's warning still up, if any. */
+let warning: (() => void) | null = null;
+
+/**
+ * Q11, D-144: the warning before a drag takes away cells with text, as the window's toast (Delete /
+ * Cancel), never in the note. Esc, the toast's time running out or another toast cancel it.
+ */
+function warn(cells: number, done: (apply: boolean) => void): void {
+  let cancel: (() => void) | null = null;
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || !cancel) return;
     event.preventDefault();
     event.stopPropagation();
-    close(false);
+    cancel();
+  };
+  const close = (apply: boolean): void => {
+    window.removeEventListener('keydown', onKey, true);
+    if (warning === cancel) warning = null;
+    done(apply);
   };
   window.addEventListener('keydown', onKey, true);
-  warning.append(text, button('Delete', true), button('Cancel', false));
-  wrap.append(warning);
-  void view;
+  warning = cancel = announceConfirm(
+    `This deletes content in ${cells} ${cells === 1 ? 'cell' : 'cells'}`,
+    'Delete',
+    { confirm: () => close(true), cancel: () => close(false) },
+  );
 }
 
 /**
  * Q11: dragging the right edge adds or removes columns, the bottom edge rows, one per step of the
  * average column width (row height); at least one column and the header row stay. During the
  * drag what would go is dimmed and what would come is counted; Esc cancels. Taking away cells
- * with text asks first, inline.
+ * with text asks first, in the window's toast (D-144).
  */
 function dragEdge(
   view: EditorView,
@@ -558,6 +546,8 @@ function dragEdge(
   if (!holder || !table || !element || !badge) return;
   start.preventDefault();
   start.stopPropagation();
+  // D-144: a new drag answers the last one's warning still up: Cancel (its cells undimmed).
+  warning?.();
   const handle = start.currentTarget as HTMLElement;
   handle.setPointerCapture(start.pointerId);
   const box = element.getBoundingClientRect();
@@ -603,9 +593,13 @@ function dragEdge(
       return;
     }
     badge.hidden = true;
-    warn(view, wrap, withText, (yes) => {
+    warn(withText, (yes) => {
       clear();
-      if (yes) resize(view, live.from, axis, count, target);
+      if (!yes) return;
+      // The note may have changed while the card was up: the table as it is now, or nothing.
+      const now = tableAt(view.state, holder.from);
+      const size = now && (axis === 'columns' ? now.columns : now.rows.length);
+      if (now && size === count) resize(view, now.from, axis, count, target);
     });
   };
   const up = (): void => finish(true);

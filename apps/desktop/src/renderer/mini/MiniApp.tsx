@@ -22,8 +22,8 @@ import { CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
 import { Composer } from '../ui/Composer.js';
 import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
-import { ToastView, useToast } from '../ui/Toast.js';
-import type { UndoNotice } from '../media/media.js';
+import { showQuestion, ToastView, useToast } from '../ui/Toast.js';
+import type { ConfirmNotice, UndoNotice } from '../media/media.js';
 import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
 import { NoteTab } from './NoteTab.js';
@@ -134,9 +134,16 @@ export function MiniApp(): ReactElement {
       const { text, undo } = (event as CustomEvent<UndoNotice>).detail;
       showToast(text, false, { label: 'Undo', run: undo });
     };
+    // D-144: an editor's question (a table's edge drag taking away text): Delete / Cancel.
+    const onConfirmNotice = (event: Event): void =>
+      showQuestion(showToast, hideToast, (event as CustomEvent<ConfirmNotice>).detail);
     window.addEventListener('flint:notice-undo', onUndoNotice);
-    return () => window.removeEventListener('flint:notice-undo', onUndoNotice);
-  }, [showToast]);
+    window.addEventListener('flint:notice-confirm', onConfirmNotice);
+    return () => {
+      window.removeEventListener('flint:notice-undo', onUndoNotice);
+      window.removeEventListener('flint:notice-confirm', onConfirmNotice);
+    };
+  }, [showToast, hideToast]);
   // The Note tab: the note shown ('' a new one, not made yet; null: to be chosen), its view.
   const [noteId, setNoteId] = useState<string | null>(null);
   // D-131: a quick note shown here isn't removed for having been left empty in the main window.

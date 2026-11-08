@@ -101,7 +101,7 @@ import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
 import { bodyImages } from '../../shared/body-markdown.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
-import { relink, type LinkedNotice, type UndoNotice } from '../media/media.js';
+import { relink, type ConfirmNotice, type LinkedNotice, type UndoNotice } from '../media/media.js';
 import { useInertText } from './inert-text.js';
 import { sidebarMotion } from './sidebar-motion.js';
 import { useScrollsWhenTaller } from '../ui/scrolls.js';
@@ -121,7 +121,7 @@ import { rowDragUnits } from '../ui/row-drag.js';
 import { Composer, listInfos } from '../ui/Composer.js';
 import { QuickTitle } from '../ui/QuickTitle.js';
 import { Glide } from '../ui/Glide.js';
-import { ToastView, useToast } from '../ui/Toast.js';
+import { showQuestion, ToastView, useToast } from '../ui/Toast.js';
 import { UPDATE_VIEW_OFF, type UpdateView } from '../../shared/updates.js';
 
 /**
@@ -1076,11 +1076,16 @@ export function App(): ReactElement {
       showToast(text, false, { label: 'Undo', run: undoIt });
     };
     window.addEventListener('flint:notice-undo', onUndoNotice);
+    // D-144: an editor's question (a table's edge drag taking away text): Delete / Cancel.
+    const onConfirmNotice = (event: Event): void =>
+      showQuestion(showToast, hideToast, (event as CustomEvent<ConfirmNotice>).detail);
+    window.addEventListener('flint:notice-confirm', onConfirmNotice);
     return () => {
       window.removeEventListener('flint:notice', onNotice);
       window.removeEventListener('flint:notice-undo', onUndoNotice);
+      window.removeEventListener('flint:notice-confirm', onConfirmNotice);
     };
-  }, [showToast]);
+  }, [showToast, hideToast]);
 
   const change = useCallback(
     (next: ListChange): Promise<ChangeOutcome | null> => window.flintMain.change(listId, next),
