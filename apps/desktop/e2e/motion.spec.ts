@@ -238,13 +238,31 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await nav('Inbox').click();
   await expect(row('Call the bank')).toBeVisible();
 
-  // Task actions.
+  // Task actions. These go through main (the change, the file, the view sent back), so each act
+  // waits for the row to show its result: on a slow machine the change (and its motion) can
+  // otherwise land after the step's recording has closed. An open task's row (a leaving ghost has
+  // no data-key).
+  const openRow = (text: string) =>
+    main.locator('.main .row[data-key]:not(.done)', { hasText: text });
   await row('Water the plants').click();
-  await step(main, 'Complete a task (Space)', 'motion', () => main.keyboard.press(' '));
-  await step(main, 'Undo it (Ctrl+Z)', 'motion', () => main.keyboard.press('Control+z'));
+  await step(main, 'Complete a task (Space)', 'motion', async () => {
+    await main.keyboard.press(' ');
+    await expect(openRow('Water the plants')).toHaveCount(0);
+  });
+  await step(main, 'Undo it (Ctrl+Z)', 'motion', async () => {
+    await main.keyboard.press('Control+z');
+    await expect(openRow('Water the plants')).toHaveCount(1);
+  });
   await row('Water the plants').click();
-  await step(main, 'Pin a task (P)', 'motion', () => main.keyboard.press('p'));
-  await step(main, 'Change its priority (3)', 'motion', () => main.keyboard.press('3'));
+  await step(main, 'Pin a task (P)', 'motion', async () => {
+    await main.keyboard.press('p');
+    await expect(row('Water the plants').locator('.pin-ind')).toBeVisible();
+  });
+  await step(main, 'Change its priority (3)', 'motion', async () => {
+    await main.keyboard.press('3');
+    // TASK-03: 3 is high.
+    await expect(row('Water the plants').locator('.stripe')).toHaveClass(/\bp-high\b/);
+  });
   await step(main, 'Open a task’s notes (Enter edits; its body)', 'motion', async () => {
     await row('Book the venue').click();
     await main.keyboard.press('Enter');
@@ -256,10 +274,12 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'Delete a task (row goes, toast comes)', 'motion', async () => {
     await row('Call the bank').click();
     await main.keyboard.press('Delete');
+    await expect(openRow('Call the bank')).toHaveCount(0);
   });
-  await step(main, 'Undo the delete (row comes back)', 'motion', () =>
-    main.keyboard.press('Control+z'),
-  );
+  await step(main, 'Undo the delete (row comes back)', 'motion', async () => {
+    await main.keyboard.press('Control+z');
+    await expect(openRow('Call the bank')).toHaveCount(1);
+  });
   await step(main, 'Add a task from the composer', 'motion', async () => {
     await main.locator('.main .composer-input').click();
     await main.keyboard.type('Buy stamps');
@@ -340,9 +360,11 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'It unfolds', 'motion', () =>
     main.locator('.nav-group .group-head, .nav-group [aria-expanded]').first().click(),
   );
-  await step(main, 'A quick note (a row appears, the note opens)', 'motion', () =>
-    main.keyboard.press('Control+Shift+j'),
-  );
+  await step(main, 'A quick note (a row appears, the note opens)', 'motion', async () => {
+    await main.keyboard.press('Control+Shift+j');
+    // Made by main: wait for the note to open.
+    await expect(main.locator('.main .note-card .cm-content')).toBeVisible();
+  });
   await main.locator('.main .note-card .cm-content').click();
   await step(main, 'The note’s slash menu opens', 'motion', async () => {
     await main.keyboard.type('/');
@@ -400,9 +422,13 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
 
   // Settings, Trash, Snapshots.
   await step(main, 'Settings opens', 'motion', () => nav('Settings').click());
-  await step(main, 'A switch changes', 'motion', () =>
-    main.locator('.switch[aria-label="Ask about unfinished pins"]').click(),
-  );
+  await step(main, 'A switch changes', 'motion', async () => {
+    // The setting is saved by main and comes back: wait for the switch to show it.
+    const pins = main.locator('.switch[aria-label="Ask about unfinished pins"]');
+    const was = await pins.getAttribute('aria-checked');
+    await pins.click();
+    await expect(pins).toHaveAttribute('aria-checked', was === 'true' ? 'false' : 'true');
+  });
   await step(main, 'Settings’ index jumps to a section', 'motion', () =>
     main.locator('.settings-index-item', { hasText: 'Data' }).click(),
   );
@@ -449,9 +475,13 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'The question goes (Cancel)', 'motion', () =>
     trashed.getByRole('button', { name: 'Cancel' }).click(),
   );
-  await step(main, 'Trash: Restore (the row goes)', 'motion', () =>
-    trashed.getByRole('button', { name: 'Restore' }).click(),
-  );
+  await step(main, 'Trash: Restore (the row goes)', 'motion', async () => {
+    await trashed.getByRole('button', { name: 'Restore' }).click();
+    // Restored by main, the row starts leaving when Trash's view comes back.
+    await expect(main.locator('.trash-row:not(.leaving)', { hasText: 'Buy stamps' })).toHaveCount(
+      0,
+    );
+  });
   await step(main, 'Snapshots open', 'motion', async () => {
     await main.keyboard.press('Control+k');
     await main.keyboard.type('snapshots');

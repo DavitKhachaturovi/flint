@@ -69,17 +69,63 @@ const altKey = (key: 'ArrowUp' | 'ArrowDown'): Promise<void> =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: which, altKey: true }));
   }, key);
 
-/** A row dragged by the mouse to another row's place (the locked, springy drag). */
+type Box = { x: number; y: number; width: number; height: number };
+/**
+ * Where two rows are once the list holds still: no motion running in mini (a row just added still
+ * opening its place, the highlight gliding) and the same boxes on two reads in a row. Measured
+ * mid-motion, the press can land on the row next to the one meant (a slow machine, CI).
+ */
+const settledBoxes = async (from: string, to: string): Promise<[Box, Box]> => {
+  let last = '';
+  let boxes: [Box, Box] | null = null;
+  await expect
+    .poll(
+      async () => {
+        const moving = await mini.evaluate(
+          () =>
+            document
+              .getAnimations()
+              .filter(
+                (each) =>
+                  each.playState === 'running' &&
+                  each.effect?.getComputedTiming().iterations !== Infinity,
+              ).length,
+        );
+        const start = await row(from).boundingBox();
+        const end = await row(to).boundingBox();
+        const seen = JSON.stringify([start, end]);
+        const still = moving === 0 && start !== null && end !== null && seen === last;
+        last = seen;
+        if (still) boxes = [start, end];
+        return still;
+      },
+      { intervals: [50] },
+    )
+    .toBe(true);
+  if (!boxes) throw new Error('rows not found');
+  return boxes;
+};
+
+/** A row's own drag shift (the drag sets `translateY(…)` inline; empty or 0 when it rests). */
+const shift = (text: string): Promise<string> =>
+  row(text).evaluate((element) => (element as HTMLElement).style.transform);
+
+/**
+ * A row dragged by the mouse to another row's place (the locked, springy drag): pressed once the
+ * list holds still, lifted past the threshold (the right row is the one lifted), moved in steps
+ * until the target row has made way, and only then dropped.
+ */
 const drag = async (from: string, to: string): Promise<void> => {
-  const start = await row(from).boundingBox();
-  const end = await row(to).boundingBox();
-  if (!start || !end) throw new Error('rows not found');
+  const [start, end] = await settledBoxes(from, to);
   const x = start.x + start.width / 2;
   await mini.mouse.move(x, start.y + start.height / 2);
   await mini.mouse.down();
   await mini.mouse.move(x, start.y + start.height / 2 - 6, { steps: 3 });
+  await expect(row(from)).toHaveClass(/\bdrag-lift\b/);
   await mini.mouse.move(x, end.y + end.height / 2 - (end.y < start.y ? 8 : -8), { steps: 10 });
-  await mini.waitForTimeout(300);
+  // The row it passed has slid out of its way: the drop lands in that row's place.
+  await expect(row(to)).toHaveClass(/\bdrag-peer\b/);
+  await expect.poll(() => shift(to)).not.toMatch(/^(translateY\(0px\))?$/);
   await mini.mouse.up();
 };
 

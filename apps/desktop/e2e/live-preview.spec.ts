@@ -47,6 +47,7 @@ let dataDirectory: string;
 let flint: string;
 let app: ElectronApplication;
 let main: Page;
+type Box = { x: number; y: number; width: number; height: number };
 
 const editor = (): Locator => main.locator('.note-editor .cm-content');
 const line = (text: string): Locator => editor().locator('.cm-line', { hasText: text }).first();
@@ -148,10 +149,17 @@ test('a picture stays drawn beside the caret; ← steps into its markdown (D-141
   const carets = main.locator('.note-editor .cm-fl-caret');
   await expect(carets).toHaveCount(1);
   await expect(editor()).toHaveClass(/cm-fl-caret-hidden/);
-  const caret = await carets.boundingBox();
-  const image = await picture.locator('.cm-fl-image img').boundingBox();
-  expect(caret && image).toBeTruthy();
-  if (caret && image) expect(Math.abs(caret.x - (image.x + image.width))).toBeLessThanOrEqual(8);
+  // Each measure is polled: the caret is drawn on the editor's next measure, so on a slow machine
+  // its first box can still be the previous position (CI read the other side of the picture).
+  // A missing box measures as Infinity and fails.
+  const measure = async (read: (caret: Box, image: Box) => number): Promise<number> => {
+    const caret = await carets.boundingBox();
+    const image = await picture.locator('.cm-fl-image img').boundingBox();
+    return caret && image ? read(caret, image) : Number.POSITIVE_INFINITY;
+  };
+  await expect
+    .poll(() => measure((caret, image) => Math.abs(caret.x - (image.x + image.width))))
+    .toBeLessThanOrEqual(8);
   // As tall as a text caret (a body character's box), on the picture's first text line, not the
   // picture's height (D-142).
   const textHeight = await line('After the picture.').evaluate((element) => {
@@ -161,16 +169,21 @@ test('a picture stays drawn beside the caret; ← steps into its markdown (D-141
     range.setEnd(text, 1);
     return range.getBoundingClientRect().height;
   });
-  if (caret && image) {
-    expect(Math.abs(caret.height - textHeight)).toBeLessThanOrEqual(2);
-    expect(caret.y).toBeGreaterThanOrEqual(image.y - 8);
-    expect(caret.y + caret.height).toBeLessThanOrEqual(image.y + 40);
-  }
-  // Right before it, likewise; away from it, the browser's own caret again.
+  await expect
+    .poll(() => measure((caret) => Math.abs(caret.height - textHeight)))
+    .toBeLessThanOrEqual(2);
+  // The caret's top at or below the picture's top - 8 px, its bottom within the picture's top 40 px.
+  await expect.poll(() => measure((caret, image) => image.y - 8 - caret.y)).toBeLessThanOrEqual(0);
+  await expect
+    .poll(() => measure((caret, image) => caret.y + caret.height - (image.y + 40)))
+    .toBeLessThanOrEqual(0);
+  // Right before it, likewise; away from it, the browser's own caret again. The caret is already
+  // one before Home moves it, so wait for its position, not its count.
   await main.keyboard.press('Home');
   await expect(carets).toHaveCount(1);
-  const before = await carets.boundingBox();
-  if (before && image) expect(Math.abs(before.x - image.x)).toBeLessThanOrEqual(8);
+  await expect
+    .poll(() => measure((caret, image) => Math.abs(caret.x - image.x)))
+    .toBeLessThanOrEqual(8);
   await main.keyboard.press('End');
   await main.keyboard.press('ArrowRight');
   await expect(carets).toHaveCount(0);
