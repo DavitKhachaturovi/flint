@@ -202,20 +202,27 @@ export function setCell(
   const missing = column - target.cells.length;
   const insert = target.trailing
     ? `${'  |'.repeat(missing)} ${written} |`
-    : ` |${'  |'.repeat(missing)} ${written}`;
+    : `${opensCell(target) ? '' : ' |'}${'  |'.repeat(missing)} ${written}`;
   return [{ from: target.to, insert }];
 }
 
-/** An empty row in the style of `template`: its indent, pipes and cell widths. */
+/**
+ * An empty row in the style of `template`: its indent and cell widths, and always both edge pipes
+ * (D-144, Proposed): GFM can't write an empty first or last cell without its edge pipe (`  |  `
+ * reads as a leading pipe and no cells), as `setCell` says.
+ */
 function emptyRow(template: TableRow, columns: number): string {
   const cells: string[] = [];
   for (let at = 0; at < columns; at++) {
     const model = template.cells[at];
     cells.push(' '.repeat(Math.max(2, model ? model.to - model.from : 2)));
   }
-  const trailing = template.trailing || columns === 1 ? '|' : '';
-  return `${template.indent}${template.leading ? '|' : ''}${cells.join('|')}${trailing}`;
+  return `${template.indent}|${cells.join('|')}|`;
 }
+
+/** Before a cell added at a row's end: a pipe, unless the row's leading pipe opens it (no cells). */
+const opensCell = (row: TableRow): boolean =>
+  row.trailing || (row.leading && row.cells.length === 0);
 
 /** Q11: a new body row after row `after` (0: right below the header), in the style of that row. */
 export function addRow(table: ParsedTable, after: number): ChangeSpec[] {
@@ -248,7 +255,7 @@ export function addColumn(table: ParsedTable, at: number, count = 1): ChangeSpec
     const more = `${content}|`.repeat(count);
     if (cell) changes.push({ from: cell.from, insert: more });
     else if (at === row.cells.length)
-      changes.push({ from: row.to, insert: row.trailing ? more : ` |${more}` });
+      changes.push({ from: row.to, insert: opensCell(row) ? more : ` |${more}` });
   }
   return changes;
 }

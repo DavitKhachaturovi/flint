@@ -45,6 +45,9 @@ const WIDE_ROW = (word: string): string =>
 const GRID = '| A  | B  | C  |\n| --- | --- | --- |\n| a1 | b1 | c1 |\n| a2 | b2 | c2 |';
 const GRID_NOTE = `---\nflint: 1\nid: grid\nmode: note\n---\nGrid.\n\n${GRID}\n\nEnd.\n`;
 const WIDE = `---\nflint: 1\nid: wide\nmode: note\n---\nWide.\n\n${WIDE_ROW('h')}\n|${' --- |'.repeat(14)}\n${WIDE_ROW('c')}\n\nEnd.\n`;
+/** D-144: a table without edge pipes. */
+const PLAIN_TABLE = 'Name | Age\n--- | ---\nAlex | 30';
+const PLAIN = `---\nflint: 1\nid: plain\nmode: note\n---\nPlain.\n\n${PLAIN_TABLE}\n\nEnd.\n`;
 /** D-144: two tables, a paragraph between them (each table's height must count exactly). */
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
 
@@ -90,6 +93,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Wide.md'), WIDE);
   await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
   await writeFile(join(flint, 'Twice.md'), TWICE);
+  await writeFile(join(flint, 'Plain.md'), PLAIN);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -878,4 +882,47 @@ test('pasting tab-separated text fills cells from the active one, growing the ta
   await expect(selected()).toHaveCount(0);
   await main.keyboard.press('Control+z');
   await expect.poll(grid).toBe(GRID_NOTE);
+});
+
+test('a table without edge pipes: Enter and Tab add a row that keeps its cells, a paste grows it (D-144)', async () => {
+  const plain = (): Promise<string> => readFile(join(flint, 'Plain.md'), 'utf8');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Plain' }).first().click();
+  await expect(cell(1, 0)).toHaveText('Alex');
+  await expect.poll(plain).toBe(PLAIN);
+  const undoAll = async (): Promise<void> => {
+    for (let tries = 0; tries < 8 && (await plain()) !== PLAIN; tries++) {
+      const now = await plain();
+      await main.keyboard.press('Control+z');
+      await expect.poll(plain).not.toBe(now);
+    }
+    await expect.poll(plain).toBe(PLAIN);
+  };
+  // Enter on the last row: a new row, written with its edge pipes (an empty first and last cell
+  // need them); the keys go into its first cell.
+  await cell(1, 0).click();
+  await main.keyboard.press('Enter');
+  await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.type('Zed');
+  await expect.poll(plain).toBe(PLAIN.replace(PLAIN_TABLE, `${PLAIN_TABLE}\n| Zed |   |`));
+  // Tab on to the next cell, and from the last cell a new row (never the row indented).
+  await main.keyboard.press('Tab');
+  await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.type('7');
+  await main.keyboard.press('Tab');
+  await expect(cell(3, 0)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.type('Ann');
+  await expect
+    .poll(plain)
+    .toBe(PLAIN.replace(PLAIN_TABLE, `${PLAIN_TABLE}\n| Zed | 7 |\n| Ann |   |`));
+  await expect(table().locator('tr')).toHaveCount(4);
+  await undoAll();
+  // A block larger than the table pasted into Alex: every cell lands, none lost.
+  await cell(1, 0).click();
+  await clipboard(activeCell(), 'paste', { 'text/plain': 'p\tq\nr\ts' });
+  await expect
+    .poll(plain)
+    .toBe(PLAIN.replace(PLAIN_TABLE, 'Name | Age\n--- | ---\np | q\n| r | s |'));
+  await expect(cell(2, 0)).toHaveText('r');
+  await expect(cell(2, 1)).toHaveText('s');
+  await undoAll();
 });

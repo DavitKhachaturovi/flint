@@ -233,6 +233,48 @@ describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
     ).toBe('| a | b | c |\n| - | - | - |\n| x |  | z |\n|  |  |');
   });
 
+  it('writes an empty row with its edge pipes, so a table without them keeps its cells', () => {
+    // `  |  ` would read as a leading pipe and no cells (GFM, and Lezer): a cell lost on a paste.
+    const plain = table('a | b\n--- | ---\n1 | 2');
+    const added = apply(plain.state, addRow(plain.table, 1));
+    expect(added).toBe('a | b\n--- | ---\n1 | 2\n|  |  |');
+    expect(texts(added)).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+      ['', ''],
+    ]);
+    expect(
+      texts(
+        apply(
+          plain.state,
+          setCells(
+            plain.state,
+            plain.table,
+            1,
+            0,
+            [
+              ['p', 'q'],
+              ['r', 's'],
+            ],
+            true,
+          ),
+        ),
+      ),
+    ).toEqual([
+      ['a', 'b'],
+      ['p', 'q'],
+      ['r', 's'],
+    ]);
+    const leadOnly = table('| a | b\n| - | -\n| 1 | 2');
+    expect(texts(apply(leadOnly.state, addRow(leadOnly.table, 1)))[2]).toEqual(['', '']);
+    // A row that is only its leading pipe (no cells): its first cell right after that pipe.
+    const bare = table('| a | b |\n| - | - |\n|');
+    expect(apply(bare.state, setCell(bare.state, bare.table, 1, 0, 'x'))).toBe(
+      '| a | b |\n| - | - |\n| x',
+    );
+    expect(texts(apply(bare.state, addColumn(bare.table, 0)))[1]).toEqual(['']);
+  });
+
   it('adds several columns in one pass, as adding them one at a time would', () => {
     const docs = [DOC, 'a | b\n--- | ---\n1 | 2\n3 |', '| a |\n|---|\n| 1 | extra |\n| 2 |'];
     for (const doc of docs) {
@@ -415,6 +457,77 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
           expect(result.slice(after.delimiter.from, after.delimiter.to)).toBe(
             doc.slice(t.delimiter.from, t.delimiter.to),
           );
+        },
+      ),
+      { numRuns: RUNS },
+    );
+  });
+
+  /** Any table: with or without edge pipes, short rows, in a quote or not, text around it or not. */
+  const anyTableDoc = fc
+    .record({
+      columns: fc.integer({ min: 1, max: 4 }),
+      rows: fc.integer({ min: 0, max: 4 }),
+      edges: fc.boolean(),
+      quote: fc.boolean(),
+      around: fc.boolean(),
+      cells: fc.array(fc.tuple(padding, cellText, padding), { minLength: 30, maxLength: 30 }),
+      short: fc.array(fc.nat({ max: 3 }), { minLength: 4, maxLength: 4 }),
+    })
+    .map(({ columns, rows, edges, quote, around, cells, short }) => {
+      let next = 0;
+      const cell = (): string => {
+        const [before, text, after] = cells[next++ % cells.length] ?? ['', '', ''];
+        const safe = text.replace(/\\/g, '').replace(/\|/g, '\\|');
+        return `${before}${safe || 'x'}${after || ' '}`;
+      };
+      const piped = edges || columns === 1;
+      const line = (parts: string[]): string => (piped ? `|${parts.join('|')}|` : parts.join('|'));
+      const header = line(Array.from({ length: columns }, () => ` h${cell()}`));
+      const delimiter = line(Array.from({ length: columns }, () => ' --- '));
+      // A short row without edge pipes still has a pipe (a line without one would be read as a
+      // row too, but as a paragraph's continuation where the table starts).
+      const body = Array.from({ length: rows }, (_, at) => {
+        const count = columns - ((short[at] ?? 0) % columns);
+        return line(
+          Array.from({ length: piped ? count : Math.max(2, count) }, () => ` b${cell()}`),
+        );
+      });
+      const prefix = quote ? '> ' : '';
+      const lines = [header, delimiter, ...body].map((each) => prefix + each).join('\n');
+      return around ? `Before.\n\n${lines}\n\nAfter.\n` : lines;
+    });
+
+  it('a pasted block grows any table: every cell lands where it should, nothing else changes (D-144)', () => {
+    fc.assert(
+      fc.property(
+        anyTableDoc,
+        fc.nat(),
+        fc.nat(),
+        fc.array(fc.array(cellText, { minLength: 1, maxLength: 4 }), {
+          minLength: 1,
+          maxLength: 4,
+        }),
+        (doc, rowPick, columnPick, block) => {
+          const { state: s, table: t } = table(doc);
+          const row = rowPick % t.rows.length;
+          const column = columnPick % t.columns;
+          const width = Math.max(...block.map((cells) => cells.length));
+          const result = apply(s, setCells(s, t, row, column, block, true));
+          const after = table(result).table;
+          // The text around the table as it was.
+          expect(result.slice(0, after.from)).toBe(doc.slice(0, t.from));
+          expect(result.slice(after.to)).toBe(doc.slice(t.to));
+          expect(after.columns).toBe(Math.max(t.columns, column + width));
+          expect(after.rows.length).toBe(Math.max(t.rows.length, row + block.length));
+          for (let r = 0; r < after.rows.length; r++)
+            for (let c = 0; c < after.columns; c++) {
+              const inBlock = r >= row && r - row < block.length && c >= column;
+              const given = inBlock ? block[r - row]?.[c - column] : undefined;
+              const wanted = given ?? t.rows[r]?.cells[c]?.text ?? '';
+              const now = after.rows[r]?.cells[c]?.text ?? '';
+              if (!wanted.includes('\\') && !now.includes('\\')) expect(now).toBe(wanted.trim());
+            }
         },
       ),
       { numRuns: RUNS },
