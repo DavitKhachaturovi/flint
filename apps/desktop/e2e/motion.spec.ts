@@ -153,7 +153,7 @@ async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
   );
   await writeFile(
     join(flint, 'Plans.md'),
-    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n- [ ] Book the hotel\n',
+    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n- [ ] Book the hotel\n\n| City | Days |\n| ---- | ---- |\n| Rome | 3    |\n',
   );
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(
@@ -401,6 +401,23 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'A note: Source mode off', 'motion', () =>
     main.keyboard.press('Control+Shift+E'),
   );
+  // NOTE-10, D-141 Q12: a table's active cell has a ring that glides; a new row fades in.
+  const tableCell = (row: number, column: number) =>
+    main.locator(`.main .note-card .cm-fl-table [data-row="${row}"][data-column="${column}"]`);
+  await step(main, 'A table: a cell is edited (its ring fades in)', 'motion', () =>
+    tableCell(1, 0).click(),
+  );
+  await step(main, 'A table: Tab (the ring glides to the next cell)', 'motion', () =>
+    main.keyboard.press('Tab'),
+  );
+  await step(
+    main,
+    'A table: Tab in the last cell (a row fades in, the table grows)',
+    'motion',
+    () => main.keyboard.press('Tab'),
+  );
+  await main.keyboard.press('Control+z');
+  await main.keyboard.press('Escape');
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),
   );

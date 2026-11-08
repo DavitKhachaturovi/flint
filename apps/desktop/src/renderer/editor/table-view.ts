@@ -15,7 +15,7 @@ import {
 } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view';
 import { titleHtml } from '../../shared/inline-markdown.js';
-import { durationMs, nudgeElement } from '../ui/motion.js';
+import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
 import { announceUndo } from '../media/media.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
@@ -199,10 +199,16 @@ class TableWidget extends WidgetType {
     // Typing was going on in a cell: whatever moves the active cell (a key, an undo, a new row),
     // the next cell's editor takes the focus, so no key goes astray.
     const cellHadFocus = holder?.editor?.hasFocus ?? false;
+    // Q12: the ring follows the active cell once the table is drawn.
+    requestAnimationFrame(() => placeRing(wrap));
     if (!holder || holder.shape !== shape) {
+      const before = holder
+        ? wrap.querySelector('.cm-fl-table-box')?.getBoundingClientRect()
+        : null;
       holder?.editor?.destroy();
       holder = build(wrap, table, shape, view);
       holders.set(wrap, holder);
+      if (before) reshaped(wrap, holder, table, before);
     }
     holder.from = table.from;
     const key = this.active ? `${this.active.row}:${this.active.column}` : null;
@@ -334,6 +340,80 @@ function build(wrap: HTMLElement, table: ParsedTable, shape: string, view: Edito
   return { from: table.from, shape, cells, editor: null, key: null };
 }
 
+/** Rows or columns just added (Q12: they fade in), set by the edit that adds them. */
+let added: { from: number; axis: 'rows' | 'columns'; first: number; last: number } | null = null;
+
+/** Q12: a table that changed shape eases from its old size to its new one; new rows or columns
+ * fade in. Off with reduce-motion; nothing waits for it (D-75). */
+function reshaped(wrap: HTMLElement, holder: Holder, table: ParsedTable, before: DOMRect): void {
+  const hint = added && added.from === table.from ? added : null;
+  added = null;
+  if (reducedMotion()) return;
+  const timing = {
+    duration: durationMs('--fl-dur-base', 200),
+    easing: 'cubic-bezier(.2, .9, .3, 1)',
+  };
+  if (hint)
+    for (const [key, cell] of holder.cells) {
+      const [row, column] = key.split(':').map(Number) as [number, number];
+      const index = hint.axis === 'rows' ? row : column;
+      if (index >= hint.first && index <= hint.last)
+        cell.animate([{ opacity: 0 }, { opacity: 1 }], timing);
+    }
+  requestAnimationFrame(() => {
+    const box = wrap.querySelector<HTMLElement>('.cm-fl-table-box');
+    if (!box) return;
+    const after = box.getBoundingClientRect();
+    if (Math.abs(after.width - before.width) < 1 && Math.abs(after.height - before.height) < 1)
+      return;
+    box.style.overflow = 'clip';
+    box
+      .animate(
+        [
+          { width: `${before.width}px`, height: `${before.height}px` },
+          { width: `${after.width}px`, height: `${after.height}px` },
+        ],
+        timing,
+      )
+      .finished.finally(() => {
+        box.style.overflow = '';
+      })
+      .catch(() => undefined);
+  });
+}
+
+/** Q12: the active cell's ring, an overlay that moves from cell to cell (and fades in and out). */
+function placeRing(wrap: HTMLElement): void {
+  const holder = holders.get(wrap);
+  const box = wrap.querySelector<HTMLElement>('.cm-fl-table-box');
+  const element = box?.querySelector<HTMLElement>('.cm-fl-table');
+  if (!holder || !box || !element) return;
+  let ring = box.querySelector<HTMLElement>('.cm-fl-cell-ring');
+  if (!ring) {
+    ring = document.createElement('div');
+    ring.className = 'cm-fl-cell-ring off';
+    box.append(ring);
+  }
+  const cell = holder.key ? holder.cells.get(holder.key) : undefined;
+  if (!cell) {
+    ring.classList.add('off');
+    return;
+  }
+  const place = (target: HTMLElement): void => {
+    target.style.left = `${element.offsetLeft + cell.offsetLeft}px`;
+    target.style.top = `${element.offsetTop + cell.offsetTop}px`;
+    target.style.width = `${cell.offsetWidth}px`;
+    target.style.height = `${cell.offsetHeight}px`;
+  };
+  if (ring.classList.contains('off')) {
+    // Appearing: in place at once, then it fades in.
+    ring.classList.add('placing');
+    place(ring);
+    void ring.offsetWidth;
+    ring.classList.remove('placing', 'off');
+  } else place(ring);
+}
+
 /** Several of a table's edits in a row as one change (one undo step): each on the table as the
  * edit before it left it. */
 function composed(
@@ -379,6 +459,7 @@ function resize(
   target: number,
 ): void {
   const more = target > count;
+  if (more) added = { from, axis, first: count, last: target - 1 };
   const changes = composed(view, from, Math.abs(target - count), (table) => {
     if (axis === 'columns')
       return more ? addColumn(table, table.columns) : deleteColumn(table, table.columns - 1);
@@ -600,6 +681,7 @@ function cellEditor(
     else if (row + 1 < table.rows.length) goTo(view, table, row + 1, 0, 'start');
     else {
       // Tab in the last cell adds a row (Q9).
+      added = { from: table.from, axis: 'rows', first: row + 1, last: row + 1 };
       view.dispatch({ changes: addRow(table, row), userEvent: 'input' });
       const grown = tableAt(view.state, table.from);
       if (grown) goTo(view, grown, row + 1, 0, 'start');
@@ -617,6 +699,7 @@ function cellEditor(
     if (row + 1 < table.rows.length) goTo(view, table, row + 1, column, 'end');
     else {
       // Enter on the last row adds a row (Q9).
+      added = { from: table.from, axis: 'rows', first: row + 1, last: row + 1 };
       view.dispatch({ changes: addRow(table, row), userEvent: 'input' });
       const grown = tableAt(view.state, table.from);
       if (grown) goTo(view, grown, row + 1, column, 'start');
@@ -842,25 +925,37 @@ export function tableCommands(view: EditorView, here: CellAt): TableCommand[] {
       id: 'table:row-above',
       label: 'Add row above',
       disabled: row === 0,
-      run: () => change(addRow(live(), row - 1), 'input.table'),
+      run: () => {
+        added = { from: table.from, axis: 'rows', first: row, last: row };
+        change(addRow(live(), row - 1), 'input.table');
+      },
     },
     {
       id: 'table:row-below',
       label: 'Add row below',
       disabled: false,
-      run: () => change(addRow(live(), row), 'input.table'),
+      run: () => {
+        added = { from: table.from, axis: 'rows', first: row + 1, last: row + 1 };
+        change(addRow(live(), row), 'input.table');
+      },
     },
     {
       id: 'table:column-left',
       label: 'Add column left',
       disabled: false,
-      run: () => change(addColumn(live(), column), 'input.table'),
+      run: () => {
+        added = { from: table.from, axis: 'columns', first: column, last: column };
+        change(addColumn(live(), column), 'input.table');
+      },
     },
     {
       id: 'table:column-right',
       label: 'Add column right',
       disabled: false,
-      run: () => change(addColumn(live(), column + 1), 'input.table'),
+      run: () => {
+        added = { from: table.from, axis: 'columns', first: column + 1, last: column + 1 };
+        change(addColumn(live(), column + 1), 'input.table');
+      },
     },
     {
       id: 'table:delete-row',

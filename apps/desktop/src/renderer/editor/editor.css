@@ -257,8 +257,32 @@
   text-align: left;
 }
 
-.cm-fl-table .cm-fl-cell-active {
+/* Q12: the active cell's ring, an overlay gliding from cell to cell; it fades in and out. */
+.cm-fl-cell-ring {
+  position: absolute;
+  border-radius: 2px;
   box-shadow: inset 0 0 0 1.5px var(--fl-accent);
+  pointer-events: none;
+  transition:
+    left var(--fl-dur-fast) ease-out,
+    top var(--fl-dur-fast) ease-out,
+    width var(--fl-dur-fast) ease-out,
+    height var(--fl-dur-fast) ease-out,
+    opacity var(--fl-dur-fast);
+}
+
+.cm-fl-cell-ring.off {
+  opacity: 0;
+}
+
+.cm-fl-cell-ring.placing {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-fl-cell-ring {
+    transition: none;
+  }
 }
 
 .cm-fl-cell-active .cm-editor,

@@ -1092,3 +1092,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 24 | Tables drawn in the editor (block widget, the rendered body's look, sideways scroll) and cells edited in place with the Q9 keys, the note's own undo, whole-table selections | NOTE-10 · Built (1.2.0 steps 2–3) | D-141 |
 | 25 | The table's commands in its right-click menu and the palette (while the caret is in a table); deletes and Align table with an Undo toast; Edit markdown | NOTE-10 · Built (1.2.0 step 4) | D-141 |
 | 26 | The edge drag: columns and rows added or taken away at the end in one step, dimmed and counted during the drag, Esc cancels, the inline warning before text goes | NOTE-10 · Built (1.2.0 step 5) | D-141 |
+| 27 | The table's motion: the ring glides, shape changes ease, new rows and columns fade in; in the motion census | NOTE-10 · Built (1.2.0 step 6) | D-141 |
