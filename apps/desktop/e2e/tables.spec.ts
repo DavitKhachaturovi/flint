@@ -178,6 +178,7 @@ test('a table is drawn as a table, its pipes and delimiter row hidden (NOTE-10, 
 test('a click edits a cell in place; only its bytes are written; Ctrl+Z undoes (Q9, Q10)', async () => {
   await cell(1, 0).click();
   await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(1, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('End');
   await main.keyboard.type('a');
   await expect.poll(file).toContain('| Alexa    | 30  |');
@@ -193,9 +194,11 @@ test('Tab goes to the next cell and, in the last one, adds a row in the table’
   await editCell(1, 0);
   await main.keyboard.press('Tab');
   await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(1, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('Tab');
   await expect.poll(file).toContain(`${TABLE}\n|         |     |\n`);
   await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(2, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Sam');
   await expect.poll(file).toContain(`${TABLE}\n| Sam |     |\n`);
   await main.keyboard.press('Shift+Tab');
@@ -203,6 +206,7 @@ test('Tab goes to the next cell and, in the last one, adds a row in the table’
   // Enter: the cell below; on the last row, a new row.
   await main.keyboard.press('Enter');
   await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(2, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('Control+z');
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
@@ -214,6 +218,7 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await main.keyboard.press('ArrowDown');
   await main.keyboard.press('ArrowDown');
   await expect(cell(0, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(0, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('ArrowUp');
   await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
   await editCell(1, 1);
@@ -768,6 +773,7 @@ test('a drag across cells selects a rectangle; a click or Esc clears it (D-144)'
   await cell(1, 1).click({ modifiers: ['Shift'] });
   await expect(selected()).toHaveCount(3);
   await expect(cell(2, 2)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(2, 2).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('Escape');
   await expect(selected()).toHaveCount(0);
   await expect(cell(2, 2)).toHaveClass(/cm-fl-cell-active/);
@@ -794,6 +800,7 @@ test('Shift+arrows select cells from the text’s edge on; a plain arrow clears 
   await expect(selected()).toHaveCount(5);
   await expect(cell(0, 2)).toHaveClass(/cm-fl-cell-selected/);
   await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(1, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('ArrowLeft');
   await expect(selected()).toHaveCount(0);
   await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
@@ -1031,14 +1038,17 @@ test('a table without edge pipes: Enter and Tab add a row that keeps its cells, 
   await editCell(1, 0);
   await main.keyboard.press('Enter');
   await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(2, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Zed');
   await expect.poll(plain).toBe(PLAIN.replace(PLAIN_TABLE, `${PLAIN_TABLE}\n| Zed |   |`));
   // Tab on to the next cell, and from the last cell a new row (never the row indented).
   await main.keyboard.press('Tab');
   await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(2, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('7');
   await main.keyboard.press('Tab');
   await expect(cell(3, 0)).toHaveClass(/cm-fl-cell-active/);
+  await expect(cell(3, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Ann');
   await expect
     .poll(plain)
