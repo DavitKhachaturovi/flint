@@ -344,7 +344,13 @@ test("a quick note's title: Enter, Tab, ↓ and Shift+Enter save it and go on in
 test("a note given its ID by its first save, opened again after another note: its own editor, and Ctrl+Z never brings in the other note's text or undoes a change from outside (D-115, D-143)", async () => {
   // D-23: a file without Flint's header gets it (and an ID) on its first save.
   await writeFile(join(flint, 'Loose.md'), 'Loose text\n');
+  // Notes of its own (an earlier test renames Plan).
+  await writeFile(
+    join(flint, 'Second note.md'),
+    '---\nflint: 1\nid: second\nmode: note\n---\nFirst line of the second note.\n',
+  );
   await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Loose' })).toBeVisible();
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Second note' })).toBeVisible();
   await open('Loose');
   const editor = main.locator('.note-card .cm-content');
   await editor.click();
@@ -355,10 +361,10 @@ test("a note given its ID by its first save, opened again after another note: it
     .poll(() => readFile(join(flint, 'Loose.md'), 'utf8'))
     .toMatch(/^---\n[\s\S]*\bid: [\s\S]*Loose text typed/);
   // Another note, its editor marked, then the first one again: a new editor, not that one.
-  await open('Plan');
-  await expect(editor).toContainText('First line of the plan.');
+  await open('Second note');
+  await expect(editor).toContainText('First line of the second note.');
   await main.locator('.note-card .cm-editor').evaluate((element) => {
-    (element as HTMLElement).dataset.e2eNote = 'plan';
+    (element as HTMLElement).dataset.e2eNote = 'second';
   });
   await open('Loose');
   await expect(editor).toContainText('Loose text typed');
@@ -368,18 +374,20 @@ test("a note given its ID by its first save, opened again after another note: it
   for (let undo = 0; undo < 3; undo += 1) await main.keyboard.press('Control+z');
   await main.waitForTimeout(1200);
   await expect(editor).toContainText('Loose text');
-  await expect(editor).not.toContainText('First line of the plan.');
-  expect(await readFile(join(flint, 'Loose.md'), 'utf8')).not.toContain('plan');
+  await expect(editor).not.toContainText('First line of the second note.');
+  expect(await readFile(join(flint, 'Loose.md'), 'utf8')).not.toContain('second note');
 
   // A change from outside (the file edited elsewhere) shows, and Ctrl+Z doesn't undo it.
-  await open('Plan');
-  const plan = await readFile(join(flint, 'Plan.md'), 'utf8');
-  await writeFile(join(flint, 'Plan.md'), plan.replace('First line', 'Changed outside'));
-  await expect(editor).toContainText('Changed outside of the plan.');
+  await open('Second note');
+  const second = await readFile(join(flint, 'Second note.md'), 'utf8');
+  await writeFile(join(flint, 'Second note.md'), second.replace('First line', 'Changed outside'));
+  await expect(editor).toContainText('Changed outside of the second note.');
   await editor.click();
   for (let undo = 0; undo < 3; undo += 1) await main.keyboard.press('Control+z');
   await main.waitForTimeout(1200);
-  await expect(editor).toContainText('Changed outside of the plan.');
-  expect(await readFile(join(flint, 'Plan.md'), 'utf8')).toContain('Changed outside of the plan.');
+  await expect(editor).toContainText('Changed outside of the second note.');
+  expect(await readFile(join(flint, 'Second note.md'), 'utf8')).toContain(
+    'Changed outside of the second note.',
+  );
   await main.locator('.sidebar > .nav[data-key="@today"]').click();
 });
