@@ -401,12 +401,11 @@ class TableWidget extends WidgetType {
     if (!target && !pressedOn.closest('.cm-fl-table')) {
       // D-144 (Proposed): a press beside or under the table, off its cells and handles (the
       // handles' gutter, the space right of a narrow table), puts the caret on the line after it,
-      // as ↓ from its last row does; nothing is written, so at the note's end the caret stays.
-      // The widget takes its own events, so without this the press would leave no caret at all.
+      // as ↓ from its last row does; at the note's end that line is made, as Esc makes it. The
+      // widget takes its own events, so without this the press would leave no caret at all.
       event.preventDefault();
       const live = tableAt(view.state, holder.from);
-      if (live && live.to < view.state.doc.length) leave(view, live, 'below');
-      else if (!view.hasFocus && !holder.editor?.hasFocus) view.focus();
+      if (live) leave(view, live, 'below', true);
       return;
     }
     if (!target) return;
@@ -1061,7 +1060,13 @@ function goTo(
   });
 }
 
-/** Leaves the table for the line above or below it (Esc: below, making one if there is none). */
+/**
+ * Leaves the table for the line above or below it (Esc: below, making one if there is none).
+ * Below, the caret goes after that line's quote marks and indentation (a table in a quote: the
+ * text stays in the quote); where the line under the table isn't empty (a heading right under it)
+ * or there is none and `make` is set, an empty line is made for it, in a quote the quote's `>`
+ * (D-144, Proposed).
+ */
 function leave(
   view: EditorView,
   table: ParsedTable,
@@ -1079,18 +1084,21 @@ function leave(
     });
     return true;
   }
-  if (table.to < doc.length) {
+  const next = table.to < doc.length ? doc.lineAt(table.to + 1) : null;
+  const prefix = next ? containerPrefix(next.text) : '';
+  if (next && next.text.slice(prefix.length).trim() === '') {
     view.dispatch({
-      selection: { anchor: table.to + 1 },
+      selection: { anchor: next.from + prefix.length },
       scrollIntoView: true,
       userEvent: 'select',
     });
     return true;
   }
-  if (!make) return false;
+  if (!next && !make) return false;
+  const blank = `\n${(table.rows[table.rows.length - 1]?.indent ?? '').trimEnd()}`;
   view.dispatch({
-    changes: { from: table.to, insert: '\n' },
-    selection: { anchor: table.to + 1 },
+    changes: { from: table.to, insert: blank },
+    selection: { anchor: table.to + blank.length },
     scrollIntoView: true,
     userEvent: 'input',
   });

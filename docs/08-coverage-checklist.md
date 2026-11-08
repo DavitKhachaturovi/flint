@@ -1102,6 +1102,8 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 34 | A click anywhere on the line under a table lands on that line (the table's block has no vertical margin, which CodeMirror's height map would leave out) | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
 | 35 | A table without edge pipes keeps its cells: a new empty row written with both edge pipes, so a grow paste, Enter and Tab work there; a randomised grow test over any table | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 04 §4, D-144 |
 | 36 | Backspace on the empty line under a table that ends the note: the text unchanged, the caret at the end of the last cell | NOTE-10 · Fixed (1.2.0, second preview) | 02, 03 §3, D-144 |
+| 37 | Esc with the edge drag's question up goes first to the note's find bar or slash menu over it | NOTE-10 · Fixed (1.2.0, second preview) | 02, 03 §4, D-144 |
+| 38 | A click under a table (and ↓ from its last row): at the note's end the line made as Esc makes it; in a quote after the quote's mark; above a heading a new line | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 02, D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 

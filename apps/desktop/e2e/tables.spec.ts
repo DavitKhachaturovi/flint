@@ -51,6 +51,10 @@ const PLAIN = `---\nflint: 1\nid: plain\nmode: note\n---\nPlain.\n\n${PLAIN_TABL
 /** D-144: a note that ends with a table (and its line break). */
 const ENDING = `---\nflint: 1\nid: ending\nmode: note\n---\nIntro.\n\n${INSERTED}\n`;
 /** D-144: two tables, a paragraph between them (each table's height must count exactly). */
+/** D-144: a note that ends with a table, no line break after it, the caret far above it. */
+const TAIL = `---\nflint: 1\nid: tail\nmode: note\n---\nFirst line here.\n\nSecond line.\n\n| a | b |\n| - | - |\n| c | d |`;
+/** D-144: a table right above a heading (no blank line between). */
+const HEADING = `---\nflint: 1\nid: heading\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |\n# Heading\n`;
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
 
 let dataDirectory: string;
@@ -97,6 +101,8 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Twice.md'), TWICE);
   await writeFile(join(flint, 'Plain.md'), PLAIN);
   await writeFile(join(flint, 'Ending.md'), ENDING);
+  await writeFile(join(flint, 'Tail.md'), TAIL);
+  await writeFile(join(flint, 'Heading.md'), HEADING);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -974,5 +980,44 @@ test('Backspace under a table that ends the note leaves the text as it is, the c
     await expect.poll(ending).toBe(ENDING.replace('| test |  |  |', '| test |  | zq |'));
     await main.keyboard.press('Control+z');
     await expect.poll(ending).toBe(ENDING);
+  }
+});
+
+test('a click under a table at the note’s end, in a quote or over a heading: the keys go on a line under it (D-144)', async () => {
+  const cases = [
+    // At the note's end: the line made as Esc makes it (the editor not focused before).
+    ['Tail', TAIL, `${TAIL}\n\nQ`],
+    // In a quote: after the quote's mark, the text stays in the quote.
+    ['Quoted', QUOTED, QUOTED.replace('| c | d |\n>\n', '| c | d |\n>\n>Q\n')],
+    // Right above a heading: a new line, not the heading's start.
+    ['Heading', HEADING, HEADING.replace('| c | d |\n', '| c | d |\n\nQ\n')],
+  ] as const;
+  for (const [name, source, after] of cases) {
+    const read = (): Promise<string> => readFile(join(flint, `${name}.md`), 'utf8');
+    // Opened from the sidebar: the note's editor has no caret the user placed.
+    await main.locator('.nav:not(.flip-ghost)', { hasText: name }).first().click();
+    await expect(cell(1, 1)).toHaveText('d');
+    // ↓ from the last row shares the way out (at the note's end it stays: Esc makes the line).
+    for (const how of name === 'Tail' ? (['click'] as const) : (['click', 'down'] as const)) {
+      if (how === 'click') {
+        const edges = await table().boundingBox();
+        if (!edges) throw new Error('no table');
+        await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
+      } else {
+        await cell(1, 1).click();
+        await main.keyboard.press('ArrowDown');
+      }
+      await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
+      await expect(editor()).toBeFocused();
+      await main.keyboard.type('Q');
+      await expect.poll(read).toBe(after);
+      await expect(table().locator('tr')).toHaveCount(2);
+      for (let tries = 0; tries < 4 && (await read()) !== source; tries++) {
+        const now = await read();
+        await main.keyboard.press('Control+z');
+        await expect.poll(read).not.toBe(now);
+      }
+      await expect.poll(read).toBe(source);
+    }
   }
 });
