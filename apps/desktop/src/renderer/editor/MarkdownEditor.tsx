@@ -12,6 +12,7 @@ import {
 } from '../media/media.js';
 import { replaceLink } from './live-preview.js';
 import { editorExtensions, type PreviewHandlers } from './live-preview.js';
+import { fromEditor, lineEndingOf, toEditor, type LineEnding } from './line-endings.js';
 
 /**
  * The note editor in React (M5, D-79): notes, and task bodies on their page and inline. It owns its
@@ -63,6 +64,9 @@ export function MarkdownEditor(props: {
   const view = useRef<EditorView | null>(null);
   const latest = useRef(props);
   latest.current = props;
+  /** The note's line ending, given back with every text (D-141: byte-exact files). */
+  const eol = useRef<LineEnding>(lineEndingOf(text));
+  const out = (editor: EditorView): string => fromEditor(editor.state.doc.toString(), eol.current);
   /** Typed and not yet handed over with `text` (it wins over `text`). */
   const pending = useRef(false);
 
@@ -72,8 +76,8 @@ export function MarkdownEditor(props: {
     const editor = new EditorView({
       parent,
       state: EditorState.create({
-        doc: text,
-        ...(caretAtEnd ? { selection: { anchor: text.length } } : {}),
+        doc: toEditor(text),
+        ...(caretAtEnd ? { selection: { anchor: toEditor(text).length } } : {}),
         extensions: [
           editorExtensions({
             readOnly,
@@ -89,7 +93,7 @@ export function MarkdownEditor(props: {
             onEscape: () => {
               const done = latest.current.onEscape;
               if (!done) return false;
-              done(editor.state.doc.toString());
+              done(out(editor));
               return true;
             },
             onPaste: (event, target) => paste(event, target),
@@ -112,10 +116,10 @@ export function MarkdownEditor(props: {
             const outside = update.transactions.some((tr) => tr.annotation(fromOutside));
             if (update.docChanged && !outside) {
               pending.current = true;
-              latest.current.onChange?.(update.state.doc.toString());
+              latest.current.onChange?.(out(update.view));
             }
             if (update.focusChanged && !update.view.hasFocus)
-              latest.current.onBlur?.(update.state.doc.toString());
+              latest.current.onBlur?.(out(update.view));
             if (update.focusChanged && update.view.hasFocus) latest.current.onFocus?.();
           }),
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
@@ -164,14 +168,16 @@ export function MarkdownEditor(props: {
   useEffect(() => {
     const editor = view.current;
     if (!editor) return;
+    eol.current = lineEndingOf(text);
     const current = editor.state.doc.toString();
-    if (current === text) {
+    const next = toEditor(text);
+    if (current === next) {
       pending.current = false;
       return;
     }
     if (pending.current && editor.hasFocus && !latest.current.locked) return;
     pending.current = false;
-    editor.dispatch({ changes: difference(current, text), annotations: fromOutside.of(true) });
+    editor.dispatch({ changes: difference(current, next), annotations: fromOutside.of(true) });
   }, [text]);
 
   // D-109: locked while another window edits the note, unlocked once this one may type.

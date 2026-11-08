@@ -27,5 +27,7 @@ export default defineConfig({
     // Georgia (UTC+4, no daylight saving) is where Flint is used first. Time tests that need a
     // daylight-saving zone set process.env.TZ themselves.
     env: { TZ: 'Asia/Tbilisi' },
+    // D-141 Q13: FLINT_FUZZ_SEED fixes fast-check's seed (npm run fuzz prints it each round).
+    setupFiles: ['scripts/fuzz-seed.mjs'],
   },
 });

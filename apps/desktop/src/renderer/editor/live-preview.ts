@@ -21,8 +21,6 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
-import type { SyntaxNode } from '@lezer/common';
-import type { MarkdownConfig } from '@lezer/markdown';
 import {
   announce,
   fileMenuItems,
@@ -31,7 +29,7 @@ import {
   mediaElement,
 } from '../media/media.js';
 import { COPY_ICON, copyWithFeedback } from '../media/copy.js';
-import { activeLinkPatterns, findShortForms, linkTitle } from '../../shared/link-patterns.js';
+import { activeLinkPatterns } from '../../shared/link-patterns.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
   EDITOR_COMMANDS,
@@ -41,6 +39,8 @@ import {
 } from './commands.js';
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
+import { buildPreview } from './preview.js';
+import { NOTE_SYNTAX } from './syntax.js';
 
 /**
  * The note editor (M5, NOTE-01, D-49, D-79): CodeMirror with an Obsidian-style live preview. The
@@ -63,38 +63,6 @@ export interface PreviewHandlers {
 const handlersFacet = Facet.define<PreviewHandlers, PreviewHandlers>({
   combine: (values) => values[0] ?? {},
 });
-
-/** `==highlight==`, as in Obsidian (NOTE-02, D-72): the same rules as `~~strikethrough~~`. */
-const PUNCTUATION = /[!-/:-@[-`{-~¡-¿]/;
-const highlightDelimiter = { resolve: 'Highlight', mark: 'HighlightMark' };
-const Highlight: MarkdownConfig = {
-  defineNodes: [
-    { name: 'Highlight', style: { 'Highlight/...': tags.special(tags.content) } },
-    { name: 'HighlightMark', style: tags.processingInstruction },
-  ],
-  parseInline: [
-    {
-      name: 'Highlight',
-      parse(cx, next, pos) {
-        if (next !== 61 || cx.char(pos + 1) !== 61 || cx.char(pos + 2) === 61) return -1;
-        const before = cx.slice(pos - 1, pos);
-        const after = cx.slice(pos + 2, pos + 3);
-        const spaceBefore = /\s|^$/.test(before);
-        const spaceAfter = /\s|^$/.test(after);
-        const punctBefore = PUNCTUATION.test(before);
-        const punctAfter = PUNCTUATION.test(after);
-        return cx.addDelimiter(
-          highlightDelimiter,
-          pos,
-          pos + 2,
-          !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
-          !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
-        );
-      },
-      after: 'Emphasis',
-    },
-  ],
-};
 
 /** The grayscale code tokens (UI-06, D-63, docs/09 §11) and the inline markdown styles. */
 const flintHighlight = HighlightStyle.define([
@@ -193,30 +161,6 @@ class FieldWidget extends WidgetType {
   }
 }
 
-/** A field's chip text: `high`, `30 Oct 15:00`, `Today`, `done 28 Oct`, `muted`. */
-function fieldText(key: string, value: string): string {
-  const when = (raw: string): string => {
-    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(raw);
-    if (!match) return raw;
-    const month = new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString('en-GB', {
-      month: 'short',
-    });
-    return `${Number(match[3])} ${month}${match[4] ? ` ${match[4]}` : ''}`;
-  };
-  switch (key) {
-    case 'reminder':
-      return when(value);
-    case 'completion':
-      return `done ${when(value)}`;
-    case 'today':
-      return /^true$/i.test(value) ? 'Today' : 'not Today';
-    case 'muted':
-      return /^true$/i.test(value) ? 'muted' : 'not muted';
-    default:
-      return value;
-  }
-}
-
 /** NOTE-05, D-82: the code card's copy button, in its top-right corner, inside the editor too. */
 class CopyWidget extends WidgetType {
   readonly code: string;
@@ -274,298 +218,71 @@ class ShortLinkWidget extends WidgetType {
 }
 
 const hidden = Decoration.replace({});
-const mark = (className: string, attributes?: Record<string, string>): Decoration =>
-  Decoration.mark({ class: className, ...(attributes && { attributes }) });
-const line = (className: string): Decoration => Decoration.line({ class: className });
 
-/** Flint's task fields in a note (LIST-04, D-77): muted chips, the `id` hidden. */
-const FIELD = /\s?[[(](id|priority|reminder|today|completion|muted)::\s*([^\])\n]*?)\s*[\])]/g;
-
-/** The lines with a cursor or selection on them, while the editor has focus. */
-function activeLines(view: EditorView): Set<number> {
-  const lines = new Set<number>();
-  if (!view.hasFocus) return lines;
-  for (const range of view.state.selection.ranges) {
-    const first = view.state.doc.lineAt(range.from).number;
-    const last = view.state.doc.lineAt(range.to).number;
-    for (let at = first; at <= last; at++) lines.add(at);
-  }
-  return lines;
-}
-
+/** The live preview's items (preview.ts) as CodeMirror decorations and widgets. */
 function decorate(view: EditorView): DecorationSet {
-  const { state } = view;
-  const doc = state.doc;
-  const active = activeLines(view);
-  const isActive = (from: number, to = from): boolean => {
-    const first = doc.lineAt(from).number;
-    const last = doc.lineAt(to).number;
-    for (let at = first; at <= last; at++) if (active.has(at)) return true;
-    return false;
-  };
+  const items = buildPreview({
+    state: view.state,
+    focused: view.hasFocus,
+    visible: view.visibleRanges,
+    patterns: activeLinkPatterns(),
+  });
   const ranges: Range<Decoration>[] = [];
-  const hide = (from: number, to: number): void => {
-    if (to > from) ranges.push(hidden.range(from, to));
-  };
-  const lines = (from: number, to: number, className: string): void => {
-    const first = doc.lineAt(from).number;
-    const last = doc.lineAt(to).number;
-    for (let at = first; at <= last; at++) {
-      let name = className;
-      if (at === first) name += ` ${className}-first`;
-      if (at === last) name += ` ${className}-last`;
-      ranges.push(line(name).range(doc.line(at).from));
-    }
-  };
-  const codeLines = new Set<number>();
-  for (const { from, to } of view.visibleRanges) {
-    syntaxTree(state).iterate({
-      from,
-      to,
-      enter: (node) => {
-        const name = node.name;
-        const heading = /^ATXHeading(\d)$/.exec(name);
-        if (heading) {
-          lines(node.from, node.to, `cm-fl-h${Math.min(3, Number(heading[1]))}`);
-          return;
-        }
-        switch (name) {
-          case 'HeaderMark': {
-            // The `#` marks and the space after them.
-            if (node.node.parent?.name.startsWith('ATXHeading') && !isActive(node.from)) {
-              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
-              hide(node.from, node.to + after);
-            } else ranges.push(mark('cm-fl-mark').range(node.from, node.to));
-            return;
-          }
-          case 'Emphasis':
-            ranges.push(mark('cm-fl-em').range(node.from, node.to));
-            return;
-          case 'StrongEmphasis':
-            ranges.push(mark('cm-fl-strong').range(node.from, node.to));
-            return;
-          case 'Strikethrough':
-            ranges.push(mark('cm-fl-strike').range(node.from, node.to));
-            return;
-          case 'Highlight':
-            ranges.push(mark('cm-fl-highlight').range(node.from, node.to));
-            return;
-          case 'InlineCode':
-            ranges.push(mark('cm-fl-inline-code').range(node.from, node.to));
-            return;
-          case 'EmphasisMark':
-          case 'StrikethroughMark':
-          case 'HighlightMark':
-            if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
-            else hide(node.from, node.to);
-            return;
-          case 'CodeMark': {
-            const parent = node.node.parent?.name;
-            if (parent === 'InlineCode') {
-              if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
-              else hide(node.from, node.to);
-            }
-            return;
-          }
-          case 'FencedCode': {
-            const open = isActive(node.from, node.to);
-            lines(node.from, node.to, 'cm-fl-code');
-            // Closed, the hidden closing fence is only the card's bottom edge.
-            const end = doc.lineAt(node.to);
-            if (
-              !open &&
-              end.number > doc.lineAt(node.from).number &&
-              /^\s*(`{3,}|~{3,})\s*$/.test(end.text)
-            )
-              ranges.push(line('cm-fl-code-end').range(end.from));
-            for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
-              codeLines.add(at);
-            // D-87: closed and without a language, the opening fence is only the card's top edge
-            // (no empty first line); a paragraph right after the card keeps its spacing.
-            const start = doc.lineAt(node.from);
-            if (!open && !node.node.getChild('CodeInfo') && start.number < end.number)
-              ranges.push(line('cm-fl-code-start').range(start.from));
-            if (end.number < doc.lines && doc.line(end.number + 1).text.trim() !== '')
-              ranges.push(line('cm-fl-after-code').range(doc.line(end.number + 1).from));
-            const text = node.node.getChild('CodeText');
-            ranges.push(
-              Decoration.widget({
-                widget: new CopyWidget(text ? doc.sliceString(text.from, text.to) : ''),
-                side: 1,
-              }).range(doc.lineAt(node.from).to),
-            );
-            const cursor = node.node.cursor();
-            if (cursor.firstChild())
-              do {
-                if (cursor.name === 'CodeMark') {
-                  if (open) ranges.push(mark('cm-fl-mark').range(cursor.from, cursor.to));
-                  else hide(cursor.from, cursor.to);
-                } else if (cursor.name === 'CodeInfo')
-                  ranges.push(mark('cm-fl-code-label').range(cursor.from, cursor.to));
-              } while (cursor.nextSibling());
-            return false;
-          }
-          case 'CodeBlock':
-            lines(node.from, node.to, 'cm-fl-code');
-            for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
-              codeLines.add(at);
-            return false;
-          case 'Blockquote':
-            lines(node.from, node.to, 'cm-fl-quote');
-            return;
-          case 'QuoteMark':
-            if (isActive(node.from)) ranges.push(mark('cm-fl-mark').range(node.from, node.to));
-            else {
-              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
-              hide(node.from, node.to + after);
-            }
-            return;
-          case 'HorizontalRule':
-            if (!isActive(node.from)) {
-              ranges.push(line('cm-fl-hr').range(doc.lineAt(node.from).from));
-              hide(node.from, node.to);
-            }
-            return;
-          case 'ListMark': {
-            const item = node.node.parent;
-            const task = item?.getChild('Task');
-            const bullet = item?.parent?.name === 'BulletList';
-            if (isActive(node.from)) {
-              ranges.push(mark('cm-fl-mark').range(node.from, node.to));
-              return;
-            }
-            const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
-            // A checklist line shows only its checkbox; a bullet a drawn bullet.
-            if (task) hide(node.from, node.to + after);
-            else if (bullet)
-              ranges.push(
-                Decoration.replace({ widget: new BulletWidget() }).range(node.from, node.to),
-              );
-            return;
-          }
-          case 'TaskMarker': {
-            const checked = /x/i.test(doc.sliceString(node.from, node.to));
-            if (!checked) return;
-            const taskEnd = node.node.parent?.to ?? node.to;
-            ranges.push(mark('cm-fl-done').range(node.to, taskEnd));
-            return;
-          }
-          case 'Link':
-          case 'Image': {
-            const url = node.node.getChild('URL');
-            const target = url ? doc.sliceString(url.from, url.to) : '';
-            if (name === 'Image') {
-              const text = doc.sliceString(node.from, node.to);
-              const alt = /^!\[([^\]]*)\]/.exec(text)?.[1] ?? '';
-              const widget = Decoration.replace({ widget: new ImageWidget(target, alt) });
-              if (!isActive(node.from)) ranges.push(widget.range(node.from, node.to));
-              else
-                ranges.push(
-                  Decoration.widget({ widget: new ImageWidget(target, alt), side: 1 }).range(
-                    node.to,
-                  ),
-                );
-              return false;
-            }
-            const marks = node.node.getChildren('LinkMark');
-            const open = marks[0];
-            const close = marks[1];
-            if (!open || !close || !url) return false;
-            if (isActive(node.from)) {
-              for (const each of marks) ranges.push(mark('cm-fl-mark').range(each.from, each.to));
-              ranges.push(mark('cm-fl-link-url').range(url.from, url.to));
-              ranges.push(mark('cm-fl-link').range(open.to, close.from));
-            } else {
-              hide(open.from, open.to);
-              ranges.push(mark('cm-fl-link', { 'data-href': target }).range(open.to, close.from));
-              hide(close.from, node.to);
-            }
-            return false;
-          }
-          case 'URL': {
-            // A bare URL or an autolink (`<https://…>`), outside a link or an image.
-            const parent = node.node.parent?.name;
-            if (parent === 'Link' || parent === 'Image') return;
-            const href = doc.sliceString(node.from, node.to);
-            // TASK-10 (D-84, D-88): a bare URL shows its smart title (a link pattern's short form,
-            // a built-in one, or its domain and path). D-105: as soon as the cursor isn't inside
-            // it (just pasted, the caret after it, it shows short already); inside, the URL.
-            const title = linkTitle(href, activeLinkPatterns());
-            const inside = state.selection.ranges.some((range) =>
-              range.empty
-                ? range.head > node.from && range.head < node.to
-                : range.from < node.to && range.to > node.from,
-            );
-            const short = inside || title === href ? null : title;
-            ranges.push(
-              short
-                ? Decoration.replace({ widget: new ShortLinkWidget(short, href) }).range(
-                    node.from,
-                    node.to,
-                  )
-                : mark('cm-fl-link', { 'data-href': href }).range(node.from, node.to),
-            );
-            return;
-          }
-          default:
-            return;
-        }
-      },
-    });
-    // Task checkboxes (`- [ ]`), drawn away from the cursor.
-    syntaxTree(state).iterate({
-      from,
-      to,
-      enter: (node) => {
-        if (node.name !== 'TaskMarker' || isActive(node.from)) return;
-        const checked = /x/i.test(doc.sliceString(node.from, node.to));
+  for (const item of items)
+    switch (item.kind) {
+      case 'hide':
+        ranges.push(hidden.range(item.from, item.to));
+        break;
+      case 'mark':
         ranges.push(
-          Decoration.replace({ widget: new CheckboxWidget(checked) }).range(node.from, node.to),
+          Decoration.mark({
+            class: item.className,
+            ...(item.href !== undefined && { attributes: { 'data-href': item.href } }),
+          }).range(item.from, item.to),
         );
-      },
-    });
-    // D-84 (NOTE-07): typed short forms (`AB#1234`) are links, outside code and links.
-    const patterns = activeLinkPatterns();
-    if (patterns.length > 0)
-      for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
-        if (codeLines.has(at)) continue;
-        const text = doc.line(at);
-        for (const link of findShortForms(text.text, patterns)) {
-          const start = text.from + link.from;
-          let inside = false;
-          for (
-            let node: SyntaxNode | null = syntaxTree(state).resolveInner(start, 1);
-            node;
-            node = node.parent
-          )
-            if (['InlineCode', 'Link', 'URL', 'Image', 'CodeText'].includes(node.name))
-              inside = true;
-          if (!inside)
-            ranges.push(
-              mark('cm-fl-link cm-fl-auto-link', { 'data-href': link.href }).range(
-                start,
-                text.from + link.to,
-              ),
-            );
-        }
+        break;
+      case 'line':
+        ranges.push(Decoration.line({ class: item.className }).range(item.at));
+        break;
+      case 'bullet':
+        ranges.push(Decoration.replace({ widget: new BulletWidget() }).range(item.from, item.to));
+        break;
+      case 'checkbox':
+        ranges.push(
+          Decoration.replace({ widget: new CheckboxWidget(item.checked) }).range(
+            item.from,
+            item.to,
+          ),
+        );
+        break;
+      case 'image': {
+        const widget = new ImageWidget(item.src, item.alt);
+        ranges.push(
+          item.replace
+            ? Decoration.replace({ widget }).range(item.from, item.to)
+            : Decoration.widget({ widget, side: 1 }).range(item.to),
+        );
+        break;
       }
-    // Flint's task fields (LIST-04, D-77), outside code and away from the cursor.
-    for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
-      if (codeLines.has(at) || active.has(at)) continue;
-      const text = doc.line(at);
-      for (const match of text.text.matchAll(FIELD)) {
-        const start = text.from + match.index;
-        const end = start + match[0].length;
-        if (match[1] === 'id') hide(start, end);
-        else
-          ranges.push(
-            Decoration.replace({
-              widget: new FieldWidget(fieldText(match[1] ?? '', match[2] ?? '')),
-            }).range(start + (match[0].startsWith(' ') ? 1 : 0), end),
-          );
-      }
+      case 'field':
+        ranges.push(
+          Decoration.replace({ widget: new FieldWidget(item.text) }).range(item.from, item.to),
+        );
+        break;
+      case 'copy':
+        ranges.push(
+          Decoration.widget({ widget: new CopyWidget(item.code), side: 1 }).range(item.at),
+        );
+        break;
+      case 'shortLink':
+        ranges.push(
+          Decoration.replace({ widget: new ShortLinkWidget(item.text, item.href) }).range(
+            item.from,
+            item.to,
+          ),
+        );
+        break;
     }
-  }
   return Decoration.set(ranges, true);
 }
 
@@ -671,7 +388,7 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     EditorView.lineWrapping,
     closeBrackets(),
     // D-84: every language CodeMirror's language data knows, each loaded when a block uses it.
-    markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [Highlight] }),
+    markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [...NOTE_SYNTAX] }),
     syntaxHighlighting(flintHighlight),
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),

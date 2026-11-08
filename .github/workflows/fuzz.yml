@@ -1,0 +1,50 @@
+# Long fuzzing (D-141 Q13, docs/05 §6): every fast-check property (the file format, shorthand,
+# time parser, undo model, the note editor's randomised editing) for a time budget, a new random
+# seed each round, printed. Nightly and on demand, apart from every push. A failure ends the run
+# with the command that repeats its round; GitHub emails the failed run.
+# Actions are pinned by commit SHA (the tag in the comment); update them deliberately.
+name: Fuzz
+
+on:
+  schedule:
+    # 02:00 in Tbilisi (UTC+4).
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Minutes of fuzzing'
+        required: false
+        default: '15'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: fuzz
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install
+        run: npm ci
+        env:
+          # The unit tests don't need Electron itself.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Fuzz
+        run: npm run fuzz
+        env:
+          FLINT_FUZZ_MINUTES: ${{ github.event.inputs.minutes || '15' }}

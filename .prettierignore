@@ -7,3 +7,4 @@ dist/
 coverage/
 package-lock.json
 out/
+apps/desktop/src/renderer/editor/fixtures/
