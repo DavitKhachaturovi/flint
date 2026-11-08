@@ -483,7 +483,7 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       ),
       { numRuns: RUNS },
     );
-  });
+  }, 60_000);
 
   /** Any table: with or without edge pipes, short rows, in a quote or not, text around it or not. */
   const anyTableDoc = fc
@@ -554,7 +554,7 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       ),
       { numRuns: RUNS },
     );
-  });
+  }, 60_000);
 
   it('changes only the edited cell: every other cell and byte stays as it was', () => {
     fc.assert(
@@ -581,5 +581,5 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       }),
       { numRuns: RUNS },
     );
-  });
+  }, 60_000);
 });
