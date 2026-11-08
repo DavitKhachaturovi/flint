@@ -50,7 +50,7 @@ import {
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
 import { blockMarkers, buildPreview } from './preview.js';
-import { tables } from './table-view.js';
+import { keepTextOutOfTables, tables } from './table-view.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
 import { checkSvg } from '../ui/check.js';
 import { NOTE_SYNTAX } from './syntax.js';
@@ -475,9 +475,12 @@ export interface EditorOptions {
 /** NOTE-09, D-141: the live preview, or none in Source mode (switched with `sourceMode`). */
 export const previewMode = new Compartment();
 
-/** The live preview's parts: none in Source mode, where every line is its raw markdown. */
+/** The live preview's parts: none in Source mode, where every line is its raw markdown (text
+ * typed under a table still stays out of it there, D-144). */
 export const sourceMode = (on: boolean): Extension =>
-  on ? [] : [livePreview, previewClicks, clicksDontReveal, pictureCaret, tables()];
+  on
+    ? [keepTextOutOfTables]
+    : [livePreview, previewClicks, clicksDontReveal, pictureCaret, tables()];
 
 /** Everything the note editor is made of, for a new editor state. */
 export function editorExtensions(options: EditorOptions): Extension[] {

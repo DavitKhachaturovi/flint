@@ -36,6 +36,8 @@ const PIXEL = Buffer.from(
 const INSERTED = '| Column | Column | Column |\n| --- | --- | --- |\n| test |  |  |';
 const PICTURE = '![](attachments/pic.png)';
 const PICTURES = `---\nflint: 1\nid: pictures\nmode: note\n---\nIntro.\n\n${INSERTED}\n\n${PICTURE}\n\nabove\n`;
+/** D-144: a table in a quote, the quote's blank line (`>`) and a picture under it. */
+const QUOTED = `---\nflint: 1\nid: quoted\nmode: note\n---\nIntro.\n\n> | a | b |\n> | - | - |\n> | c | d |\n>\n> ${PICTURE}\n\nabove\n`;
 
 let dataDirectory: string;
 let flint: string;
@@ -55,6 +57,7 @@ test.beforeAll(async () => {
   await mkdir(flint, { recursive: true });
   await writeFile(join(flint, 'Tables.md'), NOTE);
   await writeFile(join(flint, 'Pictures.md'), PICTURES);
+  await writeFile(join(flint, 'Quoted.md'), QUOTED);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -321,4 +324,69 @@ test('text typed below a table stays out of it, and so does the picture after it
   await expect(picture).toHaveCount(1);
   await undoTo(joined);
   await undoTo(PICTURES);
+});
+
+test('Backspace under a table, Source mode and a table in a quote keep text out too (D-144)', async () => {
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
+  await expect(editor()).toContainText('above');
+  const pictures = (): Promise<string> => readFile(join(flint, 'Pictures.md'), 'utf8');
+  const picture = main.locator('.note-editor .cm-fl-image img');
+  const under = main.locator('.note-editor .cm-fl-table-wrap + .cm-line');
+  const above = editor().locator('.cm-line', { hasText: /^above$/ });
+  await expect.poll(pictures).toBe(PICTURES);
+  // Backspace and Ctrl+Backspace on the blank line under the table: the text stays as it is (the
+  // picture would be a row), the caret goes up into the table's last row.
+  for (const key of ['Backspace', 'Control+Backspace']) {
+    await under.click();
+    await main.keyboard.press(key);
+    await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
+    await expect(table().locator('.cm-fl-cell-active')).toHaveCount(1);
+    // The keys go on into that cell.
+    await main.keyboard.type('z');
+    await expect.poll(pictures).toBe(PICTURES.replace('| test |  |  |', '| test |  | z |'));
+    await main.keyboard.press('Control+z');
+    await expect.poll(pictures).toBe(PICTURES);
+    await above.click();
+    await expect(table().locator('tr')).toHaveCount(2);
+    await expect(cell(1, 0)).toHaveText('test');
+    await expect(picture).toHaveCount(1);
+    await expect(under).toHaveText('');
+  }
+  // Source mode: a word typed on the blank line under the table gets the blank line above it, so
+  // the picture is still drawn when the preview comes back.
+  await under.click();
+  await main.keyboard.press('Control+Shift+E');
+  await expect(table()).toHaveCount(0);
+  await editor()
+    .locator('.cm-line', { hasText: /^\| test/ })
+    .locator('xpath=following-sibling::*[1]')
+    .click();
+  await main.keyboard.type('word');
+  const typed = PICTURES.replace(`${INSERTED}\n\n`, `${INSERTED}\n\nword\n`);
+  await expect.poll(pictures).toBe(typed);
+  await main.keyboard.press('Control+Shift+E');
+  await expect(table().locator('tr')).toHaveCount(2);
+  await expect(picture).toHaveCount(1);
+  await main.keyboard.press('Control+z');
+  await expect.poll(pictures).toBe(PICTURES);
+  // A table in a quote: read without the quote's marks; a word typed on the quote's blank line
+  // under it gets a blank quote line (`>`) above it and stays in the quote, out of the table.
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Quoted' }).first().click();
+  await expect(editor()).toContainText('above');
+  const quoted = (): Promise<string> => readFile(join(flint, 'Quoted.md'), 'utf8');
+  await expect(table().locator('tr')).toHaveCount(2);
+  await expect(cell(0, 0)).toHaveText('a');
+  await expect(cell(0, 1)).toHaveText('b');
+  await expect(cell(0, 2)).toHaveCount(0);
+  const shown = await picture.count();
+  await under.click();
+  await main.keyboard.press('End');
+  await main.keyboard.type('x');
+  await expect.poll(quoted).toBe(QUOTED.replace('| c | d |\n>\n', '| c | d |\n>\n>x\n'));
+  await above.click();
+  await expect(table().locator('tr')).toHaveCount(2);
+  await expect(cell(1, 1)).toHaveText('d');
+  await expect(picture).toHaveCount(shown);
+  await main.keyboard.press('Control+z');
+  await expect.poll(quoted).toBe(QUOTED);
 });

@@ -1,4 +1,7 @@
 import {
+  deleteCharBackward,
+  deleteCharForward,
+  deleteGroupBackward,
   history,
   indentLess,
   indentMore,
@@ -11,11 +14,12 @@ import {
 import { deleteMarkupBackward, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
+import type { Command } from '@codemirror/view';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { noteState, problems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
-import { tablesIn } from './table.js';
+import { tablesIn, type ParsedTable } from './table.js';
 import { tables } from './table-view.js';
 
 /**
@@ -69,6 +73,9 @@ const LINES = [
   `${PICTURE}\n${INSERTED}`,
   `${INSERTED}\n\nabove`,
   '| test |  |  |',
+  // In a quote and in a list item (the blank line a `>`, the rows indented).
+  `> | a | b |\n> | - | - |\n> | c | d |\n>\n> ${PICTURE}`,
+  '- item\n\n  | a | b |\n  | - | - |\n  | c | d |\n\n  after',
 ];
 /** Typed text that can't make or break a table by itself (no pipe, fence, quote or list mark). */
 const PLAIN = /^[aბ \n]+$/;
@@ -96,10 +103,24 @@ const CHARS = [
   '\t',
 ];
 
-type Step =
-  | { readonly kind: 'type'; readonly at: number; readonly text: string }
-  | { readonly kind: 'delete'; readonly at: number; readonly length: number }
-  | { readonly kind: 'command'; readonly at: number; readonly name: keyof typeof COMMANDS };
+/**
+ * Where a step acts: `at` of the way through the note, or (`edge` 0 to 2) that many characters after
+ * the end of the table `at` of the way through the note's tables, where text joins a table (D-144).
+ */
+interface Place {
+  readonly at: number;
+  readonly edge: number;
+}
+
+/** A view command that reads only the state and dispatches (the delete commands), on a state. */
+const onState = (command: Command): StateCommand => command as unknown as StateCommand;
+
+type Step = Place &
+  (
+    | { readonly kind: 'type'; readonly text: string }
+    | { readonly kind: 'delete'; readonly length: number }
+    | { readonly kind: 'command'; readonly name: keyof typeof COMMANDS }
+  );
 
 const COMMANDS = {
   enter: insertNewlineContinueMarkup,
@@ -110,29 +131,71 @@ const COMMANDS = {
   altDown: moveLineDown,
   undo,
   redo,
+  // Backspace, Ctrl+Backspace and Delete as the editor's keys run them (D-144).
+  backspaceChar: onState(deleteCharBackward),
+  backspaceWord: onState(deleteGroupBackward),
+  deleteChar: onState(deleteCharForward),
 } satisfies Record<string, StateCommand>;
 
+const DELETES: readonly (keyof typeof COMMANDS)[] = [
+  'backspaceChar',
+  'backspaceWord',
+  'deleteChar',
+];
+
 const fraction = fc.double({ min: 0, max: 1, noNaN: true });
+const edge = fc.oneof(
+  { weight: 3, arbitrary: fc.constant(-1) },
+  { weight: 1, arbitrary: fc.integer({ min: 0, max: 2 }) },
+);
 const step: fc.Arbitrary<Step> = fc.oneof(
   fc.record({
     kind: fc.constant('type' as const),
     at: fraction,
+    edge,
     text: fc.string({ unit: fc.constantFrom(...CHARS), minLength: 1, maxLength: 6 }),
   }),
   fc.record({
     kind: fc.constant('delete' as const),
     at: fraction,
+    edge,
     length: fc.integer({ min: 1, max: 8 }),
   }),
   fc.record({
     kind: fc.constant('command' as const),
     at: fraction,
+    edge,
     name: fc.constantFrom(...(Object.keys(COMMANDS) as (keyof typeof COMMANDS)[])),
   }),
 );
 
-const sources = (state: EditorState): string[] =>
-  tablesIn(state).map((table) => state.doc.sliceString(table.from, table.to));
+/**
+ * D-144: a table of `before` still stands where it was in `after`, its text as it was, and only
+ * text written with a pipe (rows, another table) joined onto its last row or after it. Both read
+ * by a fresh parse (an incremental one can differ on a table right under a paragraph).
+ */
+const fresh = (state: EditorState): ParsedTable[] => tablesIn(noteState(state.doc.toString()));
+
+function keptClosed(before: EditorState, after: EditorState, table: ParsedTable): void {
+  const source = before.doc.sliceString(table.from, table.to);
+  const now = fresh(after).find((each) => each.from === table.from);
+  expect(now && after.doc.sliceString(now.from, now.from + source.length)).toBe(source);
+  if (!now) return;
+  // Joined onto its last row, or after it: only text written with a pipe (as GFM reads it).
+  const [joined = '', ...rows] = after.doc
+    .sliceString(now.from + source.length, now.to)
+    .split('\n');
+  for (const row of [...(joined === '' ? [] : [joined]), ...rows])
+    expect(row).toMatch(/(?:^|[^\\])\|/);
+}
+
+function position(state: EditorState, each: Place): number {
+  const uniform = Math.round(each.at * state.doc.length);
+  if (each.edge < 0) return uniform;
+  const there = tablesIn(state);
+  const table = there[Math.min(there.length - 1, Math.floor(each.at * there.length))];
+  return table ? Math.min(state.doc.length, table.to + each.edge) : uniform;
+}
 
 function run(command: StateCommand, state: EditorState): EditorState {
   let next = state;
@@ -140,8 +203,22 @@ function run(command: StateCommand, state: EditorState): EditorState {
   return next;
 }
 
+/** The ranges a step asks to delete (as the bare command would, before the editor's filters). */
+function deletes(state: EditorState, each: Step): [number, number][] {
+  const at = position(state, each);
+  if (each.kind === 'delete') return [[at, Math.min(state.doc.length, at + each.length)]];
+  if (each.kind !== 'command' || !DELETES.includes(each.name)) return [];
+  const ranges: [number, number][] = [];
+  const bare = EditorState.create({ doc: state.doc, selection: EditorSelection.cursor(at) });
+  COMMANDS[each.name]({
+    state: bare,
+    dispatch: (tr) => tr.changes.iterChangedRanges((from, to) => ranges.push([from, to])),
+  });
+  return ranges;
+}
+
 function apply(state: EditorState, each: Step): EditorState {
-  const at = Math.round(each.at * state.doc.length);
+  const at = position(state, each);
   const placed = state.update({ selection: EditorSelection.cursor(at) }).state;
   let next: EditorState;
   if (each.kind === 'type')
@@ -172,15 +249,25 @@ describe('randomised editing in the note editor (D-141 Q13)', () => {
           for (const each of steps) {
             const before = state;
             state = apply(state, each);
-            // D-144: plain text typed outside every table never changes a table's bytes (it may
-            // end a code block that held one, which then is a table of its own).
+            // D-144: plain text typed below a table never joins it. (Typed above one, it may end
+            // a code block that held it, or turn indented code above its header into a paragraph
+            // that takes the header in, as markdown says.)
             if (each.kind === 'type' && PLAIN.test(each.text)) {
-              const at = Math.round(each.at * before.doc.length);
-              const there = tablesIn(before);
-              if (there.every((table) => at < table.from || at > table.to)) {
-                const after = sources(state);
-                for (const source of sources(before)) expect(after).toContain(source);
-              }
+              const at = position(before, each);
+              for (const table of fresh(before))
+                if (table.to < at) keptClosed(before, state, table);
+            }
+            // D-144: nor does deleting plain text below a table, Backspace or Delete on the blank
+            // line under it included. (Text deleted above a table may open a code block that
+            // takes it in, as markdown says.)
+            const deleted = deletes(before, each);
+            if (
+              deleted.length > 0 &&
+              deleted.every(([from, to]) => /^[\p{L} \n]*$/u.test(before.doc.sliceString(from, to)))
+            ) {
+              const first = Math.min(...deleted.map(([from]) => from));
+              for (const table of fresh(before))
+                if (table.to <= first) keptClosed(before, state, table);
             }
             for (const focused of [true, false]) {
               const found = problems(state, buildPreview({ state, focused, patterns: [] }));

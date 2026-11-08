@@ -1,12 +1,19 @@
-import { history, redo, undo } from '@codemirror/commands';
+import {
+  deleteCharBackward,
+  deleteCharForward,
+  deleteGroupBackward,
+  history,
+  redo,
+  undo,
+} from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
 import { EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, type Command } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
 import { NOTE_SYNTAX } from './syntax.js';
 import { tablesIn } from './table.js';
-import { cellAt, tables } from './table-view.js';
+import { cellAt, keepTextOutOfTables, tables } from './table-view.js';
 
 /** NOTE-10, D-141 Q9: the cell a caret is in, and selections that take a table whole. */
 
@@ -25,9 +32,10 @@ function state(doc = DOC, extra: readonly Extension[] = []): EditorState {
   return result;
 }
 
-function run(command: StateCommand, s: EditorState): EditorState {
+/** A command on a state (the delete commands read only the state and dispatch). */
+function run(command: StateCommand | Command, s: EditorState): EditorState {
   let next = s;
-  command({ state: s, dispatch: (tr) => (next = tr.state) });
+  (command as StateCommand)({ state: s, dispatch: (tr) => (next = tr.state) });
   return next;
 }
 
@@ -151,5 +159,85 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
     // A change with no user event (a file changed elsewhere) is the file's own.
     const outside = state(doc).update({ changes: { from: blank, insert: 'y' } }).state;
     expect(outside.doc.toString()).toBe(`${TABLE}\ny\n${PICTURE}`);
+  });
+
+  const parsed = (s: EditorState): EditorState => {
+    ensureSyntaxTree(s, s.doc.length, 5000);
+    return s;
+  };
+  const caret = (s: EditorState, anchor: number): EditorState =>
+    s.update({ selection: { anchor } }).state;
+
+  it('never pulls the picture in with Backspace or Ctrl+Backspace on the blank line, or Delete', () => {
+    const doc = `Intro.\n\n${TABLE}\n\n${PICTURE}\n\nabove\n`;
+    const end = doc.indexOf(TABLE) + TABLE.length;
+    const picture = doc.indexOf(PICTURE);
+    // On the blank line under the table: the text stays, the caret goes into the last cell.
+    for (const command of [deleteCharBackward, deleteGroupBackward]) {
+      const s = parsed(run(command, caret(state(doc, [history()]), end + 1)));
+      expect(s.doc.toString()).toBe(doc);
+      expect(cellAt(s, s.selection.main.head)).toMatchObject({ row: 1, column: 2 });
+      expect(sources(s)).toEqual([TABLE]);
+    }
+    // Delete at the end of the last row (shown raw), and the blank line selected and deleted.
+    expect(parsed(run(deleteCharForward, caret(state(doc), end))).doc.toString()).toBe(doc);
+    expect(edit(state(doc), { from: end, to: picture }, 'delete.selection').doc.toString()).toBe(
+      doc,
+    );
+    // Deleted on into the picture's line: what is left of that line stays below the table.
+    let cut = edit(state(doc, [history()]), { from: end, to: picture + 2 }, 'delete.selection');
+    expect(cut.doc.toString()).toBe(`Intro.\n\n${TABLE}\n\n${PICTURE.slice(2)}\n\nabove\n`);
+    expect(sources(cut)).toEqual([TABLE]);
+    cut = run(undo, cut);
+    expect(cut.doc.toString()).toBe(doc);
+  });
+
+  it('keeps text out of tables in Source mode too (only the guard, no drawing)', () => {
+    const doc = `${TABLE}\n\n${PICTURE}`;
+    const source = parsed(
+      EditorState.create({
+        doc,
+        extensions: [
+          markdown({ base: markdownLanguage, extensions: [...NOTE_SYNTAX] }),
+          keepTextOutOfTables,
+        ],
+      }),
+    );
+    const typed = edit(source, { from: TABLE.length + 1, insert: 'word' }, 'input.type');
+    expect(typed.doc.toString()).toBe(`${TABLE}\n\nword\n${PICTURE}`);
+    const back = parsed(run(deleteCharBackward, caret(source, TABLE.length + 1)));
+    expect(back.doc.toString()).toBe(doc);
+  });
+
+  it('keeps a table in a quote or a list item closed: the quote’s mark, the item’s indent', () => {
+    // In a quote: read without the quote's marks, its blank line a `>`.
+    const quoted = `Intro.\n\n> | a | b |\n> | - | - |\n> | c | d |\n>\n> ${PICTURE}\n\nabove\n`;
+    const shape = (s: EditorState): string[][][] =>
+      tablesIn(s).map((table) => table.rows.map((row) => row.cells.map((cell) => cell.text)));
+    expect(shape(state(quoted))).toEqual([
+      [
+        ['a', 'b'],
+        ['c', 'd'],
+      ],
+    ]);
+    const end = quoted.indexOf('| c | d |') + '| c | d |'.length;
+    const typed = edit(state(quoted), { from: end + 2, insert: 'x' }, 'input.type');
+    expect(typed.doc.toString()).toBe(
+      `Intro.\n\n> | a | b |\n> | - | - |\n> | c | d |\n>\n>x\n> ${PICTURE}\n\nabove\n`,
+    );
+    expect(shape(typed)).toEqual(shape(state(quoted)));
+    expect(cellAt(typed, typed.selection.main.head)).toBeNull();
+    expect(parsed(run(deleteCharForward, caret(state(quoted), end))).doc.toString()).toBe(quoted);
+    // In a list item: a line typed at the margin keeps the item's indent.
+    const list = '- item\n\n  | a | b |\n  | - | - |\n  | c | d |\n\n  after';
+    const blank = list.indexOf('| c | d |') + '| c | d |'.length + 1;
+    const inList = edit(state(list), { from: blank, insert: 'x' }, 'input.type');
+    expect(inList.doc.toString()).toBe(
+      '- item\n\n  | a | b |\n  | - | - |\n  | c | d |\n\n  x\n  after',
+    );
+    expect(inList.selection.main.head).toBe(blank + 4);
+    expect(shape(inList)).toEqual(shape(state(list)));
+    const back = parsed(run(deleteCharBackward, caret(state(list), blank)));
+    expect(back.doc.toString()).toBe(list);
   });
 });

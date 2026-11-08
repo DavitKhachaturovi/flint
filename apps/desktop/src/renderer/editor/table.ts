@@ -27,6 +27,7 @@ export interface TableRow {
   /** The line, without its line break. */
   readonly from: number;
   readonly to: number;
+  /** What comes before its first cell: indentation, and in a quote the quote's marks (`> `). */
   readonly indent: string;
   /** Written with a pipe before the first cell / after the last. */
   readonly leading: boolean;
@@ -45,11 +46,20 @@ export interface ParsedTable {
   readonly align: readonly Align[];
 }
 
+/**
+ * A line's container prefix: its indentation and, in a quote, the quote's marks (`> `, `>> `). A
+ * table's rows start after it (a line starting with `>` is never a row of a table outside a quote).
+ */
+const CONTAINER = /^(?:[ \t]*>)*[ \t]*/;
+
+/** A line's container prefix (see `CONTAINER`). */
+export const containerPrefix = (line: string): string => CONTAINER.exec(line)?.[0] ?? '';
+
 /** A table row's line split into cells at its unescaped pipes. */
 function readRow(doc: Text, lineNumber: number): TableRow {
   const line = doc.line(lineNumber);
   const text = line.text;
-  const indent = /^[ \t]*/.exec(text)?.[0] ?? '';
+  const indent = containerPrefix(text);
   const end = text.replace(/[ \t]+$/, '').length;
   const pipes: number[] = [];
   for (let at = indent.length; at < end; at++) {
@@ -109,13 +119,16 @@ export function parseTable(doc: Text, from: number, to: number): ParsedTable | n
 }
 
 /** The table around a position (or null), as the editor's parser sees it (or `tree`, a fuller
- * parse of the same state). */
+ * parse of the same state). A position in its line's container prefix (a quote's `> `) counts as
+ * the line's: a table in a quote starts at its first line's start, as other tables do (D-144). */
 export function tableAt(
   state: EditorState,
   at: number,
   tree = syntaxTree(state),
 ): ParsedTable | null {
-  for (let node: SyntaxNode | null = tree.resolveInner(at, 1); node; node = node.parent)
+  const line = state.doc.lineAt(at);
+  const from = Math.max(at, line.from + containerPrefix(line.text).length);
+  for (let node: SyntaxNode | null = tree.resolveInner(from, 1); node; node = node.parent)
     if (node.name === 'Table') return parseTable(state.doc, node.from, node.to);
   return null;
 }

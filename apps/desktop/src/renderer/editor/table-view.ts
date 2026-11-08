@@ -22,10 +22,12 @@ import {
   addColumn,
   addRow,
   alignTable,
+  containerPrefix,
   deleteColumn,
   deleteRow,
   deleteTable,
   hasRowPipe,
+  parseTable,
   setCell,
   tableAt,
   tablesIn,
@@ -887,58 +889,154 @@ const wholeTables = EditorState.transactionFilter.of((tr) => {
   ];
 });
 
-/** The table whose last line is line `number` (parsed that far), or null. */
-function tableEndingAt(state: EditorState, number: number): ParsedTable | null {
-  if (number < 1 || number > state.doc.lines) return null;
-  const line = state.doc.line(number);
-  if (line.text.trim() === '') return null;
-  const tree = ensureSyntaxTree(state, Math.min(state.doc.length, line.to + 1), 50);
-  const table = tableAt(state, line.from, tree ?? syntaxTree(state));
-  return table && table.to === line.to ? table : null;
+/** A table near an edit, and whether it stands in a list item (its rows indented into it). */
+interface NearTable {
+  readonly table: ParsedTable;
+  readonly inList: boolean;
+}
+
+/** The tables whose last line ends between `from` and `to` (the note parsed that far). */
+function tablesEndingIn(state: EditorState, from: number, to: number): NearTable[] {
+  const tree = ensureSyntaxTree(state, Math.min(state.doc.length, to + 1), 50) ?? syntaxTree(state);
+  const found: NearTable[] = [];
+  tree.iterate({
+    from: Math.max(0, from - 1),
+    to,
+    enter: (node) => {
+      if (node.name !== 'Table') return undefined;
+      const table = parseTable(state.doc, node.from, node.to);
+      if (table && table.to >= from && table.to <= to) {
+        let inList = false;
+        for (let up = node.node.parent; up; up = up.parent)
+          if (up.name === 'ListItem') inList = true;
+        found.push({ table, inList });
+      }
+      return false;
+    },
+  });
+  return found;
 }
 
 /**
  * D-144 (Proposed): text written right below a table stays a paragraph. GFM continues a table on
  * every following line until a blank line ("lazy" rows), so a word typed on the blank line under a
- * table, a Backspace that removes that blank line, or a line moved up to it would pull that line
- * and the ones after it (a picture, a paragraph) into the table. Where an edit in the note (not an
- * undo) would make a line without a pipe a new row of a table, Flint writes the blank line that
- * ends the table before it, in the same change (one undo step); a Backspace that would only remove
- * that blank line moves the caret up instead. A line written with a pipe is a row, as GFM says.
- * The file stays plain GFM: other apps read it the way Flint shows it.
+ * table, a Backspace or Delete that removes that blank line, or a line moved up to it would pull
+ * that line and the ones after it (a picture, a paragraph) into the table. Where an edit in the
+ * note (not an undo; in Source mode too) would make a line without a pipe a new row of a table, or
+ * join it onto the table's last row, Flint writes the blank line that ends the table before it, in
+ * the same change (one undo step). A deletion that would only remove that blank line moves the
+ * caret instead (Backspace on it: into the end of the table's last cell). A line written with a
+ * pipe is a row, as GFM says. In a quote the blank line keeps the quote's mark (`>`); in a list item
+ * a line typed there keeps the item's indent. A line under the table read as a heading's underline
+ * (`---`, which would take the table in as the heading's text) gets the blank line too. The file
+ * stays plain GFM: other apps read it the way Flint shows it.
  */
-const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
+export const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
   if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr;
   if (tr.isUserEvent('undo') || tr.isUserEvent('redo')) return tr;
   const start = tr.startState;
-  // Cheap first: only edits on the line right below a table's last line.
-  const above: ParsedTable[] = [];
-  tr.changes.iterChangedRanges((fromA) => {
-    const table = tableEndingAt(start, start.doc.lineAt(fromA).number - 1);
-    if (table && !above.some((each) => each.from === table.from)) above.push(table);
+  // Cheap first: only edits from the line right below a table's last line, or that reach to a
+  // table's end (the line break after it deleted).
+  const near = new Map<number, NearTable>();
+  tr.changes.iterChangedRanges((fromA, toA) => {
+    const lo = Math.max(0, start.doc.lineAt(fromA).from - 1);
+    for (const each of tablesEndingIn(start, lo, start.doc.lineAt(toA).to))
+      near.set(each.table.from, each);
   });
-  if (above.length === 0) return tr;
+  if (near.size === 0) return tr;
   const next = tr.state;
   // Parsed far enough to see the rows the edit would add.
-  const last = Math.max(...above.map((table) => tr.changes.mapPos(table.to)));
+  const last = Math.max(...[...near.values()].map(({ table }) => tr.changes.mapPos(table.to)));
   const tree =
     ensureSyntaxTree(next, Math.min(next.doc.length, last + 4000), 50) ?? syntaxTree(next);
-  const breaks: number[] = [];
-  for (const old of above) {
+  const breaks: { from: number; insert: string }[] = [];
+  for (const { table: old, inList } of near.values()) {
     const from = tr.changes.mapPos(old.from, 1);
     const end = tr.changes.mapPos(old.to, -1);
+    const lastRow = old.rows[old.rows.length - 1];
+    // The blank line that ends the table: in a quote, the quote's mark.
+    const prefix = lastRow?.indent ?? '';
+    const blank = prefix.trimEnd();
+    // The line break after the table deleted (from its last line on): what came after it, now on
+    // the table's last line (where it would be cells, or end the table), goes back below it.
+    let tail = -1;
+    let whole = false;
+    tr.changes.iterChanges((fromA, toA, _fromB, toB) => {
+      if (fromA >= (lastRow?.from ?? old.to) && fromA <= old.to && old.to < toA) {
+        tail = toB;
+        // Only the line break: the line after it is whole again with it back (it never joined).
+        whole = fromA === old.to && toA === old.to + 1;
+      }
+    });
     const table = tableAt(next, from, tree);
-    if (!table || table.from !== from) continue;
+    const stands = table !== null && table.from === from;
+    // Its text as it was (the edit below it): then a table gone is one the edit broke from below.
+    const intact = next.doc.sliceString(from, end) === start.doc.sliceString(old.from, old.to);
+    if (tail >= end) {
+      const line = next.doc.lineAt(tail);
+      const rest = next.doc.sliceString(tail, line.to);
+      // Text without a pipe (cells nobody wrote), or any that broke the table (a table without
+      // body rows: joined onto its delimiter row).
+      if (line.from <= end && rest !== '' && (!hasRowPipe(rest) || (!stands && intact))) {
+        // Text joined (not a blank line, nor only a quote's blank line): a blank line before it.
+        const content = rest.slice(containerPrefix(rest).length).trim() !== '';
+        breaks.push({ from: tail, insert: content && !whole ? `\n${blank}\n` : '\n' });
+        continue;
+      }
+    }
+    if (!table || !stands) {
+      // Gone, its text as it was: the line now under it reads as a heading's underline (`-`,
+      // `---`) and takes the table in as its heading's text. The blank line back between them.
+      if (!intact) continue;
+      const last = next.doc.lineAt(end);
+      if (last.to !== end) continue;
+      // Past the lines written with a pipe (rows), to the first that isn't one.
+      for (let number = last.number + 1; number <= next.doc.lines; number++) {
+        const below = next.doc.line(number);
+        if (below.text.trim() === '') break;
+        if (hasRowPipe(below.text)) continue;
+        breaks.push({ from: below.from, insert: `${blank}\n` });
+        break;
+      }
+      continue;
+    }
     const joined = table.rows.find(
       (row) => row.from > end && !hasRowPipe(next.doc.sliceString(row.from, row.to)),
     );
-    if (joined) breaks.push(joined.from);
+    if (!joined) continue;
+    // In a list item, a line typed at the margin under its table keeps to the item.
+    let pad = '';
+    if (inList && prefix.trim() === '') {
+      const lead = /^[ \t]*/.exec(next.doc.sliceString(joined.from, joined.to))?.[0] ?? '';
+      let typed = false;
+      tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+        if (toB > fromB && toB > joined.from && fromB <= joined.to) typed = true;
+      });
+      if (typed && lead.length < prefix.length && prefix.startsWith(lead))
+        pad = prefix.slice(lead.length);
+    }
+    breaks.push({ from: joined.from, insert: `${blank}\n${pad}` });
   }
   if (breaks.length === 0) return tr;
-  const extra = next.changes(breaks.map((at) => ({ from: at, insert: '\n' })));
+  const extra = next.changes(breaks);
   const selection = next.selection.map(extra);
-  if (tr.changes.compose(extra).apply(start.doc).eq(start.doc))
-    return { selection, scrollIntoView: true, userEvent: 'select' };
+  if (tr.changes.compose(extra).apply(start.doc).eq(start.doc)) {
+    // The text as it was: only the caret moves. Left at a table's very end (Backspace on the
+    // blank line under it), it goes into the end of the last cell, as ↑ from below goes in (Q9).
+    let head = selection.main.head;
+    for (const { table } of near.values()) {
+      const row = table.rows.length - 1;
+      const cells = table.rows[row]?.cells ?? [];
+      const cell = cells[Math.min(cells.length, table.columns) - 1];
+      if (selection.main.empty && head === table.to)
+        head = cellPosition(start, cell, row, table, 'end');
+    }
+    return {
+      selection: head === selection.main.head ? selection : EditorSelection.cursor(head),
+      scrollIntoView: true,
+      userEvent: 'select',
+    };
+  }
   return [tr, { changes: extra, selection, sequential: true }];
 });
 
