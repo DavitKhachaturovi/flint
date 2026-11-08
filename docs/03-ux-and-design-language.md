@@ -154,7 +154,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic in the editor | Ctrl+B / Ctrl+I | Proposed (D-82) |
 | Paste as plain text in the editor | Ctrl+Shift+V | Proposed (D-82) |
 | Formatting context menu | Right-click | Decided |
-| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor) |
+| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor; Ctrl+E for inline code not built yet) |
+| Source mode for this note (NOTE-09) | Ctrl+Shift+E (Ctrl+E is inline code) | Open (D-141; recommended, to be confirmed) |
+| Step into a marker or embedded object (show its raw markdown) | ← from just after it, → from just before it | Decided (D-141, not built yet) |
 
 ### Mouse
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.

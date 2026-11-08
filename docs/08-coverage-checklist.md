@@ -1053,3 +1053,19 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | 1.0.0 on GitHub Releases with latest.yml; installed copies update themselves | APP-06 · Done (1.0.0) | D-136, D-139 |
 | 5 | Versions after 1.0.0: 1.0.x fixes, 1.x.0 features | — · Proposed | D-139 |
 | 6 | Restart to update hides Flint at once and says it reopens in about a minute (no frozen window) | APP-06 · Done (1.0.1) | 02, D-140 |
+
+## BQ. The live preview made reliable: the plan (8 Nov 2026, grill Q1–Q4)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Rebuild Flint's live-preview layer on the syntax tree (no live-preview library; ProseMirror, Milkdown, Tiptap ruled out) | NOTE-01 · Decided (1.1.0) | D-141 |
+| 2 | Block markers and embedded objects show raw only with the caret strictly inside; inline formatting inside or at its edge; ← / → step in; clicks and selections never reveal | NOTE-01 · Decided (1.1.0) | 02, 03 §3, D-141 |
+| 3 | Numbered markers always in the gray mono look | NOTE-01 · Decided (1.1.0) | D-141 |
+| 4 | The checkbox's tick centred | NOTE-01 · Decided (1.1.0) | D-141 |
+| 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Decided (1.1.0) | 02, D-141 |
+| 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; its shortcut open (Ctrl+Shift+E recommended) | NOTE-09 · Decided (1.1.0), shortcut open | 02, 03 §3, D-141 |
+| 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
+| 8 | Renumbering and nesting indents for numbered lists | NOTE-01 · Open (grill Q5, Q6) | 06 §0 |
+| 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.1.0), details open | 02, D-141, 06 §0 |
+| 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), scrambled shape-only fixtures of real notes (after Davit's review), the real folder local-only (`FLINT_CORPUS`), randomised editing tests | NOTE-01 · Decided (1.1.0) | D-141 |
+| 11 | Ctrl+E for inline code (decided in D-106, never built) | NOTE-02 · Decided, not built | 03 §3, 06 §0 |

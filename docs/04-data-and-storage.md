@@ -168,6 +168,7 @@ mode: note
 ```
 
 - Free-form markdown. Checkboxes in notes are plain markdown checkboxes; they become tasks only via conversion (LIST-04).
+- **Numbered lists (D-141, decided; not built yet):** Flint reads any line `N.` or `N)` followed by a space as a list item, also right after a paragraph line, as Obsidian's editor does. **Known difference:** CommonMark lets an ordered list interrupt a paragraph only when it starts at 1, so GitHub and Obsidian's Reading view show `text` followed directly by `2. item` as one paragraph (a blank line before the list makes every reader agree). Flint never changes the file for this; it is only how Flint displays it.
 - Converting a task list to a note keeps the `[key:: value]` fields on checklist lines so converting back is lossless (LIST-04). While a list is a note, those fields are inert (no Today membership, no reminders) and their IDs stay reserved (D-29).
 - A `.md` file without Flint frontmatter is a note (D-23). When Flint adds its header on the first save caused by an edit, it inserts `flint`, `id` and `mode` into the existing frontmatter block (or creates one) without changing the other keys.
 
