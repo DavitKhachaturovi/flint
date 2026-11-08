@@ -252,13 +252,132 @@ function placeKey(list: string, page: string | null): string {
   return page === null ? list : `${list}/${page}`;
 }
 
-function flash(element: Element, strong = false): void {
-  // D-107: the strong one (a note's line from the palette) is brighter and lasts longer.
-  const name = strong ? 'fl-flash-strong' : 'fl-flash';
-  element.classList.remove(name);
+function flash(element: Element): void {
+  element.classList.remove('fl-flash');
   void (element as HTMLElement).offsetWidth;
-  element.classList.add(name);
-  window.setTimeout(() => element.classList.remove(name), strong ? 1600 : 900);
+  element.classList.add('fl-flash');
+  window.setTimeout(() => element.classList.remove('fl-flash'), 900);
+}
+
+/** D-107, D-143: how long a note line's flash lasts (`.fl-line-flash` in app.css). */
+const LINE_FLASH_MS = 1600;
+
+/** D-143: stops the note line's flash running now, so a new one replaces it. */
+let lineFlash: (() => void) | null = null;
+
+/** A note line's drawn element at a position, or null while it isn't drawn. */
+function drawnLine(cm: CodeEditorView, from: number): HTMLElement | null {
+  const at = cm.domAtPos(from).node;
+  const line = (at instanceof Element ? at : at.parentElement)?.closest<HTMLElement>('.cm-line');
+  return line && cm.contentDOM.contains(line) ? line : null;
+}
+
+/**
+ * D-107, D-143: a note's line chosen in the palette lights up like a task row's flash (the
+ * selected row's look, held a moment, then fading). It is a box of its own behind the text, padded
+ * out from the note's text column on both sides like a row around its title (app.css): a line
+ * carries no padding (D-91), and its own background would cover only the text column. A line with
+ * a background of its own (a code card's) would hide the box, so that line lights up too
+ * (`.fl-line-lit`). The box is placed in the editor's measure cycle, once the line is drawn (not
+ * after a fixed delay a busy machine can outrun), follows the line every frame while it runs (a
+ * line drawn anew or moved by a late layout keeps it), and goes after the flash, when the next one
+ * starts, with the note's editor, or as soon as the note is edited (D-75: interruptible).
+ */
+function flashNoteLine(cm: CodeEditorView, from: number): void {
+  lineFlash?.();
+  const box = document.createElement('div');
+  box.className = 'fl-line-flash';
+  box.setAttribute('aria-hidden', 'true');
+  const doc = cm.state.doc;
+  let frame = 0;
+  let timer = 0;
+  let tries = 0;
+  let started = 0;
+  let lit: HTMLElement | null = null;
+  const unlight = (): void => {
+    lit?.classList.remove('fl-line-lit');
+    lit?.style.removeProperty('animation-delay');
+    lit = null;
+  };
+  const stop = (): void => {
+    cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
+    box.remove();
+    unlight();
+    if (lineFlash === stop) lineFlash = null;
+  };
+  lineFlash = stop;
+  const read = (): {
+    line: HTMLElement;
+    own: boolean;
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null => {
+    if (!cm.dom.isConnected || cm.state.doc !== doc) return null;
+    let line = drawnLine(cm, from);
+    if (!line) return null;
+    if (line.getBoundingClientRect().height === 0) {
+      // A fence line drawn as the code card's edge (no height): the card's first or last line.
+      const next = line.nextElementSibling;
+      const near = next?.classList.contains('cm-fl-code') ? next : line.previousElementSibling;
+      if (!(near instanceof HTMLElement) || !near.classList.contains('cm-line')) return null;
+      line = near;
+    }
+    const style = getComputedStyle(line);
+    // The text's own height: a line's padding and borders (a code card's edges, the space after
+    // one) are left out, so the box sits evenly around the text.
+    const above = parseFloat(style.paddingTop) + parseFloat(style.borderTopWidth);
+    const below = parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth);
+    const host = cm.dom.getBoundingClientRect();
+    const text = cm.contentDOM.getBoundingClientRect();
+    const row = line.getBoundingClientRect();
+    const height = row.height - above - below;
+    if (height <= 0) return null;
+    return {
+      line,
+      own: line.classList.contains('cm-fl-code'),
+      top: row.top + above - host.top,
+      left: text.left - host.left,
+      width: text.width,
+      height,
+    };
+  };
+  const write = (at: ReturnType<typeof read>): void => {
+    if (lineFlash !== stop) return;
+    if (!at) {
+      // Not drawn yet: a few more tries; once shown, no line means the note was edited or went.
+      if (box.isConnected || ++tries >= 10) stop();
+      else frame = requestAnimationFrame(first);
+      return;
+    }
+    box.style.setProperty('--x', `${at.left}px`);
+    box.style.setProperty('--y', `${at.top}px`);
+    box.style.setProperty('--w', `${at.width}px`);
+    box.style.setProperty('--h', `${at.height}px`);
+    if (!box.isConnected) {
+      // First in the editor, so its scroller (and the text) is drawn over it.
+      cm.dom.prepend(box);
+      started = performance.now();
+      timer = window.setTimeout(stop, LINE_FLASH_MS);
+    }
+    if (at.own && (lit !== at.line || !lit.classList.contains('fl-line-lit'))) {
+      // Lit in step with the box, also when the editor draws the line (or its classes) anew.
+      unlight();
+      lit = at.line;
+      lit.style.animationDelay = `${-Math.round(performance.now() - started)}ms`;
+      lit.classList.add('fl-line-lit');
+    }
+    frame = requestAnimationFrame(follow);
+  };
+  // The first place in the editor's measure cycle (after the scroll is laid out); then each frame
+  // a read and a write of the box's own place, outside the editor's updates.
+  const first = (): void => {
+    if (lineFlash === stop) cm.requestMeasure({ read, write });
+  };
+  const follow = (): void => write(read());
+  first();
 }
 
 /** D-86, D-87: a copy of the hidden panel, which slides and fades out from where it was. */
@@ -3853,34 +3972,8 @@ export function App(): ReactElement {
         yMargin: Math.round(root.clientHeight / 3),
       }),
     });
-    // D-143: flashed once the editor has drawn the line (its own measure cycle runs after the
-    // scroll is laid out), not after a fixed delay that a busy machine can outrun; and if the
-    // editor draws the line anew while the flash runs, the new element gets the flash too.
-    const lineAt = (): Element | null => {
-      if (from > cm.state.doc.length) return null;
-      const at = cm.domAtPos(from).node;
-      return (at instanceof Element ? at : at.parentElement)?.closest('.cm-line') ?? null;
-    };
-    let flashed: Element | null = null;
-    let tries = 0;
-    const show = (): void => {
-      cm.requestMeasure({
-        read: lineAt,
-        write: (line) => {
-          if (line?.isConnected) {
-            flashed = line;
-            flash(line, true);
-          } else if (++tries < 10) requestAnimationFrame(show);
-        },
-      });
-    };
-    show();
-    const recheck = window.setTimeout(() => {
-      const line = lineAt();
-      if (line && line !== flashed && !line.classList.contains('fl-flash-strong'))
-        flash(line, true);
-    }, 300);
-    return () => window.clearTimeout(recheck);
+    // D-143: not tied to this effect, which runs again at once (lineTarget is cleared above).
+    flashNoteLine(cm, from);
   }, [view, page, lineTarget]);
 
   /**

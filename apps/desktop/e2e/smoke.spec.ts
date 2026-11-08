@@ -3722,6 +3722,7 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
   // 4. One order: Go to, Commands, Tasks, Lists and notes, lines in notes last.
   const lines = Array.from({ length: 90 }, (_, i) => `Filler line ${i + 1}`);
   lines[75] = 'The quick brown needle is here';
+  lines.splice(80, 3, '```bash', 'echo brown haystack', '```');
   await writeFile(
     join(flint, 'Quick reference.md'),
     `---\nflint: 1\nid: qref\nmode: note\n---\n${lines.join('\n')}\n`,
@@ -3751,7 +3752,62 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
     hasText: 'The quick brown needle is here',
   });
   await expect(needle).toBeInViewport();
-  await expect(needle).toHaveClass(/fl-flash-strong/);
+  // D-143: the flash is a task row's look on a box of its own, lined up with the line and padded
+  // out 12 px from the note's text column on both sides, and it goes after the flash. Measured in
+  // one frame (the page may still be rising in).
+  const lineFlash = main.locator('.note-editor .fl-line-flash');
+  await expect(lineFlash).toHaveCount(1);
+  const flashed = await lineFlash.evaluate((box) => {
+    const editor = box.closest('.note-editor');
+    const line = [...(editor?.querySelectorAll('.cm-line') ?? [])].find((element) =>
+      element.textContent?.includes('The quick brown needle is here'),
+    );
+    const text = editor?.querySelector('.cm-content');
+    if (!line || !text) return null;
+    const ground = (token: string): string => {
+      const probe = document.createElement('div');
+      probe.style.background = `var(${token})`;
+      document.body.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    };
+    const b = box.getBoundingClientRect();
+    const l = line.getBoundingClientRect();
+    const t = text.getBoundingClientRect();
+    const style = getComputedStyle(box);
+    return {
+      centre: Math.abs(b.top + b.height / 2 - (l.top + l.height / 2)),
+      taller: b.height - l.height,
+      left: t.left - b.left,
+      right: b.right - t.right,
+      background: style.backgroundColor,
+      tile: ground('--fl-ground-tile'),
+      ring: style.boxShadow,
+    };
+  });
+  if (!flashed) throw new Error('the flashed line or the note not laid out');
+  expect(flashed.centre).toBeLessThan(1);
+  expect(flashed.taller).toBeCloseTo(6, 0);
+  expect(flashed.left).toBeCloseTo(12, 0);
+  expect(flashed.right).toBeCloseTo(12, 0);
+  expect(flashed.background).toBe(flashed.tile);
+  expect(flashed.ring).not.toBe('none');
+  await expect(lineFlash).toHaveCount(0, { timeout: 4000 });
+
+  // D-143: a line in a code card (a background of its own) lights up too.
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('brown haystack');
+  await palette.locator('.palette-item', { hasText: 'echo brown haystack' }).click();
+  const codeLine = main.locator('.note-editor .cm-line.cm-fl-code', {
+    hasText: 'echo brown haystack',
+  });
+  await expect(codeLine).toBeInViewport();
+  await expect(codeLine).toHaveClass(/fl-line-lit/);
+  await expect(lineFlash).toHaveCount(1);
+  await expect(codeLine).not.toHaveClass(/fl-line-lit/, { timeout: 4000 });
+  await expect(lineFlash).toHaveCount(0);
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 

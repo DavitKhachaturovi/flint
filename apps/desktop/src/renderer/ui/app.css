@@ -3328,22 +3328,52 @@ a.auto-link {
   }
 }
 
-/* D-107: a note's line reached from the palette: a little brighter (with a ring), held a moment,
-   then fading, so the eye finds it after the jump. */
-.fl-flash-strong {
-  border-radius: 4px;
-  animation: fl-flash-strong 1600ms ease-out;
+/* D-107, D-143: a note's line reached from the palette lights up like a task row's flash: a
+   selected row's shape, ring and shadow, a step brighter (the tile ground) so the eye finds it
+   after the jump, held for the first third of 1.6 s, then fading. A box of its own behind the text
+   (flashNoteLine in App.tsx sets the place of the line's text in the editor), padded out from the
+   text column like a row around its title: 12 px on both sides, 3 px above and below. A line with
+   a background of its own (a code card's) lights up the same way (.fl-line-lit). Off under
+   reduced motion, like the other flashes (D-108). */
+.fl-line-flash {
+  position: absolute;
+  z-index: 0;
+  left: calc(var(--x) - 12px);
+  top: calc(var(--y) - 3px);
+  width: calc(var(--w) + 24px);
+  height: calc(var(--h) + 6px);
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-tile);
+  box-shadow: var(--fl-shadow-selected);
+  pointer-events: none;
+  animation: fl-line-flash 1600ms ease-out forwards;
 }
 
-@keyframes fl-flash-strong {
+@keyframes fl-line-flash {
   0%,
   35% {
-    background-color: var(--fl-ground-hover);
-    box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+    opacity: 1;
   }
   100% {
-    background-color: transparent;
-    box-shadow: inset 0 0 0 1px transparent;
+    opacity: 0;
+  }
+}
+
+.cm-line.fl-line-lit {
+  animation: fl-line-lit 1600ms ease-out;
+}
+
+/* From the flash's ground back to the line's own. */
+@keyframes fl-line-lit {
+  0%,
+  35% {
+    background-color: var(--fl-ground-tile);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-line-flash {
+    display: none;
   }
 }
 
