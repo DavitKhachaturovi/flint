@@ -282,4 +282,13 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
     const back = parsed(run(deleteCharBackward, caret(state(list), blank)));
     expect(back.doc.toString()).toBe(list);
   });
+
+  it('writes a `>` in the blank line only for a table in a quote, not for a row that starts with one (the editing fuzz)', () => {
+    // A row typed under a table as `\t>|a` (a tab, then text starting with `>`: no quote there).
+    const doc = `${TABLE}\n\t>|a\n\n${PICTURE}`;
+    const end = doc.indexOf('>|a') + '>|a'.length;
+    const s = parsed(run(deleteCharForward, caret(state(doc), end)));
+    expect(sources(s)).toEqual([`${TABLE}\n\t>|a`]);
+    expect(s.doc.toString()).toBe(doc);
+  });
 });

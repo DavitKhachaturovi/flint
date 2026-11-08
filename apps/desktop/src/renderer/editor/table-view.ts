@@ -1454,6 +1454,18 @@ const wholeTables = EditorState.transactionFilter.of((tr) => {
 interface NearTable {
   readonly table: ParsedTable;
   readonly inList: boolean;
+  /** How many quotes it stands in (its rows' `>` marks; a row's own text may start with one). */
+  readonly quotes: number;
+}
+
+/**
+ * The blank line for a table in `quotes` quotes: its row's prefix up to that many `>` marks (none
+ * outside a quote, where a row like `\t>|a` starts with its own text, not a quote's mark).
+ */
+function quoteMarks(prefix: string, quotes: number): string {
+  let at = 0;
+  for (let found = 0; found < quotes && at < prefix.length; at++) if (prefix[at] === '>') found++;
+  return prefix.slice(0, at).trimEnd();
 }
 
 /** The tables whose last line ends between `from` and `to` (the note parsed that far). */
@@ -1468,9 +1480,12 @@ function tablesEndingIn(state: EditorState, from: number, to: number): NearTable
       const table = parseTable(state.doc, node.from, node.to);
       if (table && table.to >= from && table.to <= to) {
         let inList = false;
-        for (let up = node.node.parent; up; up = up.parent)
+        let quotes = 0;
+        for (let up = node.node.parent; up; up = up.parent) {
           if (up.name === 'ListItem') inList = true;
-        found.push({ table, inList });
+          if (up.name === 'Blockquote') quotes++;
+        }
+        found.push({ table, inList, quotes });
       }
       return false;
     },
@@ -1515,13 +1530,13 @@ export const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
   tr.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
     if (inserted.toString().includes('|')) wrotePipe = true;
   });
-  for (const { table: old, inList } of near.values()) {
+  for (const { table: old, inList, quotes } of near.values()) {
     const from = tr.changes.mapPos(old.from, 1);
     const end = tr.changes.mapPos(old.to, -1);
     const lastRow = old.rows[old.rows.length - 1];
     // The blank line that ends the table: in a quote, the quote's mark.
     const prefix = lastRow?.indent ?? '';
-    const blank = prefix.trimEnd();
+    const blank = quoteMarks(prefix, quotes);
     // The line break after the table deleted (from its last line on): what came after it, now on
     // the table's last line (where it would be cells, or end the table), goes back below it.
     let tail = -1;
