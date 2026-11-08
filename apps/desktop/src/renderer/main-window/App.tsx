@@ -3853,12 +3853,34 @@ export function App(): ReactElement {
         yMargin: Math.round(root.clientHeight / 3),
       }),
     });
-    // Once the editor has drawn the lines scrolled to.
-    window.setTimeout(() => {
+    // D-143: flashed once the editor has drawn the line (its own measure cycle runs after the
+    // scroll is laid out), not after a fixed delay that a busy machine can outrun; and if the
+    // editor draws the line anew while the flash runs, the new element gets the flash too.
+    const lineAt = (): Element | null => {
+      if (from > cm.state.doc.length) return null;
       const at = cm.domAtPos(from).node;
-      const line = (at instanceof Element ? at : at.parentElement)?.closest('.cm-line');
-      if (line) flash(line, true);
-    }, 60);
+      return (at instanceof Element ? at : at.parentElement)?.closest('.cm-line') ?? null;
+    };
+    let flashed: Element | null = null;
+    let tries = 0;
+    const show = (): void => {
+      cm.requestMeasure({
+        read: lineAt,
+        write: (line) => {
+          if (line?.isConnected) {
+            flashed = line;
+            flash(line, true);
+          } else if (++tries < 10) requestAnimationFrame(show);
+        },
+      });
+    };
+    show();
+    const recheck = window.setTimeout(() => {
+      const line = lineAt();
+      if (line && line !== flashed && !line.classList.contains('fl-flash-strong'))
+        flash(line, true);
+    }, 300);
+    return () => window.clearTimeout(recheck);
   }, [view, page, lineTarget]);
 
   /**

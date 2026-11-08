@@ -1096,8 +1096,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | CodeQL #4: the `##` list name's trailing dots in one pass; also `matchTime` reads at most six words, code spans walked once, list lookups indexed (many lists, long names) | CAP-03, CAP-05, REM-02 · Fixed (1.1.1, not released) | `shorthand/parse.ts`, `shorthand/lists.ts`, `time/parse.ts`, D-143 |
 | 2 | CodeQL #5–#8: paste titles, trailing spaces, fenced blocks and image links read by linear scanners, with four unflagged patterns in the same file | CAP-06, CAP-07 · Fixed (1.1.1, not released) | `shorthand/paste.ts`, `shorthand/paste-scan.ts`, D-143 |
 | 3 | CodeQL #9: the Go function line and the located frame of stack traces in linear time | CAP-06 · Fixed (1.1.1, not released) | `shorthand/trace.ts`, D-143 |
-| 4 | The highlighter's file-and-line and JSON token patterns (unflagged) in linear time | CAP-06 · Fixed (1.1.1, not released) | `renderer/highlight/tokens.ts`, D-143 |
+| 4 | The highlighter's file-and-line and JSON token patterns (unflagged) in linear time | CAP-06 · Moved to 1.2.0 (Davit) | `renderer/highlight/tokens.ts`, D-143 |
 | 5 | CodeQL #1–#3: package names fully encoded in the release-age check; the release-notes heading matched as text; the workspace test's prefix compared as text | — · Fixed (1.1.1, not released) | `scripts/`, `workspace.test.ts`, D-143 |
 | 6 | Dependabot #1: minimatch (development and build only, not reachable) overridden to 11.0.3 for the vulnerable range; the preview's packed files compared with 1.1.0's; the override removed once the tools move to 11 | — · Fixed (1.1.1, not released) | `package.json`, D-30, D-143 |
 | 7 | Tests: each fix compared with the code it replaced (property tests) and timed on 50,000-character pathological inputs | CAP-03, CAP-06 · Done (1.1.1) | D-143 |
-| 8 | The file format's task-line reader is quadratic on long field-like text (not a CodeQL alert) | — · Proposed: its own change after 1.1.1 | 04 §3, D-21, D-143 |
+| 8 | The file format's task-line reader is quadratic on long field-like text (not a CodeQL alert) | — · Decided (Davit): its own change right after 1.1.1 | 04 §3, D-21, D-143 |
+| 9 | A note's line chosen in Ctrl+K flashes once it is drawn, not after a fixed 60 ms | NAV-01 · Fixed (1.1.1, not released) | D-143 |
