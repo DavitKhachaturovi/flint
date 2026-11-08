@@ -172,6 +172,8 @@ export const Channels = {
   mainSetPanel: 'main:set-panel',
   /** Main window → main: a note in monospace or not (NOTE-06, D-84). */
   mainNoteMono: 'main:note-mono',
+  /** Main window or mini → main: a note in Source mode or not (NOTE-09, D-141). */
+  mainNoteSource: 'main:note-source',
   /**
    * D-116: main → main window and mini: everything is set up, calls can go; asked, whether it is
    * (answered from before the page loads).
@@ -679,6 +681,8 @@ export interface ListView {
   readonly noteText: string | null;
   /** NOTE-06, D-84: a note shown in monospace (this machine's choice). */
   readonly mono?: boolean;
+  /** NOTE-09, D-141: a note shown as raw markdown (Source mode; this machine's choice). */
+  readonly source?: boolean;
   /** NAV-07: when the file last changed (`just now`, `2 h ago`). */
   readonly edited?: string;
   /** NAV-07, D-85: a note's first sighting (`2 Nov`). */

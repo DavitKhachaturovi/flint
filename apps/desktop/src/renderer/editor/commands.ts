@@ -265,6 +265,8 @@ export const EDITOR_COMMANDS: readonly EditorCommand[] = [
   {
     id: 'code',
     label: 'Code',
+    // D-106, D-141 Q5.
+    hint: 'Ctrl+E',
     word: 'code',
     section: 'format',
     glyph: '`',

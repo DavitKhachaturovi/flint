@@ -168,6 +168,7 @@ export function NoteTab(props: {
           text={savedText}
           readOnly={false}
           mono={null}
+          source={view?.source === true}
           window="mini"
           className="note-editor mini-editor"
           onId={(id) => {

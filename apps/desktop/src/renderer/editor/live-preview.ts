@@ -9,7 +9,14 @@ import {
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { EditorSelection, EditorState, Facet, type Extension, type Range } from '@codemirror/state';
+import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  Facet,
+  type Extension,
+  type Range,
+} from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -391,7 +398,16 @@ export interface EditorOptions {
   readonly onEscape?: () => boolean;
   /** Text pasted in: true when handled (code fenced, an image attached; CAP-06). */
   readonly onPaste?: (event: ClipboardEvent, view: EditorView) => boolean;
+  /** NOTE-09, D-141: Source mode: the whole note as raw markdown (no live preview). */
+  readonly source?: boolean;
 }
+
+/** NOTE-09, D-141: the live preview, or none in Source mode (switched with `sourceMode`). */
+export const previewMode = new Compartment();
+
+/** The live preview's parts: none in Source mode, where every line is its raw markdown. */
+export const sourceMode = (on: boolean): Extension =>
+  on ? [] : [livePreview, previewClicks, clicksDontReveal];
 
 /** Everything the note editor is made of, for a new editor state. */
 export function editorExtensions(options: EditorOptions): Extension[] {
@@ -431,10 +447,8 @@ export function editorExtensions(options: EditorOptions): Extension[] {
       ...defaultKeymap,
       ...historyKeymap,
     ]),
-    livePreview,
-    clicksDontReveal,
+    previewMode.of(sourceMode(options.source === true)),
     renumberAfterEdits,
-    previewClicks,
     findInNote(),
     ...(options.commands && !options.readOnly
       ? [slashCommands(options.commands), formatMenu(options.commands)]
@@ -461,9 +475,12 @@ export interface MenuHost {
   readonly pastePlain: () => void;
   /** NOTE-06, D-84: a note's Monospace toggle (notes only). */
   readonly monospace?: { readonly on: boolean; readonly toggle: () => void } | undefined;
+  /** NOTE-09, D-141: a note's Source mode toggle (notes only, also in mini mode). */
+  readonly source?: { readonly on: boolean; readonly toggle: () => void } | undefined;
 }
 
-/** Ctrl+B and Ctrl+I (Proposed, D-82): bold and italic, as the menu's hints say. */
+/** Ctrl+B and Ctrl+I (Proposed, D-82): bold and italic, as the menu's hints say; Ctrl+E inline
+ * code (D-106, D-141 Q5); Ctrl+Shift+M Monospace, Ctrl+Shift+E Source mode. */
 function formatKeys(
   host: () => CommandHost & MenuHost,
 ): { key: string; run: (view: EditorView) => boolean }[] {
@@ -478,6 +495,7 @@ function formatKeys(
   return [
     { key: 'Mod-b', run: run('bold') },
     { key: 'Mod-i', run: run('italic') },
+    { key: 'Mod-e', run: run('code') },
     {
       key: 'Mod-Shift-v',
       run: () => {
@@ -491,6 +509,15 @@ function formatKeys(
         const monospace = host().monospace;
         if (!monospace) return false;
         monospace.toggle();
+        return true;
+      },
+    },
+    {
+      key: 'Mod-Shift-e',
+      run: () => {
+        const source = host().source;
+        if (!source) return false;
+        source.toggle();
         return true;
       },
     },
@@ -567,14 +594,25 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
           },
           'divider',
           { label: 'Select all', hint: 'Ctrl+A', action: () => commands.edit('selectAll') },
+          ...(commands.monospace || commands.source ? ['divider' as const] : []),
           ...(commands.monospace
             ? [
-                'divider' as const,
                 {
                   label: 'Monospace',
                   hint: 'Ctrl+Shift+M',
                   checked: commands.monospace.on,
                   action: () => commands.monospace?.toggle(),
+                },
+              ]
+            : []),
+          // NOTE-09, D-141: next to Monospace.
+          ...(commands.source
+            ? [
+                {
+                  label: 'Source mode',
+                  hint: 'Ctrl+Shift+E',
+                  checked: commands.source.on,
+                  action: () => commands.source?.toggle(),
                 },
               ]
             : []),

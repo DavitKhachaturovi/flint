@@ -232,6 +232,41 @@ test("the checkbox is the task row's in its compact size, its tick centred; a cl
     .toContain('\n- [ ] A task\n');
 });
 
+test('Source mode shows the whole note raw (Ctrl+Shift+E, the menu, the palette); the file never changes (NOTE-09, D-141)', async () => {
+  const before = await readFile(join(flint, 'Preview.md'), 'utf8');
+  await line('First item').click();
+  await main.keyboard.press('Control+Shift+E');
+  await expect(editor().locator('.cm-fl-bullet')).toHaveCount(0);
+  await expect(line('First item')).toHaveText('- First item');
+  await expect(line('Heading')).toHaveText('## Heading');
+  await expect(editor()).toContainText('![picture](attachments/image-01.png)');
+  // Checked in the note's right-click menu, next to Monospace.
+  await line('First item').click({ button: 'right' });
+  await expect(
+    main.locator('.fl-menu .fl-menu-item', { hasText: 'Source mode' }).first(),
+  ).toBeVisible();
+  await main.keyboard.press('Escape');
+  // The palette switches it off again.
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('Source mode off');
+  await main.keyboard.press('Enter');
+  await expect(line('First item').locator('.cm-fl-bullet')).toHaveCount(1);
+  expect(await readFile(join(flint, 'Preview.md'), 'utf8')).toBe(before);
+});
+
+test('Ctrl+E makes the word at the caret inline code; Ctrl+Z undoes it (D-106, D-141 Q5)', async () => {
+  await caretAtEnd('After the picture.');
+  await left(3);
+  await main.keyboard.press('Control+e');
+  await expect
+    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
+    .toContain('After the `picture`.');
+  await main.keyboard.press('Control+z');
+  await expect
+    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
+    .toContain('After the picture.');
+});
+
 test('a click puts the caret after a bullet, and a selection reveals nothing (D-141 Q3)', async () => {
   // A click on the bullet: the caret goes after it, so the bullet stays drawn.
   await line('First item').locator('.cm-fl-bullet').click();

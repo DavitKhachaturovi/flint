@@ -154,8 +154,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic in the editor | Ctrl+B / Ctrl+I | Proposed (D-82) |
 | Paste as plain text in the editor | Ctrl+Shift+V | Proposed (D-82) |
 | Formatting context menu | Right-click | Decided |
-| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor; Ctrl+E for inline code not built yet; D-141: built with the live-preview work) |
-| Source mode for this note (NOTE-09) | Ctrl+Shift+E (pairs with Monospace's Ctrl+Shift+M; Ctrl+E is inline code) | Decided (D-141, grill Q5; not built yet) |
+| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor; Ctrl+E for inline code built in 1.1.0, D-141) |
+| Source mode for this note (NOTE-09) | Ctrl+Shift+E (pairs with Monospace's Ctrl+Shift+M; Ctrl+E is inline code) | Decided (D-141, grill Q5); built in 1.1.0 |
 | Step into a marker or embedded object (show its raw markdown) | ← from just after it, → from just before it; a picture's, video's or file's right-click menu: Edit markdown | Decided (D-141; built in 1.1.0) |
 | In a table (NOTE-10, also in task bodies) | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row); Enter the cell below (adds a row on the last); Shift+Enter nudges; ↑ / ↓ rows, and in and out of the table; ← / → across cell edges; Esc leaves the table | Decided (D-141, grill Q9; not built yet) |
 

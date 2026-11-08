@@ -26,6 +26,8 @@ export function NoteEditor(props: {
   readonly onImage: ShowImage;
   /** NOTE-06, D-84: shown in monospace (this machine's choice); null: no Monospace toggle. */
   readonly mono: boolean | null;
+  /** NOTE-09, D-141: in Source mode (this machine's choice); null or absent: no toggle. */
+  readonly source?: boolean | null;
   /** D-86: just made by Convert to note: the cursor goes to the end of the text, ready to type. */
   readonly focus?: boolean;
   /**
@@ -123,6 +125,13 @@ export function NoteEditor(props: {
         {...(mono !== null && {
           monospace: { on: mono, toggle: () => void window.flintMain.noteMono(id, !mono) },
         })}
+        {...(props.source != null &&
+          id !== '' && {
+            source: {
+              on: props.source,
+              toggle: () => void window.flintMain.noteSource(id, props.source !== true),
+            },
+          })}
         ariaLabel="Note"
         readOnly={readOnly}
         locked={locked}

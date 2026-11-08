@@ -1004,6 +1004,12 @@ async function start(): Promise<void> {
     await workspace.setMono(id, on);
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainChanged);
   });
+  // NOTE-09, D-141: a note in Source mode, on this machine; from the main window or mini.
+  ipcMain.handle(Channels.mainNoteSource, async (event, id: unknown, on: unknown) => {
+    if (!owns(event.sender) || typeof id !== 'string' || typeof on !== 'boolean') return;
+    await workspace.setSource(id, on);
+    toWindows(Channels.mainChanged);
+  });
   // NOTE-07, D-84: the user's link patterns, for titles, bodies and notes.
   ipcMain.handle(Channels.mainLinkPatterns, (event) =>
     owns(event.sender) ? settingsFile.current.linkPatterns : [],

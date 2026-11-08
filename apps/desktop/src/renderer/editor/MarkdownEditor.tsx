@@ -11,7 +11,8 @@ import {
   openAttachment,
 } from '../media/media.js';
 import { replaceLink } from './live-preview.js';
-import { editorExtensions, type PreviewHandlers } from './live-preview.js';
+import { editorExtensions, previewMode, sourceMode, type PreviewHandlers } from './live-preview.js';
+import { durationMs, reducedMotion } from '../ui/motion.js';
 import { fromEditor, lineEndingOf, toEditor, type LineEnding } from './line-endings.js';
 
 /**
@@ -48,6 +49,8 @@ export function MarkdownEditor(props: {
   readonly onEscape?: (text: string) => void;
   /** NOTE-06, D-84: a note's Monospace toggle, in its menu (and Ctrl+Shift+M). */
   readonly monospace?: { readonly on: boolean; readonly toggle: () => void };
+  /** NOTE-09, D-141: a note's Source mode, in its menu (and Ctrl+Shift+E); notes only. */
+  readonly source?: { readonly on: boolean; readonly toggle: () => void };
 }): ReactElement {
   const {
     text,
@@ -81,6 +84,7 @@ export function MarkdownEditor(props: {
         extensions: [
           editorExtensions({
             readOnly,
+            source: props.source?.on === true,
             ...(placeholder ? { placeholder } : {}),
             handlers: {
               // D-84: a link to an attachment (a document) opens in its default app, by Flint's rules.
@@ -101,6 +105,7 @@ export function MarkdownEditor(props: {
             commands: () => ({
               pickImage: () => window.flintMain.pickImage(),
               monospace: latest.current.monospace,
+              source: latest.current.source,
               edit: (command) => window.flintMain.edit(command),
               pastePlain: () => {
                 plainPaste = true;
@@ -179,6 +184,21 @@ export function MarkdownEditor(props: {
     pending.current = false;
     editor.dispatch({ changes: difference(current, next), annotations: fromOutside.of(true) });
   }, [text]);
+
+  // NOTE-09, D-141: Source mode switched: the live preview off or on, the text fading over (Q12).
+  const sourceOn = props.source?.on === true;
+  const shownSource = useRef(sourceOn);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || shownSource.current === sourceOn) return;
+    shownSource.current = sourceOn;
+    editor.dispatch({ effects: previewMode.reconfigure(sourceMode(sourceOn)) });
+    if (!reducedMotion())
+      editor.contentDOM.animate([{ opacity: 0.25 }, { opacity: 1 }], {
+        duration: durationMs('--fl-dur-state', 260),
+        easing: 'ease-out',
+      });
+  }, [sourceOn]);
 
   // D-109: locked while another window edits the note, unlocked once this one may type.
   useEffect(() => {

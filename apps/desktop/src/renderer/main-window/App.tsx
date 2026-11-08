@@ -4168,6 +4168,23 @@ export function App(): ReactElement {
           ]
         : []),
       ...fromMenu(sortItems(), 'sort'),
+      // NOTE-09, D-141: Source mode for the open note; NOTE-06's Monospace beside it (D-106).
+      ...(view?.mode === 'note' && view.readOnly === null
+        ? [
+            {
+              id: 'note:source',
+              label: view.source === true ? 'Source mode off' : 'Source mode',
+              hint: 'Ctrl+Shift+E',
+              run: () => void window.flintMain.noteSource(view.id, view.source !== true),
+            },
+            {
+              id: 'note:monospace',
+              label: view.mono === true ? 'Monospace off' : 'Monospace',
+              hint: 'Ctrl+Shift+M',
+              run: () => void window.flintMain.noteMono(view.id, view.mono !== true),
+            },
+          ]
+        : []),
       ...(view && !lists.find((list) => list.id === view.id)?.inbox && view.id !== TODAY_ID
         ? [
             {
@@ -5190,6 +5207,7 @@ export function App(): ReactElement {
                     }}
                     onImage={showImage}
                     mono={view.mono === true}
+                    source={view.source === true}
                     focus={focusNote === view.id}
                     onFocused={() => setFocusNote(null)}
                   />

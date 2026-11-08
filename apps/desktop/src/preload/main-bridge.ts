@@ -375,6 +375,10 @@ export const main = {
   noteMono(id: string, on: boolean): Promise<void> {
     return invoke(Channels.mainNoteMono, id, on) as Promise<void>;
   },
+  /** NOTE-09, D-141: a note in Source mode or not (this machine). */
+  noteSource(id: string, on: boolean): Promise<void> {
+    return invoke(Channels.mainNoteSource, id, on) as Promise<void>;
+  },
   /** NOTE-07, D-84: the user's link patterns, from the settings. */
   linkPatterns(): Promise<readonly LinkPattern[]> {
     return invoke(Channels.mainLinkPatterns) as Promise<readonly LinkPattern[]>;

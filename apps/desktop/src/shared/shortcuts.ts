@@ -91,9 +91,10 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
     name: 'Notes',
     shortcuts: [
       { keys: '/', action: 'Insert a block (slash commands)' },
-      { keys: 'Ctrl+B / Ctrl+I', action: 'Bold / italic' },
+      { keys: 'Ctrl+B / Ctrl+I / Ctrl+E', action: 'Bold / italic / inline code' },
       { keys: 'Ctrl+Shift+V', action: 'Paste as plain text' },
       { keys: 'Ctrl+Shift+M', action: 'Monospace for this note' },
+      { keys: 'Ctrl+Shift+E', action: 'Source mode for this note' },
     ],
   },
   {

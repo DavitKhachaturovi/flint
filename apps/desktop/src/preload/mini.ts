@@ -25,6 +25,7 @@ const MINI_PLATFORM = [
   'undo',
   'redo',
   'saveNote',
+  'noteSource',
   'quickNote',
   'keepQuickNote',
   'discardQuickNote',

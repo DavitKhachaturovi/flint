@@ -379,6 +379,18 @@ export class Workspace {
     await this.saveUiState({ monoNotes: on ? [...others, id] : others });
   }
 
+  /** NOTE-09, D-141: the notes in Source mode on this machine (ui-state.json). */
+  private get sourceNotes(): string[] {
+    const value = this.uiState.sourceNotes;
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  }
+
+  /** NOTE-09, D-141: a note in Source mode or not; this machine only, the file unchanged. */
+  async setSource(id: string, on: boolean): Promise<void> {
+    const others = this.sourceNotes.filter((other) => other !== id);
+    await this.saveUiState({ sourceNotes: on ? [...others, id] : others });
+  }
+
   private get collapsedGroups(): string[] {
     const value = this.uiState.collapsedGroups;
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
@@ -825,6 +837,7 @@ export class Workspace {
     return {
       ...view,
       ...(this.monoNotes.includes(id) && { mono: true }),
+      ...(this.sourceNotes.includes(id) && { source: true }),
       ...(edited !== undefined && { edited }),
       ...(created !== undefined && { created: dayLabel(created, now) }),
     };

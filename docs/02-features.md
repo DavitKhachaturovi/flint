@@ -478,10 +478,10 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-104 (0.8.2):** the editor is built in **Settings → Links**: your patterns as their short form and where it links, each with Delete (asked inline); **Add a link pattern**: paste an example link (a preset kind is recognised and its short form filled in) or type the short form, a live preview both ways with another number, a second example when ambiguous, **Advanced** shows the pattern (read-only). A short form you already have is refused; to change one, delete it and add it again.
 - **D-105 (0.8.3):** **Edit** on each pattern (the same editor, as it was left); a part that changes can be a word between fixed text (`{name}-repo`); a short form needs fixed text around what changes (Flint suggests one, `de:…`), and the preview counts the places it would link now, warning when that's many; the built-in recognizers are listed with a switch each; link chips show in the composer and the capture popup while a task is typed, and a pasted URL shows short in the editors once the caret isn't inside it.
 
-### NOTE-09 — Source mode (v1.1, D-141)
+### NOTE-09 — Source mode (v1.1, D-141, built)
 - A per-note toggle that shows the whole note as raw markdown in the same editor, with Flint's font: an escape hatch when the live preview gets in the way. The file never changes.
 - In the Ctrl+K palette and as a checked item in the note's right-click menu, next to Monospace; remembered per note on this machine like Monospace (UI state). Also in mini mode's Note tab; Monospace still applies in it; switching crossfades (off with reduce-motion). Not for task bodies.
-- **Shortcut: Ctrl+Shift+E** (grill Q5; pairs with Monospace's Ctrl+Shift+M; Ctrl+E stays inline code, D-106, built with this work). Decided, not built yet.
+- **Shortcut: Ctrl+Shift+E** (grill Q5; pairs with Monospace's Ctrl+Shift+M; Ctrl+E stays inline code, D-106, built with this work). **Built in 1.1.0** (D-141 step 5); the palette has Source mode / Source mode off while a note is open, and Monospace / Monospace off beside it (**Proposed**).
 
 ### NOTE-10 — Tables (v1.2, D-141)
 - GFM tables (`| Column | … |`) render as real tables in the note editor, mini mode's Note tab and task bodies (edited and rendered; grill Q9) instead of raw text. Edits write back only the bytes that changed: the alignment row, padding and escaped pipes stay as they were.

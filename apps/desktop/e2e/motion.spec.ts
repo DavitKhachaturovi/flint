@@ -383,6 +383,14 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'A note: it unticks (the text comes back)', 'motion', () =>
     hotel.locator('.cm-fl-task-box .check').click(),
   );
+  // NOTE-09, D-141 Q12: Source mode fades the note's text over, on and off.
+  await main.locator('.main .note-card .cm-line', { hasText: 'Beach' }).click();
+  await step(main, 'A note: Source mode on (Ctrl+Shift+E, the text fades over)', 'motion', () =>
+    main.keyboard.press('Control+Shift+E'),
+  );
+  await step(main, 'A note: Source mode off', 'motion', () =>
+    main.keyboard.press('Control+Shift+E'),
+  );
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),
   );
