@@ -13,7 +13,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 **Known issues.**
 - While a task is dragged, headings and paragraphs between tasks don't make room, so rows can pass over them. The drop itself is right.
 - A drag moves one task, not a multi-selection.
-- Opening a list of 1,000 tasks takes about 130–170 ms, over the 100 ms budget (D-137); long lists get virtualised after 1.0 (05 §4 rule 6).
+- Opening a list of 1,000 tasks takes about 130–170 ms, over the 100 ms budget (D-137); long lists get virtualised after 1.0 (05 §4 rule 6). On a busy machine it can pass its 200 ms hard limit (296, 218 and 155 ms on 8 Nov 2026), so a local run of `performance.spec.ts` may fail there now and then: accepted by Davit until the virtualisation.
 - The end-to-end tests in a file run in order and depend on each other: one failure makes the later ones fail too, so fix the first one (Playwright restarts its worker after a failure, so the next test reports "main window page not found"; D-93). They run on the test clock (D-107), never touch the real clipboard (D-93) and never press Alt for real (Discord push-to-talk); Alt+keys are dispatched as page events.
 
 **Next steps.**
