@@ -753,10 +753,10 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   await main.keyboard.press('Enter');
   await expect(main.locator('.note-editor')).toBeVisible();
   await main.locator('.note-editor').click();
-  await main.keyboard.type('# Standup\nNika: DNS');
+  await main.keyboard.type('# Standup\nAlex: DNS');
   await expect
     .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
-    .toMatch(/mode: note\n---\n# Standup\nNika: DNS$/);
+    .toMatch(/mode: note\n---\n# Standup\nAlex: DNS$/);
   // Away from the cursor the marks are hidden and the text shows formatted; on its line they show.
   await main.keyboard.type('\n**Decision:** keep');
   await main.locator('h1').click();
@@ -767,7 +767,7 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   await expect(main.locator('.note-editor .cm-fl-mark')).toHaveCount(2);
   await expect
     .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
-    .toMatch(/# Standup\nNika: DNS\n\*\*Decision:\*\* keep$/);
+    .toMatch(/# Standup\nAlex: DNS\n\*\*Decision:\*\* keep$/);
 
   // NOTE-03, D-82: "/" at a line's start opens the command menu; typing filters it, Enter applies.
   await main.keyboard.press('End');

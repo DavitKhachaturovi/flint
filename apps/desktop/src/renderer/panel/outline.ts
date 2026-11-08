@@ -1,6 +1,8 @@
 import { markdownLanguage } from '@codemirror/lang-markdown';
+import type { MarkdownParser } from '@lezer/markdown';
 import { classifyPaste } from '@flint/core/shorthand';
 import { codeLanguage } from '../../shared/code-language.js';
+import { NOTE_SYNTAX } from '../editor/syntax.js';
 
 /**
  * The context panel's outline (NAV-07, D-83) of a note or a task page's body: its headings
@@ -142,8 +144,11 @@ function fileName(src: string): string {
   }
 }
 
+/** The note editor's parser (D-141 Q4: both read lists alike). */
+const parser = (markdownLanguage.parser as MarkdownParser).configure([...NOTE_SYNTAX]);
+
 export function outline(text: string): Outline {
-  const tree = markdownLanguage.parser.parse(text);
+  const tree = parser.parse(text);
   const headings: { level: number; text: string; from: number; blocks: OutlineBlock[] }[] = [];
   const before: OutlineBlock[] = [];
   let done = 0;

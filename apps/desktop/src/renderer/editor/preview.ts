@@ -91,16 +91,79 @@ export function fieldText(key: string, value: string): string {
   }
 }
 
-/** The lines with a cursor or selection on them, while the editor has focus. */
-function activeLines(state: EditorState, focused: boolean): Set<number> {
-  const lines = new Set<number>();
-  if (!focused) return lines;
-  for (const range of state.selection.ranges) {
-    const first = state.doc.lineAt(range.from).number;
-    const last = state.doc.lineAt(range.to).number;
-    for (let at = first; at <= last; at++) lines.add(at);
+/** A block marker or an embedded object (D-141 Q3): drawn unless an empty caret is inside it. */
+export interface BlockMarker {
+  readonly kind:
+    'bullet' | 'checkbox' | 'number' | 'heading' | 'quote' | 'rule' | 'image' | 'field';
+  /** The marker and the space after it (`- `, `- [ ] `, `12. `, `## `, `> `), or the object. */
+  readonly from: number;
+  readonly to: number;
+}
+
+/** The block markers and embedded objects in these ranges (the whole text when omitted). */
+export function blockMarkers(
+  state: EditorState,
+  visible?: readonly { readonly from: number; readonly to: number }[],
+): BlockMarker[] {
+  const doc = state.doc;
+  const space = (at: number): number => (doc.sliceString(at, at + 1) === ' ' ? 1 : 0);
+  const found: BlockMarker[] = [];
+  const codeLines = new Set<number>();
+  for (const { from, to } of visible ?? [{ from: 0, to: doc.length }]) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        switch (node.name) {
+          case 'FencedCode':
+          case 'CodeBlock':
+            for (let at = doc.lineAt(node.from).number; at <= doc.lineAt(node.to).number; at++)
+              codeLines.add(at);
+            return false;
+          case 'HeaderMark':
+            if (node.node.parent?.name.startsWith('ATXHeading'))
+              found.push({ kind: 'heading', from: node.from, to: node.to + space(node.to) });
+            return;
+          case 'QuoteMark':
+            found.push({ kind: 'quote', from: node.from, to: node.to + space(node.to) });
+            return;
+          case 'HorizontalRule':
+            found.push({ kind: 'rule', from: node.from, to: node.to });
+            return;
+          case 'ListMark': {
+            const item = node.node.parent;
+            const task = item?.getChild('Task')?.getChild('TaskMarker');
+            if (task)
+              found.push({ kind: 'checkbox', from: node.from, to: task.to + space(task.to) });
+            else
+              found.push({
+                kind: item?.parent?.name === 'OrderedList' ? 'number' : 'bullet',
+                from: node.from,
+                to: node.to + space(node.to),
+              });
+            return;
+          }
+          case 'Image':
+            // One spanning lines (a line break in its text) always shows its markdown.
+            if (doc.lineAt(node.from).number === doc.lineAt(node.to).number)
+              found.push({ kind: 'image', from: node.from, to: node.to });
+            return false;
+          default:
+            return;
+        }
+      },
+    });
+    // Flint's task fields (LIST-04, D-77), outside code.
+    for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
+      if (codeLines.has(at)) continue;
+      const text = doc.line(at);
+      for (const match of text.text.matchAll(FIELD)) {
+        const start = text.from + match.index + (match[0].startsWith(' ') ? 1 : 0);
+        found.push({ kind: 'field', from: start, to: text.from + match.index + match[0].length });
+      }
+    }
   }
-  return lines;
+  return found;
 }
 
 /** The live preview's items for these ranges, in no particular order. */
@@ -108,13 +171,17 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
   const { state, focused, patterns } = input;
   const doc = state.doc;
   const tree = syntaxTree(state);
-  const active = activeLines(state, focused);
-  const isActive = (from: number, to = from): boolean => {
-    const first = doc.lineAt(from).number;
-    const last = doc.lineAt(to).number;
-    for (let at = first; at <= last; at++) if (active.has(at)) return true;
-    return false;
-  };
+  // D-141 Q3: only an empty caret reveals (a selection never does). A block marker or an object
+  // shows raw only with the caret strictly inside it; inline formatting also at its edge.
+  const carets = focused
+    ? state.selection.ranges.filter((range) => range.empty).map((range) => range.head)
+    : [];
+  const strictlyInside = (from: number, to: number): boolean =>
+    carets.some((caret) => caret > from && caret < to);
+  const atOrInside = (from: number, to: number): boolean =>
+    carets.some((caret) => caret >= from && caret <= to);
+  const markers = new Map<number, BlockMarker>();
+  for (const marker of blockMarkers(state, input.visible)) markers.set(marker.from, marker);
   const items: PreviewItem[] = [];
   // Line by line: CodeMirror can't hide a line break from a view plugin (a link's address can
   // start on the next line, CommonMark example 510).
@@ -156,10 +223,9 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
         switch (name) {
           case 'HeaderMark': {
             // The `#` marks and the space after them.
-            if (node.node.parent?.name.startsWith('ATXHeading') && !isActive(node.from)) {
-              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
-              hide(node.from, node.to + after);
-            } else mark(node.from, node.to, 'cm-fl-mark');
+            const marker = markers.get(node.from);
+            if (marker && !strictlyInside(marker.from, marker.to)) hide(marker.from, marker.to);
+            else mark(node.from, node.to, 'cm-fl-mark');
             return;
           }
           case 'Emphasis':
@@ -180,18 +246,17 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
           case 'EmphasisMark':
           case 'StrikethroughMark':
           case 'HighlightMark':
-            if (isActive(node.from)) mark(node.from, node.to, 'cm-fl-mark');
-            else hide(node.from, node.to);
-            return;
           case 'CodeMark': {
-            if (node.node.parent?.name === 'InlineCode') {
-              if (isActive(node.from)) mark(node.from, node.to, 'cm-fl-mark');
-              else hide(node.from, node.to);
-            }
+            // Inline formatting: raw while the caret is inside its span or at its edge.
+            const span = node.node.parent;
+            if (!span || (name === 'CodeMark' && span.name !== 'InlineCode')) return;
+            if (atOrInside(span.from, span.to)) mark(node.from, node.to, 'cm-fl-mark');
+            else hide(node.from, node.to);
             return;
           }
           case 'FencedCode': {
-            const open = isActive(node.from, node.to);
+            // A code card opens while an empty caret is in it.
+            const open = atOrInside(node.from, node.to);
             lines(node.from, node.to, 'cm-fl-code');
             // Closed, the hidden closing fence is only the card's bottom edge.
             const end = doc.lineAt(node.to);
@@ -234,38 +299,43 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
           case 'Blockquote':
             lines(node.from, node.to, 'cm-fl-quote');
             return;
-          case 'QuoteMark':
-            if (isActive(node.from)) mark(node.from, node.to, 'cm-fl-mark');
-            else {
-              const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
-              hide(node.from, node.to + after);
-            }
+          case 'QuoteMark': {
+            const marker = markers.get(node.from);
+            if (marker && !strictlyInside(marker.from, marker.to)) hide(marker.from, marker.to);
+            else mark(node.from, node.to, 'cm-fl-mark');
             return;
+          }
           case 'HorizontalRule':
-            if (!isActive(node.from)) {
+            if (!strictlyInside(node.from, node.to)) {
               line(doc.lineAt(node.from).from, 'cm-fl-hr');
               hide(node.from, node.to);
             }
             return;
           case 'ListMark': {
-            const item = node.node.parent;
-            const task = item?.getChild('Task');
-            const bullet = item?.parent?.name === 'BulletList';
-            if (isActive(node.from)) {
+            const marker = markers.get(node.from);
+            if (!marker) return;
+            // Numbered markers always have the gray mono look (D-141 Q3).
+            if (marker.kind === 'number') {
+              mark(node.from, node.to, 'cm-fl-mark cm-fl-number');
+              return;
+            }
+            if (strictlyInside(marker.from, marker.to)) {
               mark(node.from, node.to, 'cm-fl-mark');
               return;
             }
-            const after = doc.sliceString(node.to, node.to + 1) === ' ' ? 1 : 0;
             // A checklist line shows only its checkbox; a bullet a drawn bullet.
-            if (task) hide(node.from, node.to + after);
-            else if (bullet) items.push({ kind: 'bullet', from: node.from, to: node.to });
+            if (marker.kind === 'checkbox') {
+              const task = node.node.parent?.getChild('Task')?.getChild('TaskMarker');
+              if (!task) return;
+              hide(node.from, task.from);
+              const checked = /x/i.test(doc.sliceString(task.from, task.to));
+              items.push({ kind: 'checkbox', from: task.from, to: task.to, checked });
+            } else items.push({ kind: 'bullet', from: node.from, to: node.to });
             return;
           }
           case 'TaskMarker': {
-            const checked = /x/i.test(doc.sliceString(node.from, node.to));
-            if (!isActive(node.from))
-              items.push({ kind: 'checkbox', from: node.from, to: node.to, checked });
-            if (checked) mark(node.to, node.node.parent?.to ?? node.to, 'cm-fl-done');
+            if (/x/i.test(doc.sliceString(node.from, node.to)))
+              mark(node.to, node.node.parent?.to ?? node.to, 'cm-fl-done');
             return;
           }
           case 'Link':
@@ -275,9 +345,9 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
             if (name === 'Image') {
               const text = doc.sliceString(node.from, node.to);
               const alt = /^!\[([^\]]*)\]/.exec(text)?.[1] ?? '';
-              // One spanning lines (a line break in its text) keeps its markdown, the picture after.
-              const replace =
-                !isActive(node.from) && doc.lineAt(node.from).number === doc.lineAt(node.to).number;
+              // Raw only with the caret strictly inside (then the picture shows after it); one
+              // spanning lines (a line break in its text) always keeps its markdown.
+              const replace = markers.has(node.from) && !strictlyInside(node.from, node.to);
               items.push({
                 kind: 'image',
                 from: node.from,
@@ -293,7 +363,7 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
             const close = marks[1];
             // The link's text is formatted too (`[*foo* bar](/url)`, an image in a link).
             if (!open || !close || !url) return;
-            if (isActive(node.from)) {
+            if (atOrInside(node.from, node.to)) {
               for (const each of marks) mark(each.from, each.to, 'cm-fl-mark');
               mark(url.from, url.to, 'cm-fl-link-url');
               mark(open.to, close.from, 'cm-fl-link');
@@ -313,11 +383,7 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
             // a built-in one, or its domain and path). D-105: as soon as the cursor isn't inside
             // it (just pasted, the caret after it, it shows short already); inside, the URL.
             const title = linkTitle(href, patterns);
-            const inside = state.selection.ranges.some((range) =>
-              range.empty
-                ? range.head > node.from && range.head < node.to
-                : range.from < node.to && range.to > node.from,
-            );
+            const inside = strictlyInside(node.from, node.to);
             if (!inside && title !== href)
               items.push({ kind: 'shortLink', from: node.from, to: node.to, text: title, href });
             else mark(node.from, node.to, 'cm-fl-link', href);
@@ -342,23 +408,23 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
           if (!inside) mark(start, text.from + link.to, 'cm-fl-link cm-fl-auto-link', link.href);
         }
       }
-    // Flint's task fields (LIST-04, D-77), outside code and away from the cursor.
-    for (let at = doc.lineAt(from).number; at <= doc.lineAt(to).number; at++) {
-      if (codeLines.has(at) || active.has(at)) continue;
-      const text = doc.line(at);
-      for (const match of text.text.matchAll(FIELD)) {
-        const start = text.from + match.index;
-        const end = start + match[0].length;
-        if (match[1] === 'id') hide(start, end);
-        else
-          items.push({
-            kind: 'field',
-            from: start + (match[0].startsWith(' ') ? 1 : 0),
-            to: end,
-            text: fieldText(match[1] ?? '', match[2] ?? ''),
-          });
-      }
-    }
+  }
+  // Flint's task fields (LIST-04, D-77) as chips, the `id` hidden with the space before it; raw
+  // with the caret strictly inside.
+  for (const marker of markers.values()) {
+    if (marker.kind !== 'field' || strictlyInside(marker.from, marker.to)) continue;
+    const match = new RegExp(FIELD.source).exec(doc.sliceString(marker.from, marker.to));
+    if (!match) continue;
+    if (match[1] === 'id') {
+      const before = marker.from > 0 && doc.sliceString(marker.from - 1, marker.from) === ' ';
+      hide(before ? marker.from - 1 : marker.from, marker.to);
+    } else
+      items.push({
+        kind: 'field',
+        from: marker.from,
+        to: marker.to,
+        text: fieldText(match[1] ?? '', match[2] ?? ''),
+      });
   }
   return items;
 }

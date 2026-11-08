@@ -9,7 +9,7 @@ import {
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { EditorState, Facet, type Extension, type Range } from '@codemirror/state';
+import { EditorSelection, EditorState, Facet, type Extension, type Range } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -20,6 +20,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
+import type { SyntaxNode } from '@lezer/common';
 import { tags } from '@lezer/highlight';
 import {
   announce,
@@ -39,7 +40,9 @@ import {
 } from './commands.js';
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
-import { buildPreview } from './preview.js';
+import { blockMarkers, buildPreview } from './preview.js';
+import { nestItems, renumberAfterEdits } from './lists.js';
+import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
 import { NOTE_SYNTAX } from './syntax.js';
 
 /**
@@ -119,6 +122,10 @@ class BulletWidget extends WidgetType {
     const bullet = document.createElement('span');
     bullet.className = 'cm-fl-bullet';
     return bullet;
+  }
+  // D-141 Q3: a click on the bullet places the caret (after it: `clicksDontReveal`).
+  override ignoreEvent(): boolean {
+    return false;
   }
 }
 
@@ -392,7 +399,11 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     syntaxHighlighting(flintHighlight),
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
-      { key: 'Tab', run: indentMore, shift: indentLess },
+      // D-141 Q7: in a list, Tab and Shift+Tab nest items; elsewhere they indent as before.
+      { key: 'Tab', run: listTab(1), shift: listTab(-1) },
+      // D-141 Q3: ← from just after a drawn marker or object, → from just before it, step in.
+      { key: 'ArrowLeft', run: stepInto(-1) },
+      { key: 'ArrowRight', run: stepInto(1) },
       // D-106 (docs/03 §3): Ctrl+K with text selected makes it a link, the caret where its address
       // goes; with nothing selected the palette opens (the window has it).
       {
@@ -414,6 +425,8 @@ export function editorExtensions(options: EditorOptions): Extension[] {
       ...historyKeymap,
     ]),
     livePreview,
+    clicksDontReveal,
+    renumberAfterEdits,
     previewClicks,
     findInNote(),
     ...(options.commands && !options.readOnly
@@ -499,6 +512,8 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
               ...(picture
                 ? imageMenuItems(link, () => openInViewer(view, picture))
                 : fileMenuItems(link, media)),
+              // D-141 Q3: its raw markdown, the caret in its address.
+              { label: 'Edit markdown', action: () => editMarkdown(view, media) },
               ...(isLinkedFile(link)
                 ? [
                     {
@@ -561,6 +576,133 @@ function formatMenu(host: () => CommandHost & MenuHost): Extension {
       );
       return true;
     },
+  });
+}
+
+/** The `.cm-line` element showing a position. */
+function lineElement(view: EditorView, at: number): HTMLElement | null {
+  const { node } = view.domAtPos(at);
+  return (
+    (node instanceof HTMLElement ? node : node.parentElement)?.closest<HTMLElement>('.cm-line') ??
+    null
+  );
+}
+
+/** D-141 Q7: Tab (1) / Shift+Tab (-1) on list items: they move with what is nested under them and
+ * glide to their new indent (Q12); an impossible move nudges the line (D-87). Elsewhere, the
+ * usual indent. */
+function listTab(direction: 1 | -1): (view: EditorView) => boolean {
+  return (view) => {
+    const nesting = nestItems(view.state, direction);
+    if (nesting.kind === 'none') return (direction > 0 ? indentMore : indentLess)(view);
+    if (nesting.kind === 'impossible') {
+      const line = lineElement(view, view.state.selection.main.head);
+      if (line) nudgeElement(line, direction > 0 ? 'right' : 'left');
+      return true;
+    }
+    const before = nesting.starts.map((at) => view.coordsAtPos(at)?.left ?? null);
+    const changes = view.state.changes(nesting.changes);
+    view.dispatch({
+      changes,
+      userEvent: direction > 0 ? 'input.indent' : 'delete.dedent',
+      scrollIntoView: true,
+    });
+    if (reducedMotion()) return true;
+    const moved = nesting.starts.map((at, index) => ({
+      from: changes.mapPos(at, 1),
+      to: changes.mapPos(nesting.ends[index] ?? at, 1),
+      was: before[index] ?? null,
+    }));
+    view.requestMeasure({
+      read: () =>
+        moved.map(({ from, to, was }) => {
+          const doc = view.state.doc;
+          const now = view.coordsAtPos(Math.min(from, doc.length))?.left ?? null;
+          const lines: HTMLElement[] = [];
+          for (
+            let at = doc.lineAt(from).number;
+            at <= doc.lineAt(Math.min(to, doc.length)).number;
+            at++
+          ) {
+            const element = lineElement(view, doc.line(at).from);
+            if (element) lines.push(element);
+          }
+          return { shift: was === null || now === null ? 0 : was - now, lines };
+        }),
+      write: (measured) => {
+        for (const { shift, lines } of measured)
+          if (Math.abs(shift) >= 1)
+            for (const line of lines)
+              line.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], {
+                duration: durationMs('--fl-dur-base', 200),
+                easing: 'cubic-bezier(.2, .9, .3, 1)',
+              });
+      },
+    });
+    return true;
+  };
+}
+
+/** D-141 Q3: ← from just after a drawn block marker or object, → from just before it, put the caret
+ * one character into it, so its raw markdown shows; further presses walk through it. */
+function stepInto(direction: -1 | 1): (view: EditorView) => boolean {
+  return (view) => {
+    const { state } = view;
+    const caret = state.selection.main;
+    if (state.selection.ranges.length > 1 || !caret.empty) return false;
+    const line = state.doc.lineAt(caret.head);
+    for (const marker of blockMarkers(state, [{ from: line.from, to: line.to }])) {
+      // Numbers are never hidden; a one-character marker has no inside.
+      if (marker.kind === 'number' || marker.to - marker.from < 2) continue;
+      if (caret.head !== (direction < 0 ? marker.to : marker.from)) continue;
+      view.dispatch({
+        selection: { anchor: direction < 0 ? marker.to - 1 : marker.from + 1 },
+        scrollIntoView: true,
+        userEvent: 'select',
+      });
+      return true;
+    }
+    return false;
+  };
+}
+
+/** The line prefixes a click never reveals: the caret goes after them, to the text (D-141 Q3). */
+const PREFIXES = new Set(['bullet', 'checkbox', 'heading', 'quote']);
+
+/** D-141 Q3: clicks don't reveal. A click landing before or inside a hidden line prefix (the
+ * bullet, a quote's `>`, a heading's `#`) puts the caret after it, at the text. */
+const clicksDontReveal = EditorState.transactionFilter.of((tr) => {
+  if (!tr.isUserEvent('select.pointer') || tr.docChanged) return tr;
+  const caret = tr.newSelection.main;
+  if (tr.newSelection.ranges.length > 1 || !caret.empty) return tr;
+  const line = tr.startState.doc.lineAt(caret.head);
+  const prefixes = blockMarkers(tr.startState, [{ from: line.from, to: line.to }]).filter(
+    (marker) => PREFIXES.has(marker.kind),
+  );
+  let at = caret.head;
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const marker of prefixes)
+      if (at >= marker.from && at < marker.to) {
+        at = marker.to;
+        moved = true;
+      }
+  }
+  if (at === caret.head) return tr;
+  return { selection: EditorSelection.cursor(at), userEvent: 'select.pointer' };
+});
+
+/** D-141 Q3: an embedded object's Edit markdown: its raw markdown, the caret where its address
+ * starts (**Proposed**). */
+function editMarkdown(view: EditorView, element: HTMLElement): void {
+  let node = syntaxTree(view.state).resolveInner(view.posAtDOM(element), 1) as SyntaxNode | null;
+  while (node && node.name !== 'Image') node = node.parent;
+  if (!node) return;
+  const address = node.getChild('URL');
+  view.focus();
+  view.dispatch({
+    selection: { anchor: address ? address.from : node.from + 2 },
+    scrollIntoView: true,
   });
 }
 

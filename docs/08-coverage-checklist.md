@@ -1059,14 +1059,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | 1 | Rebuild Flint's live-preview layer on the syntax tree (no live-preview library; ProseMirror, Milkdown, Tiptap ruled out) | NOTE-01 · Decided (1.1.0) | D-141 |
-| 2 | Block markers and embedded objects show raw only with the caret strictly inside; inline formatting inside or at its edge; ← / → step in; clicks and selections never reveal | NOTE-01 · Decided (1.1.0) | 02, 03 §3, D-141 |
-| 3 | Numbered markers always in the gray mono look | NOTE-01 · Decided (1.1.0) | D-141 |
+| 2 | Block markers and embedded objects show raw only with the caret strictly inside; inline formatting inside or at its edge; ← / → step in; clicks and selections never reveal | NOTE-01 · Built (1.1.0 step 2) | 02, 03 §3, D-141 |
+| 3 | Numbered markers always in the gray mono look | NOTE-01 · Built (1.1.0 step 2) | D-141 |
 | 4 | The checkbox's tick centred: the shared task-row checkbox in its compact size (17 px), the same tick, hover, press and check-pop | NOTE-01 · Decided (1.1.0) | D-141 |
-| 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Decided (1.1.0) | 02, D-141 |
+| 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Built (1.1.0 step 2) | 02, D-141 |
 | 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; Ctrl+Shift+E | NOTE-09 · Decided (1.1.0) | 02, 03 §3, D-141 |
-| 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
-| 8 | Renumbering: only the edited list, after Flint's structural edits, one undo step, first number and delimiter kept, nested lines shifted when a number's width changes; never on open, typing or outside changes | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
-| 8a | Nesting indents: Tab to the parent's text column with the subtree, Shift+Tab back, nested numbers join or start at 1, tabs only where the list already uses them; Tab on the first item nudges (Shift+Tab on a top-level item nudges: Proposed) | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
+| 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
+| 8 | Renumbering: only the edited list, after Flint's structural edits, one undo step, first number and delimiter kept, nested lines shifted when a number's width changes; never on open, typing or outside changes | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
+| 8a | Nesting indents: Tab to the parent's text column with the subtree, Shift+Tab back, nested numbers join or start at 1, tabs only where the list already uses them; Tab on the first item nudges (Shift+Tab on a top-level item nudges: Proposed) | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
 | 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.2.0) | 02, D-141, 06 §0 |
 | 9a | Editing a table: cells in place, Tab / Enter / Shift+Enter / arrows / Esc as in 03 §3, one editor at a time, the note's own undo, Ctrl+F into cells, whole-table selections, sideways scroll; in notes, mini's Note tab and task bodies (edited and rendered) | NOTE-10 · Decided (1.2.0) | 02, 03 §3, D-141 |
 | 9b | Writing a table back: only the edited cell's bytes, padding kept, `\|` escaping, pasted line breaks as spaces, short rows grow to the edited cell, extra cells kept, new rows and columns in the existing style, line endings kept | NOTE-10 · Decided (1.2.0) | 04 §4, D-141 |
@@ -1081,3 +1081,5 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 13 | The live preview's decisions as a pure function (`buildPreview`), the parser's additions in one module | NOTE-01 · Built (1.1.0 step 1) | D-141 |
 | 14 | Fixed (found by the spec examples): a link whose address starts on the next line crashed the drawing; formatting inside a link's text showed raw; an image spanning lines | NOTE-01 · Built (1.1.0 step 1) | D-141 |
 | 15 | A note's line endings kept by the editor (`\r\n` stays `\r\n`) | NOTE-01 · Proposed, built (1.1.0 step 1) | 04 §4, D-141 |
+| 16 | A picture drawn with the caret beside it; raw (the picture after it) with the caret inside its markdown | NOTE-01, MEDIA-01 · Built (1.1.0 step 2) | D-141 |
+| 17 | A click before a hidden line prefix puts the caret after it; a bullet click places the caret | NOTE-01 · Built (1.1.0 step 2) | D-141 |

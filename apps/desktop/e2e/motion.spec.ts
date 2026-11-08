@@ -153,7 +153,7 @@ async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
   );
   await writeFile(
     join(flint, 'Plans.md'),
-    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n',
+    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n1. Pack\n2. Travel\n',
   );
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(
@@ -356,6 +356,25 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   // A note's picture and the side panel's extra sections.
   await nav('Plans').click();
   await expect(main.locator('.main .fl-media img').first()).toBeVisible();
+  // D-141 Q3: a marker's raw markdown shows at once (typing never waits, D-75).
+  await main.locator('.main .note-card .cm-line', { hasText: 'Spring' }).click();
+  await main.keyboard.press('End');
+  for (let at = 0; at < 'Spring'.length; at++) await main.keyboard.press('ArrowLeft');
+  await step(main, 'A note: ← steps into a heading’s marks', { instant: 'D-141 Q3, D-75' }, () =>
+    main.keyboard.press('ArrowLeft'),
+  );
+  // D-141 Q7, Q12: Tab nests a list item, gliding to its indent; on the first item it nudges.
+  await main.locator('.main .note-card .cm-line', { hasText: 'Travel' }).click();
+  await step(main, 'A note: Tab nests a list item (it glides)', 'motion', () =>
+    main.keyboard.press('Tab'),
+  );
+  await step(main, 'A note: Shift+Tab takes it back (it glides)', 'motion', () =>
+    main.keyboard.press('Shift+Tab'),
+  );
+  await main.locator('.main .note-card .cm-line', { hasText: 'Pack' }).click();
+  await step(main, 'A note: Tab on a list’s first item (a nudge)', 'motion', () =>
+    main.keyboard.press('Tab'),
+  );
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),
   );
