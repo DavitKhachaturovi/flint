@@ -13,7 +13,21 @@ import {
 import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { nudgeElement } from '../ui/motion.js';
-import { addRow, setCell, tableAt, tablesIn, type ParsedTable, type TableCell } from './table.js';
+import { announceUndo } from '../media/media.js';
+import { openMenu, type MenuEntry } from '../menu/menu.js';
+import {
+  addColumn,
+  addRow,
+  alignTable,
+  deleteColumn,
+  deleteRow,
+  deleteTable,
+  setCell,
+  tableAt,
+  tablesIn,
+  type ParsedTable,
+  type TableCell,
+} from './table.js';
 
 /**
  * Tables drawn and edited in the note editor (NOTE-10; D-141 Q9). A table is a block widget; the
@@ -124,6 +138,18 @@ class TableWidget extends WidgetType {
     const wrap = document.createElement('div');
     wrap.className = 'cm-fl-table-wrap';
     wrap.addEventListener('mousedown', (event) => this.pressed(event, view, wrap));
+    // Q11: the table's own right-click menu, on the cell under the pointer.
+    wrap.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const holder = holders.get(wrap);
+      const table = holder ? tableAt(view.state, holder.from) : null;
+      if (!table) return;
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-row]');
+      const row = target ? Number(target.dataset['row']) : 0;
+      const column = target ? Number(target.dataset['column']) : 0;
+      openMenu(menuEntries(view, { table, row, column }), { x: event.clientX, y: event.clientY });
+    });
     this.fill(wrap, view);
     return wrap;
   }
@@ -589,12 +615,142 @@ function intoTable(direction: 1 | -1): (view: EditorView) => boolean {
   };
 }
 
+/** One of a table's commands (Q11), for its right-click menu and the palette. */
+export interface TableCommand {
+  readonly id: string;
+  readonly label: string;
+  readonly disabled: boolean;
+  readonly run: () => void;
+}
+
+/**
+ * Q11: Add row above / below, Add column left / right, Delete row / column / table, Align table and
+ * Edit markdown, on a cell. Deletes act at once with an Undo toast (the note's own undo); Align
+ * table says so too, since the drawn table looks the same (Q10, Proposed).
+ */
+export function tableCommands(view: EditorView, here: CellAt): TableCommand[] {
+  const { table, row, column } = here;
+  const change = (changes: ReturnType<typeof addRow>, event: string, notice?: string): void => {
+    if (changes.length === 0) return;
+    view.dispatch({ changes, userEvent: event, scrollIntoView: true });
+    if (notice) announceUndo(notice, () => undo(view));
+  };
+  const live = (): ParsedTable => tableAt(view.state, table.from) ?? table;
+  return [
+    {
+      id: 'table:row-above',
+      label: 'Add row above',
+      disabled: row === 0,
+      run: () => change(addRow(live(), row - 1), 'input.table'),
+    },
+    {
+      id: 'table:row-below',
+      label: 'Add row below',
+      disabled: false,
+      run: () => change(addRow(live(), row), 'input.table'),
+    },
+    {
+      id: 'table:column-left',
+      label: 'Add column left',
+      disabled: false,
+      run: () => change(addColumn(live(), column), 'input.table'),
+    },
+    {
+      id: 'table:column-right',
+      label: 'Add column right',
+      disabled: false,
+      run: () => change(addColumn(live(), column + 1), 'input.table'),
+    },
+    {
+      id: 'table:delete-row',
+      label: 'Delete row',
+      disabled: row === 0,
+      run: () => change(deleteRow(live(), row), 'delete.table', 'Row deleted'),
+    },
+    {
+      id: 'table:delete-column',
+      label: 'Delete column',
+      disabled: table.columns <= 1,
+      run: () => change(deleteColumn(live(), column), 'delete.table', 'Column deleted'),
+    },
+    {
+      id: 'table:delete',
+      label: 'Delete table',
+      disabled: false,
+      run: () => change(deleteTable(view.state, live()), 'delete.table', 'Table deleted'),
+    },
+    {
+      id: 'table:align',
+      label: 'Align table',
+      disabled: false,
+      run: () => change(alignTable(view.state, live()), 'input.table', 'Table aligned'),
+    },
+    {
+      id: 'table:markdown',
+      label: 'Edit markdown',
+      disabled: false,
+      run: () => {
+        // Q9: the raw table, the caret at the start of the cell it was on.
+        const cell = table.rows[row]?.cells[column];
+        view.focus();
+        view.dispatch({
+          effects: showTableMarkdown.of(table.from),
+          selection: { anchor: cellPosition(view.state, cell, row, table, 0) },
+          scrollIntoView: true,
+        });
+      },
+    },
+  ];
+}
+
+/** The menu: the commands in groups (adding, deleting, the table as a whole). */
+function menuEntries(view: EditorView, here: CellAt): MenuEntry[] {
+  const commands = tableCommands(view, here);
+  const entry = (command: TableCommand): MenuEntry => ({
+    label: command.label,
+    disabled: command.disabled,
+    action: command.run,
+  });
+  const [above, below, left, right, row, column, table, align, markdown] = commands.map(entry) as [
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+    MenuEntry,
+  ];
+  return [above, below, left, right, 'divider', row, column, table, 'divider', align, markdown];
+}
+
+/** The editor and cell the caret was last in a table of (the palette acts there, Q11). */
+let lastInTable: { view: EditorView; at: number } | null = null;
+
+/** The palette's table commands, while the caret is in a table (D-106, Q11); none otherwise. */
+export function tablePaletteCommands(): TableCommand[] {
+  const last = lastInTable;
+  if (!last || !last.view.dom.isConnected) return [];
+  const here = cellAt(last.view.state, last.at);
+  return here ? tableCommands(last.view, here) : [];
+}
+
+/** Keeps `lastInTable` up to date. */
+const trackCaret = EditorView.updateListener.of((update) => {
+  if (!update.selectionSet && !update.docChanged && !update.focusChanged) return;
+  const head = update.state.selection.main.head;
+  if (cellAt(update.state, head)) lastInTable = { view: update.view, at: head };
+  else if (lastInTable?.view === update.view) lastInTable = null;
+});
+
 /** Tables in the note editor: drawn, edited in place, kept whole by selections (NOTE-10). */
 export function tables(): Extension {
   return [
     rawTable,
     tableDecorations,
     wholeTables,
+    trackCaret,
     // Before the editor's own ↑ / ↓ (which would skip over the table).
     Prec.high(
       keymap.of([

@@ -139,3 +139,47 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
 });
+
+test("the table's right-click menu: rows, a delete with Undo, Align table, Edit markdown (Q10, Q11)", async () => {
+  const menuItem = (label: string): Locator =>
+    main.locator('.fl-menu .fl-menu-item', { hasText: label }).first();
+  await cell(1, 0).click({ button: 'right' });
+  await menuItem('Add row below').click();
+  await expect.poll(file).toContain(`${TABLE}\n|         |     |\n`);
+  await cell(2, 0).click({ button: 'right' });
+  await menuItem('Delete row').click();
+  await expect.poll(file).toBe(NOTE);
+  // Deleted at once; the toast's Undo brings it back (the note's own undo).
+  await cell(1, 0).click({ button: 'right' });
+  await menuItem('Delete row').click();
+  await expect.poll(file).not.toContain('| Alex');
+  await main.locator('.toast button', { hasText: 'Undo' }).click();
+  await expect.poll(file).toBe(NOTE);
+  // Align table: the whole table re-padded, on request.
+  await cell(1, 0).click({ button: 'right' });
+  await menuItem('Align table').click();
+  await expect.poll(file).toContain('| Name | Age |\n| ---- | --: |\n| Alex |  30 |');
+  await main.locator('.toast button', { hasText: 'Undo' }).click();
+  await expect.poll(file).toBe(NOTE);
+  // Edit markdown: the table raw while the caret is in it.
+  await cell(0, 0).click({ button: 'right' });
+  await menuItem('Edit markdown').click();
+  await expect(table()).toHaveCount(0);
+  await expect(editor()).toContainText('| ------- | --: |');
+  await line('After the table.').click();
+  await expect(table()).toHaveCount(1);
+});
+
+test("the palette has the table's commands while the caret is in a table (D-106, Q11)", async () => {
+  await cell(1, 1).click();
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('Add column right');
+  await expect(main.locator('.palette-item.on')).toContainText('Add column right');
+  await main.keyboard.press('Enter');
+  await expect
+    .poll(file)
+    .toContain('| Name    | Age |  |\n| ------- | --: | --- |\n| Alex    | 30  |  |');
+  await cell(1, 0).click();
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
+});

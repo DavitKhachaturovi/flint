@@ -76,6 +76,7 @@ import {
 import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
+import { tablePaletteCommands } from '../editor/table-view.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {
@@ -100,7 +101,7 @@ import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
 import { bodyImages } from '../../shared/body-markdown.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
-import { relink, type LinkedNotice } from '../media/media.js';
+import { relink, type LinkedNotice, type UndoNotice } from '../media/media.js';
 import { useInertText } from './inert-text.js';
 import { sidebarMotion } from './sidebar-motion.js';
 import { useScrollsWhenTaller } from '../ui/scrolls.js';
@@ -1069,7 +1070,16 @@ export function App(): ReactElement {
     const onNotice = (event: Event): void =>
       showToast((event as CustomEvent<string>).detail, false);
     window.addEventListener('flint:notice', onNotice);
-    return () => window.removeEventListener('flint:notice', onNotice);
+    // NOTE-10: an editor's change with its own Undo (the note's history, not the app's).
+    const onUndoNotice = (event: Event): void => {
+      const { text, undo: undoIt } = (event as CustomEvent<UndoNotice>).detail;
+      showToast(text, false, { label: 'Undo', run: undoIt });
+    };
+    window.addEventListener('flint:notice-undo', onUndoNotice);
+    return () => {
+      window.removeEventListener('flint:notice', onNotice);
+      window.removeEventListener('flint:notice-undo', onUndoNotice);
+    };
   }, [showToast]);
 
   const change = useCallback(
@@ -4185,6 +4195,10 @@ export function App(): ReactElement {
             },
           ]
         : []),
+      // NOTE-10, D-141 Q11: the table's commands while the caret is in one (a note or a body).
+      ...tablePaletteCommands()
+        .filter((command) => !command.disabled)
+        .map((command) => ({ id: command.id, label: command.label, run: command.run })),
       ...(view && !lists.find((list) => list.id === view.id)?.inbox && view.id !== TODAY_ID
         ? [
             {

@@ -23,6 +23,7 @@ import { Composer } from '../ui/Composer.js';
 import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
 import { ToastView, useToast } from '../ui/Toast.js';
+import type { UndoNotice } from '../media/media.js';
 import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
 import { NoteTab } from './NoteTab.js';
@@ -127,6 +128,15 @@ export function MiniApp(): ReactElement {
   const [selected, setSelected] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
+  // NOTE-10: the Note tab's editor changes with their own Undo (a table's row deleted).
+  useEffect(() => {
+    const onUndoNotice = (event: Event): void => {
+      const { text, undo } = (event as CustomEvent<UndoNotice>).detail;
+      showToast(text, false, { label: 'Undo', run: undo });
+    };
+    window.addEventListener('flint:notice-undo', onUndoNotice);
+    return () => window.removeEventListener('flint:notice-undo', onUndoNotice);
+  }, [showToast]);
   // The Note tab: the note shown ('' a new one, not made yet; null: to be chosen), its view.
   const [noteId, setNoteId] = useState<string | null>(null);
   // D-131: a quick note shown here isn't removed for having been left empty in the main window.

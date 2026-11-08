@@ -225,3 +225,15 @@ export function showInViewer(images: string[], index: number): void {
 export function announce(text: string): void {
   window.dispatchEvent(new CustomEvent<string>('flint:notice', { detail: text }));
 }
+
+/** An editor's change with its own Undo (a table's row deleted, NOTE-10): the window's toast. */
+export interface UndoNotice {
+  readonly text: string;
+  readonly undo: () => void;
+}
+
+export function announceUndo(text: string, undo: () => void): void {
+  window.dispatchEvent(
+    new CustomEvent<UndoNotice>('flint:notice-undo', { detail: { text, undo } }),
+  );
+}
