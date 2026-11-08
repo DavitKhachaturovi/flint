@@ -1104,3 +1104,27 @@ test('an edge drag in a note just opened from the sidebar: Ctrl+Z undoes it (D-1
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
 });
+
+test('the Undo toast goes with its note’s editor: another note opened (D-144)', async () => {
+  await openGrid();
+  const cleared = GRID_NOTE.replace('| a1 | b1 | c1 |', '|  |  | c1 |').replace(
+    '| a2 | b2 | c2 |',
+    '|  |  | c2 |',
+  );
+  const toast = main.locator('.toast:not(.leaving)', { hasText: 'Cells cleared' });
+  await cell(1, 0).click();
+  await cell(2, 1).click({ modifiers: ['Shift'] });
+  await expect(selected()).toHaveCount(3);
+  await main.keyboard.press('Delete');
+  await expect.poll(grid).toBe(cleared);
+  await expect(toast).toHaveCount(1);
+  // Its Undo would run on an editor that is gone: the toast goes with it, as the drag's question.
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
+  await expect(editor()).toContainText('above');
+  await expect(toast).toHaveCount(0, { timeout: 1500 });
+  expect(await grid()).toBe(cleared);
+  // Put back from outside (the note opened again has no history of the clear).
+  await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
+  await openGrid();
+  await expect(cell(1, 0)).toHaveText('a1');
+});

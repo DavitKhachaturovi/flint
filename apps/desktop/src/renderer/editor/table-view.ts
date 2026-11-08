@@ -902,11 +902,16 @@ function warn(view: EditorView, cells: number, done: (apply: boolean) => void): 
 
 /**
  * D-144: the warning goes with its note's editor (another note opened, mini mode's tab changed): a
- * Delete left on the toast would change nothing, so it is cancelled and the toast taken away.
+ * Delete left on the toast would change nothing, so it is cancelled and the toast taken away. The
+ * Undo toast goes too: its Undo would run on an editor that is gone, and do nothing.
  */
 const cancelWarningWithEditor = ViewPlugin.define((view) => ({
   destroy(): void {
     if (warning?.view === view) warning.cancel();
+    if (undoToast?.view === view) {
+      undoToast.hide();
+      undoToast = null;
+    }
   },
 }));
 
