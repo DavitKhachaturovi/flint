@@ -1,6 +1,8 @@
-# Flint release (docs/05 §6, D-136): a version tag v* builds, tests and publishes the installer to
-# GitHub Releases with latest.yml for the updater. The release text is the version's section of
-# docs/whats-new.md. Actions are pinned by commit SHA (the tag in the comment).
+# Flint release (docs/05 §6, D-136): a version tag v* builds and publishes the installer to GitHub
+# Releases with latest.yml for the updater. The release text is the version's section of
+# docs/whats-new.md. D-145: the gate is CI green on the tagged commit (lint, types, unit and the
+# sharded end-to-end tests ran there); the release doesn't run them again, and refuses to publish
+# a commit CI hasn't passed. Actions are pinned by commit SHA (the tag in the comment).
 name: Release
 
 on:
@@ -23,7 +25,22 @@ jobs:
     permissions:
       # Creating the release and uploading its files.
       contents: write
+      # Reading CI's runs for the tagged commit (the gate).
+      actions: read
     steps:
+      # D-145: tag only a commit CI has passed (push it to next, wait for CI, then tag).
+      - name: CI passed on the tagged commit
+        shell: bash
+        run: |
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1" --jq '.total_count')
+          if [ "${passed:-0}" -lt 1 ]; then
+            echo "::error::CI has not passed on $GITHUB_SHA. Wait for CI to pass on this commit, then run this release again."
+            exit 1
+          fi
+          echo "CI passed on $GITHUB_SHA."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -50,25 +67,6 @@ jobs:
 
       - name: Embedded-Node check (Electron must embed Node >= 24.22.1, D-30)
         run: npm run check:electron-node
-
-      - name: Lint, format, typecheck
-        run: |
-          npm run lint
-          npm run format:check
-          npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-        env:
-          FLINT_FUZZ_RUNS: '10000'
-
-      - name: Build
-        run: npm run build
-
-      - name: End-to-end tests
-        run: npm run test:e2e -w @flint/desktop
-        env:
-          FLINT_CI: '1'
 
       # D-139: the draft release exists before electron-builder uploads: its uploads run in parallel,
       # and with no release yet each made its own draft (1.0.0's blockmap landed in a second one).
