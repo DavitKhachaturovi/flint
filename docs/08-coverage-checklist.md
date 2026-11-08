@@ -1126,7 +1126,19 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | CodeQL #1–#3: package names fully encoded in the release-age check; the release-notes heading matched as text; the workspace test's prefix compared as text | — · Fixed (1.1.1) | `scripts/`, `workspace.test.ts`, D-143 |
 | 6 | Dependabot #1: minimatch (development and build only, not reachable) overridden to 11.0.3 for the vulnerable range; the preview's packed files compared with 1.1.0's; the override removed once the tools move to 11 | — · Fixed (1.1.1) | `package.json`, D-30, D-143 |
 | 7 | Tests: each fix compared with the code it replaced (property tests) and timed on 50,000-character pathological inputs | CAP-03, CAP-06 · Done (1.1.1) | D-143 |
-| 8 | The file format's task-line reader is quadratic on long field-like text (not a CodeQL alert) | — · Decided (Davit): its own change right after 1.1.1 | 04 §3, D-21, D-143 |
+| 8 | The file format's task-line reader is quadratic on long field-like text (not a CodeQL alert) | — · Decided (Davit): its own change right after 1.1.1; done for 1.2.0 (BS) | 04 §3, D-21, D-143, D-146 |
 | 9 | A note's line chosen in Ctrl+K flashes once it is drawn, not after a fixed 60 ms | NAV-01 · Fixed (1.1.1) | D-143 |
 | 10 | A note's line from Ctrl+K: the words searched for lit as Ctrl+F's current match (the line's text on a loose match), then fading; gone at the first edit | NAV-01 · Fixed (1.1.1) | 09, D-143 |
 | 11 | A note opened again after another note gets its own editor (D-115's kept editor only for its own ID step); a change from outside is not an undo step | NOTE-01, D-115 · Fixed (1.1.1) | D-143 |
+
+## BS. The task-line reader in linear time (D-146)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | `parseTaskContent` linear on long field-like lines (unclosed fields, code spans, nested brackets, escapes, a run of spaces): the next `::` and bracket kept per scan, code spans walked once, values closed from one pass per bracket kind; byte for byte the same results (linear with item 5's code-span scan) | — · Done (1.2.0) | 04 §3, `format/fields.ts`, D-21, D-143, D-146 |
+| 2 | The writer's last resort (`escapeEverything`, `insertBackslashes`) linear, the same output | — · Done (1.2.0) | `format/fields.ts`, D-146 |
+| 3 | Tests: 24 reader and writer shapes of 50,000 characters under 100 ms (each fails on the old code); the old reader (with the old code-span scan) and writer as the reference in a property test (200,000 inputs once, identical); `packages/core` green with `FLINT_FUZZ_RUNS=20000` | — · Done (1.2.0) | `fields.linear.test.ts`, D-146 |
+| 4 | `escapeTitle` on nested field-like titles: one more opener escaped per pass (8 s at 50,000 characters); reached when a typed title is saved, and from a file's changed task when its title doesn't read back as it is | — · Found, not fixed: its own change in 1.2.0 (Proposed, Davit to decide) | D-146 |
+| 5 | The code-span scan (`codeSpanRanges`) linear: an escaped backtick before longer runs (`\``` repeated, 1.55 s at 50,000 characters) and runs of rising length; the runs listed once by length, each with a forward cursor; the same spans (review of D-146) | — · Done (1.2.0) | `format/code-spans.ts`, D-143, D-146 |
+| 6 | The writer tries the title as it is before working out its escaped forms: a changed task read from a file no longer pays for the repeated escaping when its title reads back (7.7 s at 50,000 characters before); the same output (review of D-146) | — · Done (1.2.0) | `format/fields.ts`, D-146 |
+| 7 | Tests: 8 code-span shapes (rising runs at 400,000), 3 writer shapes on a line read from a file and then changed, `escapeTitle` on escaped backticks, each under 100 ms (each fails on the old code); the old and new code-span scans and the writer on completed and pinned lines compared (200,000 inputs once, identical) | — · Done (1.2.0) | `fields.linear.test.ts`, D-146 |
