@@ -644,14 +644,20 @@ function escapeEverything(title: string): string {
  * read as a field (a repeated Flint field that was visible text, say), the least escaping that
  * makes it read back correctly is applied; unescaped text is preferred so Dataview keeps seeing
  * the fields it saw before.
+ *
+ * Each escaped form is worked out only when the one before it doesn't read back (D-146): a task
+ * read from a file and then changed (completed, pinned) usually reads back with its title as it
+ * is, and the repeated escaping costs time quadratic in a long field-like title.
  */
 export function formatTaskContent(content: TaskContent): string {
+  const plain = compose(content.title, content);
+  if (readsBackAs(plain, content.title, content)) return plain;
   const flintEscaped = escapeFieldOpenersFully(content.title, true);
+  const flintText = compose(flintEscaped, content);
+  if (readsBackAs(flintText, flintEscaped, content)) return flintText;
   const allEscaped = escapeFieldOpenersFully(content.title, false);
-  for (const title of [content.title, flintEscaped, allEscaped]) {
-    const text = compose(title, content);
-    if (readsBackAs(text, title, content)) return text;
-  }
+  const allText = compose(allEscaped, content);
+  if (readsBackAs(allText, allEscaped, content)) return allText;
   return compose(escapeEverything(allEscaped), content);
 }
 

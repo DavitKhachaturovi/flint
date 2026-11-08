@@ -25,6 +25,11 @@ const RUNS = Number(process.env.FLINT_FUZZ_RUNS ?? 2000);
 // Deep runs (FLINT_FUZZ_RUNS=200000 was run once for D-146) take longer than the default timeout.
 const TIMEOUT = Math.max(5_000, RUNS * 2);
 
+const COMPLETED_AT = parseLocalDateTime('2026-03-10T10:00');
+if (!COMPLETED_AT) throw new Error('the completion time must parse');
+/** A completion Flint sets (written canonically), as completing a task does. */
+const COMPLETION: FieldValue<ParsedLocalDateTime> = { value: COMPLETED_AT, raw: null };
+
 /**
  * D-146: the task-line reader as it was before (1.1.1), quadratic on long field-like text. It is
  * the reference the linear reader must match exactly, and the writer with it, since the writer
@@ -37,6 +42,56 @@ interface Candidate {
   readonly key: string;
   readonly value: string;
   readonly spaced: boolean;
+}
+
+/**
+ * D-146: `codeSpanRanges` as it was before, quadratic when openers don't close (each one read the
+ * rest of the line for a run of its length). The reference reader uses it too, so the property
+ * tests cover the code-span scan as well as the reader.
+ */
+function oldCodeSpanRanges(text: string): Range[] {
+  const ranges: Range[] = [];
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '\\') {
+      index += 2;
+      continue;
+    }
+    if (char !== '`') {
+      index++;
+      continue;
+    }
+    const openEnd = oldRunEnd(text, index);
+    const length = openEnd - index;
+    let cursor = openEnd;
+    let close = -1;
+    while (cursor < text.length) {
+      if (text[cursor] !== '`') {
+        cursor++;
+        continue;
+      }
+      const end = oldRunEnd(text, cursor);
+      if (end - cursor === length) {
+        close = cursor;
+        break;
+      }
+      cursor = end;
+    }
+    if (close === -1) {
+      index = openEnd;
+      continue;
+    }
+    ranges.push([index, close + length]);
+    index = close + length;
+  }
+  return ranges;
+}
+
+function oldRunEnd(text: string, start: number): number {
+  let end = start;
+  while (text[end] === '`') end++;
+  return end;
 }
 
 const BLOCK_ID = /(^|[ \t])\^([A-Za-z0-9-]+)[ \t]*$/;
@@ -182,7 +237,7 @@ function buildField<T>(candidate: Candidate, value: T): FieldValue<T> {
 }
 
 function oldParseTaskContent(text: string): TaskContent {
-  const code = codeSpanRanges(text);
+  const code = oldCodeSpanRanges(text);
   let end = text.length;
   let blockId: string | null = null;
   const block = BLOCK_ID.exec(text);
@@ -348,7 +403,7 @@ function insertBackslashes(text: string, indexes: readonly number[]): string {
 }
 
 function escapeFieldOpeners(title: string, flintOnly: boolean): string {
-  const code = codeSpanRanges(title);
+  const code = oldCodeSpanRanges(title);
   const indexes = findCandidates(title, title.length, code)
     .filter((candidate) => {
       const key = flintKeyOf(candidate.key.toLowerCase());
@@ -369,7 +424,7 @@ function escapeFieldOpenersFully(title: string, flintOnly: boolean): string {
 }
 
 function escapeEverything(title: string): string {
-  const code = codeSpanRanges(title);
+  const code = oldCodeSpanRanges(title);
   const indexes: number[] = [];
   for (let index = 0; index < title.length; index++) {
     const char = title[index];
@@ -448,6 +503,8 @@ describe('parseTaskContent: long field-like lines stay fast (D-146)', () => {
     ['a lone surrogate before each field', repeat('\ud83d[a:: ')],
     ['unclosed fields after a long title', `${'a'.repeat(size / 2)} ${repeat('(k:: v ')}`],
     ['spaces inside the title', `a${' '.repeat(size)}b [priority:: high]`],
+    ['an escaped backtick before each pair of backticks', repeat('\\``')],
+    ['escaped backticks after code spans', repeat('``a`` \\``')],
   ])(
     '%s',
     (_, input) => {
@@ -495,6 +552,102 @@ describe('formatTaskContent: long titles that need escaping stay fast (D-146)', 
     },
     10_000,
   );
+});
+
+/** Backtick runs of rising length (1, 2, 3…), each followed by a space, `size` characters or more. */
+function risingRuns(size: number, before = ''): string {
+  let text = '';
+  for (let length = 1; text.length < size; length++) text += `${before}${'`'.repeat(length)} `;
+  return text;
+}
+
+/**
+ * D-146 (review): `codeSpanRanges` skips an escaped backtick only while looking for an opening run,
+ * so on `\``` repeated every opener is one backtick and every later run two: each opener read the
+ * rest of the line (1.55 s at 50,000 characters). It runs for every task line read, in the
+ * shorthand parse on every keystroke and in each pass of the writer's escaping. Runs of rising
+ * length took about n^1.5 (15 ms at 50,000, 0.6 s at 200,000), so they are measured at 400,000.
+ * Now each shape takes a few milliseconds.
+ */
+describe('codeSpanRanges: openers that never close stay fast (D-146)', () => {
+  const size = 50_000;
+  const LIMIT_MS = 100;
+  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
+
+  it.each([
+    ['an escaped backtick before each pair', repeat('\\``')],
+    ['an escaped backtick before each pair, text between', repeat('\\`` a ')],
+    ['an escaped backtick before each triple', repeat('\\```')],
+    ['escaped backticks and emoji', repeat('\\``😀')],
+    ['escaped backticks after code spans', repeat('``a`` \\``')],
+    ['escaped backticks inside unclosed fields', repeat('[a:: \\`` ')],
+    ['runs of rising length', risingRuns(8 * size)],
+    ['escaped runs of rising length', risingRuns(8 * size, '\\')],
+  ])(
+    '%s',
+    (_, input) => {
+      expect(input.length).toBeGreaterThanOrEqual(size);
+      codeSpanRanges(input.slice(0, 1000)); // Warms the JIT.
+      expect(elapsed(() => codeSpanRanges(input))).toBeLessThan(LIMIT_MS);
+    },
+    10_000,
+  );
+
+  it('finds the same spans as the old scan on long lines', () => {
+    for (const input of [repeat('`a` \\`` ``b`` '), risingRuns(5_000), risingRuns(5_000, '\\')]) {
+      expect(codeSpanRanges(input)).toEqual(oldCodeSpanRanges(input));
+    }
+  });
+});
+
+/**
+ * D-146 (review): a task read from a file goes through the writer whenever it is changed
+ * (completed, pinned, given a reminder). The writer worked out both escaped forms of the title
+ * before trying the title as it is, so a long field-like title that reads back unchanged still
+ * paid for the repeated escaping: 2.1 s at 25,000 characters, 7.7 s at 50,000 for the nested shape
+ * below. `escapeTitle` on escaped backticks took 3 s through the code-span scan.
+ */
+describe('the writer on long lines read from a file stays fast (D-146)', () => {
+  const size = 50_000;
+  const LIMIT_MS = 100;
+  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
+  const nested = (count: number): string =>
+    `${'[a:: (b:: [c:: '.repeat(count)}${']'.repeat(3 * count)}`;
+
+  /** The line as Flint reads it from a file, then completed and pinned. */
+  function changed(line: string): TaskContent {
+    const content = parseTaskContent(line);
+    return {
+      ...content,
+      fields: { ...content.fields, completion: COMPLETION, pinned: { value: true, raw: null } },
+    };
+  }
+
+  it.each([
+    ['nested field-like text that reads back as it is', nested(Math.ceil(size / 18))],
+    ['an escaped backtick before each pair of backticks', repeat('\\``')],
+    ['escaped backticks inside unclosed fields', repeat('[a:: \\`` ')],
+  ])(
+    '%s',
+    (_, line) => {
+      expect(line.length).toBeGreaterThanOrEqual(size);
+      formatTaskContent(changed(line.slice(0, 1000))); // Warms the JIT.
+      const content = changed(line);
+      expect(elapsed(() => formatTaskContent(content))).toBeLessThan(LIMIT_MS);
+      // The title is written as it was read: nothing in it is escaped.
+      expect(formatTaskContent(content)).toBe(
+        `${line.trimEnd()} [pinned:: true] [completion:: 2026-03-10T10:00]`,
+      );
+    },
+    10_000,
+  );
+
+  it('escapeTitle on escaped backticks', () => {
+    const title = repeat('\\``');
+    escapeTitle(title.slice(0, 1000)); // Warms the JIT.
+    expect(elapsed(() => escapeTitle(title))).toBeLessThan(LIMIT_MS);
+    expect(escapeTitle(title)).toBe(title);
+  }, 10_000);
 });
 
 describe('the linear task-line reader reads exactly as the old one (D-146)', () => {
@@ -586,6 +739,16 @@ describe('the linear task-line reader reads exactly as the old one (D-146)', () 
           // resort (escapeEverything).
           const typed = { ...content, title: text };
           expect(formatTaskContent(typed)).toBe(oldFormatTaskContent(typed));
+          // The task read from the line, then completed and pinned by Flint.
+          const done: TaskContent = {
+            ...content,
+            fields: {
+              ...content.fields,
+              completion: COMPLETION,
+              pinned: { value: true, raw: null },
+            },
+          };
+          expect(formatTaskContent(done)).toBe(oldFormatTaskContent(done));
         }),
         { numRuns: RUNS },
       );
@@ -599,6 +762,24 @@ describe('the linear task-line reader reads exactly as the old one (D-146)', () 
       fc.assert(
         fc.property(fc.string({ unit: 'binary', maxLength: 40 }), (text) => {
           expect(parseTaskContent(text)).toEqual(oldParseTaskContent(text));
+        }),
+        { numRuns: RUNS },
+      );
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'codeSpanRanges finds the same spans as the old scan',
+    () => {
+      const backticky = fc
+        .array(fc.constantFrom('`', '``', '```', '````', '\\', '\\`', 'a', ' ', '😀', '\ud83d'), {
+          maxLength: 30,
+        })
+        .map((pieces) => pieces.join(''));
+      fc.assert(
+        fc.property(fc.oneof(backticky, fc.string({ unit: 'binary', maxLength: 40 })), (text) => {
+          expect(codeSpanRanges(text)).toEqual(oldCodeSpanRanges(text));
         }),
         { numRuns: RUNS },
       );
