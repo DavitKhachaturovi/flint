@@ -301,3 +301,45 @@ test('a click puts the caret after a bullet, and a selection reveals nothing (D-
   await expect(line('Heading')).toHaveText('Heading');
   await expect(editor()).not.toContainText('![picture]');
 });
+
+test('a pasted picture: the caret is beside it at once, not inside it while it loads (D-144)', async () => {
+  // A 480×160 screenshot, pasted with a synthetic paste event (D-93: never the real clipboard),
+  // at the end of the note: saved to attachments/ and drawn, the caret right after it.
+  await caretAtEnd('After the picture.');
+  await main.keyboard.press('Enter');
+  await main.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 160;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.fillStyle = 'gray';
+      context.fillRect(0, 0, 480, 160);
+    }
+    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'));
+    if (!blob) throw new Error('no picture');
+    const data = new DataTransfer();
+    data.items.add(new File([blob], 'screenshot.png', { type: 'image/png' }));
+    document.activeElement?.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  const image = editor().locator('.cm-fl-image img').last();
+  await expect(editor().locator('.cm-fl-image img')).toHaveCount(2);
+  await expect
+    .poll(() => image.evaluate((element: HTMLImageElement) => element.complete && element.width))
+    .toBe(480);
+  // No key, click or scroll after the paste: the caret is drawn at the loaded picture's right edge
+  // (it was at the 64 px placeholder's edge, inside the picture, until the next action).
+  const carets = main.locator('.note-editor .cm-fl-caret');
+  await expect(carets).toHaveCount(1);
+  const gap = async (): Promise<number> => {
+    const caret = await carets.boundingBox();
+    const box = await image.boundingBox();
+    return caret && box ? Math.abs(caret.x - (box.x + box.width)) : Number.POSITIVE_INFINITY;
+  };
+  await expect.poll(gap, { timeout: 2_000 }).toBeLessThanOrEqual(8);
+  await expect
+    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
+    .toMatch(/After the picture\.\n\n?!\[\]\(attachments\/[\w-]+\.png\)\n?$/);
+});

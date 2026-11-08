@@ -14,6 +14,7 @@ import {
   EditorSelection,
   EditorState,
   Facet,
+  StateEffect,
   type Extension,
   type Range,
 } from '@codemirror/state';
@@ -101,6 +102,13 @@ const flintHighlight = HighlightStyle.define([
   { tag: tags.strikethrough, textDecoration: 'line-through' },
 ]);
 
+/**
+ * D-144: a picture or video has its size only once it has loaded (until then the 64 px
+ * placeholder). Its load says so, so the caret drawn beside it (`pictureCaret`) and the editor's
+ * line heights are measured again at once, not on the next key or click.
+ */
+const mediaSized = StateEffect.define<null>();
+
 class ImageWidget extends WidgetType {
   readonly src: string;
   readonly alt: string;
@@ -112,11 +120,16 @@ class ImageWidget extends WidgetType {
   override eq(other: ImageWidget): boolean {
     return other.src === this.src && other.alt === this.alt;
   }
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     // D-84: pictures, videos and other attachments, with the Linked badge and File not found.
     const holder = document.createElement('span');
     holder.className = 'cm-fl-image';
     holder.append(mediaElement(this.src, this.alt));
+    const sized = (): void => {
+      if (holder.isConnected) view.dispatch({ effects: mediaSized.of(null) });
+    };
+    holder.querySelector('img')?.addEventListener('load', sized, { once: true });
+    holder.querySelector('video')?.addEventListener('loadedmetadata', sized, { once: true });
     return holder;
   }
   override ignoreEvent(): boolean {
@@ -389,7 +402,10 @@ const pictureCaret: Extension = [
       update.docChanged ||
       update.focusChanged ||
       update.viewportChanged ||
-      update.geometryChanged,
+      update.geometryChanged ||
+      update.transactions.some((transaction) =>
+        transaction.effects.some((effect) => effect.is(mediaSized)),
+      ),
   }),
   EditorView.contentAttributes.of((view) =>
     caretBesidePicture(view) === null ? null : { class: 'cm-fl-caret-hidden' },
