@@ -1150,3 +1150,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | A task the composer sends to another list (`##list`): "Added to <list>" with Go to <list> and Undo; Go to opens the list, the task selected, scrolled into view and flashed (Restore's path, D-98) | CAP-05 · Built (1.2.0) | 02, D-147, `smoke.spec.ts` |
 | 2 | The same for a list's new row typed below a task | CAP-05 · Built (1.2.0; Proposed) | 02, D-147 |
 | 3 | Mini mode's composer: Go to opens the main window at the list, the task selected and flashed; mini stays | MINI-01 · Built (1.2.0; Proposed) | 02, D-147, `mini.spec.ts` |
+
+## BU. App icon detail at small sizes (9 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Taskbar and tray icons: the master's facets at every small size, a hairline outline with a lit upper edge; logos drawn at 16, 24, 32 and 48 px, each `.ico` size from the nearest | UI-07 · Built (1.2.0) | 09 §8, D-148 |
