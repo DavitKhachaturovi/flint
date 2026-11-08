@@ -13,7 +13,14 @@ import {
   type Extension,
   type Range,
 } from '@codemirror/state';
-import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view';
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+  keymap,
+  type DecorationSet,
+} from '@codemirror/view';
 import { titleHtml } from '../../shared/inline-markdown.js';
 import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
 import { announceConfirm, announceUndo } from '../media/media.js';
@@ -498,33 +505,58 @@ function resize(
     });
 }
 
-/** D-144: the way to cancel the edge drag's warning still up, if any. */
-let warning: (() => void) | null = null;
+/** D-144: the edge drag's warning still up, if any: the editor it is for, and the way to cancel it. */
+let warning: { readonly view: EditorView; readonly cancel: () => void } | null = null;
+
+/** Layers above the note that take Esc themselves: a menu, a picker, the palette, the viewer. */
+const ABOVE = '.fl-menu, .fl-picker, .palette-layer, .lightbox';
 
 /**
  * Q11, D-144: the warning before a drag takes away cells with text, as the window's toast (Delete /
- * Cancel), never in the note. Esc, the toast's time running out or another toast cancel it.
+ * Cancel), never in the note. Esc in the note (or its cell), the toast's time running out, another
+ * toast, a new drag or the note's editor going away cancel it.
  */
-function warn(cells: number, done: (apply: boolean) => void): void {
+function warn(view: EditorView, cells: number, done: (apply: boolean) => void): void {
+  let open = true;
   let cancel: (() => void) | null = null;
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape' || !cancel) return;
+    // Esc goes to the topmost layer first: a palette, menu or picker opened over the note keeps it.
+    const target = event.target instanceof Node ? event.target : null;
+    const here =
+      target !== null &&
+      (view.dom.contains(target) ||
+        (target instanceof Element && target.closest('.toast') !== null));
+    if (!here || document.querySelector(ABOVE)) return;
     event.preventDefault();
     event.stopPropagation();
     cancel();
   };
   const close = (apply: boolean): void => {
+    open = false;
     window.removeEventListener('keydown', onKey, true);
-    if (warning === cancel) warning = null;
+    if (warning?.cancel === cancel) warning = null;
     done(apply);
   };
   window.addEventListener('keydown', onKey, true);
-  warning = cancel = announceConfirm(
+  cancel = announceConfirm(
     `This deletes content in ${cells} ${cells === 1 ? 'cell' : 'cells'}`,
     'Delete',
     { confirm: () => close(true), cancel: () => close(false) },
   );
+  // With no window to show it, it was cancelled at once: nothing is up.
+  if (open) warning = { view, cancel };
 }
+
+/**
+ * D-144: the warning goes with its note's editor (another note opened, mini mode's tab changed): a
+ * Delete left on the toast would change nothing, so it is cancelled and the toast taken away.
+ */
+const cancelWarningWithEditor = ViewPlugin.define((view) => ({
+  destroy(): void {
+    if (warning?.view === view) warning.cancel();
+  },
+}));
 
 /**
  * Q11: dragging the right edge adds or removes columns, the bottom edge rows, one per step of the
@@ -547,7 +579,7 @@ function dragEdge(
   start.preventDefault();
   start.stopPropagation();
   // D-144: a new drag answers the last one's warning still up: Cancel (its cells undimmed).
-  warning?.();
+  warning?.cancel();
   const handle = start.currentTarget as HTMLElement;
   handle.setPointerCapture(start.pointerId);
   const box = element.getBoundingClientRect();
@@ -593,7 +625,7 @@ function dragEdge(
       return;
     }
     badge.hidden = true;
-    warn(withText, (yes) => {
+    warn(view, withText, (yes) => {
       clear();
       if (!yes) return;
       // The note may have changed while the card was up: the table as it is now, or nothing.
@@ -1217,6 +1249,7 @@ export function tables(): Extension {
     wholeTables,
     keepTextOutOfTables,
     trackCaret,
+    cancelWarningWithEditor,
     // Before the editor's own ↑ / ↓ (which would skip over the table).
     Prec.high(
       keymap.of([

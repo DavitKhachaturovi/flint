@@ -51,6 +51,26 @@ const cell = (row: number, column: number): Locator =>
 const file = (): Promise<string> => readFile(join(flint, 'Tables.md'), 'utf8');
 const line = (text: string): Locator => editor().locator('.cm-line', { hasText: text }).first();
 
+/** Q11: drags a table's right or bottom edge by `steps` cells (`finish`: lets go at the end). */
+const drag = async (edge: 'right' | 'bottom', steps: number, finish = true): Promise<void> => {
+  const handle = main.locator(`.note-editor .cm-fl-table-edge-${edge}`);
+  const box = await handle.boundingBox();
+  const tableBox = await table().boundingBox();
+  if (!box || !tableBox) throw new Error('no edge');
+  const columns = await table().locator('th').count();
+  const rows = await table().locator('tr').count();
+  const step = edge === 'right' ? tableBox.width / columns : tableBox.height / rows;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await main.mouse.move(x, y);
+  await main.mouse.down();
+  const dx = edge === 'right' ? step * steps : 0;
+  const dy = edge === 'bottom' ? step * steps : 0;
+  await main.mouse.move(x + dx / 2, y + dy / 2);
+  await main.mouse.move(x + dx, y + dy);
+  if (finish) await main.mouse.up();
+};
+
 test.beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), 'flint-e2e-tables-'));
   flint = join(dataDirectory, 'Flint');
@@ -202,24 +222,6 @@ test("the palette has the table's commands while the caret is in a table (D-106,
 });
 
 test('dragging the edges adds and removes columns and rows; text asks first, in a toast (Q11, D-144)', async () => {
-  const drag = async (edge: 'right' | 'bottom', steps: number, finish = true): Promise<void> => {
-    const handle = main.locator(`.note-editor .cm-fl-table-edge-${edge}`);
-    const box = await handle.boundingBox();
-    const tableBox = await table().boundingBox();
-    if (!box || !tableBox) throw new Error('no edge');
-    const columns = await table().locator('th').count();
-    const rows = await table().locator('tr').count();
-    const step = edge === 'right' ? tableBox.width / columns : tableBox.height / rows;
-    const x = box.x + box.width / 2;
-    const y = box.y + box.height / 2;
-    await main.mouse.move(x, y);
-    await main.mouse.down();
-    const dx = edge === 'right' ? step * steps : 0;
-    const dy = edge === 'bottom' ? step * steps : 0;
-    await main.mouse.move(x + dx / 2, y + dy / 2);
-    await main.mouse.move(x + dx, y + dy);
-    if (finish) await main.mouse.up();
-  };
   // One step right: a column; one step back: it goes at once (empty).
   await drag('right', 1);
   await expect.poll(file).toContain('| Name    | Age |  |');
@@ -271,6 +273,59 @@ test('dragging the edges adds and removes columns and rows; text asks first, in 
   await main.keyboard.press('Escape');
   await main.mouse.up();
   expect(await file()).toBe(NOTE);
+});
+
+/** D-144: the edge drag's question for the Tables note's Age column, and its dimmed cells. */
+const question = (): Locator =>
+  main.locator('.toast', { hasText: 'This deletes content in 2 cells' });
+const going = (): Locator => table().locator('.cm-fl-cell-going');
+const raiseQuestion = async (): Promise<void> => {
+  await line('After the table.').click();
+  // The table's box at rest (no reshape still gliding) before the drag measures it.
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = JSON.stringify(await table().boundingBox());
+      const same = now === last;
+      last = now;
+      return same;
+    })
+    .toBe(true);
+  await drag('right', -1);
+  await expect(question()).toHaveCount(1);
+  await expect(going()).toHaveCount(2);
+};
+
+test("the drag's question leaves Esc to a layer on top of it first (D-144)", async () => {
+  const warning = question();
+  const palette = main.locator('.palette-layer');
+  // The palette opened over it: the first Esc closes the palette and the question stays; the
+  // next one, in the note, cancels it.
+  await raiseQuestion();
+  await main.keyboard.press('Control+k');
+  await expect(palette).toHaveCount(1);
+  await main.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+  await expect(warning).toHaveCount(1);
+  await expect(going()).toHaveCount(2);
+  await line('After the table.').click();
+  await main.keyboard.press('Escape');
+  await expect(warning).toHaveCount(0);
+  await expect(going()).toHaveCount(0);
+  expect(await file()).toBe(NOTE);
+});
+
+test("the drag's question goes with its note's editor, as Cancel (D-144)", async () => {
+  // Another note opened while it is up: the editor it would change is gone, so it goes (a Delete
+  // left over the other note would do nothing).
+  await raiseQuestion();
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
+  await expect(editor()).toContainText('above');
+  await expect(question()).toHaveCount(0);
+  expect(await file()).toBe(NOTE);
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Tables' }).first().click();
+  await expect(table()).toHaveCount(1);
+  await expect(going()).toHaveCount(0);
 });
 
 test('text typed below a table stays out of it, and so does the picture after it (D-144)', async () => {
