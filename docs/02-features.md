@@ -483,10 +483,14 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - In the Ctrl+K palette and as a checked item in the note's right-click menu, next to Monospace; remembered per note on this machine like Monospace (UI state). Also in mini mode's Note tab; Monospace still applies in it; switching crossfades (off with reduce-motion). Not for task bodies.
 - **Shortcut: Ctrl+Shift+E** (grill Q5; pairs with Monospace's Ctrl+Shift+M; Ctrl+E stays inline code, D-106, built with this work). Decided, not built yet.
 
-### NOTE-10 — Tables (v1.1, D-141)
-- GFM tables (`| Column | … |`) render as real tables in the note editor instead of raw text. Edits write back only the bytes that changed: the alignment row, padding and escaped pipes stay as they were.
+### NOTE-10 — Tables (v1.2, D-141)
+- GFM tables (`| Column | … |`) render as real tables in the note editor, mini mode's Note tab and task bodies (edited and rendered; grill Q9) instead of raw text. Edits write back only the bytes that changed: the alignment row, padding and escaped pipes stay as they were.
 - Markdown can't store column widths, so columns are not resized. Instead, **dragging the table's right edge adds or removes columns, dragging its bottom edge adds or removes rows**; removing columns or rows that contain text warns first ("This deletes content in 2 cells").
-- Decided, not built yet; the editing details (cells, keyboard, motion, the warning's look) are decided in the grill (06 §0).
+- **Editing (grill Q9):** click a cell to edit it in place. Tab / Shift+Tab move between cells (Tab in the last cell adds a row), Enter goes to the cell below (adding a row on the last one), Shift+Enter nudges (no line breaks in cells), ↑ / ↓ move between rows and in and out of the table, ← / → cross cell edges, Esc leaves it. Undo, Ctrl+F and copy work through the note's own text; a selection crossing the table takes all of it; wide tables scroll sideways. The raw table only through Source mode or Edit markdown in its right-click menu.
+- **Writing back (grill Q10, 04 §4):** only the edited cell's bytes change; nothing is re-padded by itself. **Align table** in the table's right-click menu and the Ctrl+K palette re-pads the whole table in the raw text, in one undo step (a toast "Table aligned" with Undo, **Proposed**).
+- **Size and shape (grill Q11):** a hover handle on the right and bottom edge; each drag step adds or removes one column or row at the end (dimmed before it goes, Esc cancels, at least one column and the header row); the warning shows on letting go only when the drag removes text. The table's right-click menu and the palette: Add row above / below, Add column left / right, Delete row / column / table (at once, with an Undo toast), Align table. Reordering rows and columns by drag is Later.
+- **Motion (grill Q12):** new rows and columns ease in, deleted ones fade and collapse, the parts a drag removes dim first, the active cell's ring moves between cells, the warning fades; off with reduce-motion.
+- Decided, not built yet.
 
 ---
 

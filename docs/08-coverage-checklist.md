@@ -1054,7 +1054,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Versions after 1.0.0: 1.0.x fixes, 1.x.0 features | — · Proposed | D-139 |
 | 6 | Restart to update hides Flint at once and says it reopens in about a minute (no frozen window) | APP-06 · Done (1.0.1) | 02, D-140 |
 
-## BQ. The live preview made reliable: the plan (8 Nov 2026, grill Q1–Q4)
+## BQ. The live preview made reliable: the plan (8 Nov 2026, grill Q1–Q14)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
@@ -1067,6 +1067,14 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
 | 8 | Renumbering: only the edited list, after Flint's structural edits, one undo step, first number and delimiter kept, nested lines shifted when a number's width changes; never on open, typing or outside changes | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
 | 8a | Nesting indents: Tab to the parent's text column with the subtree, Shift+Tab back, nested numbers join or start at 1, tabs only where the list already uses them; Tab on the first item nudges (Shift+Tab on a top-level item nudges: Proposed) | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
-| 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.1.0), details open | 02, D-141, 06 §0 |
-| 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), scrambled shape-only fixtures of real notes (after Davit's review), the real folder local-only (`FLINT_CORPUS`), randomised editing tests | NOTE-01 · Decided (1.1.0) | D-141 |
+| 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.2.0) | 02, D-141, 06 §0 |
+| 9a | Editing a table: cells in place, Tab / Enter / Shift+Enter / arrows / Esc as in 03 §3, one editor at a time, the note's own undo, Ctrl+F into cells, whole-table selections, sideways scroll; in notes, mini's Note tab and task bodies (edited and rendered) | NOTE-10 · Decided (1.2.0) | 02, 03 §3, D-141 |
+| 9b | Writing a table back: only the edited cell's bytes, padding kept, `\|` escaping, pasted line breaks as spaces, short rows grow to the edited cell, extra cells kept, new rows and columns in the existing style, line endings kept | NOTE-10 · Decided (1.2.0) | 04 §4, D-141 |
+| 9c | Align table: right-click menu and palette, the whole table re-padded in one undo step (details and the toast Proposed) | NOTE-10 · Decided (1.2.0) | 02, 04 §4, D-141 |
+| 9d | A table's size and shape: edge-drag handles (one column or row per step, at the end, dimmed before it goes, Esc cancels, minimum one column and the header), the inline warning for drags that remove text; Add row above / below, Add column left / right, Delete row / column / table with an Undo toast, in the menu and palette | NOTE-10 · Decided (1.2.0) | 02, D-141 |
+| 9e | Reordering table rows and columns by drag | NOTE-10 · Later | D-141 |
+| 9f | Motion: markers, renumbering and Align table instant (in the census as such); the indent glide, the first-item nudge, the checkbox pop, table rows and columns, the drag's dimming, the active cell's ring, the warning and Source mode animated; every action in the motion census | NOTE-01, NOTE-09 · Decided (1.1.0); NOTE-10 (1.2.0) | D-141 |
+| 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), scrambled shape-only fixtures of real notes (after Davit's review), the real folder local-only (`FLINT_CORPUS`), randomised editing tests; decorations checked against the syntax tree at every caret position, real-folder failures without note text, the scrambler's surviving-word check | NOTE-01 · Decided (1.1.0) | D-141 |
+| 10a | Long fuzzing: `npm run fuzz` on demand (a time budget) and a nightly scheduled GitHub Actions run, core's format fuzz and the editor's, the seed printed (details Proposed) | NOTE-01 · Decided (1.1.0) | D-141 |
 | 11 | Ctrl+E for inline code (decided in D-106, never built), built with this work | NOTE-02 · Decided (1.1.0) | 03 §3, D-141 |
+| 12 | Two releases: 1.1.0 the reliable live preview (corpus, reveal rule, Edit markdown, lists, checkbox, Source mode, Ctrl+E, nightly fuzzing), 1.2.0 tables; each a local installer for Davit first, released only after his OK | NOTE-01, NOTE-09, NOTE-10 · Decided | 06 §0, D-141 |
