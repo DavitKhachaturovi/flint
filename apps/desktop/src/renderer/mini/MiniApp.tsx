@@ -472,8 +472,13 @@ export function MiniApp(): ReactElement {
     });
     if (!outcome?.key) return;
     // Today's tasks are made in Inbox, pinned: that is no other place to tell about.
-    if (outcome.listId !== listId && !(listId === TODAY_ID && outcome.listId === INBOX_ID))
-      showToast(outcome.label, true);
+    if (outcome.listId === listId || (listId === TODAY_ID && outcome.listId === INBOX_ID)) return;
+    // D-147: the way to it, as Open does: the main window at that list, the task flashed there.
+    const { key, listId: target, listName } = outcome;
+    showToast(outcome.label, true, {
+      label: `Go to ${listName}`,
+      run: () => window.flintMini.open({ listId: target, key }),
+    });
   };
 
   const quick = lists.find((list) => list.id === noteId) ?? null;

@@ -1142,3 +1142,11 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | The code-span scan (`codeSpanRanges`) linear: an escaped backtick before longer runs (`\``` repeated, 1.55 s at 50,000 characters) and runs of rising length; the runs listed once by length, each with a forward cursor; the same spans (review of D-146) | — · Done (1.2.0) | `format/code-spans.ts`, D-143, D-146 |
 | 6 | The writer tries the title as it is before working out its escaped forms: a changed task read from a file no longer pays for the repeated escaping when its title reads back (7.7 s at 50,000 characters before); the same output (review of D-146) | — · Done (1.2.0) | `format/fields.ts`, D-146 |
 | 7 | Tests: 8 code-span shapes (rising runs at 400,000), 3 writer shapes on a line read from a file and then changed, `escapeTitle` on escaped backticks, each under 100 ms (each fails on the old code); the old and new code-span scans and the writer on completed and pinned lines compared (200,000 inputs once, identical) | — · Done (1.2.0) | `fields.linear.test.ts`, D-146 |
+
+## BT. Go to from the composer's toast (D-147)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A task the composer sends to another list (`##list`): "Added to <list>" with Go to <list> and Undo; Go to opens the list, the task selected, scrolled into view and flashed (Restore's path, D-98) | CAP-05 · Built (1.2.0) | 02, D-147, `smoke.spec.ts` |
+| 2 | The same for a list's new row typed below a task | CAP-05 · Built (1.2.0; Proposed) | 02, D-147 |
+| 3 | Mini mode's composer: Go to opens the main window at the list, the task selected and flashed; mini stays | MINI-01 · Built (1.2.0; Proposed) | 02, D-147, `mini.spec.ts` |

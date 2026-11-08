@@ -125,6 +125,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 - **D-87 (both the popup and the main window's composer, D-51 parity):** after `##`, the longest existing list name spelled out by the following words, spaces included (exact, ignoring case, spaces and hyphens as D-25), wins before the single-word rules; `##new list 2` goes to "new list 2" when "new list 1" exists too. The composer shows the popup's `##` menu (search, recent lists) and close-match card.
 - **D-89:** the `##` menu lists every matching list, scrolling past five (wheel, ↑/↓), in the composer and the popup.
+- **D-147 (1.2.0):** a task the main window's composer sends to another list (`##list`) gets the toast "Added to <list>" with **Go to <list>** and Undo, as Restore's toast (D-98): that list opens, the new task selected, scrolled into view and flashed. **Proposed:** the same for a list's new row (typed below a task) and for mini mode's composer, whose Go to opens the main window there as Open does (mini stays).
 ### CAP-06 — Paste-to-capture (v1)
 - **D-80:** in the main window's composer, pasted images and code look as in the popup: a thumbnail chip and a code card preview, never raw link or fence text (TASK-05).
 - **D-79:** pasted content that already contains markdown (a fenced code block, an image link) stays markdown; only raw, unfenced code, JSON and stack traces are fenced. The same rules apply in the main window's composer and in body fields.

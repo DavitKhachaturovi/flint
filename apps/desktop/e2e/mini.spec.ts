@@ -448,6 +448,26 @@ test('Inbox: its open tasks, the tab arriving as a page does; drag reorders; P p
   await mini.keyboard.press('Escape');
 });
 
+test("the composer's toast: Go to opens the list a ##list task went to in the main window, mini stays (D-147)", async () => {
+  await mini.keyboard.press('Control+2');
+  await expect(mini.locator('.mini-tabs .trash-tab.on')).toHaveText('Inbox');
+  await main.locator('.sidebar > .nav[data-key="@today"]').click();
+  await mini.locator('.composer-input').click();
+  await mini.keyboard.type('Send the mini notes ##Wor');
+  await expect(mini.locator('.composer-suggestion').first()).toContainText('Work');
+  await mini.keyboard.press('Enter');
+  await expect(mini.locator('.composer-input')).toHaveValue('Send the mini notes ##Work');
+  await mini.keyboard.press('Enter');
+  const toast = mini.locator('.toast');
+  await expect(toast).toContainText('Added to Work');
+  await expect(toast.locator('button')).toHaveText(['Go to Work', 'Undo']);
+  await toast.locator('button', { hasText: 'Go to Work' }).click();
+  await expect(main.locator('h1')).toContainText('Work');
+  await expect(main.locator('.row.sel')).toContainText('Send the mini notes');
+  expect(await hook('miniVisible')).toBe(true);
+  await mini.keyboard.press('Control+1');
+});
+
 test('a reminder: the toast and the card; Done in mini completes it and takes the toast back (REM-06, D-109)', async () => {
   const at = stamp(appNow());
   await writeFile(

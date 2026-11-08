@@ -1639,6 +1639,22 @@ export function App(): ReactElement {
   );
 
   /**
+   * D-147: a task `##list` sent to another list: its toast offers the way to it, as Restore's does
+   * (D-98): that list opened, the task selected, scrolled into view and flashed.
+   */
+  const toastAddedElsewhere = useCallback(
+    (outcome: ChangeOutcome): void => {
+      const { key, listId: target, listName } = outcome;
+      showToast(
+        outcome.label,
+        true,
+        key ? { label: `Go to ${listName}`, run: () => reveal(target, key) } : undefined,
+      );
+    },
+    [showToast, reveal],
+  );
+
+  /**
    * D-111: an empty new row that is left plays the remove animation where it was (in the list and
    * on a task's page), instead of vanishing. `shownNewRow` is where the row was drawn last.
    */
@@ -1682,7 +1698,7 @@ export function App(): ReactElement {
       const anchor = current.added.at(-1) ?? current.after;
       void change({ kind: 'add', text, where: { after: anchor }, ...(id ? { id } : {}) }).then(
         (outcome) => {
-          if (outcome && outcome.listId !== listId) showToast(outcome.label, true);
+          if (outcome && outcome.listId !== listId) toastAddedElsewhere(outcome);
         },
       );
       const key = here ? id : null;
@@ -1701,7 +1717,7 @@ export function App(): ReactElement {
       // D-78: Shift+Enter goes on into the new task's notes.
       if (key && how === 'notes') openNotes(key);
     },
-    [change, listId, lists, showToast, openNotes],
+    [change, listId, lists, toastAddedElsewhere, openNotes],
   );
 
   const addFromComposer = useCallback(
@@ -1714,10 +1730,10 @@ export function App(): ReactElement {
       });
       if (!outcome?.key) return;
       frontAdd();
-      if (outcome.listId !== listId) showToast(outcome.label, true);
+      if (outcome.listId !== listId) toastAddedElsewhere(outcome);
       else setSelected(outcome.key);
     },
-    [change, listId, showToast, frontAdd],
+    [change, listId, toastAddedElsewhere, frontAdd],
   );
 
   /**

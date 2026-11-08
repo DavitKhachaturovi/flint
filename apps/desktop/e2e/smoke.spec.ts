@@ -3791,6 +3791,63 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 
+test("the composer's toast: Go to the list a ##list task went to, the task selected, in view and flashed (CAP-04, D-147)", async () => {
+  const main = app.windows().find((page) => page.url().includes('main-window'));
+  if (!main) throw new Error('main window page not found');
+  const flint = join(dataDirectory, 'Flint');
+  const file = join(flint, 'Faraway.md');
+  const tasks = Array.from({ length: 60 }, (_, i) => `- [ ] Faraway task ${i + 1} [id:: fw${i}]`);
+  await writeFile(file, `---\nflint: 1\nid: far1\nmode: tasks\n---\n${tasks.join('\n')}\n`);
+  // Opened once and left scrolled to its end: Go to has to bring the new task (at the top) back
+  // into view.
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Faraway' }).click();
+  await expect(main.locator('.row', { hasText: 'Faraway task 60' })).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      await main.evaluate(() =>
+        document.querySelector('.scroller')?.scrollTo({ top: 1200, behavior: 'instant' }),
+      );
+      return main.evaluate(() => document.querySelector('.scroller')?.scrollTop ?? 0);
+    })
+    .toBeGreaterThan(300);
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await expect(main.locator('h1')).toContainText('Inbox');
+  // The flash is recorded as it happens (it lasts 900 ms).
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as { goToFlashes?: string[] }).goToFlashes = seen;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const row = record.target as HTMLElement;
+        if (row.classList.contains('fl-flash')) seen.push(row.textContent ?? '');
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
+
+  const composer = main.locator('.composer-input');
+  await composer.click();
+  await main.keyboard.type('Pack the cables ##Farawa');
+  await expect(main.locator('.composer-suggestion').first()).toContainText('Faraway');
+  await main.keyboard.press('Enter');
+  await expect(composer).toHaveValue('Pack the cables ##Faraway');
+  await main.keyboard.press('Enter');
+  const toast = main.locator('.toast');
+  await expect(toast).toContainText('Added to Faraway');
+  // D-147: the way to it, then Undo, as Restore's toast (D-98).
+  await expect(toast.locator('button')).toHaveText(['Go to Faraway', 'Undo']);
+  await expect.poll(() => readFile(file, 'utf8')).toContain('- [ ] Pack the cables [id:: ');
+  await toast.locator('button', { hasText: 'Go to Faraway' }).click();
+  await expect(main.locator('h1')).toContainText('Faraway');
+  const added = main.locator('.row', { hasText: 'Pack the cables' });
+  await expect(added).toHaveClass(/\bsel\b/);
+  await expect(added).toBeInViewport();
+  await expect
+    .poll(() => main.evaluate(() => (window as { goToFlashes?: string[] }).goToFlashes))
+    .toEqual(expect.arrayContaining([expect.stringContaining('Pack the cables')]));
+  await expect(toast).toHaveCount(0);
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+});
+
 test('leaves the machine alone: toast schemes and the Start Menu are untouched (D-32, D-33)', () => {
   expect(machineState()).toBe(machineBefore);
 });
