@@ -829,7 +829,11 @@ function warn(view: EditorView, cells: number, done: (apply: boolean) => void): 
       target !== null &&
       (view.dom.contains(target) ||
         (target instanceof Element && target.closest('.toast') !== null));
-    if (!here || document.querySelector(ABOVE)) return;
+    // So does a layer inside the note's editor: its find bar, the slash menu (a completion list).
+    const inside =
+      (target instanceof Element && target.closest('.fl-find') !== null) ||
+      view.dom.querySelector('.cm-tooltip-autocomplete:not(.fl-slash-ghost)') !== null;
+    if (!here || inside || document.querySelector(ABOVE)) return;
     event.preventDefault();
     event.stopPropagation();
     cancel();

@@ -332,6 +332,37 @@ test("the drag's question leaves Esc to a layer on top of it first (D-144)", asy
   await expect(warning).toHaveCount(0);
   await expect(going()).toHaveCount(0);
   expect(await file()).toBe(NOTE);
+  // The note's find bar (Ctrl+F) over it: its Esc closes the bar first.
+  const find = main.locator('.note-editor .fl-find');
+  await raiseQuestion();
+  await main.keyboard.press('Control+f');
+  await expect(main.locator('.note-editor .fl-find-input')).toBeFocused();
+  await main.keyboard.press('Escape');
+  await expect(find).toHaveCount(0);
+  await expect(warning).toHaveCount(1);
+  await expect(going()).toHaveCount(2);
+  await main.keyboard.press('Escape');
+  await expect(warning).toHaveCount(0);
+  expect(await file()).toBe(NOTE);
+  // The slash menu open in the note: its Esc closes the menu first.
+  const slash = main.locator('.fl-slash-menu');
+  await raiseQuestion();
+  await main.keyboard.press('End');
+  await main.keyboard.press('Enter');
+  await main.keyboard.type('/');
+  await expect(slash).toHaveCount(1);
+  await main.keyboard.press('Escape');
+  await expect(slash).toHaveCount(0);
+  await expect(warning).toHaveCount(1);
+  await expect(going()).toHaveCount(2);
+  await main.keyboard.press('Escape');
+  await expect(warning).toHaveCount(0);
+  for (let tries = 0; tries < 4 && (await file()) !== NOTE; tries++) {
+    const now = await file();
+    await main.keyboard.press('Control+z');
+    await expect.poll(file).not.toBe(now);
+  }
+  await expect.poll(file).toBe(NOTE);
 });
 
 test("the drag's question goes with its note's editor, as Cancel (D-144)", async () => {
