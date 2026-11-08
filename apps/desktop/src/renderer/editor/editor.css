@@ -507,6 +507,50 @@
   background: color-mix(in srgb, var(--fl-text-primary) 38%, transparent);
 }
 
+/* NAV-01, D-107, D-143: a note's line reached from Ctrl+K: the words searched for (the line's
+   text when the search matched only loosely) lit like the current match above, held a moment,
+   then fading; gone at the first edit (match-flash.ts). The fade runs on the editor, a property
+   its marks read, so a line drawn anew mid-fade doesn't start it again. Off under reduced
+   motion, like the other flashes (D-108): the property stays at 0%. */
+@property --fl-match-flash {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+.md-editor .cm-editor.fl-match-flash-a {
+  animation: fl-match-flash-a 1600ms ease-out forwards;
+}
+
+.md-editor .cm-editor.fl-match-flash-b {
+  animation: fl-match-flash-b 1600ms ease-out forwards;
+}
+
+@keyframes fl-match-flash-a {
+  0%,
+  35% {
+    --fl-match-flash: 38%;
+  }
+  100% {
+    --fl-match-flash: 0%;
+  }
+}
+
+@keyframes fl-match-flash-b {
+  0%,
+  35% {
+    --fl-match-flash: 38%;
+  }
+  100% {
+    --fl-match-flash: 0%;
+  }
+}
+
+.md-editor .fl-match-flash {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fl-text-primary) var(--fl-match-flash), transparent);
+}
+
 /* NOTE-06, D-84: a note in monospace (its headings keep their sizes). */
 .md-editor.mono .cm-content {
   font-family: var(--fl-font-mono);

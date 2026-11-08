@@ -76,6 +76,7 @@ import {
 import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
+import { flashMatches, matchRanges, type LineMatch } from '../editor/match-flash.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {
@@ -257,127 +258,6 @@ function flash(element: Element): void {
   void (element as HTMLElement).offsetWidth;
   element.classList.add('fl-flash');
   window.setTimeout(() => element.classList.remove('fl-flash'), 900);
-}
-
-/** D-107, D-143: how long a note line's flash lasts (`.fl-line-flash` in app.css). */
-const LINE_FLASH_MS = 1600;
-
-/** D-143: stops the note line's flash running now, so a new one replaces it. */
-let lineFlash: (() => void) | null = null;
-
-/** A note line's drawn element at a position, or null while it isn't drawn. */
-function drawnLine(cm: CodeEditorView, from: number): HTMLElement | null {
-  const at = cm.domAtPos(from).node;
-  const line = (at instanceof Element ? at : at.parentElement)?.closest<HTMLElement>('.cm-line');
-  return line && cm.contentDOM.contains(line) ? line : null;
-}
-
-/**
- * D-107, D-143: a note's line chosen in the palette lights up like a task row's flash (the
- * selected row's look, held a moment, then fading). It is a box of its own behind the text, padded
- * out from the note's text column on both sides like a row around its title (app.css): a line
- * carries no padding (D-91), and its own background would cover only the text column. A line with
- * a background of its own (a code card's) would hide the box, so that line lights up too
- * (`.fl-line-lit`). The box is placed in the editor's measure cycle, once the line is drawn (not
- * after a fixed delay a busy machine can outrun), follows the line every frame while it runs (a
- * line drawn anew or moved by a late layout keeps it), and goes after the flash, when the next one
- * starts, with the note's editor, or as soon as the note is edited (D-75: interruptible).
- */
-function flashNoteLine(cm: CodeEditorView, from: number): void {
-  lineFlash?.();
-  const box = document.createElement('div');
-  box.className = 'fl-line-flash';
-  box.setAttribute('aria-hidden', 'true');
-  const doc = cm.state.doc;
-  let frame = 0;
-  let timer = 0;
-  let tries = 0;
-  let started = 0;
-  let lit: HTMLElement | null = null;
-  const unlight = (): void => {
-    lit?.classList.remove('fl-line-lit');
-    lit?.style.removeProperty('animation-delay');
-    lit = null;
-  };
-  const stop = (): void => {
-    cancelAnimationFrame(frame);
-    window.clearTimeout(timer);
-    box.remove();
-    unlight();
-    if (lineFlash === stop) lineFlash = null;
-  };
-  lineFlash = stop;
-  const read = (): {
-    line: HTMLElement;
-    own: boolean;
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null => {
-    if (!cm.dom.isConnected || cm.state.doc !== doc) return null;
-    let line = drawnLine(cm, from);
-    if (!line) return null;
-    if (line.getBoundingClientRect().height === 0) {
-      // A fence line drawn as the code card's edge (no height): the card's first or last line.
-      const next = line.nextElementSibling;
-      const near = next?.classList.contains('cm-fl-code') ? next : line.previousElementSibling;
-      if (!(near instanceof HTMLElement) || !near.classList.contains('cm-line')) return null;
-      line = near;
-    }
-    const style = getComputedStyle(line);
-    // The text's own height: a line's padding and borders (a code card's edges, the space after
-    // one) are left out, so the box sits evenly around the text.
-    const above = parseFloat(style.paddingTop) + parseFloat(style.borderTopWidth);
-    const below = parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth);
-    const host = cm.dom.getBoundingClientRect();
-    const text = cm.contentDOM.getBoundingClientRect();
-    const row = line.getBoundingClientRect();
-    const height = row.height - above - below;
-    if (height <= 0) return null;
-    return {
-      line,
-      own: line.classList.contains('cm-fl-code'),
-      top: row.top + above - host.top,
-      left: text.left - host.left,
-      width: text.width,
-      height,
-    };
-  };
-  const write = (at: ReturnType<typeof read>): void => {
-    if (lineFlash !== stop) return;
-    if (!at) {
-      // Not drawn yet: a few more tries; once shown, no line means the note was edited or went.
-      if (box.isConnected || ++tries >= 10) stop();
-      else frame = requestAnimationFrame(first);
-      return;
-    }
-    box.style.setProperty('--x', `${at.left}px`);
-    box.style.setProperty('--y', `${at.top}px`);
-    box.style.setProperty('--w', `${at.width}px`);
-    box.style.setProperty('--h', `${at.height}px`);
-    if (!box.isConnected) {
-      // First in the editor, so its scroller (and the text) is drawn over it.
-      cm.dom.prepend(box);
-      started = performance.now();
-      timer = window.setTimeout(stop, LINE_FLASH_MS);
-    }
-    if (at.own && (lit !== at.line || !lit.classList.contains('fl-line-lit'))) {
-      // Lit in step with the box, also when the editor draws the line (or its classes) anew.
-      unlight();
-      lit = at.line;
-      lit.style.animationDelay = `${-Math.round(performance.now() - started)}ms`;
-      lit.classList.add('fl-line-lit');
-    }
-    frame = requestAnimationFrame(follow);
-  };
-  // The first place in the editor's measure cycle (after the scroll is laid out); then each frame
-  // a read and a write of the box's own place, outside the editor's updates.
-  const first = (): void => {
-    if (lineFlash === stop) cm.requestMeasure({ read, write });
-  };
-  const follow = (): void => write(read());
-  first();
 }
 
 /** D-86, D-87: a copy of the hidden panel, which slides and fades out from where it was. */
@@ -794,11 +674,12 @@ export function App(): ReactElement {
    * is shown again (back, or its sidebar row).
    */
   const scrollMemory = useRef(new Map<string, number>());
-  /** D-107: a note's line to open at (from the palette). */
+  /** D-107: a note's line to open at (from the palette), and what was found in it (D-143). */
   const [lineTarget, setLineTarget] = useState<{
     readonly list: string;
     readonly line: number;
     readonly at: number;
+    readonly match: LineMatch;
   } | null>(null);
   const show = useCallback((place: Place, select: string | null = null, back = false): void => {
     const root = scroller.current;
@@ -3958,7 +3839,8 @@ export function App(): ReactElement {
     requestAnimationFrame(follow);
   }, [view, listId, page]);
 
-  // D-107: a note's line chosen in the palette: the note opens scrolled to it, the line flashed.
+  // D-107: a note's line chosen in the palette: the note opens scrolled to it. D-143: what was
+  // searched for in it lights up as find's current match does, then fades (match-flash.ts).
   useEffect(() => {
     const target = lineTarget;
     if (!target || view?.id !== target.list || view.mode !== 'note' || page) return;
@@ -3966,16 +3848,21 @@ export function App(): ReactElement {
     const cm = root ? noteEditorView(root) : null;
     if (!root || !cm) return;
     setLineTarget(null);
-    const from = cm.state.doc.line(Math.min(target.line + 1, cm.state.doc.lines)).from;
+    const line = cm.state.doc.line(Math.min(target.line + 1, cm.state.doc.lines));
     // The editor scrolls it there itself: it measures the lines (an estimate fell short).
     cm.dispatch({
-      effects: CodeEditorView.scrollIntoView(from, {
+      effects: CodeEditorView.scrollIntoView(line.from, {
         y: 'start',
         yMargin: Math.round(root.clientHeight / 3),
       }),
     });
-    // D-143: not tied to this effect, which runs again at once (lineTarget is cleared above).
-    flashNoteLine(cm, from);
+    flashMatches(
+      cm,
+      matchRanges(line.text, target.match).map(([from, to]) => ({
+        from: line.from + from,
+        to: line.from + to,
+      })),
+    );
   }, [view, page, lineTarget]);
 
   /**
@@ -4492,7 +4379,12 @@ export function App(): ReactElement {
           detail: hit.listName,
           indices: hit.indices,
           run: () => {
-            setLineTarget({ list: hit.listId, line: hit.line ?? 0, at: Date.now() });
+            setLineTarget({
+              list: hit.listId,
+              line: hit.line ?? 0,
+              at: Date.now(),
+              match: { text: hit.text, indices: hit.indices, loose: hit.loose === true },
+            });
             openList(hit.listId);
           },
         };

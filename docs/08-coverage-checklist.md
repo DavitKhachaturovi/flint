@@ -1102,5 +1102,5 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 7 | Tests: each fix compared with the code it replaced (property tests) and timed on 50,000-character pathological inputs | CAP-03, CAP-06 · Done (1.1.1) | D-143 |
 | 8 | The file format's task-line reader is quadratic on long field-like text (not a CodeQL alert) | — · Decided (Davit): its own change right after 1.1.1 | 04 §3, D-21, D-143 |
 | 9 | A note's line chosen in Ctrl+K flashes once it is drawn, not after a fixed 60 ms | NAV-01 · Fixed (1.1.1, not released) | D-143 |
-| 10 | The note line's flash looks like a task row's flash (a selected row's look, a step brighter), padded out evenly around the line's text, a code card's line lit too, gone when the note is edited | NAV-01 · Fixed (1.1.1, not released) | 09, D-143 |
+| 10 | A note's line from Ctrl+K: the words searched for lit as Ctrl+F's current match (the line's text on a loose match), then fading; gone at the first edit | NAV-01 · Fixed (1.1.1, not released) | 09, D-143 |
 | 11 | A note opened again after another note gets its own editor (D-115's kept editor only for its own ID step); a change from outside is not an undo step | NOTE-01, D-115 · Fixed (1.1.1, not released) | D-143 |

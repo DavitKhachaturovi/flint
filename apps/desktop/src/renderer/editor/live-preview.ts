@@ -49,6 +49,7 @@ import {
 } from './commands.js';
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
+import { matchFlash } from './match-flash.js';
 import { blockMarkers, buildPreview } from './preview.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
 import { checkSvg } from '../ui/check.js';
@@ -517,6 +518,8 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     ]),
     previewMode.of(sourceMode(options.source === true)),
     findInNote(),
+    // D-143: what Ctrl+K found in the note's line, lit like find's current match.
+    matchFlash(),
     ...(options.commands && !options.readOnly
       ? [slashCommands(options.commands), formatMenu(options.commands)]
       : []),

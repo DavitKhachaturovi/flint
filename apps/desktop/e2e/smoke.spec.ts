@@ -3752,62 +3752,42 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
     hasText: 'The quick brown needle is here',
   });
   await expect(needle).toBeInViewport();
-  // D-143: the flash is a task row's look on a box of its own, lined up with the line and padded
-  // out 12 px from the note's text column on both sides, and it goes after the flash. Measured in
-  // one frame (the page may still be rising in).
-  const lineFlash = main.locator('.note-editor .fl-line-flash');
-  await expect(lineFlash).toHaveCount(1);
-  const flashed = await lineFlash.evaluate((box) => {
-    const editor = box.closest('.note-editor');
-    const line = [...(editor?.querySelectorAll('.cm-line') ?? [])].find((element) =>
-      element.textContent?.includes('The quick brown needle is here'),
-    );
-    const text = editor?.querySelector('.cm-content');
-    if (!line || !text) return null;
-    const ground = (token: string): string => {
-      const probe = document.createElement('div');
-      probe.style.background = `var(${token})`;
-      document.body.append(probe);
-      const color = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return color;
-    };
-    const b = box.getBoundingClientRect();
-    const l = line.getBoundingClientRect();
-    const t = text.getBoundingClientRect();
-    const style = getComputedStyle(box);
-    return {
-      centre: Math.abs(b.top + b.height / 2 - (l.top + l.height / 2)),
-      taller: b.height - l.height,
-      left: t.left - b.left,
-      right: b.right - t.right,
-      background: style.backgroundColor,
-      tile: ground('--fl-ground-tile'),
-      ring: style.boxShadow,
-    };
+  // D-143: what was searched for in the line lights up as find's current match (Ctrl+F) does,
+  // word by word, then fades and goes.
+  const lit = main.locator('.note-editor .fl-match-flash');
+  await expect(lit).toHaveText(['brown', 'needle']);
+  const looks = await lit.first().evaluate((mark) => {
+    const editor = mark.closest('.cm-editor');
+    // At the start of the fade (it may have run on a moment), then put back where it was.
+    const fade = editor?.getAnimations()[0];
+    const at = fade?.currentTime ?? null;
+    if (fade) fade.currentTime = 0;
+    const flash = getComputedStyle(mark).backgroundColor;
+    if (fade && at !== null) fade.currentTime = at;
+    const probe = document.createElement('span');
+    probe.className = 'cm-searchMatch cm-searchMatch-selected';
+    editor?.closest('.md-editor')?.append(probe);
+    const find = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { flash, find, fading: fade !== undefined };
   });
-  if (!flashed) throw new Error('the flashed line or the note not laid out');
-  expect(flashed.centre).toBeLessThan(1);
-  expect(flashed.taller).toBeCloseTo(6, 0);
-  expect(flashed.left).toBeCloseTo(12, 0);
-  expect(flashed.right).toBeCloseTo(12, 0);
-  expect(flashed.background).toBe(flashed.tile);
-  expect(flashed.ring).not.toBe('none');
-  await expect(lineFlash).toHaveCount(0, { timeout: 4000 });
+  expect(looks.fading).toBe(true);
+  expect(looks.flash).toBe(looks.find);
+  await expect(lit).toHaveCount(0, { timeout: 4000 });
 
-  // D-143: a line in a code card (a background of its own) lights up too.
+  // A line in a code card lights the same way.
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
   await main.keyboard.press('Control+k');
   await main.keyboard.type('brown haystack');
   await palette.locator('.palette-item', { hasText: 'echo brown haystack' }).click();
-  const codeLine = main.locator('.note-editor .cm-line.cm-fl-code', {
-    hasText: 'echo brown haystack',
-  });
-  await expect(codeLine).toBeInViewport();
-  await expect(codeLine).toHaveClass(/fl-line-lit/);
-  await expect(lineFlash).toHaveCount(1);
-  await expect(codeLine).not.toHaveClass(/fl-line-lit/, { timeout: 4000 });
-  await expect(lineFlash).toHaveCount(0);
+  await expect(
+    main.locator('.note-editor .cm-line.cm-fl-code', { hasText: 'echo brown haystack' }),
+  ).toBeInViewport();
+  await expect(main.locator('.note-editor .cm-fl-code .fl-match-flash')).toHaveText([
+    'brown',
+    'haystack',
+  ]);
+  await expect(lit).toHaveCount(0, { timeout: 4000 });
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 

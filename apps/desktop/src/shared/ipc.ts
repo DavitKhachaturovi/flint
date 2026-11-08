@@ -893,6 +893,11 @@ export interface SearchHit {
   readonly score: number;
   /** The letters of `text` that matched, to highlight. */
   readonly indices: readonly number[];
+  /**
+   * D-143: a note's line that matched only loosely (one word's letters in order, not the word):
+   * the note lights the line's text, not single letters.
+   */
+  readonly loose?: boolean;
 }
 
 /** MINI-01, D-109: mini mode's tabs. */

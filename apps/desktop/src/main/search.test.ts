@@ -52,6 +52,14 @@ describe('NAV-01, D-106: the palette search', () => {
     expect(hits.find((hit) => hit.key === 'd')?.done).toBe(true);
   });
 
+  it('says when a note line matched only loosely (D-143: the note lights its whole text)', () => {
+    const line = (query: string) => searchLists(views, query).find((hit) => hit.kind === 'line');
+    expect(line('dns move')?.loose).toBeUndefined();
+    expect(line('agreed')?.loose).toBeUndefined();
+    // One word whose letters are in the line, but not the word itself.
+    expect(line('wgdm')?.loose).toBe(true);
+  });
+
   it('Trash and the archive, when asked', () => {
     const trash: TrashView = {
       deleted: [
