@@ -798,6 +798,8 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Paste as plain text',
     'Select all',
     'Monospace',
+    // NOTE-09, D-141: next to Monospace.
+    'Source mode',
   ]);
   // NOTE-06, D-84: Monospace for this note (this machine), and back with Ctrl+Shift+M.
   await menu.getByText('Monospace', { exact: true }).click();
