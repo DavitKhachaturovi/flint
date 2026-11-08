@@ -254,8 +254,23 @@ describe('randomised editing in the note editor (D-141 Q13)', () => {
             // that takes the header in, as markdown says.)
             if (each.kind === 'type' && PLAIN.test(each.text)) {
               const at = position(before, each);
-              for (const table of fresh(before))
-                if (table.to < at) keptClosed(before, state, table);
+              const tables = fresh(before);
+              for (const table of tables) if (table.to < at) keptClosed(before, state, table);
+              // D-144: plain text typed outside every table never changes a table's bytes. Except,
+              // as markdown says, a table under a fence (typing can open or close a code block
+              // around it) or right under a line (a line with a pipe can take its header in).
+              if (tables.every((table) => at < table.from || at > table.to)) {
+                const after = fresh(state).map((table) =>
+                  state.doc.sliceString(table.from, table.to),
+                );
+                for (const table of tables) {
+                  const first = before.doc.lineAt(table.from).number;
+                  const above = first > 1 ? before.doc.line(first - 1).text : '';
+                  if (above.trim() !== '' || /```|~~~/.test(before.doc.sliceString(0, table.from)))
+                    continue;
+                  expect(after).toContain(before.doc.sliceString(table.from, table.to));
+                }
+              }
             }
             // D-144: nor does deleting plain text below a table, Backspace or Delete on the blank
             // line under it included. (Text deleted above a table may open a code block that

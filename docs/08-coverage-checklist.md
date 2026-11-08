@@ -1106,6 +1106,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 38 | A click under a table (and ↓ from its last row): at the note's end the line made as Esc makes it; in a quote after the quote's mark; above a heading a new line | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 02, D-144 |
 | 39 | A table's Undo toast goes once the note changes again; after its Undo the note (its active cell) has the focus | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | D-144 |
 | 40 | The caret beside a picture redrawn on any change of its size (loaded, "File not found", a player), not only on its load | NOTE-10, MEDIA-01 · Fixed (1.2.0, second preview) | D-144 |
+| 41 | The editing fuzz again checks that plain text typed outside every table never changes a table's bytes (a table under a fence, or right under a line, excepted) | NOTE-10 · Done (1.2.0, second preview) | D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 
