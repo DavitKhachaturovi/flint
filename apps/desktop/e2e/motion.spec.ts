@@ -418,6 +418,27 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   );
   await main.keyboard.press('Control+z');
   await main.keyboard.press('Escape');
+  // D-144: the table's handles fade in under the pointer; a drag grows a ghost of what it adds.
+  const tableHandle = main.locator('.main .note-card .cm-fl-table-edge-right');
+  await step(main, 'A table: the pointer over it (its "+" handles fade in)', 'motion', async () => {
+    await main.locator('.main .note-card .cm-fl-table').hover();
+    await expect(tableHandle).toHaveCSS('opacity', '1');
+  });
+  await step(
+    main,
+    'A table: its right handle dragged (a ghost column grows)',
+    'motion',
+    async () => {
+      const handle = await tableHandle.boundingBox();
+      if (!handle) throw new Error('no handle');
+      await main.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await main.mouse.down();
+      await main.mouse.move(handle.x + 120, handle.y + handle.height / 2, { steps: 4 });
+      await expect(main.locator('.main .note-card .cm-fl-table-ghost.adding')).toHaveCount(1);
+    },
+  );
+  await main.keyboard.press('Escape');
+  await main.mouse.up();
   await step(main, 'The side panel: an extra section opens (Attachments)', 'motion', () =>
     main.locator('.context-panel .panel-extra-head').first().click(),
   );

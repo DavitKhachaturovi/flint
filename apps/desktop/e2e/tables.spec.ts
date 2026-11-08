@@ -328,6 +328,58 @@ test("the drag's question goes with its note's editor, as Cancel (D-144)", async
   await expect(going()).toHaveCount(0);
 });
 
+test('the edge handles: a "+" chip beside each edge on hover, a ghost of what a drag adds or takes (D-144)', async () => {
+  const right = main.locator('.note-editor .cm-fl-table-edge-right');
+  const bottom = main.locator('.note-editor .cm-fl-table-edge-bottom');
+  const ghost = main.locator('.note-editor .cm-fl-table-ghost');
+  await line('After the table.').click();
+  await main.mouse.move(2, 2);
+  await expect(right).toHaveCSS('opacity', '0');
+  await table().hover();
+  await expect(right).toHaveCSS('opacity', '1');
+  await expect(bottom).toHaveCSS('opacity', '1');
+  // Beside the middle of the right edge and of the bottom edge, outside the cells; a drawn "+".
+  const edges = await table().boundingBox();
+  const at = await right.boundingBox();
+  const below = await bottom.boundingBox();
+  if (!edges || !at || !below) throw new Error('no handles');
+  expect(at.x).toBeGreaterThanOrEqual(edges.x + edges.width);
+  expect(Math.abs(at.y + at.height / 2 - (edges.y + edges.height / 2))).toBeLessThan(2);
+  expect(below.y).toBeGreaterThanOrEqual(edges.y + edges.height);
+  expect(Math.abs(below.x + below.width / 2 - (edges.x + edges.width / 2))).toBeLessThan(2);
+  await expect(right.locator('svg path')).toHaveCount(2);
+  // A click just inside the last column's right edge, or the last row's bottom edge, is the cell's.
+  const last = await cell(1, 1).boundingBox();
+  const first = await cell(1, 0).boundingBox();
+  if (!last || !first) throw new Error('no cells');
+  await main.mouse.click(edges.x + edges.width - 3, last.y + last.height / 2);
+  await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-active/);
+  await main.mouse.click(first.x + first.width / 2, edges.y + edges.height - 3);
+  await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
+  // Mid-drag adding: dashed new cells beside the table (2 columns × 2 rows), the count in them.
+  await drag('right', 2, false);
+  await expect(ghost).toHaveClass(/adding/);
+  await expect(ghost.locator('.cm-fl-ghost-cell')).toHaveCount(4);
+  await expect(main.locator('.note-editor .cm-fl-table-badge')).toHaveText('+2 columns');
+  await expect(right).toHaveClass(/\bon\b/);
+  await expect(bottom).toHaveCSS('opacity', '0');
+  await main.keyboard.press('Escape');
+  await main.mouse.up();
+  await expect(ghost).toHaveCount(0);
+  expect(await file()).toBe(NOTE);
+  // Mid-drag taking away: the row dimmed inside an outline, the handle's "+" a "−".
+  await drag('bottom', -1, false);
+  await expect(ghost).toHaveClass(/going/);
+  await expect(going()).toHaveCount(2);
+  await expect(bottom).toHaveClass(/removing/);
+  await main.keyboard.press('Escape');
+  await main.mouse.up();
+  await expect(ghost).toHaveCount(0);
+  await expect(going()).toHaveCount(0);
+  await expect(bottom).not.toHaveClass(/removing/);
+  expect(await file()).toBe(NOTE);
+});
+
 test('text typed below a table stays out of it, and so does the picture after it (D-144)', async () => {
   await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
   await expect(editor()).toContainText('above');

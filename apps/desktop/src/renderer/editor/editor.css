@@ -234,7 +234,8 @@
 .cm-fl-table-wrap {
   max-width: 100%;
   overflow-x: auto;
-  margin: 2px 0 8px;
+  /* The handles' gutter (below) is the space under the table. */
+  margin: 2px 0 0;
 }
 
 .cm-fl-table {
@@ -300,60 +301,90 @@
   padding: 0;
 }
 
-/* Q11: the table's edges, shown on hover: drag the right one for columns, the bottom one for rows
-   (the resize cursors say so: Proposed beside UI-01's arrow, since a drag edge is not a button). */
+/* Q11, D-144 (Proposed): the table's handles, a small "+" chip beside the middle of the right edge
+   (columns) and of the bottom edge (rows), in a gutter outside the cells; they fade in while the
+   pointer is over the table. Dragging one grows the box by the new columns or rows (a dashed
+   ghost; the handle rides the new edge) or outlines the ones that would go (its "+" folds into a
+   "−"). The resize cursors say it is a drag, not a button (Proposed beside UI-01's arrow). */
 .cm-fl-table-box {
+  --fl-table-gutter: 24px;
   position: relative;
   display: inline-block;
-  padding: 0 10px 10px 0;
+  padding: 0 calc(var(--fl-table-gutter) + var(--fl-table-grow-x, 0px))
+    calc(var(--fl-table-gutter) + var(--fl-table-grow-y, 0px)) 0;
+  transition: padding var(--fl-dur-fast) ease-out;
 }
 
 .cm-fl-table-edge {
   position: absolute;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-secondary);
   opacity: 0;
-  transition: opacity var(--fl-dur-fast);
+  transition:
+    opacity var(--fl-dur-fast),
+    color var(--fl-dur-fast),
+    background-color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
 }
 
-.cm-fl-table-edge::after {
+/* A slightly larger target than the chip, still outside the cells. */
+.cm-fl-table-edge::before {
   content: '';
   position: absolute;
-  border-radius: 2px;
-  background: var(--fl-accent);
+  inset: -3px;
+}
+
+.cm-fl-table-edge svg {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.cm-fl-edge-bar {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--fl-dur-fast) ease-out;
+}
+
+.cm-fl-table-edge.removing .cm-fl-edge-bar {
+  transform: scaleY(0);
 }
 
 .cm-fl-table-edge-right {
-  top: 0;
-  right: 0;
-  width: 10px;
-  height: calc(100% - 10px);
+  right: 1px;
+  top: calc((100% - var(--fl-table-gutter) - var(--fl-table-grow-y, 0px)) / 2);
+  transform: translateY(-50%);
   cursor: col-resize;
 }
 
-.cm-fl-table-edge-right::after {
-  top: 6px;
-  bottom: 6px;
-  left: 3px;
-  width: 3px;
-}
-
 .cm-fl-table-edge-bottom {
-  left: 0;
-  bottom: 0;
-  width: calc(100% - 10px);
-  height: 10px;
+  bottom: 1px;
+  left: calc((100% - var(--fl-table-gutter) - var(--fl-table-grow-x, 0px)) / 2);
+  transform: translateX(-50%);
   cursor: row-resize;
 }
 
-.cm-fl-table-edge-bottom::after {
-  left: 6px;
-  right: 6px;
-  top: 3px;
-  height: 3px;
+.cm-fl-table-box:hover .cm-fl-table-edge,
+.cm-fl-table-dragging .cm-fl-table-edge.on {
+  opacity: 1;
 }
 
-.cm-fl-table-box:hover .cm-fl-table-edge,
-.cm-fl-table-dragging .cm-fl-table-edge {
-  opacity: 0.7;
+.cm-fl-table-dragging .cm-fl-table-edge:not(.on) {
+  opacity: 0;
+}
+
+.cm-fl-table-edge:hover,
+.cm-fl-table-edge.on {
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-accent);
+  color: var(--fl-text-highlight);
 }
 
 .cm-fl-table .cm-fl-cell-going {
@@ -361,16 +392,71 @@
   transition: opacity var(--fl-dur-fast);
 }
 
+/* The drag's ghost: new columns or rows as dashed cells beside the table, or an outline around
+   the dimmed ones that would go. Faint, under the handle, never in the way of the pointer. */
+.cm-fl-table-ghost {
+  position: absolute;
+  display: grid;
+  box-sizing: border-box;
+  border-radius: 2px;
+  pointer-events: none;
+  transition:
+    opacity var(--fl-dur-fast),
+    left var(--fl-dur-fast) ease-out,
+    top var(--fl-dur-fast) ease-out,
+    width var(--fl-dur-fast) ease-out,
+    height var(--fl-dur-fast) ease-out;
+}
+
+.cm-fl-table-ghost.placing {
+  transition: opacity var(--fl-dur-fast);
+}
+
+.cm-fl-table-ghost.off {
+  opacity: 0;
+}
+
+.cm-fl-table-ghost.adding {
+  background: var(--fl-ground-hover);
+  outline: 1px dashed var(--fl-accent);
+  outline-offset: -1px;
+}
+
+.cm-fl-ghost-cell {
+  border-right: 1px dashed var(--fl-edge-chip);
+  border-bottom: 1px dashed var(--fl-edge-chip);
+}
+
+.cm-fl-table-ghost.going {
+  outline: 1px dashed var(--fl-text-faint);
+  outline-offset: -1px;
+}
+
 .cm-fl-table-badge {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  z-index: 1;
+  transform: translate(-50%, -50%);
   padding: 1px 7px;
   border-radius: var(--fl-radius-check);
   background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
   color: var(--fl-text-muted);
   font-size: var(--fl-size-meta);
+  white-space: nowrap;
   pointer-events: none;
+  transition:
+    left var(--fl-dur-fast) ease-out,
+    top var(--fl-dur-fast) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-fl-table-box,
+  .cm-fl-table-edge,
+  .cm-fl-edge-bar,
+  .cm-fl-table-ghost,
+  .cm-fl-table-badge {
+    transition: none;
+  }
 }
 
 /* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */

@@ -352,15 +352,12 @@ function build(wrap: HTMLElement, table: ParsedTable, shape: string, view: Edito
       body.append(line);
     }
   });
-  // Q11: the edges a drag adds or removes columns and rows at, and the count of what it adds.
+  // Q11, D-144: the handles a drag adds or removes columns and rows with (a small "+" chip beside
+  // the right and bottom edges, outside the cells), and the count of what it adds.
   const box = document.createElement('div');
   box.className = 'cm-fl-table-box';
-  const right = document.createElement('div');
-  right.className = 'cm-fl-table-edge cm-fl-table-edge-right';
-  right.title = 'Drag to add or remove columns';
-  const bottom = document.createElement('div');
-  bottom.className = 'cm-fl-table-edge cm-fl-table-edge-bottom';
-  bottom.title = 'Drag to add or remove rows';
+  const right = edgeHandle('right', 'Drag to add or remove columns');
+  const bottom = edgeHandle('bottom', 'Drag to add or remove rows');
   const badge = document.createElement('div');
   badge.className = 'cm-fl-table-badge';
   badge.hidden = true;
@@ -369,6 +366,33 @@ function build(wrap: HTMLElement, table: ParsedTable, shape: string, view: Edito
   box.append(element, right, bottom, badge);
   wrap.append(box);
   return { from: table.from, shape, cells, editor: null, key: null };
+}
+
+/** D-144: an edge's handle: a small chip with a "+" (stroke-drawn, as Flint's icons are). */
+function edgeHandle(edge: 'right' | 'bottom', title: string): HTMLElement {
+  const handle = document.createElement('div');
+  handle.className = `cm-fl-table-edge cm-fl-table-edge-${edge}`;
+  handle.title = title;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [name, value] of Object.entries({
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2.25',
+    'stroke-linecap': 'round',
+    'aria-hidden': 'true',
+  }))
+    svg.setAttribute(name, value);
+  // The bar folds away while a drag takes columns or rows away: the "+" becomes a "−".
+  const across = document.createElementNS(ns, 'path');
+  across.setAttribute('d', 'M6 12h12');
+  const bar = document.createElementNS(ns, 'path');
+  bar.setAttribute('d', 'M12 6v12');
+  bar.setAttribute('class', 'cm-fl-edge-bar');
+  svg.append(across, bar);
+  handle.append(svg);
+  return handle;
 }
 
 /** Rows or columns just added (Q12: they fade in), set by the edit that adds them. */
@@ -573,32 +597,110 @@ function dragEdge(
   if (start.button !== 0) return;
   const holder = holders.get(wrap);
   const table = holder ? tableAt(view.state, holder.from) : null;
-  const element = wrap.querySelector<HTMLElement>('.cm-fl-table');
+  const element = wrap.querySelector<HTMLTableElement>('.cm-fl-table');
+  const box = wrap.querySelector<HTMLElement>('.cm-fl-table-box');
   const badge = wrap.querySelector<HTMLElement>('.cm-fl-table-badge');
-  if (!holder || !table || !element || !badge) return;
+  if (!holder || !table || !element || !box || !badge) return;
   start.preventDefault();
   start.stopPropagation();
   // D-144: a new drag answers the last one's warning still up: Cancel (its cells undimmed).
   warning?.cancel();
   const handle = start.currentTarget as HTMLElement;
   handle.setPointerCapture(start.pointerId);
-  const box = element.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
   const count = axis === 'columns' ? table.columns : table.rows.length;
-  const step = Math.max(24, (axis === 'columns' ? box.width : box.height) / count);
+  const step = Math.max(24, (axis === 'columns' ? rect.width : rect.height) / count);
   let target = count;
   wrap.classList.add('cm-fl-table-dragging');
+  handle.classList.add('on');
+  // D-144 (Proposed): what the drag would do, drawn faintly: the new columns or rows as a dashed
+  // ghost extending the table (the box grows to make room, so the text below moves as it will),
+  // the ones that would go dimmed inside a dashed outline. The handle rides the grown edge when
+  // adding and stays put, its "+" turned "−", when taking away (over the cells it would hide text).
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const heights = Array.from(element.rows, (row) => row.offsetHeight);
+  const widths = Array.from(element.rows[0]?.cells ?? [], (cell) => cell.offsetWidth);
+  const ghost = document.createElement('div');
+  ghost.className = 'cm-fl-table-ghost off';
+  ghost.setAttribute('aria-hidden', 'true');
+  box.append(ghost);
+  let drawn = 0;
+  const grow = axis === 'columns' ? '--fl-table-grow-x' : '--fl-table-grow-y';
+  const drawGhost = (): void => {
+    const more = target - count;
+    let x = 0;
+    let y = 0;
+    let across = width;
+    let down = height;
+    if (more > 0 && axis === 'columns') [x, across] = [width, more * step];
+    else if (more > 0) [y, down] = [height, more * step];
+    else if (more < 0 && axis === 'columns') {
+      x = holder.cells.get(`0:${target}`)?.offsetLeft ?? width;
+      across = width - x;
+    } else if (more < 0) {
+      y = holder.cells.get(`${target}:0`)?.offsetTop ?? height;
+      down = height - y;
+    }
+    const left = element.offsetLeft + x;
+    const top = element.offsetTop + y;
+    // The count sits in the middle of the ghost.
+    badge.style.left = `${left + across / 2}px`;
+    badge.style.top = `${top + down / 2}px`;
+    if (more !== 0) {
+      // Appearing: in place at once, then it fades in; after that it glides from step to step.
+      const appearing = ghost.classList.contains('off');
+      if (appearing) ghost.classList.add('placing');
+      ghost.style.left = `${left}px`;
+      ghost.style.top = `${top}px`;
+      ghost.style.width = `${across}px`;
+      ghost.style.height = `${down}px`;
+      if (appearing) void ghost.offsetWidth;
+      ghost.classList.remove('placing');
+    }
+    ghost.classList.toggle('off', more === 0);
+    ghost.classList.toggle('adding', more > 0);
+    ghost.classList.toggle('going', more < 0);
+    box.style.setProperty(grow, `${Math.max(0, more) * step}px`);
+    handle.classList.toggle('removing', more < 0);
+    if (more === drawn) return;
+    drawn = more;
+    ghost.textContent = '';
+    if (more <= 0) return;
+    // The new cells, lined up with the table's rows (columns): one dashed cell each.
+    const lines = axis === 'columns' ? heights : widths;
+    const template = lines.map((size) => `${size}px`).join(' ');
+    ghost.style.gridTemplateColumns = axis === 'columns' ? `repeat(${more}, 1fr)` : template;
+    ghost.style.gridTemplateRows = axis === 'columns' ? template : `repeat(${more}, 1fr)`;
+    for (let index = 0; index < more * lines.length; index++) {
+      const ghostCell = document.createElement('div');
+      ghostCell.className = 'cm-fl-ghost-cell';
+      ghost.append(ghostCell);
+    }
+  };
   const show = (): void => {
     for (const [key, cell] of holder.cells) {
       const [row, column] = key.split(':').map(Number) as [number, number];
       cell.classList.toggle('cm-fl-cell-going', (axis === 'columns' ? column : row) >= target);
     }
+    drawGhost();
     badge.hidden = target <= count;
     badge.textContent = `+${target - count} ${axis === 'columns' ? (target - count === 1 ? 'column' : 'columns') : target - count === 1 ? 'row' : 'rows'}`;
     badge.dataset['axis'] = axis;
   };
+  /** The handle back at rest ("+") and the box at its size (a drag let go of). */
+  const settle = (): void => {
+    handle.classList.remove('on', 'removing');
+    box.style.removeProperty(grow);
+  };
   const clear = (): void => {
     for (const cell of holder.cells.values()) cell.classList.remove('cm-fl-cell-going');
     badge.hidden = true;
+    settle();
+    // The ghost fades out (D-75: nothing waits for it).
+    ghost.classList.add('off');
+    if (reducedMotion()) ghost.remove();
+    else setTimeout(() => ghost.remove(), durationMs('--fl-dur-fast', 120) + 40);
   };
   const move = (event: PointerEvent): void => {
     const distance =
@@ -624,7 +726,9 @@ function dragEdge(
       resize(view, live.from, axis, count, target);
       return;
     }
+    // While the warning is up, what would go stays dimmed and outlined; the handle goes back.
     badge.hidden = true;
+    settle();
     warn(view, withText, (yes) => {
       clear();
       if (!yes) return;
