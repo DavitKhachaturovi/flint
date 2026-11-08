@@ -1034,6 +1034,8 @@ test('Backspace under a table that ends the note leaves the text as it is, the c
     await main.locator('.note-editor .cm-fl-table-wrap + .cm-line').click();
     await main.keyboard.press(key);
     await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
+    // Its editor takes the keys a moment after it lights up (on a slow runner, after the next key).
+    await expect(cell(1, 2).locator('.cm-content')).toBeFocused();
     expect(await ending()).toBe(ENDING);
     await main.keyboard.type('zq');
     await expect.poll(ending).toBe(ENDING.replace('| test |  |  |', '| test |  | zq |'));
