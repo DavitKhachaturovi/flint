@@ -77,6 +77,17 @@ const editCell = async (row: number, column: number): Promise<void> => {
   await cell(row, column).click();
   await expect(cell(row, column).locator('.cm-content')).toBeFocused();
 };
+/**
+ * The table's box, once one table is drawn: a note that was open before may still be leaving with
+ * its own table for a moment (a check on a cell's text can pass on that one).
+ */
+const tableBox = async (): Promise<{ x: number; y: number; width: number; height: number }> => {
+  await expect(table()).toHaveCount(1);
+  await expect.poll(async () => (await table().boundingBox()) !== null).toBe(true);
+  const box = await table().boundingBox();
+  if (!box) throw new Error('no table');
+  return box;
+};
 const file = (): Promise<string> => readFile(join(flint, 'Tables.md'), 'utf8');
 const line = (text: string): Locator => editor().locator('.cm-line', { hasText: text }).first();
 
@@ -213,6 +224,25 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await expect.poll(file).toContain(`${TABLE}\n\nx\nAfter the table.`);
   await expect(table().locator('tr')).toHaveCount(2);
   await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
+});
+
+test('a / typed in a cell is just a slash: no slash menu in a table (D-149)', async () => {
+  await editCell(1, 0);
+  await main.keyboard.press('End');
+  await main.keyboard.type(' /');
+  await expect.poll(file).toContain('Alex /');
+  await expect(cell(1, 0)).toContainText('Alex /');
+  // The menu would open a moment after the slash.
+  await main.waitForTimeout(300);
+  await expect(main.locator('.fl-slash-menu')).toHaveCount(0);
+  // Arrows still move between cells.
+  await main.keyboard.press('ArrowDown');
+  await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
+  for (let undo = 0; undo < 3 && (await file()) !== NOTE; undo += 1) {
+    await main.keyboard.press('Control+z');
+    await main.waitForTimeout(300);
+  }
   await expect.poll(file).toBe(NOTE);
 });
 
@@ -411,7 +441,7 @@ test('the edge handles: a "+" chip beside each edge on hover, a ghost of what a 
   await expect(right).toHaveCSS('opacity', '1');
   await expect(bottom).toHaveCSS('opacity', '1');
   // Beside the middle of the right edge and of the bottom edge, outside the cells; a drawn "+".
-  const edges = await table().boundingBox();
+  const edges = await tableBox();
   const at = await right.boundingBox();
   const below = await bottom.boundingBox();
   if (!edges || !at || !below) throw new Error('no handles');
@@ -466,7 +496,7 @@ test('a click under or beside a table, off its cells and handles, puts the caret
     [10, 12, cell(1, 0)],
   ] as const) {
     await from.click();
-    const edges = await table().boundingBox();
+    const edges = await tableBox();
     if (!edges) throw new Error('no table');
     const x = dx === 'beside' ? edges.x + edges.width + 120 : edges.x + dx;
     const y = dx === 'beside' ? edges.y + edges.height / 2 : edges.y + edges.height + dy;
@@ -1061,8 +1091,7 @@ test('a click under a table at the note’s end, in a quote or over a heading: t
     // ↓ from the last row shares the way out (at the note's end it stays: Esc makes the line).
     for (const how of name === 'Tail' ? (['click'] as const) : (['click', 'down'] as const)) {
       if (how === 'click') {
-        const edges = await table().boundingBox();
-        if (!edges) throw new Error('no table');
+        const edges = await tableBox();
         await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
       } else {
         await editCell(1, 1);
@@ -1160,7 +1189,7 @@ test('a click under a read-only note’s table never changes its text: no line i
           requestAnimationFrame(() => requestAnimationFrame(() => done())),
         ),
     );
-  const edges = await table().boundingBox();
+  const edges = await tableBox();
   if (!edges) throw new Error('no table');
   await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
   await frames();
@@ -1180,7 +1209,7 @@ test('a click under a table, a line of spaces under it: the text starts that lin
   await expect(cell(1, 1)).toHaveText('d');
   for (const how of ['click', 'down'] as const) {
     if (how === 'click') {
-      const edges = await table().boundingBox();
+      const edges = await tableBox();
       if (!edges) throw new Error('no table');
       await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
     } else {
