@@ -384,11 +384,11 @@ describe('the main window: Navigate/Edit keys and the composer (M4, TASK-02..04,
     const workspace = await open();
     const outcome = await workspace.change('inbox', { kind: 'duplicate', key: 'aaa1' }, now);
     expect(outcome?.label).toBe('Duplicated');
-    expect(await inbox()).toMatch(
-      new RegExp(
-        `^${header.replace(/[-]/g, '\\-')}- \\[ \\] call \\[reminder:: 2026-10-30T09:00\\] \\[priority:: low\\] \\[id:: aaa1\\]\\n- \\[ \\] call \\[priority:: low\\] \\[id:: ${outcome?.key ?? 'x'}\\]\\n- \\[ \\] next`,
-      ),
-    );
+    // Compared as plain text (the file starts with exactly this), not as a pattern built from it.
+    const expected =
+      `${header}- [ ] call [reminder:: 2026-10-30T09:00] [priority:: low] [id:: aaa1]\n` +
+      `- [ ] call [priority:: low] [id:: ${outcome?.key ?? 'x'}]\n- [ ] next`;
+    expect((await inbox()).slice(0, expected.length)).toBe(expected);
   });
 
   it('duplicates and converts lists, undoably (LIST-01, LIST-04, D-72)', async () => {

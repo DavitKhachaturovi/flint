@@ -5,6 +5,15 @@
  * or else the first meaningful line of the paste (**Proposed**).
  */
 
+import {
+  firstFence,
+  hasImageLink,
+  isBareUrl,
+  isSpace,
+  removeFields,
+  stripEnds,
+  trimBlankLines,
+} from './paste-scan.js';
 import { FRAME_LINE, TRACE_HEADER } from './trace.js';
 
 export type PasteKind = 'json' | 'stack-trace' | 'code' | 'text';
@@ -14,7 +23,6 @@ const FRAME_LINES = FRAME_LINE;
 const TRACEBACK = /^Traceback \(most recent call last\):\s*$/m;
 
 const MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})/m;
-const MARKDOWN_IMAGE = /!\[[^\]]*\]\([^)\s]+\)/;
 
 /** A markdown list item, heading or quote: never code on its own (D-76). */
 const MARKDOWN_LINE = /^ {0,3}(?:[-*+] |\d{1,3}[.)] |#{1,6} |>)/;
@@ -37,12 +45,11 @@ export function normalizeNewlines(text: string): string {
 const CODE_START =
   /^\s*(?:\/\*|\/\/|(?:export|import|const|let|var|function|class|interface|type|enum|return|async|await|def|public|private|protected|static|package|using|namespace|fn|impl|struct|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\b)/;
 const CODE_MARK = /=>|\(\{|\}\)|\);|\};|===|!==|\w::\w|&&|\|\||\w\s*=\s*[\w'"`[{(]/g;
-/** Dataview fields (`[id::x]`) are Flint's own text, not code. */
-const FIELD = /\[[\w-]+::[^\]]*\]/g;
 
 function shortCode(line: string): boolean {
-  const text = line.replace(FIELD, '');
-  if (text.trim().length < 12 || /^\s*\S+:\/\/\S+\s*$/.test(text)) return false;
+  // Dataview fields (`[id::x]`) are Flint's own text, not code; a bare URL is not code either.
+  const text = removeFields(line);
+  if (text.trim().length < 12 || isBareUrl(text)) return false;
   const marks = text.match(CODE_MARK)?.length ?? 0;
   return marks >= 2 || (marks >= 1 && CODE_START.test(text) && /[{}()[\];=]/.test(text));
 }
@@ -50,7 +57,7 @@ function shortCode(line: string): boolean {
 export function classifyPaste(text: string): PasteKind {
   const trimmed = normalizeNewlines(text).trim();
   // D-79: markdown already (a fenced block, an image link) stays markdown; only raw code is fenced.
-  if (MARKDOWN_FENCE.test(trimmed) || MARKDOWN_IMAGE.test(trimmed)) return 'text';
+  if (MARKDOWN_FENCE.test(trimmed) || hasImageLink(trimmed, true)) return 'text';
   if (/^[[{]/.test(trimmed)) {
     try {
       const value: unknown = JSON.parse(trimmed);
@@ -80,7 +87,7 @@ export function fencedBlock(raw: string, language = ''): string {
   const text = normalizeNewlines(raw);
   const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((match) => match[0].length));
   const fence = '`'.repeat(Math.max(3, longest + 1));
-  return `${fence}${language}\n${text.replace(/\s+$/, '')}\n${fence}`;
+  return `${fence}${language}\n${text.trimEnd()}\n${fence}`;
 }
 
 /** Shorthand-looking text from a paste stays text: `\##`, `\!`, `\@` (CAP-03 escapes). */
@@ -108,7 +115,8 @@ export function titleFromPaste(text: string, maxLength = 80): string {
   const pick = TRACEBACK.test(text)
     ? candidates.filter((line) => !/^Traceback /.test(line)).at(-1)
     : candidates.find((line) => /\p{L}{3}/u.test(line));
-  const title = (pick ?? '').replace(/^[\s{}[\],"]+|[\s{}[\],"]+$/g, '');
+  // Without the spaces, brackets, commas and quotes around it (a JSON-ish line).
+  const title = stripEnds(pick ?? '', (char) => isSpace(char) || '{}[],"'.includes(char));
   const short = title.length > maxLength ? `${title.slice(0, maxLength - 1).trimEnd()}…` : title;
   return escapeShorthand(short);
 }
@@ -133,7 +141,7 @@ export function isCodeBlock(kind: BlockKind): boolean {
 export function blockFor(raw: string): CaptureBlock {
   const text = normalizeNewlines(raw);
   const kind = classifyPaste(text);
-  return { kind, text: kind === 'text' ? text.trim() : text.replace(/^\s*\n|\s+$/g, '') };
+  return { kind, text: kind === 'text' ? text.trim() : trimBlankLines(text) };
 }
 
 /**
@@ -157,7 +165,7 @@ export function composeCapture(title: string, blocks: readonly CaptureBlock[]): 
   const parts = rest.map((block) =>
     isCodeBlock(block.kind)
       ? fencedBlock(block.text.trim(), block.kind === 'json' ? 'json' : '')
-      : block.text.replace(/\s+$/, ''),
+      : block.text.trimEnd(),
   );
   return [head, ...parts].join('\n');
 }
@@ -173,10 +181,10 @@ export function taskLabel(title: string, body: string, maxLength = 48): string {
   const short = (text: string): string =>
     text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
   if (title.trim() !== '') return short(title.trim());
-  const fence = /^(`{3,}|~{3,})(\w*)\s*\n([\s\S]*?)\n\1\s*$/m.exec(body.trim());
+  const fence = firstFence(body.trim());
   if (fence) {
-    const content = fence[3] ?? '';
-    const kind = fence[2] === 'json' ? 'json' : classifyPaste(content);
+    const { content } = fence;
+    const kind = fence.info === 'json' ? 'json' : classifyPaste(content);
     const label = kind === 'text' ? KIND_LABEL.code : KIND_LABEL[kind];
     const peek =
       kind === 'json'
@@ -184,7 +192,7 @@ export function taskLabel(title: string, body: string, maxLength = 48): string {
         : titleFromPaste(content).replace(/\\(##|!|@)/g, '$1');
     return short(peek === '' ? label : `${label} · ${peek}`);
   }
-  if (/!\[[^\]]*\]\([^)]*\)/.test(body)) return 'Screenshot';
+  if (hasImageLink(body, false)) return 'Screenshot';
   const line = body
     .split(/\r\n|\r|\n/)
     .map((text) => text.trim())

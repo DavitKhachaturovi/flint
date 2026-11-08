@@ -22,12 +22,22 @@ for (const [path, entry] of Object.entries(lock.packages ?? {})) {
   packages.set(`${name}@${entry.version}`, { name, version: entry.version });
 }
 
+/**
+ * The registry URL of a package's metadata. A scoped name keeps its "@" and has its "/" encoded
+ * ("@types/node" → "@types%2Fnode", as npm itself requests it); every other character is
+ * percent-encoded too, so no name from the lockfile can change the URL's path or query.
+ */
+const registryUrl = (name) =>
+  `https://registry.npmjs.org/${
+    name.startsWith('@') ? `@${encodeURIComponent(name.slice(1))}` : encodeURIComponent(name)
+  }`;
+
 const cutoff = Date.now() - MIN_DAYS * 86_400_000;
 const failures = [];
 const queue = [...packages.values()];
 async function worker() {
   for (let item = queue.shift(); item; item = queue.shift()) {
-    const response = await fetch(`https://registry.npmjs.org/${item.name.replace('/', '%2f')}`);
+    const response = await fetch(registryUrl(item.name));
     if (!response.ok) {
       failures.push(`${item.name}@${item.version}: registry returned ${response.status}`);
       continue;

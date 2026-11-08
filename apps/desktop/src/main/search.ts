@@ -20,6 +20,14 @@ function snippet(text: string, query: string): string | null {
 
 export function searchLists(views: readonly ListView[], query: string): SearchHit[] {
   const hits: SearchHit[] = [];
+  // D-143: one word that isn't a piece of a line matched it only by its letters (fuzzyMatch).
+  const words = query
+    .trim()
+    .toLowerCase()
+    .split(/s+/)
+    .filter((word) => word !== '');
+  const loose = (text: string): boolean =>
+    words.length === 1 && !text.toLowerCase().includes(words[0] ?? '');
   for (const view of views) {
     if (view.mode === 'note') {
       const lines = (view.noteText ?? '').split(/\r?\n/);
@@ -36,6 +44,7 @@ export function searchLists(views: readonly ListView[], query: string): SearchHi
             line: index,
             score: match.score,
             indices: match.indices.filter((at) => at < 119),
+            ...(loose(text) && { loose: true }),
           });
       });
       continue;

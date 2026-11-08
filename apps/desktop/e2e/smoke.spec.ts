@@ -3722,6 +3722,7 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
   // 4. One order: Go to, Commands, Tasks, Lists and notes, lines in notes last.
   const lines = Array.from({ length: 90 }, (_, i) => `Filler line ${i + 1}`);
   lines[75] = 'The quick brown needle is here';
+  lines.splice(80, 3, '```bash', 'echo brown haystack', '```');
   await writeFile(
     join(flint, 'Quick reference.md'),
     `---\nflint: 1\nid: qref\nmode: note\n---\n${lines.join('\n')}\n`,
@@ -3751,7 +3752,42 @@ test("fixes after 0.8.5: the quick-note tip, renames kept on leaving, the palett
     hasText: 'The quick brown needle is here',
   });
   await expect(needle).toBeInViewport();
-  await expect(needle).toHaveClass(/fl-flash-strong/);
+  // D-143: what was searched for in the line lights up as find's current match (Ctrl+F) does,
+  // word by word, then fades and goes.
+  const lit = main.locator('.note-editor .fl-match-flash');
+  await expect(lit).toHaveText(['brown', 'needle']);
+  const looks = await lit.first().evaluate((mark) => {
+    const editor = mark.closest('.cm-editor');
+    // At the start of the fade (it may have run on a moment), then put back where it was.
+    const fade = editor?.getAnimations()[0];
+    const at = fade?.currentTime ?? null;
+    if (fade) fade.currentTime = 0;
+    const flash = getComputedStyle(mark).backgroundColor;
+    if (fade && at !== null) fade.currentTime = at;
+    const probe = document.createElement('span');
+    probe.className = 'cm-searchMatch cm-searchMatch-selected';
+    editor?.closest('.md-editor')?.append(probe);
+    const find = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { flash, find, fading: fade !== undefined };
+  });
+  expect(looks.fading).toBe(true);
+  expect(looks.flash).toBe(looks.find);
+  await expect(lit).toHaveCount(0, { timeout: 4000 });
+
+  // A line in a code card lights the same way.
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  await main.keyboard.press('Control+k');
+  await main.keyboard.type('brown haystack');
+  await palette.locator('.palette-item', { hasText: 'echo brown haystack' }).click();
+  await expect(
+    main.locator('.note-editor .cm-line.cm-fl-code', { hasText: 'echo brown haystack' }),
+  ).toBeInViewport();
+  await expect(main.locator('.note-editor .cm-fl-code .fl-match-flash')).toHaveText([
+    'brown',
+    'haystack',
+  ]);
+  await expect(lit).toHaveCount(0, { timeout: 4000 });
   await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
 });
 

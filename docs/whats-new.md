@@ -2,6 +2,12 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.1.1 (8 Nov 2026)
+
+- **No more freezes on long pastes:** pasting a very long line (a log line, minified JSON) into the capture popup or a list no longer makes Flint stop responding.
+- **Ctrl+K shows what it found in a note:** pick a line from a note and the words you searched for light up as they do in Ctrl+F, then fade; typing ends it.
+- **Undo stays in your note:** Ctrl+Z in a note undoes only what you did there, never a change made to the file elsewhere, and a note opened again in mini mode never brings back another note's text.
+
 ## 1.1.0 (8 Nov 2026)
 
 - **Notes stay tidy while you write:** bullets, checkboxes, headings and pictures no longer turn into raw markdown just because the cursor is on their line. To edit one, press ← right after it (or → right before it), or right-click a picture and choose **Edit markdown**.

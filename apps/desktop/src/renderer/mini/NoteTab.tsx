@@ -31,15 +31,22 @@ export function NoteTab(props: {
   /** D-122: a note opened with Open a note… (not a quick note): its name is its title. */
   const permanent = quick !== null && quick.mode === 'note' && !quick.quick;
   // The editor stays the same one when its note is made on the first keystroke (a new one only
-  // for another note), so nothing typed meanwhile is lost.
-  const made = useRef(new Set<string>());
-  const [editorKey, setEditorKey] = useState(0);
-  const shownId = useRef(noteId);
-  useEffect(() => {
-    if (noteId !== shownId.current && !(noteId && made.current.has(noteId)))
-      setEditorKey((key) => key + 1);
-    shownId.current = noteId;
-  }, [noteId]);
+  // for another note), so nothing typed meanwhile is lost. D-143: only for that step (from the ID
+  // the editor had, '' before the note was made, to the new one), once, and decided as the tab is
+  // drawn: remembering every note made here let one opened again later take over another note's
+  // editor, whose undo history could then bring that note's text into it.
+  const editorFor = useRef({ id: noteId, key: 0 });
+  const handover = useRef<{ from: string; to: string } | null>(null);
+  /** The note the editor was kept for, shown before its view arrives. */
+  const keptFor = useRef<string | null>(null);
+  if (noteId !== editorFor.current.id) {
+    const step = handover.current;
+    const same = noteId !== '' && step?.to === noteId && step.from === editorFor.current.id;
+    handover.current = null;
+    keptFor.current = same ? noteId : null;
+    editorFor.current = { id: noteId, key: editorFor.current.key + (same ? 0 : 1) };
+  }
+  const editorKey = editorFor.current.key;
   const loaded = view !== null && view.id === noteId;
   const savedText = loaded ? (view.noteText ?? '') : '';
   // What the note holds now (typing comes before the save): empty, it can't be left for a new one.
@@ -65,9 +72,10 @@ export function NoteTab(props: {
   }, [noteId]);
   const make = (): Promise<string | null> => {
     making.current ??= (async () => {
+      const from = editorFor.current.id;
       const id = await window.flintMain.quickNote();
       if (id) {
-        made.current.add(id);
+        handover.current = { from, to: id };
         onMade(id);
       }
       return id;
@@ -130,7 +138,7 @@ export function NoteTab(props: {
     ];
     openMenu(entries, at);
   };
-  const ready = noteId === '' || made.current.has(noteId) || loaded;
+  const ready = noteId === '' || keptFor.current === noteId || loaded;
   return (
     <div className="mini-note">
       <div className="mini-note-head">
@@ -171,8 +179,9 @@ export function NoteTab(props: {
           source={view?.source === true}
           window="mini"
           className="note-editor mini-editor"
-          onId={(id) => {
-            made.current.add(id);
+          onId={(id, from) => {
+            // Already handed over when make() reported it.
+            if (id !== editorFor.current.id) handover.current = { from, to: id };
             onMade(id);
           }}
           onImage={() => undefined}

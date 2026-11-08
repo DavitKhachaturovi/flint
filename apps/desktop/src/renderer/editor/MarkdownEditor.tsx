@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
-import { Annotation, Compartment, EditorState } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
 import { insertBlock } from './commands.js';
@@ -170,7 +170,9 @@ export function MarkdownEditor(props: {
     requestAnimationFrame(check);
   }, [autoFocus]);
 
-  // A change from outside shows when nothing typed is waiting to be saved.
+  // A change from outside shows when nothing typed is waiting to be saved. D-143: not an undo step
+  // (Ctrl+Z here undoes only what was done here, never the file changed elsewhere, nor another
+  // note's text brought back into this one), so undo maps what was typed over it.
   useEffect(() => {
     const editor = view.current;
     if (!editor) return;
@@ -183,7 +185,10 @@ export function MarkdownEditor(props: {
     }
     if (pending.current && editor.hasFocus && !latest.current.locked) return;
     pending.current = false;
-    editor.dispatch({ changes: difference(current, next), annotations: fromOutside.of(true) });
+    editor.dispatch({
+      changes: difference(current, next),
+      annotations: [fromOutside.of(true), Transaction.addToHistory.of(false)],
+    });
   }, [text]);
 
   // NOTE-09, D-141: Source mode switched: the live preview off or on, the text fading over (Q12).

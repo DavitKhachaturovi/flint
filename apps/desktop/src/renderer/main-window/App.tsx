@@ -77,6 +77,7 @@ import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
 import { openFindIn } from '../editor/find.js';
 import { tablePaletteCommands } from '../editor/table-view.js';
+import { flashMatches, matchRanges, type LineMatch } from '../editor/match-flash.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {
@@ -253,13 +254,11 @@ function placeKey(list: string, page: string | null): string {
   return page === null ? list : `${list}/${page}`;
 }
 
-function flash(element: Element, strong = false): void {
-  // D-107: the strong one (a note's line from the palette) is brighter and lasts longer.
-  const name = strong ? 'fl-flash-strong' : 'fl-flash';
-  element.classList.remove(name);
+function flash(element: Element): void {
+  element.classList.remove('fl-flash');
   void (element as HTMLElement).offsetWidth;
-  element.classList.add(name);
-  window.setTimeout(() => element.classList.remove(name), strong ? 1600 : 900);
+  element.classList.add('fl-flash');
+  window.setTimeout(() => element.classList.remove('fl-flash'), 900);
 }
 
 /** D-86, D-87: a copy of the hidden panel, which slides and fades out from where it was. */
@@ -676,11 +675,12 @@ export function App(): ReactElement {
    * is shown again (back, or its sidebar row).
    */
   const scrollMemory = useRef(new Map<string, number>());
-  /** D-107: a note's line to open at (from the palette). */
+  /** D-107: a note's line to open at (from the palette), and what was found in it (D-143). */
   const [lineTarget, setLineTarget] = useState<{
     readonly list: string;
     readonly line: number;
     readonly at: number;
+    readonly match: LineMatch;
   } | null>(null);
   const show = useCallback((place: Place, select: string | null = null, back = false): void => {
     const root = scroller.current;
@@ -1437,17 +1437,19 @@ export function App(): ReactElement {
   /**
    * D-115: the note editor stays the same one while it is the same note: renamed (a quick note's
    * title: the caret goes on into it) or given its ID by its first save; another note, a new one.
+   * D-143: only for that step (the editor's own note, from the ID it had to the new one), once:
+   * remembering every such ID let a note opened again later take over the other note's editor,
+   * whose undo history could then bring the other note's text into it.
    */
   const noteEditor = useRef({ id: '', key: 0 });
-  const noteIdsFromEditor = useRef(new Set<string>());
+  const noteIdHandover = useRef<{ from: string; to: string } | null>(null);
   const noteEditorKey = (id: string): string => {
-    if (id !== noteEditor.current.id)
-      noteEditor.current = {
-        id,
-        key: noteIdsFromEditor.current.has(id)
-          ? noteEditor.current.key
-          : noteEditor.current.key + 1,
-      };
+    if (id !== noteEditor.current.id) {
+      const handover = noteIdHandover.current;
+      const same = handover?.to === id && handover.from === noteEditor.current.id;
+      noteIdHandover.current = null;
+      noteEditor.current = { id, key: same ? noteEditor.current.key : noteEditor.current.key + 1 };
+    }
     return `note-${noteEditor.current.key}`;
   };
   const triageDetails = useCallback((key: string | null): void => setSelected(key), []);
@@ -3852,7 +3854,8 @@ export function App(): ReactElement {
     requestAnimationFrame(follow);
   }, [view, listId, page]);
 
-  // D-107: a note's line chosen in the palette: the note opens scrolled to it, the line flashed.
+  // D-107: a note's line chosen in the palette: the note opens scrolled to it. D-143: what was
+  // searched for in it lights up as find's current match does, then fades (match-flash.ts).
   useEffect(() => {
     const target = lineTarget;
     if (!target || view?.id !== target.list || view.mode !== 'note' || page) return;
@@ -3860,20 +3863,21 @@ export function App(): ReactElement {
     const cm = root ? noteEditorView(root) : null;
     if (!root || !cm) return;
     setLineTarget(null);
-    const from = cm.state.doc.line(Math.min(target.line + 1, cm.state.doc.lines)).from;
+    const line = cm.state.doc.line(Math.min(target.line + 1, cm.state.doc.lines));
     // The editor scrolls it there itself: it measures the lines (an estimate fell short).
     cm.dispatch({
-      effects: CodeEditorView.scrollIntoView(from, {
+      effects: CodeEditorView.scrollIntoView(line.from, {
         y: 'start',
         yMargin: Math.round(root.clientHeight / 3),
       }),
     });
-    // Once the editor has drawn the lines scrolled to.
-    window.setTimeout(() => {
-      const at = cm.domAtPos(from).node;
-      const line = (at instanceof Element ? at : at.parentElement)?.closest('.cm-line');
-      if (line) flash(line, true);
-    }, 60);
+    flashMatches(
+      cm,
+      matchRanges(line.text, target.match).map(([from, to]) => ({
+        from: line.from + from,
+        to: line.from + to,
+      })),
+    );
   }, [view, page, lineTarget]);
 
   /**
@@ -4394,7 +4398,12 @@ export function App(): ReactElement {
           detail: hit.listName,
           indices: hit.indices,
           run: () => {
-            setLineTarget({ list: hit.listId, line: hit.line ?? 0, at: Date.now() });
+            setLineTarget({
+              list: hit.listId,
+              line: hit.line ?? 0,
+              at: Date.now(),
+              match: { text: hit.text, indices: hit.indices, loose: hit.loose === true },
+            });
             openList(hit.listId);
           },
         };
@@ -5220,8 +5229,8 @@ export function App(): ReactElement {
                     id={view.id}
                     text={view.noteText ?? ''}
                     readOnly={view.readOnly !== null}
-                    onId={(id) => {
-                      noteIdsFromEditor.current.add(id);
+                    onId={(id, from) => {
+                      noteIdHandover.current = { from, to: id };
                       setListId(id);
                     }}
                     onImage={showImage}

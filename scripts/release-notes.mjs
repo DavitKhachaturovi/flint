@@ -15,11 +15,14 @@ const version = JSON.parse(
 ).version;
 if (tag !== `v${version}`) fail(`the tag "${tag}" is not v${version}, the app's version`);
 
-const whatsNew = readFileSync(new URL('docs/whats-new.md', root), 'utf8').replace(/\r\n/g, '\n');
-const heading = new RegExp(`^## ${version.replace(/\./g, '\\.')} \\(.*\\)$`, 'm');
-const start = whatsNew.search(heading);
+const lines = readFileSync(new URL('docs/whats-new.md', root), 'utf8')
+  .replace(/\r\n/g, '\n')
+  .split('\n');
+// The heading is "## <version> (<date>)". Matched as plain text rather than a regular expression
+// built from the version, so no character in a version (a prerelease's "-", "+" or ".") needs escaping.
+const start = lines.findIndex((line) => line.startsWith(`## ${version} (`) && line.endsWith(')'));
 if (start < 0) fail(`docs/whats-new.md has no "## ${version} (…)" section`);
-const body = whatsNew.slice(start).split('\n').slice(1);
+const body = lines.slice(start + 1);
 const next = body.findIndex((line) => line.startsWith('## '));
 const section = (next < 0 ? body : body.slice(0, next)).join('\n').trim();
 if (!section) fail(`the ${version} section of docs/whats-new.md is empty`);

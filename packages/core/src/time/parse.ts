@@ -173,13 +173,27 @@ function at(day: Day, clock: Clock): LocalDateTime {
   };
 }
 
-/** Parses a whole phrase (lowercase, single spaces). */
-function parsePhrase(phrase: string, context: TimeContext): LocalDateTime | null {
-  const now = context.now;
-  const nowLocal = fromDate(now);
-  const today: Day = { year: nowLocal.year, month: nowLocal.month, day: nowLocal.day };
-  const defaultClock: Clock = { hour: context.defaultHour ?? DEFAULT_HOUR, minute: 0 };
+/** What every phrase of one `matchTime` call is read against, worked out once per call. */
+interface PhraseContext {
+  readonly now: Date;
+  readonly today: Day;
+  readonly defaultClock: Clock;
+}
 
+function phraseContext(context: TimeContext): PhraseContext {
+  const nowLocal = fromDate(context.now);
+  return {
+    now: context.now,
+    today: { year: nowLocal.year, month: nowLocal.month, day: nowLocal.day },
+    defaultClock: { hour: context.defaultHour ?? DEFAULT_HOUR, minute: 0 },
+  };
+}
+
+/** Parses a whole phrase (lowercase, single spaces). */
+function parsePhrase(
+  phrase: string,
+  { now, today, defaultClock }: PhraseContext,
+): LocalDateTime | null {
   // Relative: 20m, 2h, 3d, 1h30m, in 20m, in 2 hours.
   const relative = /^(?:in\s+)?(\d+)\s*([a-z]+)(?:\s*(\d+)\s*([a-z]+))?$/.exec(phrase);
   if (relative) {
@@ -228,22 +242,52 @@ function parsePhrase(phrase: string, context: TimeContext): LocalDateTime | null
 }
 
 /**
+ * Every rule in `parsePhrase` starts with a digit or one of these words (`in 20m`, `at 3pm`,
+ * `next fri`, `today`, `fri 10`, `nov 2`), and reads only words made of the characters in
+ * `PHRASE_WORD`. A rule that can start with another word, or read another character, adds it here.
+ */
+const PHRASE_WORD = /^[a-z\d:.-]+$/;
+const FIRST_WORDS: ReadonlySet<string> = new Set([
+  'in',
+  'at',
+  'next',
+  'today',
+  'tomorrow',
+  'tmrw',
+  ...Object.keys(WEEKDAYS),
+  ...Object.keys(MONTHS),
+]);
+
+/**
  * The longest time expression at the start of `text`, up to 6 words: `tomorrow 10 deploy` reads
  * `tomorrow 10`. Null if the text doesn't start with one, or it names a time that has passed.
  */
 export function matchTime(text: string, context: TimeContext): TimeMatch | null {
-  const words = [...text.matchAll(/\S+/g)];
-  const first = words[0];
-  if (!first || first.index !== 0) return null;
-  for (let count = Math.min(MAX_WORDS, words.length); count >= 1; count--) {
+  if (!/^\S/.test(text)) return null;
+  // Only the words an expression can use are read: the first ones, up to one no rule can read
+  // (`10 @fri`). The capture shorthand calls this at every `@` with the rest of the line, which can
+  // be a long paste; reading every word each time made a line of many `@` quadratic (CodeQL
+  // js/polynomial-redos).
+  const words: { readonly text: string; readonly end: number }[] = [];
+  for (const match of text.matchAll(/\S+/g)) {
+    const word = match[0].toLowerCase();
+    if (!PHRASE_WORD.test(word)) break;
+    words.push({ text: word, end: match.index + match[0].length });
+    if (words.length === MAX_WORDS) break;
+  }
+  // `@alex`: a word no expression starts with is rejected without trying each phrase.
+  const first = words[0]?.text;
+  if (first === undefined || (!/^\d/.test(first) && !FIRST_WORDS.has(first))) return null;
+  const phrases = phraseContext(context);
+  for (let count = words.length; count >= 1; count--) {
     const last = words[count - 1];
     if (!last) continue;
     const phrase = words
       .slice(0, count)
-      .map((word) => word[0].toLowerCase())
+      .map((word) => word.text)
       .join(' ');
-    const result = parsePhrase(phrase, context);
-    if (result) return { at: result, length: last.index + last[0].length };
+    const result = parsePhrase(phrase, phrases);
+    if (result) return { at: result, length: last.end };
   }
   return null;
 }

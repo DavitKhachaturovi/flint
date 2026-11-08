@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   editDistance,
   isValidListName,
+  listResolver,
   listToken,
   normalizeListName,
   resolveList,
   suggestLists,
   type ListInfo,
+  type ListResolution,
 } from './lists.js';
 import { listTokenAt, parseCapture, type ShorthandContext } from './parse.js';
 
@@ -228,6 +230,69 @@ describe('resolveList (D-25)', () => {
   it('a one-letter prefix is not a close match', () => {
     expect(resolveList('u', lists)).toEqual({ kind: 'new', name: 'u' });
   });
+
+  it(
+    'property: resolves every name as the original resolveList did (js/polynomial-redos fix)',
+    () => {
+      // The resolver before the fix: each list's name normalized for every name, the edit distance
+      // worked out for every task list, and sidebar order found with indexOf.
+      function reference(name: string, all: readonly ListInfo[]): ListResolution {
+        const normalized = normalizeListName(name);
+        const same = all.filter((list) => normalizeListName(list.name) === normalized);
+        const sameTasks = same.filter((list) => list.mode === 'tasks');
+        const exact = sameTasks.find((list) => list.name === name) ?? sameTasks[0];
+        if (exact) return { kind: 'existing', list: exact };
+        if (same[0]) return { kind: 'note', list: same[0] };
+        const taskLists = all.filter((list) => list.mode === 'tasks');
+        const order = (a: ListInfo, b: ListInfo): number =>
+          (a.recentRank ?? Infinity) - (b.recentRank ?? Infinity) ||
+          all.indexOf(a) - all.indexOf(b);
+        if (normalized.length >= 2) {
+          const first = taskLists
+            .filter((list) => normalizeListName(list.name).startsWith(normalized))
+            .sort(order)[0];
+          if (first) return { kind: 'close-match', list: first, name };
+        }
+        const typo = taskLists
+          .map((list) => {
+            const candidate = normalizeListName(list.name);
+            const limit = candidate.length <= 4 ? 1 : 2;
+            return { list, distance: editDistance(normalized, candidate), limit };
+          })
+          .filter(({ distance, limit }) => distance <= limit)
+          .sort((a, b) => a.distance - b.distance || order(a.list, b.list))[0];
+        if (typo) return { kind: 'close-match', list: typo.list, name };
+        return isValidListName(name) ? { kind: 'new', name } : { kind: 'invalid-name', name };
+      }
+      const word = fc
+        .array(fc.constantFrom(...'abcab -_.ქ'), { maxLength: 9 })
+        .map((chars) => chars.join(''));
+      const list = fc.record({
+        name: word,
+        mode: fc.constantFrom<'tasks' | 'note'>('tasks', 'tasks', 'note'),
+        recentRank: fc.option(fc.integer({ min: 0, max: 3 }), { nil: undefined }),
+      });
+      fc.assert(
+        fc.property(
+          fc.array(list, { maxLength: 8 }),
+          fc.array(word, { maxLength: 6 }),
+          (all, names) => {
+            // Distinct ids, so a wrong pick among lists of the same name can't pass as equal.
+            const own = all.map(({ recentRank, ...rest }, index): ListInfo => {
+              const one = { ...rest, id: `l${index}` };
+              return recentRank === undefined ? one : { ...one, recentRank };
+            });
+            // The same list object twice: its sidebar place is the first, as indexOf found it.
+            const doubled = own[0] ? [...own, own[0]] : own;
+            const resolve = listResolver(doubled);
+            for (const name of names) expect(resolve(name)).toEqual(reference(name, doubled));
+          },
+        ),
+        { numRuns: RUNS },
+      );
+    },
+    Math.max(5_000, RUNS * 2),
+  );
 });
 
 describe('list helpers', () => {
@@ -235,6 +300,31 @@ describe('list helpers', () => {
     expect(normalizeListName('Meeting  notes_2')).toBe('meetingnotes2');
     expect(listToken('Meeting notes')).toBe('Meeting-notes');
   });
+
+  it(
+    'property: a run of words normalizes as its words one by one (D-87 lookups, D-143)',
+    () => {
+      // Letters that compose (NFC) or lowercase by context (the final sigma), and marks that could
+      // attach across a space if spaces didn't stop them.
+      const chars = [
+        ...'aZΣσΑß_-.1ქ',
+        ...[0x301, 0x345, 0x130, 0x212a, 0x1100, 0x1161, 0x11a8, 0x3099, 0x304b].map((code) =>
+          String.fromCharCode(code),
+        ),
+      ];
+      const word = fc.array(fc.constantFrom(...chars), { minLength: 1, maxLength: 6 });
+      const gap = fc.array(fc.constantFrom(' ', '\t'), { minLength: 1, maxLength: 2 });
+      fc.assert(
+        fc.property(fc.array(fc.tuple(word, gap), { minLength: 1, maxLength: 8 }), (parts) => {
+          const words = parts.map(([letters]) => letters.join(''));
+          const run = parts.map(([letters, space]) => letters.join('') + space.join('')).join('');
+          expect(normalizeListName(run)).toBe(words.map(normalizeListName).join(''));
+        }),
+        { numRuns: RUNS * 5 },
+      );
+    },
+    Math.max(5_000, RUNS * 5),
+  );
 
   it('validates Windows names', () => {
     for (const name of ['Inbox', 'v1.2', 'სამუშაო']) expect(isValidListName(name)).toBe(true);
@@ -314,4 +404,109 @@ describe('property: parseCapture', () => {
     },
     Math.max(5_000, RUNS * 2),
   );
+
+  it(
+    'a one-word ## token is the name without its trailing dots (as with the old /\\.+$/)',
+    () => {
+      const char = fc.constantFrom(...'..# ai-_`@1ქ\\');
+      fc.assert(
+        fc.property(fc.array(char, { maxLength: 40 }), (chars) => {
+          const input = chars.join('');
+          for (const token of capture(input).tokens) {
+            if (token.kind !== 'list') continue;
+            // The reference: the regexes the scanner used before the CodeQL js/polynomial-redos fix.
+            const rest = input.slice(token.start + 2);
+            const expected = (/^[\p{L}\p{N}_.-]+/u.exec(rest)?.[0] ?? '').replace(/\.+$/, '');
+            expect(input.slice(token.start + 2, token.end)).toBe(expected);
+          }
+        }),
+        { numRuns: RUNS },
+      );
+    },
+    Math.max(5_000, RUNS * 2),
+  );
+});
+
+/**
+ * CodeQL js/polynomial-redos: the scanner runs on every keystroke in the capture popup (docs/05 §4:
+ * shorthand parse < 1 ms per keystroke), and a pasted line can be long. Each shape below took time
+ * quadratic in its length before (0.45 s to 16 s, and up to 7 s with hundreds of lists); now it is
+ * linear, so 50,000 characters take at most about 25 ms. The limit leaves room for a machine five
+ * times slower under the whole suite's load, while a quadratic parse still fails it. The best of
+ * three runs is measured, so a GC pause doesn't fail the test either.
+ */
+describe('parseCapture: long pasted lines stay fast', () => {
+  const size = 50_000;
+  const LIMIT_MS = 250;
+  const many: ListInfo[] = [
+    ...lists,
+    { id: 'n1l', name: 'new list 1', mode: 'tasks' },
+    { id: 'n2l', name: 'new list 2', mode: 'tasks' },
+  ];
+  // Hundreds of lists, with names of every length up to Windows' limit: each name after `##` is
+  // compared with all of them (D-25), so their number must not multiply the cost of a long name.
+  const crowded: ListInfo[] = [
+    ...many,
+    ...Array.from({ length: 200 }, (_, index): ListInfo => {
+      const base = `Project ${String(index)} ${'release planning '.repeat(index % 12)}`.trim();
+      return { id: `p${String(index)}`, name: base, mode: index % 7 === 0 ? 'note' : 'tasks' };
+    }),
+  ];
+  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
+
+  function elapsed(input: string, extra: Partial<ShorthandContext> = {}): number {
+    let best = Infinity;
+    for (let run = 0; run < 3; run++) {
+      const start = performance.now();
+      capture(input, extra);
+      best = Math.min(best, performance.now() - start);
+    }
+    return best;
+  }
+
+  it.each([
+    ['## then dots then a letter', `##${'.'.repeat(size)}x`],
+    ['## a name, dots, then a hyphen', `fix ##a${'.'.repeat(size)}-`],
+    ['## then only dots', `fix ##${'.'.repeat(size)}`],
+    ['many ## tokens with dots inside', repeat(`##${'.'.repeat(60)}x `)],
+    ['many ## tokens', repeat('##a ')],
+    ['many lone @', repeat('@ ')],
+    ['many @ before words', repeat('@x ')],
+    ['many @ before numbers', repeat('@10 ')],
+    ['many @ before six numbers each', repeat('@1 1 1 1 1 1 ')],
+    ['many @ before a full time', repeat('@tomorrow 10 ')],
+    ['many inline code spans', repeat('`a` ')],
+    ['code spans between tokens', repeat('`a` ##b @c !h ')],
+    ['many escapes', repeat('\\##a ')],
+    ['many ! tokens', repeat('!x ')],
+    ['## then dots and hyphens', `##${'.-'.repeat(size / 2)}x`],
+    ['## then one long word', `##${'a'.repeat(size)}`],
+    ['many different ## names', Array.from({ length: size / 6 }, (_, n) => `##t${n}`).join(' ')],
+    ['many ## names close to a list', repeat('##project-1-releas ##projet-2 ')],
+  ])(
+    '%s',
+    (_, input) => {
+      expect(input.length).toBeGreaterThanOrEqual(size);
+      capture(input.slice(0, 1000)); // Warms the JIT, so the time measured is the parse itself.
+      expect(elapsed(input)).toBeLessThan(LIMIT_MS);
+      expect(elapsed(input, { lists: many })).toBeLessThan(LIMIT_MS);
+      expect(elapsed(input, { lists: crowded })).toBeLessThan(LIMIT_MS);
+    },
+    10_000,
+  );
+
+  it('still reads the tokens of a long line correctly', () => {
+    const words = 'word '.repeat(size / 5);
+    const result = capture(`${words}##infra${'.'.repeat(size)} !h @tomorrow 10`);
+    expect(result.target).toEqual({ kind: 'existing', list: infra });
+    expect(result.priority).toBe('high');
+    expect(result.reminderLabel).toBe('Tomorrow 10:00');
+    expect(result.title).toBe(`${words.trimEnd()}${'.'.repeat(size)}`);
+    expect(capture(`x ##${'.'.repeat(size)}x`).tokens).toEqual([
+      { kind: 'list', start: 2, end: size + 5, role: 'ignored' },
+    ]);
+    const spans = capture(`${'`##infra` '.repeat(size / 10)}##unicorn`);
+    expect(spans.target).toEqual({ kind: 'existing', list: unicorn });
+    expect(spans.counts.list).toBe(1);
+  });
 });

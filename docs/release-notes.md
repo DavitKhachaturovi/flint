@@ -2,6 +2,13 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.1.1 (8 Nov 2026)
+
+- **Security (D-143):** the CodeQL and Dependabot alerts on GitHub are fixed, none dismissed. The capture shorthand (`##` list names, `@` times, code spans), paste handling, stack-trace recognition and the list lookup ran in quadratic time on long pasted lines (up to 16 s per keystroke at 50,000 characters) and now run in linear time, each tested against the code it replaced and timed on pathological inputs. The release scripts escape completely (a version with build metadata found no release-notes section). minimatch 11.0.3 for the vulnerable range (an override; build tools only, nothing that ships); `npm audit` reports none. The installer packs the same files as 1.1.0, checked file by file.
+- **The note-line flash (NAV-01, D-143):** a note's line chosen in Ctrl+K now lights the words searched for in it (its whole text on a loose match) in Ctrl+F's current-match style, held, then fading; it ends at the first edit. Before, a box flashed on the whole line, faint and not lined up with the text, and on a busy machine it could miss the line.
+- **Fixed (NOTE-01, D-115, D-143):** in mini mode's Note tab, a quick note opened again after another note kept that note's editor, and Ctrl+Z could bring the other note's text into it and save it. A note's editor is now kept only for the step where its own note is made or given its ID, in both windows. A change from outside (the file edited elsewhere, the other window's text) is no longer an undo step.
+- **Moved:** the highlighter's linear matchers ship with 1.2.0; the file format's task-line reader is its own change right after 1.1.1.
+
 ## 1.1.0 (8 Nov 2026)
 
 - **The live preview, rebuilt (D-141, D-142):** its decisions are one pure function on CodeMirror's syntax tree (`editor/preview.ts`). Block markers (bullets, checkboxes, headings, quotes, task-field chips) and embedded objects (pictures, videos, files) stay drawn with the caret beside them and show raw only with the caret strictly inside; inline formatting shows raw with the caret inside it or at its edge; ← / → step into a marker; clicks and selections never reveal. A picture's (video's, file's) right-click menu has **Edit markdown**. The raw link no longer shows beside a picture on the cursor's line, and the caret beside a picture is one text-sized caret at its real position.
