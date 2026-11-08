@@ -122,7 +122,7 @@ import { rowDragUnits } from '../ui/row-drag.js';
 import { Composer, listInfos } from '../ui/Composer.js';
 import { QuickTitle } from '../ui/QuickTitle.js';
 import { Glide } from '../ui/Glide.js';
-import { showQuestion, ToastView, useToast } from '../ui/Toast.js';
+import { showQuestion, showUndoNotice, ToastView, useToast } from '../ui/Toast.js';
 import { UPDATE_VIEW_OFF, type UpdateView } from '../../shared/updates.js';
 
 /**
@@ -1071,10 +1071,8 @@ export function App(): ReactElement {
       showToast((event as CustomEvent<string>).detail, false);
     window.addEventListener('flint:notice', onNotice);
     // NOTE-10: an editor's change with its own Undo (the note's history, not the app's).
-    const onUndoNotice = (event: Event): void => {
-      const { text, undo: undoIt } = (event as CustomEvent<UndoNotice>).detail;
-      showToast(text, false, { label: 'Undo', run: undoIt });
-    };
+    const onUndoNotice = (event: Event): void =>
+      showUndoNotice(showToast, hideToast, (event as CustomEvent<UndoNotice>).detail);
     window.addEventListener('flint:notice-undo', onUndoNotice);
     // D-144: an editor's question (a table's edge drag taking away text): Delete / Cancel.
     const onConfirmNotice = (event: Event): void =>

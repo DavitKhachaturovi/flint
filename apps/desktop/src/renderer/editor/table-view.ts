@@ -252,9 +252,38 @@ export function clearSelectedCells(view: EditorView): boolean {
     userEvent: 'delete.table',
     annotations: [onRange.of(true), isolateHistory.of('full')],
   });
-  announceUndo('Cells cleared', () => undo(view));
+  offerUndo(view, 'Cells cleared');
   return true;
 }
+
+/** D-144: the table's Undo toast still up, if any: the editor it is for, the way to take it away. */
+let undoToast: { readonly view: EditorView; readonly hide: () => void } | null = null;
+
+/**
+ * Q11, D-144: a table's delete with the window's Undo toast. Its Undo takes back the note's last
+ * step, so the toast goes as soon as the note changes again (Proposed: it would take back
+ * something else); after it, the note has the keys again (the active cell's editor, if any).
+ */
+function offerUndo(view: EditorView, text: string): void {
+  undoToast?.hide();
+  const hide = announceUndo(text, () => {
+    undoToast = null;
+    view.focus();
+    undo(view);
+    requestAnimationFrame(() => {
+      const cell = view.dom.querySelector<HTMLElement>('.cm-fl-cell-active .cm-content');
+      if (cell && !cell.contains(document.activeElement)) cell.focus();
+    });
+  });
+  undoToast = { view, hide };
+}
+
+/** D-144: the note changed again (typing, an undo, a change from outside): its Undo toast goes. */
+const closeUndoToast = EditorView.updateListener.of((update) => {
+  if (!update.docChanged || undoToast?.view !== update.view) return;
+  undoToast.hide();
+  undoToast = null;
+});
 
 /**
  * D-144 (Proposed): Ctrl+C on selected cells: tab-separated text as the plain text (Excel and
@@ -1595,7 +1624,7 @@ export function tableCommands(view: EditorView, here: CellAt): TableCommand[] {
     // A delete with an Undo toast is its own undo step: the toast's Undo takes back only it.
     const annotations = notice ? isolateHistory.of('full') : [];
     view.dispatch({ changes, userEvent: event, scrollIntoView: true, annotations });
-    if (notice) announceUndo(notice, () => undo(view));
+    if (notice) offerUndo(view, notice);
   };
   const live = (): ParsedTable => tableAt(view.state, table.from) ?? table;
   return [
@@ -1758,6 +1787,7 @@ export function tables(): Extension {
     keepTextOutOfTables,
     trackCaret,
     cancelWarningWithEditor,
+    closeUndoToast,
     // Before the editor's own ↑ / ↓ (which would skip over the table).
     Prec.high(
       keymap.of([

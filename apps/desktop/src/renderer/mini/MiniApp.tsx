@@ -22,7 +22,7 @@ import { CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
 import { Composer } from '../ui/Composer.js';
 import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
-import { showQuestion, ToastView, useToast } from '../ui/Toast.js';
+import { showQuestion, showUndoNotice, ToastView, useToast } from '../ui/Toast.js';
 import type { ConfirmNotice, UndoNotice } from '../media/media.js';
 import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
@@ -130,10 +130,8 @@ export function MiniApp(): ReactElement {
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
   // NOTE-10: the Note tab's editor changes with their own Undo (a table's row deleted).
   useEffect(() => {
-    const onUndoNotice = (event: Event): void => {
-      const { text, undo } = (event as CustomEvent<UndoNotice>).detail;
-      showToast(text, false, { label: 'Undo', run: undo });
-    };
+    const onUndoNotice = (event: Event): void =>
+      showUndoNotice(showToast, hideToast, (event as CustomEvent<UndoNotice>).detail);
     // D-144: an editor's question (a table's edge drag taking away text): Delete / Cancel.
     const onConfirmNotice = (event: Event): void =>
       showQuestion(showToast, hideToast, (event as CustomEvent<ConfirmNotice>).detail);

@@ -230,12 +230,18 @@ export function announce(text: string): void {
 export interface UndoNotice {
   readonly text: string;
   readonly undo: () => void;
+  /** Set by the window that shows it: takes this toast away, if it is still the one shown. */
+  hide?: () => void;
 }
 
-export function announceUndo(text: string, undo: () => void): void {
-  window.dispatchEvent(
-    new CustomEvent<UndoNotice>('flint:notice-undo', { detail: { text, undo } }),
-  );
+/**
+ * Shows the Undo toast; returns the way to take it away from the editor (D-144, Proposed: the
+ * note edited again, so its Undo could only take back something else). Never another toast.
+ */
+export function announceUndo(text: string, undo: () => void): () => void {
+  const notice: UndoNotice = { text, undo };
+  window.dispatchEvent(new CustomEvent<UndoNotice>('flint:notice-undo', { detail: notice }));
+  return () => notice.hide?.();
 }
 
 /**

@@ -812,6 +812,49 @@ test('Delete clears selected cells at once, in one undo step, with an Undo toast
   await expect.poll(grid).toBe(GRID_NOTE);
 });
 
+test('the Undo toast goes once the note is edited again; its Undo gives the note the keys back (D-144)', async () => {
+  await openGrid();
+  const cleared = GRID_NOTE.replace('| a1 | b1 | c1 |', '|  |  | c1 |').replace(
+    '| a2 | b2 | c2 |',
+    '|  |  | c2 |',
+  );
+  const toast = main.locator('.toast:not(.leaving)', { hasText: 'Cells cleared' });
+  const select = async (): Promise<void> => {
+    await cell(1, 0).click();
+    await cell(2, 1).click({ modifiers: ['Shift'] });
+    await expect(selected()).toHaveCount(3);
+  };
+  // Typed on after the clear: the toast goes, so its Undo can't take back the typing instead.
+  await select();
+  await main.keyboard.press('Delete');
+  await expect.poll(grid).toBe(cleared);
+  await expect(toast).toHaveCount(1);
+  await main.keyboard.type('Q');
+  await expect.poll(grid).toBe(cleared.replace('|  |  | c1 |', '| Q |  | c1 |'));
+  // At once, well before its own time (5 s) runs out.
+  await expect(toast).toHaveCount(0, { timeout: 1500 });
+  for (let tries = 0; tries < 4 && (await grid()) !== GRID_NOTE; tries++) {
+    const now = await grid();
+    await main.keyboard.press('Control+z');
+    await expect.poll(grid).not.toBe(now);
+  }
+  await expect.poll(grid).toBe(GRID_NOTE);
+  // The toast's Undo: the note (its cell) has the keys again, and Ctrl+Z is the note's own.
+  await select();
+  await main.keyboard.press('Delete');
+  await expect.poll(grid).toBe(cleared);
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(grid).toBe(GRID_NOTE);
+  await expect
+    .poll(() => main.evaluate(() => document.activeElement?.closest('.note-editor') !== null))
+    .toBe(true);
+  await main.keyboard.press('End');
+  await main.keyboard.type('Z');
+  await expect.poll(grid).toBe(GRID_NOTE.replace('| a1 |', '| a1Z |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(grid).toBe(GRID_NOTE);
+});
+
 test('Delete or a paste right after typing is its own undo step: the typing stays (D-144)', async () => {
   await openGrid();
   // Typed, then at once (well within history's 500 ms) b1 selected and cleared.

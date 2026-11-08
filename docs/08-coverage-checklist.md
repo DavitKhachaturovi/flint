@@ -1104,6 +1104,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 36 | Backspace on the empty line under a table that ends the note: the text unchanged, the caret at the end of the last cell | NOTE-10 · Fixed (1.2.0, second preview) | 02, 03 §3, D-144 |
 | 37 | Esc with the edge drag's question up goes first to the note's find bar or slash menu over it | NOTE-10 · Fixed (1.2.0, second preview) | 02, 03 §4, D-144 |
 | 38 | A click under a table (and ↓ from its last row): at the note's end the line made as Esc makes it; in a quote after the quote's mark; above a heading a new line | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 02, D-144 |
+| 39 | A table's Undo toast goes once the note changes again; after its Undo the note (its active cell) has the focus | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 

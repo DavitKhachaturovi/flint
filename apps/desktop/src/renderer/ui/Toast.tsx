@@ -1,6 +1,6 @@
 /** Toast with Undo (03 §4, D-77), shared by the main window and mini mode (D-110). */
 import { useCallback, useRef, useState, type MouseEvent, type ReactElement } from 'react';
-import { CONFIRM_MS, type ConfirmNotice } from '../media/media.js';
+import { CONFIRM_MS, type ConfirmNotice, type UndoNotice } from '../media/media.js';
 import { durationMs } from './motion.js';
 
 export interface Toast {
@@ -127,6 +127,22 @@ export function ToastView(props: {
       )}
     </div>
   );
+}
+
+/**
+ * NOTE-10: an editor's change with its own Undo (announceUndo) as the window's toast; its `hide`
+ * takes away only this toast, never one shown after it (D-144).
+ */
+export function showUndoNotice(
+  showToast: ReturnType<typeof useToast>['showToast'],
+  hideToast: () => void,
+  notice: UndoNotice,
+): void {
+  let up = true;
+  showToast(notice.text, false, { label: 'Undo', run: notice.undo }, { onEnd: () => (up = false) });
+  notice.hide = () => {
+    if (up) hideToast();
+  };
 }
 
 /**
