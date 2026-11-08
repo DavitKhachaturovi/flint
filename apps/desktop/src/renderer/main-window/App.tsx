@@ -1541,17 +1541,19 @@ export function App(): ReactElement {
   /**
    * D-115: the note editor stays the same one while it is the same note: renamed (a quick note's
    * title: the caret goes on into it) or given its ID by its first save; another note, a new one.
+   * D-143: only for that step (the editor's own note, from the ID it had to the new one), once:
+   * remembering every such ID let a note opened again later take over the other note's editor,
+   * whose undo history could then bring the other note's text into it.
    */
   const noteEditor = useRef({ id: '', key: 0 });
-  const noteIdsFromEditor = useRef(new Set<string>());
+  const noteIdHandover = useRef<{ from: string; to: string } | null>(null);
   const noteEditorKey = (id: string): string => {
-    if (id !== noteEditor.current.id)
-      noteEditor.current = {
-        id,
-        key: noteIdsFromEditor.current.has(id)
-          ? noteEditor.current.key
-          : noteEditor.current.key + 1,
-      };
+    if (id !== noteEditor.current.id) {
+      const handover = noteIdHandover.current;
+      const same = handover?.to === id && handover.from === noteEditor.current.id;
+      noteIdHandover.current = null;
+      noteEditor.current = { id, key: same ? noteEditor.current.key : noteEditor.current.key + 1 };
+    }
     return `note-${noteEditor.current.key}`;
   };
   const triageDetails = useCallback((key: string | null): void => setSelected(key), []);
@@ -5316,8 +5318,8 @@ export function App(): ReactElement {
                     id={view.id}
                     text={view.noteText ?? ''}
                     readOnly={view.readOnly !== null}
-                    onId={(id) => {
-                      noteIdsFromEditor.current.add(id);
+                    onId={(id, from) => {
+                      noteIdHandover.current = { from, to: id };
                       setListId(id);
                     }}
                     onImage={showImage}

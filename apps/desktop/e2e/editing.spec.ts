@@ -340,3 +340,46 @@ test("a quick note's title: Enter, Tab, ↓ and Shift+Enter save it and go on in
     expect((await readdir(flint)).filter((file) => file.startsWith('Quick note'))).toEqual([]);
   }
 });
+
+test("a note given its ID by its first save, opened again after another note: its own editor, and Ctrl+Z never brings in the other note's text or undoes a change from outside (D-115, D-143)", async () => {
+  // D-23: a file without Flint's header gets it (and an ID) on its first save.
+  await writeFile(join(flint, 'Loose.md'), 'Loose text\n');
+  await expect(main.locator('.nav:not(.flip-ghost)', { hasText: 'Loose' })).toBeVisible();
+  await open('Loose');
+  const editor = main.locator('.note-card .cm-content');
+  await editor.click();
+  await main.keyboard.press('Control+Home');
+  await main.keyboard.press('End');
+  await main.keyboard.type(' typed');
+  await expect
+    .poll(() => readFile(join(flint, 'Loose.md'), 'utf8'))
+    .toMatch(/^---\n[\s\S]*\bid: [\s\S]*Loose text typed/);
+  // Another note, its editor marked, then the first one again: a new editor, not that one.
+  await open('Plan');
+  await expect(editor).toContainText('First line of the plan.');
+  await main.locator('.note-card .cm-editor').evaluate((element) => {
+    (element as HTMLElement).dataset.e2eNote = 'plan';
+  });
+  await open('Loose');
+  await expect(editor).toContainText('Loose text typed');
+  await expect(main.locator('.note-card .cm-editor[data-e2e-note]')).toHaveCount(0);
+  // Ctrl+Z has nothing of the other note's to bring back.
+  await editor.click();
+  for (let undo = 0; undo < 3; undo += 1) await main.keyboard.press('Control+z');
+  await main.waitForTimeout(1200);
+  await expect(editor).toContainText('Loose text');
+  await expect(editor).not.toContainText('First line of the plan.');
+  expect(await readFile(join(flint, 'Loose.md'), 'utf8')).not.toContain('plan');
+
+  // A change from outside (the file edited elsewhere) shows, and Ctrl+Z doesn't undo it.
+  await open('Plan');
+  const plan = await readFile(join(flint, 'Plan.md'), 'utf8');
+  await writeFile(join(flint, 'Plan.md'), plan.replace('First line', 'Changed outside'));
+  await expect(editor).toContainText('Changed outside of the plan.');
+  await editor.click();
+  for (let undo = 0; undo < 3; undo += 1) await main.keyboard.press('Control+z');
+  await main.waitForTimeout(1200);
+  await expect(editor).toContainText('Changed outside of the plan.');
+  expect(await readFile(join(flint, 'Plan.md'), 'utf8')).toContain('Changed outside of the plan.');
+  await main.locator('.sidebar > .nav[data-key="@today"]').click();
+});

@@ -678,6 +678,48 @@ ${name} text here.
   await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
 });
 
+test("the Note tab: a quick note made here, opened again after another note: its own editor; Ctrl+Z never brings in the other note's text (D-115, D-143)", async () => {
+  // A click: Today's composer may have the keys.
+  await mini.locator('.mini-tabs .trash-tab', { hasText: 'Note' }).click();
+  const editor = mini.locator('.mini-editor .cm-content');
+  await expect(editor).toContainText('Plan text here.');
+  await mini.locator('.mini-note-head .tool').click();
+  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  await expect(mini.locator('.quick-title-input')).toHaveValue('');
+  await editor.click();
+  await mini.keyboard.type('Mini alpha text');
+  const alphaFile = async (): Promise<string | null> => {
+    for (const file of await readdir(flint)) {
+      if (!file.endsWith('.md')) continue;
+      const text = await readFile(join(flint, file), 'utf8').catch(() => '');
+      if (text.includes('Mini alpha')) return file;
+    }
+    return null;
+  };
+  await expect.poll(alphaFile).not.toBeNull();
+  const alpha = (await alphaFile()) ?? '';
+  // Another note (Plan), its editor marked, then the quick note again: a new editor.
+  await mini.locator('.mini-note-head .tool').click();
+  await mini.locator('.fl-menu-item', { hasText: 'Open a note…' }).click();
+  await mini.keyboard.type('plan');
+  await expect(mini.locator('.fl-picker .fl-picker-label')).toHaveText(['Plan']);
+  await mini.keyboard.press('Enter');
+  await expect(editor).toContainText('Plan text here.');
+  await mini.locator('.mini-editor .cm-editor').evaluate((element) => {
+    (element as HTMLElement).dataset.e2eNote = 'plan';
+  });
+  await mini.locator('.mini-note-head .tool').click();
+  await mini.locator('.fl-menu-item', { hasText: 'Mini alpha' }).click();
+  await expect(editor).toContainText('Mini alpha text');
+  await expect(mini.locator('.mini-editor .cm-editor[data-e2e-note]')).toHaveCount(0);
+  await editor.click();
+  for (let undo = 0; undo < 3; undo += 1) await mini.keyboard.press('Control+z');
+  await mini.waitForTimeout(1200);
+  await expect(editor).not.toContainText('Plan text here.');
+  expect(await readFile(join(flint, alpha), 'utf8')).not.toContain('Plan text here.');
+  await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
+});
+
 /** Drags a resize handle by (dx, dy). */
 const resize = async (handle: string, dx: number, dy: number): Promise<void> => {
   const box = await mini.locator(`.mini-handle.${handle}`).boundingBox();

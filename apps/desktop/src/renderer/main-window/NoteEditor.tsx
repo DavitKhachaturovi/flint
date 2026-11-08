@@ -20,8 +20,12 @@ export function NoteEditor(props: {
   readonly id: string;
   readonly text: string;
   readonly readOnly: boolean;
-  /** Flint added its header to a file that had none (D-23), or the note was made: its ID. */
-  readonly onId: (id: string) => void;
+  /**
+   * Flint added its header to a file that had none (D-23), or the note was made: its ID, and the
+   * one this editor had for it before ('' for a note not made yet). D-143: the window keeps this
+   * editor for that one step only.
+   */
+  readonly onId: (id: string, from: string) => void;
   /** MEDIA-01: an image opens the lightbox. */
   readonly onImage: ShowImage;
   /** NOTE-06, D-84: shown in monospace (this machine's choice); null: no Monospace toggle. */
@@ -72,14 +76,14 @@ export function NoteEditor(props: {
       const made = await creating.current;
       if (!made) return latest.current.value;
       latest.current.id = made;
-      onId(made);
+      onId(made, '');
     }
     const { id: noteId, value: noteText } = latest.current;
     latest.current.dirty = false;
     const outcome = await window.flintMain.saveNote(noteId, noteText);
     if (outcome?.ok && outcome.listId !== noteId) {
       latest.current.id = outcome.listId;
-      onId(outcome.listId);
+      onId(outcome.listId, noteId);
     }
     return noteText;
   };
