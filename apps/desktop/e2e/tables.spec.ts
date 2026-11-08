@@ -366,6 +366,8 @@ test("the drag's question leaves Esc to a layer on top of it first (D-144)", asy
   await expect(going()).toHaveCount(2);
   await main.keyboard.press('Escape');
   await expect(warning).toHaveCount(0);
+  // Saved first (the slash typed), then undone step by step.
+  await expect.poll(file).toBe(NOTE.replace('After the table.\n', 'After the table.\n/\n'));
   for (let tries = 0; tries < 4 && (await file()) !== NOTE; tries++) {
     const now = await file();
     await main.keyboard.press('Control+z');
