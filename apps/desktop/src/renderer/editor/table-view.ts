@@ -1,6 +1,9 @@
 import { history, redo, undo } from '@codemirror/commands';
+import { ensureSyntaxTree } from '@codemirror/language';
 import {
   Annotation,
+  ChangeSet,
+  type ChangeSpec,
   EditorSelection,
   EditorState,
   Prec,
@@ -12,7 +15,7 @@ import {
 } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, keymap, type DecorationSet } from '@codemirror/view';
 import { titleHtml } from '../../shared/inline-markdown.js';
-import { nudgeElement } from '../ui/motion.js';
+import { durationMs, nudgeElement } from '../ui/motion.js';
 import { announceUndo } from '../media/media.js';
 import { openMenu, type MenuEntry } from '../menu/menu.js';
 import {
@@ -198,7 +201,7 @@ class TableWidget extends WidgetType {
     const cellHadFocus = holder?.editor?.hasFocus ?? false;
     if (!holder || holder.shape !== shape) {
       holder?.editor?.destroy();
-      holder = build(wrap, table, shape);
+      holder = build(wrap, table, shape, view);
       holders.set(wrap, holder);
     }
     holder.from = table.from;
@@ -283,7 +286,7 @@ interface Holder {
 }
 const holders = new WeakMap<HTMLElement, Holder>();
 
-function build(wrap: HTMLElement, table: ParsedTable, shape: string): Holder {
+function build(wrap: HTMLElement, table: ParsedTable, shape: string, view: EditorView): Holder {
   wrap.textContent = '';
   const element = document.createElement('table');
   element.className = 'cm-fl-table';
@@ -312,8 +315,206 @@ function build(wrap: HTMLElement, table: ParsedTable, shape: string): Holder {
       body.append(line);
     }
   });
-  wrap.append(element);
+  // Q11: the edges a drag adds or removes columns and rows at, and the count of what it adds.
+  const box = document.createElement('div');
+  box.className = 'cm-fl-table-box';
+  const right = document.createElement('div');
+  right.className = 'cm-fl-table-edge cm-fl-table-edge-right';
+  right.title = 'Drag to add or remove columns';
+  const bottom = document.createElement('div');
+  bottom.className = 'cm-fl-table-edge cm-fl-table-edge-bottom';
+  bottom.title = 'Drag to add or remove rows';
+  const badge = document.createElement('div');
+  badge.className = 'cm-fl-table-badge';
+  badge.hidden = true;
+  right.addEventListener('pointerdown', (event) => dragEdge(view, wrap, 'columns', event));
+  bottom.addEventListener('pointerdown', (event) => dragEdge(view, wrap, 'rows', event));
+  box.append(element, right, bottom, badge);
+  wrap.append(box);
   return { from: table.from, shape, cells, editor: null, key: null };
+}
+
+/** Several of a table's edits in a row as one change (one undo step): each on the table as the
+ * edit before it left it. */
+function composed(
+  view: EditorView,
+  from: number,
+  times: number,
+  edit: (table: ParsedTable, state: EditorState) => ChangeSpec[],
+): ChangeSet | null {
+  let state = view.state;
+  let set = ChangeSet.empty(state.doc.length);
+  let at = from;
+  for (let step = 0; step < times; step++) {
+    ensureSyntaxTree(state, state.doc.length, 200);
+    const table = tableAt(state, at);
+    if (!table) break;
+    const next = state.changes(edit(table, state));
+    set = set.compose(next);
+    at = next.mapPos(at);
+    state = state.update({ changes: next }).state;
+  }
+  return set.empty ? null : set;
+}
+
+/** The cells a drag would take away (the columns from `target` on, or the rows), with text. */
+function goingWithText(table: ParsedTable, axis: 'columns' | 'rows', target: number): number {
+  let count = 0;
+  table.rows.forEach((row, index) =>
+    row.cells.forEach((cell, column) => {
+      const going =
+        axis === 'columns' ? column >= target && column < table.columns : index >= target;
+      if (going && cell.text !== '') count++;
+    }),
+  );
+  return count;
+}
+
+/** Applies a drag's result: columns or rows added or taken away at the end, in one step. */
+function resize(
+  view: EditorView,
+  from: number,
+  axis: 'columns' | 'rows',
+  count: number,
+  target: number,
+): void {
+  const more = target > count;
+  const changes = composed(view, from, Math.abs(target - count), (table) => {
+    if (axis === 'columns')
+      return more ? addColumn(table, table.columns) : deleteColumn(table, table.columns - 1);
+    const last = table.rows.length - 1;
+    return more ? addRow(table, last) : deleteRow(table, last);
+  });
+  if (changes)
+    view.dispatch({
+      changes,
+      userEvent: more ? 'input.table' : 'delete.table',
+      scrollIntoView: true,
+    });
+}
+
+/** Q11: the inline warning before a drag takes away cells with text: Delete / Cancel. */
+function warn(
+  view: EditorView,
+  wrap: HTMLElement,
+  cells: number,
+  done: (apply: boolean) => void,
+): void {
+  wrap.querySelector('.cm-fl-table-warning')?.remove();
+  const warning = document.createElement('div');
+  warning.className = 'cm-fl-table-warning';
+  warning.setAttribute('role', 'alert');
+  const text = document.createElement('span');
+  text.textContent = `This deletes content in ${cells} ${cells === 1 ? 'cell' : 'cells'}`;
+  const close = (apply: boolean): void => {
+    window.removeEventListener('keydown', onKey, true);
+    warning.classList.add('leaving');
+    window.setTimeout(() => warning.remove(), durationMs('--fl-dur-fast', 120));
+    done(apply);
+  };
+  const button = (label: string, apply: boolean): HTMLButtonElement => {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = apply ? 'trash-action danger' : 'trash-action';
+    element.textContent = label;
+    element.addEventListener('mousedown', (event) => event.preventDefault());
+    element.addEventListener('click', () => close(apply));
+    return element;
+  };
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    close(false);
+  };
+  window.addEventListener('keydown', onKey, true);
+  warning.append(text, button('Delete', true), button('Cancel', false));
+  wrap.append(warning);
+  void view;
+}
+
+/**
+ * Q11: dragging the right edge adds or removes columns, the bottom edge rows, one per step of the
+ * average column width (row height); at least one column and the header row stay. During the
+ * drag what would go is dimmed and what would come is counted; Esc cancels. Taking away cells
+ * with text asks first, inline.
+ */
+function dragEdge(
+  view: EditorView,
+  wrap: HTMLElement,
+  axis: 'columns' | 'rows',
+  start: PointerEvent,
+): void {
+  if (start.button !== 0) return;
+  const holder = holders.get(wrap);
+  const table = holder ? tableAt(view.state, holder.from) : null;
+  const element = wrap.querySelector<HTMLElement>('.cm-fl-table');
+  const badge = wrap.querySelector<HTMLElement>('.cm-fl-table-badge');
+  if (!holder || !table || !element || !badge) return;
+  start.preventDefault();
+  start.stopPropagation();
+  const handle = start.currentTarget as HTMLElement;
+  handle.setPointerCapture(start.pointerId);
+  const box = element.getBoundingClientRect();
+  const count = axis === 'columns' ? table.columns : table.rows.length;
+  const step = Math.max(24, (axis === 'columns' ? box.width : box.height) / count);
+  let target = count;
+  wrap.classList.add('cm-fl-table-dragging');
+  const show = (): void => {
+    for (const [key, cell] of holder.cells) {
+      const [row, column] = key.split(':').map(Number) as [number, number];
+      cell.classList.toggle('cm-fl-cell-going', (axis === 'columns' ? column : row) >= target);
+    }
+    badge.hidden = target <= count;
+    badge.textContent = `+${target - count} ${axis === 'columns' ? (target - count === 1 ? 'column' : 'columns') : target - count === 1 ? 'row' : 'rows'}`;
+    badge.dataset['axis'] = axis;
+  };
+  const clear = (): void => {
+    for (const cell of holder.cells.values()) cell.classList.remove('cm-fl-cell-going');
+    badge.hidden = true;
+  };
+  const move = (event: PointerEvent): void => {
+    const distance =
+      axis === 'columns' ? event.clientX - start.clientX : event.clientY - start.clientY;
+    target = Math.max(1, count + Math.round(distance / step));
+    show();
+  };
+  const finish = (apply: boolean): void => {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', up);
+    handle.removeEventListener('pointercancel', cancel);
+    window.removeEventListener('keydown', escape, true);
+    wrap.classList.remove('cm-fl-table-dragging');
+    if (!apply || target === count) {
+      clear();
+      return;
+    }
+    const live = tableAt(view.state, holder.from);
+    if (!live) return clear();
+    const withText = target < count ? goingWithText(live, axis, target) : 0;
+    if (withText === 0) {
+      clear();
+      resize(view, live.from, axis, count, target);
+      return;
+    }
+    badge.hidden = true;
+    warn(view, wrap, withText, (yes) => {
+      clear();
+      if (yes) resize(view, live.from, axis, count, target);
+    });
+  };
+  const up = (): void => finish(true);
+  const cancel = (): void => finish(false);
+  const escape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    finish(false);
+  };
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', up);
+  handle.addEventListener('pointercancel', cancel);
+  window.addEventListener('keydown', escape, true);
 }
 
 /** The live table and the active cell's place in it, from the note's state. */

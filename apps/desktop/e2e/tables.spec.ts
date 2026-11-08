@@ -183,3 +183,52 @@ test("the palette has the table's commands while the caret is in a table (D-106,
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
 });
+
+test('dragging the edges adds and removes columns and rows; text asks first, inline (Q11)', async () => {
+  const drag = async (edge: 'right' | 'bottom', steps: number, finish = true): Promise<void> => {
+    const handle = main.locator(`.note-editor .cm-fl-table-edge-${edge}`);
+    const box = await handle.boundingBox();
+    const tableBox = await table().boundingBox();
+    if (!box || !tableBox) throw new Error('no edge');
+    const columns = await table().locator('th').count();
+    const rows = await table().locator('tr').count();
+    const step = edge === 'right' ? tableBox.width / columns : tableBox.height / rows;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await main.mouse.move(x, y);
+    await main.mouse.down();
+    const dx = edge === 'right' ? step * steps : 0;
+    const dy = edge === 'bottom' ? step * steps : 0;
+    await main.mouse.move(x + dx / 2, y + dy / 2);
+    await main.mouse.move(x + dx, y + dy);
+    if (finish) await main.mouse.up();
+  };
+  // One step right: a column; one step back: it goes at once (empty).
+  await drag('right', 1);
+  await expect.poll(file).toContain('| Name    | Age |  |');
+  await drag('right', -1);
+  await expect.poll(file).toBe(NOTE);
+  // Over a column with text: the warning first; Cancel keeps it, Delete takes it, Ctrl+Z undoes.
+  await drag('right', -1);
+  const warning = main.locator('.note-editor .cm-fl-table-warning');
+  await expect(warning).toContainText('This deletes content in 2 cells');
+  await warning.locator('button', { hasText: 'Cancel' }).click();
+  await expect(warning).toHaveCount(0);
+  expect(await file()).toBe(NOTE);
+  await drag('right', -1);
+  await warning.locator('button', { hasText: 'Delete' }).click();
+  await expect.poll(file).toContain('| Name    |\n| ------- |\n| Alex    |');
+  await cell(0, 0).click();
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
+  // The bottom edge: a row added, then taken away again without asking (it is empty).
+  await drag('bottom', 1);
+  await expect.poll(file).toContain(`${TABLE}\n|         |     |\n`);
+  await drag('bottom', -1);
+  await expect.poll(file).toBe(NOTE);
+  // Esc during a drag: nothing happens.
+  await drag('bottom', 2, false);
+  await main.keyboard.press('Escape');
+  await main.mouse.up();
+  expect(await file()).toBe(NOTE);
+});

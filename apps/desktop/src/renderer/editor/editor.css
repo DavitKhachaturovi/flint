@@ -276,6 +276,99 @@
   padding: 0;
 }
 
+/* Q11: the table's edges, shown on hover: drag the right one for columns, the bottom one for rows
+   (the resize cursors say so: Proposed beside UI-01's arrow, since a drag edge is not a button). */
+.cm-fl-table-box {
+  position: relative;
+  display: inline-block;
+  padding: 0 10px 10px 0;
+}
+
+.cm-fl-table-edge {
+  position: absolute;
+  opacity: 0;
+  transition: opacity var(--fl-dur-fast);
+}
+
+.cm-fl-table-edge::after {
+  content: '';
+  position: absolute;
+  border-radius: 2px;
+  background: var(--fl-accent);
+}
+
+.cm-fl-table-edge-right {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: calc(100% - 10px);
+  cursor: col-resize;
+}
+
+.cm-fl-table-edge-right::after {
+  top: 6px;
+  bottom: 6px;
+  left: 3px;
+  width: 3px;
+}
+
+.cm-fl-table-edge-bottom {
+  left: 0;
+  bottom: 0;
+  width: calc(100% - 10px);
+  height: 10px;
+  cursor: row-resize;
+}
+
+.cm-fl-table-edge-bottom::after {
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 3px;
+}
+
+.cm-fl-table-box:hover .cm-fl-table-edge,
+.cm-fl-table-dragging .cm-fl-table-edge {
+  opacity: 0.7;
+}
+
+.cm-fl-table .cm-fl-cell-going {
+  opacity: 0.35;
+  transition: opacity var(--fl-dur-fast);
+}
+
+.cm-fl-table-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  padding: 1px 7px;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-muted);
+  font-size: var(--fl-size-meta);
+  pointer-events: none;
+}
+
+.cm-fl-table-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+  color: var(--fl-text-body);
+  animation: fl-table-warning-in var(--fl-dur-fast) ease-out;
+}
+
+.cm-fl-table-warning.leaving {
+  opacity: 0;
+  transition: opacity var(--fl-dur-fast);
+}
+
+@keyframes fl-table-warning-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */
 .cm-fl-image {
   display: inline-block;
