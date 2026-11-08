@@ -9,6 +9,7 @@ import {
 import { Prec, type Extension } from '@codemirror/state';
 import { EditorView, keymap, ViewPlugin } from '@codemirror/view';
 import { EDITOR_COMMANDS, inCode, type CommandHost } from './commands.js';
+import { tableAt } from './table.js';
 
 /**
  * Slash commands (M5, NOTE-03, D-82): `/` at the start of a line or after a space opens the command
@@ -66,7 +67,7 @@ export function slashCommands(host: () => CommandHost): Extension {
     const typed = context.matchBefore(/(?:^|\s)\/[\w-]*$/);
     if (!typed) return null;
     const slash = typed.text.startsWith('/') ? typed.from : typed.from + 1;
-    if (inCode(context.state, slash)) return null;
+    if (inCode(context.state, slash) || tableAt(context.state, slash)) return null;
     const query = context.state.sliceDoc(slash + 1, context.pos).toLowerCase();
     const options = EDITOR_COMMANDS.filter(
       (command) =>
@@ -100,6 +101,9 @@ export function slashCommands(host: () => CommandHost): Extension {
     const lineStart = update.state.doc.lineAt(head).from === head - 1;
     if (!lineStart && !/\s/.test(before)) return;
     if (inCode(update.state, head - 1)) return;
+    // D-149: not in a table's cell (a `/` there is just a slash): the menu would open in the note
+    // at the table's hidden text and fight the cell for the keys. A menu for cells is for later.
+    if (tableAt(update.state, head - 1)) return;
     window.setTimeout(() => startCompletion(update.view), 0);
   });
   return [

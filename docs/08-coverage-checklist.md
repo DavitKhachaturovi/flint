@@ -1114,6 +1114,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 46 | The caret on the line under a table skips only the prefix the table's rows have: under a table outside any container, at the line's start (spaces there never make the text code) | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
 | 47 | An edit that writes no `|` never makes a line a table's row (text typed before a quote's or list item's mark under a table, the mark deleted): the line goes below the blank line | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 02, D-144 |
 | 48 | The blank line that ends a table keeps only the `>` marks of the quotes it stands in (a row that starts with `>` outside a quote gets an empty one) | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
+| 49 | A `/` typed in a table's cell is just a slash: no slash menu in a table (a slash menu for cells is for later) | NOTE-10 · Built (1.2.0) | `editor/slash.ts`, D-149 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 
@@ -1122,7 +1123,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | CodeQL #4: the `##` list name's trailing dots in one pass; also `matchTime` reads at most six words, code spans walked once, list lookups indexed (many lists, long names) | CAP-03, CAP-05, REM-02 · Fixed (1.1.1) | `shorthand/parse.ts`, `shorthand/lists.ts`, `time/parse.ts`, D-143 |
 | 2 | CodeQL #5–#8: paste titles, trailing spaces, fenced blocks and image links read by linear scanners, with four unflagged patterns in the same file | CAP-06, CAP-07 · Fixed (1.1.1) | `shorthand/paste.ts`, `shorthand/paste-scan.ts`, D-143 |
 | 3 | CodeQL #9: the Go function line and the located frame of stack traces in linear time | CAP-06 · Fixed (1.1.1) | `shorthand/trace.ts`, D-143 |
-| 4 | The highlighter's file-and-line and JSON token patterns (unflagged) in linear time | CAP-06 · Moved to 1.2.0 (Davit) | `renderer/highlight/tokens.ts`, D-143 |
+| 4 | The highlighter's file-and-line and JSON token patterns (unflagged) in linear time | CAP-06 · Built (1.2.0) | `renderer/highlight/tokens.ts`, D-143 |
 | 5 | CodeQL #1–#3: package names fully encoded in the release-age check; the release-notes heading matched as text; the workspace test's prefix compared as text | — · Fixed (1.1.1) | `scripts/`, `workspace.test.ts`, D-143 |
 | 6 | Dependabot #1: minimatch (development and build only, not reachable) overridden to 11.0.3 for the vulnerable range; the preview's packed files compared with 1.1.0's; the override removed once the tools move to 11 | — · Fixed (1.1.1) | `package.json`, D-30, D-143 |
 | 7 | Tests: each fix compared with the code it replaced (property tests) and timed on 50,000-character pathological inputs | CAP-03, CAP-06 · Done (1.1.1) | D-143 |
