@@ -1,4 +1,5 @@
 import { traceLineKinds, type BlockKind, type TraceLineKind } from '@flint/core/shorthand';
+import { jsonTokens, traceLocation } from './tokens.js';
 
 /**
  * A small highlighter for what actually gets captured (D-38), in the grayscale scheme (UI-06, D-63):
@@ -6,12 +7,9 @@ import { traceLineKinds, type BlockKind, type TraceLineKind } from '@flint/core/
  * exception lines bright, frames and headers dim, file:line marked; core's `traceLineKinds`, D-65).
  * Other code stays plain monospace; a full highlighter would weigh down the pre-warmed popup
  * (CAP-10).
- * Everything is set as text, never as HTML.
+ * Everything is set as text, never as HTML. The tokens and locations are found in linear time
+ * (`tokens.ts`, D-143): a pasted line can be long.
  */
-
-const JSON_TOKEN =
-  /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)/g;
-const LOCATION = /((?:[A-Za-z]:)?[\\/\w.-]+\.\w+(?::line)?[:\s]\d+(?::\d+)?)|(line \d+)/;
 
 function span(className: string, text: string): HTMLSpanElement {
   const node = document.createElement('span');
@@ -33,10 +31,8 @@ function plain(text: string): Node[] {
 function jsonLine(line: string): Node[] {
   const nodes: Node[] = [];
   let last = 0;
-  for (const match of line.matchAll(JSON_TOKEN)) {
-    const start = match.index;
+  for (const { index: start, text: whole, string, colon, number, literal } of jsonTokens(line)) {
     if (start > last) nodes.push(...plain(line.slice(last, start)));
-    const [whole, string, colon, number, literal] = match;
     if (string !== undefined) {
       nodes.push(span(colon ? 'tok-key' : 'tok-string', string));
       if (colon) nodes.push(...plain(colon));
@@ -52,12 +48,12 @@ function traceLine(line: string, kind: TraceLineKind): Node[] {
   if (kind === 'exception') return [span('tok-error', line)];
   if (kind === 'header') return [span('tok-frame', line)];
   if (kind === 'plain') return [span('', line)];
-  const location = LOCATION.exec(line);
+  const location = traceLocation(line);
   if (!location) return [span('tok-frame', line)];
   return [
     span('tok-frame', line.slice(0, location.index)),
-    span('tok-location', location[0]),
-    span('tok-frame', line.slice(location.index + location[0].length)),
+    span('tok-location', location.text),
+    span('tok-frame', line.slice(location.index + location.text.length)),
   ];
 }
 
