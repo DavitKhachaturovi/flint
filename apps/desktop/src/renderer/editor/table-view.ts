@@ -203,9 +203,22 @@ class TableWidget extends WidgetType {
   /** A click on a cell makes it active, the caret where the click was. */
   private pressed(event: MouseEvent, view: EditorView, wrap: HTMLElement): void {
     if (event.button !== 0) return;
-    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-row]');
+    const pressedOn = event.target as HTMLElement;
     const holder = holders.get(wrap);
-    if (!target || !holder) return;
+    if (!holder || pressedOn.closest('.cm-fl-table-edge')) return;
+    const target = pressedOn.closest<HTMLElement>('[data-row]');
+    if (!target && !pressedOn.closest('.cm-fl-table')) {
+      // D-144 (Proposed): a press beside or under the table, off its cells and handles (the
+      // handles' gutter, the space right of a narrow table), puts the caret on the line after it,
+      // as ↓ from its last row does; nothing is written, so at the note's end the caret stays.
+      // The widget takes its own events, so without this the press would leave no caret at all.
+      event.preventDefault();
+      const live = tableAt(view.state, holder.from);
+      if (live && live.to < view.state.doc.length) leave(view, live, 'below');
+      else if (!view.hasFocus && !holder.editor?.hasFocus) view.focus();
+      return;
+    }
+    if (!target) return;
     const row = Number(target.dataset['row']);
     const column = Number(target.dataset['column']);
     if (holder.key === `${row}:${column}`) return;

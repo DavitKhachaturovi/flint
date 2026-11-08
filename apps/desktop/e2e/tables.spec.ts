@@ -38,6 +38,10 @@ const PICTURE = '![](attachments/pic.png)';
 const PICTURES = `---\nflint: 1\nid: pictures\nmode: note\n---\nIntro.\n\n${INSERTED}\n\n${PICTURE}\n\nabove\n`;
 /** D-144: a table in a quote, the quote's blank line (`>`) and a picture under it. */
 const QUOTED = `---\nflint: 1\nid: quoted\nmode: note\n---\nIntro.\n\n> | a | b |\n> | - | - |\n> | c | d |\n>\n> ${PICTURE}\n\nabove\n`;
+/** D-144: a table whose cells fill the note's width (their words wrap), so it is exactly as wide. */
+const WIDE_ROW = (word: string): string =>
+  `| ${Array.from({ length: 14 }, (_, n) => `${word}${n} lorem ipsum`).join(' | ')} |`;
+const WIDE = `---\nflint: 1\nid: wide\nmode: note\n---\nWide.\n\n${WIDE_ROW('h')}\n|${' --- |'.repeat(14)}\n${WIDE_ROW('c')}\n\nEnd.\n`;
 
 let dataDirectory: string;
 let flint: string;
@@ -78,6 +82,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Tables.md'), NOTE);
   await writeFile(join(flint, 'Pictures.md'), PICTURES);
   await writeFile(join(flint, 'Quoted.md'), QUOTED);
+  await writeFile(join(flint, 'Wide.md'), WIDE);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -380,6 +385,34 @@ test('the edge handles: a "+" chip beside each edge on hover, a ghost of what a 
   expect(await file()).toBe(NOTE);
 });
 
+test('a click under or beside a table, off its cells and handles, puts the caret on the line after it (D-144)', async () => {
+  // The blank line under the table, typed on as any line under a table is (the blank line that
+  // ends the table written before the text).
+  const after = NOTE.replace(`${TABLE}\n\n`, `${TABLE}\n\nQ\n`);
+  // In the handles' gutter (and the line's own space under the box), beside the table, and from a
+  // cell being edited.
+  for (const [dx, dy, from] of [
+    [10, 4, line('After the table.')],
+    [10, 12, line('After the table.')],
+    [10, 20, line('After the table.')],
+    ['beside', 0, line('After the table.')],
+    [10, 12, cell(1, 0)],
+  ] as const) {
+    await from.click();
+    const edges = await table().boundingBox();
+    if (!edges) throw new Error('no table');
+    const x = dx === 'beside' ? edges.x + edges.width + 120 : edges.x + dx;
+    const y = dx === 'beside' ? edges.y + edges.height / 2 : edges.y + edges.height + dy;
+    await main.mouse.click(x, y);
+    await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
+    await expect(editor()).toBeFocused();
+    await main.keyboard.type('Q');
+    await expect.poll(file).toBe(after);
+    await main.keyboard.press('Control+z');
+    await expect.poll(file).toBe(NOTE);
+  }
+});
+
 test('text typed below a table stays out of it, and so does the picture after it (D-144)', async () => {
   await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
   await expect(editor()).toContainText('above');
@@ -519,4 +552,20 @@ test('Backspace under a table, Source mode and a table in a quote keep text out 
   await expect(picture).toHaveCount(shown);
   await main.keyboard.press('Control+z');
   await expect.poll(quoted).toBe(QUOTED);
+});
+
+test('a table as wide as the note has no scrollbar under it: its handles stay inside (D-144)', async () => {
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Wide' }).first().click();
+  await expect(cell(0, 13)).toHaveText('h13 lorem ipsum');
+  const wrap = main.locator('.note-editor .cm-fl-table-wrap');
+  const sizes = (): Promise<string> =>
+    wrap.evaluate(
+      (element) =>
+        `${element.scrollWidth - element.clientWidth} ${element.scrollHeight - element.clientHeight}`,
+    );
+  // The cells wrap their words, so the table is as wide as the note, no wider.
+  expect(await wrap.evaluate((element) => element.clientWidth)).toBeLessThan(14 * 100);
+  await expect.poll(sizes).toBe('0 0');
+  await table().hover();
+  await expect.poll(sizes).toBe('0 0');
 });

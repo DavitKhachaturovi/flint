@@ -334,11 +334,20 @@
     box-shadow var(--fl-dur-fast);
 }
 
-/* A slightly larger target than the chip, still outside the cells. */
+/* A slightly larger target than the chip, still outside the cells and inside the box: past the
+   box's outer edge it would make the wrap scroll (a scrollbar under a table as wide as the note). */
 .cm-fl-table-edge::before {
   content: '';
   position: absolute;
   inset: -3px;
+}
+
+.cm-fl-table-edge-right::before {
+  right: -1px;
+}
+
+.cm-fl-table-edge-bottom::before {
+  bottom: -1px;
 }
 
 .cm-fl-table-edge svg {
