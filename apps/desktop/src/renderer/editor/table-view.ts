@@ -1,5 +1,5 @@
 import { history, redo, undo } from '@codemirror/commands';
-import { ensureSyntaxTree } from '@codemirror/language';
+import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
 import {
   Annotation,
   ChangeSet,
@@ -25,6 +25,7 @@ import {
   deleteColumn,
   deleteRow,
   deleteTable,
+  hasRowPipe,
   setCell,
   tableAt,
   tablesIn,
@@ -92,11 +93,32 @@ function cellOffset(state: EditorState, cell: TableCell, at: number): number {
 /** Q9: Edit markdown shows this table raw (its position) until the caret leaves it. */
 export const showTableMarkdown = StateEffect.define<number>();
 
+/**
+ * D-144 (Proposed): typing in the note that puts its caret into a table it wasn't in (a row typed
+ * under a table, `|` first) shows that table raw, as Edit markdown does, until the caret leaves:
+ * the caret stays where the keys go and no cell takes the focus mid-word. Not a table Flint just
+ * made (Insert ▸ Table, drawn at once), nor the table's own edits (the caret was in it already).
+ */
+function typedIntoTable(tr: Transaction): number | null {
+  if (!tr.docChanged || !(tr.isUserEvent('input') || tr.isUserEvent('delete'))) return null;
+  if (tr.isUserEvent('input.format') || tr.isUserEvent('input.table')) return null;
+  if (tr.isUserEvent('delete.table')) return null;
+  if (cellAt(tr.startState, tr.startState.selection.main.head)) return null;
+  const head = tr.state.selection.main.head;
+  // From its line's start: a caret at the table's very end is in it too.
+  const lineFrom = tr.state.doc.lineAt(head).from;
+  const table = tableAt(tr.state, lineFrom);
+  if (!table || head < table.from || head > table.to) return null;
+  const before = tr.changes.invert(tr.startState.doc).mapPos(table.from);
+  return tableAt(tr.startState, before)?.from === before ? lineFrom : null;
+}
+
 const rawTable = StateField.define<number | null>({
   create: () => null,
   update(value, tr) {
     let raw = value === null ? null : tr.changes.mapPos(value);
     for (const effect of tr.effects) if (effect.is(showTableMarkdown)) raw = effect.value;
+    raw ??= typedIntoTable(tr);
     if (raw === null) return null;
     const table = tableAt(tr.state, raw);
     const head = tr.state.selection.main.head;
@@ -865,6 +887,61 @@ const wholeTables = EditorState.transactionFilter.of((tr) => {
   ];
 });
 
+/** The table whose last line is line `number` (parsed that far), or null. */
+function tableEndingAt(state: EditorState, number: number): ParsedTable | null {
+  if (number < 1 || number > state.doc.lines) return null;
+  const line = state.doc.line(number);
+  if (line.text.trim() === '') return null;
+  const tree = ensureSyntaxTree(state, Math.min(state.doc.length, line.to + 1), 50);
+  const table = tableAt(state, line.from, tree ?? syntaxTree(state));
+  return table && table.to === line.to ? table : null;
+}
+
+/**
+ * D-144 (Proposed): text written right below a table stays a paragraph. GFM continues a table on
+ * every following line until a blank line ("lazy" rows), so a word typed on the blank line under a
+ * table, a Backspace that removes that blank line, or a line moved up to it would pull that line
+ * and the ones after it (a picture, a paragraph) into the table. Where an edit in the note (not an
+ * undo) would make a line without a pipe a new row of a table, Flint writes the blank line that
+ * ends the table before it, in the same change (one undo step); a Backspace that would only remove
+ * that blank line moves the caret up instead. A line written with a pipe is a row, as GFM says.
+ * The file stays plain GFM: other apps read it the way Flint shows it.
+ */
+const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr;
+  if (tr.isUserEvent('undo') || tr.isUserEvent('redo')) return tr;
+  const start = tr.startState;
+  // Cheap first: only edits on the line right below a table's last line.
+  const above: ParsedTable[] = [];
+  tr.changes.iterChangedRanges((fromA) => {
+    const table = tableEndingAt(start, start.doc.lineAt(fromA).number - 1);
+    if (table && !above.some((each) => each.from === table.from)) above.push(table);
+  });
+  if (above.length === 0) return tr;
+  const next = tr.state;
+  // Parsed far enough to see the rows the edit would add.
+  const last = Math.max(...above.map((table) => tr.changes.mapPos(table.to)));
+  const tree =
+    ensureSyntaxTree(next, Math.min(next.doc.length, last + 4000), 50) ?? syntaxTree(next);
+  const breaks: number[] = [];
+  for (const old of above) {
+    const from = tr.changes.mapPos(old.from, 1);
+    const end = tr.changes.mapPos(old.to, -1);
+    const table = tableAt(next, from, tree);
+    if (!table || table.from !== from) continue;
+    const joined = table.rows.find(
+      (row) => row.from > end && !hasRowPipe(next.doc.sliceString(row.from, row.to)),
+    );
+    if (joined) breaks.push(joined.from);
+  }
+  if (breaks.length === 0) return tr;
+  const extra = next.changes(breaks.map((at) => ({ from: at, insert: '\n' })));
+  const selection = next.selection.map(extra);
+  if (tr.changes.compose(extra).apply(start.doc).eq(start.doc))
+    return { selection, scrollIntoView: true, userEvent: 'select' };
+  return [tr, { changes: extra, selection, sequential: true }];
+});
+
 /** Q9: ↓ from the line above a table and ↑ from the line below go into its nearest cell. */
 function intoTable(direction: 1 | -1): (view: EditorView) => boolean {
   return (view) => {
@@ -1046,6 +1123,7 @@ export function tables(): Extension {
     rawTable,
     tableDecorations,
     wholeTables,
+    keepTextOutOfTables,
     trackCaret,
     // Before the editor's own ↑ / ↓ (which would skip over the table).
     Prec.high(

@@ -108,16 +108,20 @@ export function parseTable(doc: Text, from: number, to: number): ParsedTable | n
   };
 }
 
-/** The table around a position (or null), as the editor's parser sees it. */
-export function tableAt(state: EditorState, at: number): ParsedTable | null {
-  for (
-    let node: SyntaxNode | null = syntaxTree(state).resolveInner(at, 1);
-    node;
-    node = node.parent
-  )
+/** The table around a position (or null), as the editor's parser sees it (or `tree`, a fuller
+ * parse of the same state). */
+export function tableAt(
+  state: EditorState,
+  at: number,
+  tree = syntaxTree(state),
+): ParsedTable | null {
+  for (let node: SyntaxNode | null = tree.resolveInner(at, 1); node; node = node.parent)
     if (node.name === 'Table') return parseTable(state.doc, node.from, node.to);
   return null;
 }
+
+/** A row's line written with a pipe that isn't escaped (`\|`): a line meant as a table row. */
+export const hasRowPipe = (line: string): boolean => /(?:^|[^\\])\|/.test(line);
 
 /** Every table in the document (or in a range of it). */
 export function tablesIn(state: EditorState, from = 0, to = state.doc.length): ParsedTable[] {

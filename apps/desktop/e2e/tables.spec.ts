@@ -27,6 +27,15 @@ const electronPath = execFileSync(process.execPath, ['-p', "require('electron')"
 const CLOCK_OFFSET = new Date(2026, 2, 10, 10, 0).getTime() - Date.now();
 const TABLE = '| Name    | Age |\n| ------- | --: |\n| Alex    | 30  |';
 const NOTE = `---\nflint: 1\nid: tables\nmode: note\n---\nBefore the table.\n\n${TABLE}\n\nAfter the table.\n`;
+/** A 1×1 PNG. */
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+/** D-144: Davit's note: Insert ▸ Table's table with a word in a cell, a picture, a paragraph. */
+const INSERTED = '| Column | Column | Column |\n| --- | --- | --- |\n| test |  |  |';
+const PICTURE = '![](attachments/pic.png)';
+const PICTURES = `---\nflint: 1\nid: pictures\nmode: note\n---\nIntro.\n\n${INSERTED}\n\n${PICTURE}\n\nabove\n`;
 
 let dataDirectory: string;
 let flint: string;
@@ -45,6 +54,9 @@ test.beforeAll(async () => {
   flint = join(dataDirectory, 'Flint');
   await mkdir(flint, { recursive: true });
   await writeFile(join(flint, 'Tables.md'), NOTE);
+  await writeFile(join(flint, 'Pictures.md'), PICTURES);
+  await mkdir(join(flint, 'attachments'), { recursive: true });
+  await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && key !== 'ELECTRON_RUN_AS_NODE') env[key] = value;
@@ -135,7 +147,9 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await main.keyboard.press('Escape');
   await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
   await main.keyboard.type('x');
-  await expect.poll(file).toContain(`${TABLE}\nx\nAfter the table.`);
+  // D-144: a blank line keeps it out of the table (GFM would make it a row).
+  await expect.poll(file).toContain(`${TABLE}\n\nx\nAfter the table.`);
+  await expect(table().locator('tr')).toHaveCount(2);
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
 });
@@ -231,4 +245,80 @@ test('dragging the edges adds and removes columns and rows; text asks first, inl
   await main.keyboard.press('Escape');
   await main.mouse.up();
   expect(await file()).toBe(NOTE);
+});
+
+test('text typed below a table stays out of it, and so does the picture after it (D-144)', async () => {
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Pictures' }).first().click();
+  await expect(editor()).toContainText('above');
+  const pictures = (): Promise<string> => readFile(join(flint, 'Pictures.md'), 'utf8');
+  const picture = main.locator('.note-editor .cm-fl-image img');
+  const under = main.locator('.note-editor .cm-fl-table-wrap + .cm-line');
+  const settled = async (): Promise<void> => {
+    await expect(table()).toHaveCount(1);
+    await expect(table().locator('tr')).toHaveCount(2);
+    await expect(cell(1, 0)).toHaveText('test');
+    await expect(picture).toHaveCount(1);
+    await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
+    await expect(editor()).toBeFocused();
+  };
+  const undoTo = async (text: string): Promise<void> => {
+    // One Ctrl+Z at a time, each once the file has it (no undo past the text wanted).
+    for (let tries = 0; tries < 6; tries++) {
+      const now = await pictures();
+      if (now === text) break;
+      await main.keyboard.press('Control+z');
+      await expect.poll(pictures).not.toBe(now);
+    }
+    await expect.poll(pictures).toBe(text);
+  };
+  await expect(picture).toHaveCount(1);
+  // Davit's report: a word typed on the line right under the table. It stays a paragraph (a blank
+  // line goes between), the picture stays drawn, the table keeps its rows, the keys stay here.
+  await under.click();
+  await main.keyboard.type('more');
+  await expect.poll(pictures).toBe(PICTURES.replace(`${INSERTED}\n\n`, `${INSERTED}\n\nmore\n`));
+  await settled();
+  await undoTo(PICTURES);
+  // The line above "above".
+  const above = editor().locator('.cm-line', { hasText: /^above$/ });
+  await above.locator('xpath=preceding-sibling::*[1]').click();
+  await main.keyboard.type('x');
+  await expect.poll(pictures).toBe(PICTURES.replace('\n\nabove', '\nx\nabove'));
+  await settled();
+  await undoTo(PICTURES);
+  // No blank line between the picture and "above": Backspace at the start of "above".
+  await above.click();
+  await main.keyboard.press('Home');
+  await main.keyboard.press('Backspace');
+  const joined = PICTURES.replace('\n\nabove', '\nabove');
+  await expect.poll(pictures).toBe(joined);
+  await under.click();
+  await main.keyboard.type('more');
+  await expect.poll(pictures).toBe(joined.replace(`${INSERTED}\n\n`, `${INSERTED}\n\nmore\n`));
+  await settled();
+  await undoTo(joined);
+  // Backspace on the picture's line would take the blank line under the table away: the
+  // picture would become a row. The caret moves up instead; nothing changes.
+  await under.click();
+  await main.keyboard.press('ArrowDown');
+  await main.keyboard.press('Home');
+  await main.keyboard.press('Backspace');
+  await main.keyboard.type('y');
+  await expect.poll(pictures).toBe(joined.replace(`${INSERTED}\n\n`, `${INSERTED}\n\ny\n`));
+  await settled();
+  await undoTo(joined);
+  // A row written in markdown (`|` first) is a row, as GFM says: the table shows raw while the
+  // caret is in it, no cell takes the keys mid-word, and the picture stays out of it.
+  await under.click();
+  await main.keyboard.type('| new |');
+  await expect(table()).toHaveCount(0);
+  await expect(editor()).toContainText('| new |');
+  await expect(editor()).toBeFocused();
+  await expect.poll(pictures).toBe(joined.replace(`${INSERTED}\n\n`, `${INSERTED}\n| new |\n\n`));
+  await above.click();
+  await expect(table().locator('tr')).toHaveCount(3);
+  await expect(cell(2, 0)).toHaveText('new');
+  await expect(picture).toHaveCount(1);
+  await undoTo(joined);
+  await undoTo(PICTURES);
 });

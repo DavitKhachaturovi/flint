@@ -15,10 +15,13 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { noteState, problems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
+import { tablesIn } from './table.js';
+import { tables } from './table-view.js';
 
 /**
  * Randomised editing (D-141 Q13): typing, deleting, Enter, Backspace, Tab / Shift+Tab, Alt+↑/↓,
- * undo and redo on markdown made of the shapes notes use. After every step the live preview stays
+ * undo and redo on markdown made of the shapes notes use, tables and pictures together among them
+ * (D-144). After every step the live preview stays
  * drawable with and without focus; undoing everything gives back the exact text. Runs from
  * `FLINT_EDITOR_FUZZ_RUNS` (multi-step sequences, so fewer than core's `FLINT_FUZZ_RUNS`);
  * `npm run fuzz` runs it long, fast-check prints the seed of a failure.
@@ -26,6 +29,8 @@ import { buildPreview } from './preview.js';
 
 const RUNS = Number(process.env['FLINT_EDITOR_FUZZ_RUNS'] ?? 300);
 
+const INSERTED = '| Column | Column | Column |\n| --- | --- | --- |\n|  |  |  |';
+const PICTURE = '![](attachments/pic.png)';
 const LINES = [
   '',
   'Plain text with **bold**, *italic*, `code`, ==mark== and ~~gone~~.',
@@ -57,7 +62,16 @@ const LINES = [
   'attachments/image-02.png "title")',
   '**open',
   'close**',
+  // D-144: tables (Insert ▸ Table's shape) and pictures together, with and without blank lines.
+  `${INSERTED}\n${PICTURE}`,
+  `${INSERTED}\n\n${PICTURE}\nabove`,
+  `${INSERTED}\n\n${PICTURE}\n\nabove`,
+  `${PICTURE}\n${INSERTED}`,
+  `${INSERTED}\n\nabove`,
+  '| test |  |  |',
 ];
+/** Typed text that can't make or break a table by itself (no pipe, fence, quote or list mark). */
+const PLAIN = /^[aბ \n]+$/;
 const CHARS = [
   'a',
   'ბ',
@@ -117,6 +131,9 @@ const step: fc.Arbitrary<Step> = fc.oneof(
   }),
 );
 
+const sources = (state: EditorState): string[] =>
+  tablesIn(state).map((table) => state.doc.sliceString(table.from, table.to));
+
 function run(command: StateCommand, state: EditorState): EditorState {
   let next = state;
   command({ state, dispatch: (tr) => (next = tr.state) });
@@ -151,9 +168,20 @@ describe('randomised editing in the note editor (D-141 Q13)', () => {
         fc.array(step, { minLength: 1, maxLength: 25 }),
         (lines, steps) => {
           const text = lines.join('\n');
-          let state = noteState(text, 0, 0, [history()]);
+          let state = noteState(text, 0, 0, [history(), tables()]);
           for (const each of steps) {
+            const before = state;
             state = apply(state, each);
+            // D-144: plain text typed outside every table never changes a table's bytes (it may
+            // end a code block that held one, which then is a table of its own).
+            if (each.kind === 'type' && PLAIN.test(each.text)) {
+              const at = Math.round(each.at * before.doc.length);
+              const there = tablesIn(before);
+              if (there.every((table) => at < table.from || at > table.to)) {
+                const after = sources(state);
+                for (const source of sources(before)) expect(after).toContain(source);
+              }
+            }
             for (const focused of [true, false]) {
               const found = problems(state, buildPreview({ state, focused, patterns: [] }));
               expect(found).toEqual([]);

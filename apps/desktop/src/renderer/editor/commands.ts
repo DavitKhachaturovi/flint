@@ -189,8 +189,17 @@ function setLineKind(view: EditorView, kind: LineKind): void {
   view.focus();
 }
 
-/** A block on lines of its own at the cursor; `caret` is where the cursor goes inside it. */
-export function insertBlock(view: EditorView, raw: string, caret?: number): void {
+/**
+ * A block on lines of its own at the cursor; `caret` is where the cursor goes inside it.
+ * `blankAfter`: text after it starts after a blank line (a table: GFM would make the next line one
+ * of its rows otherwise; D-144, Proposed).
+ */
+export function insertBlock(
+  view: EditorView,
+  raw: string,
+  caret?: number,
+  blankAfter = false,
+): void {
   // D-91: the editor keeps `\n` only; a `\r` would put the caret past the end (and throw).
   const block = raw.replace(/\r\n?/g, '\n');
   const at = Math.min(caret ?? block.length, block.length);
@@ -199,7 +208,12 @@ export function insertBlock(view: EditorView, raw: string, caret?: number): void
   const before = doc.sliceString(Math.max(0, from - 2), from);
   const after = doc.sliceString(to, to + 1);
   const lead = from === 0 || before === '\n\n' ? '' : before.endsWith('\n') ? '\n' : '\n\n';
-  const trail = after === '' || after === '\n' ? '' : '\n';
+  let trail = after === '' || after === '\n' ? '' : '\n';
+  if (blankAfter && after !== '') {
+    // The line after the block, once it's in: blank (or none), else a blank line goes between.
+    const blank = trail === '' && doc.lineAt(to + 1).text.trim() === '';
+    if (!blank) trail += '\n';
+  }
   view.dispatch({
     changes: { from, to, insert: lead + block + trail },
     selection: { anchor: from + lead.length + at },
@@ -363,7 +377,7 @@ export const EDITOR_COMMANDS: readonly EditorCommand[] = [
     word: 'table',
     section: 'insert',
     glyph: TABLE_ICON,
-    run: (view) => insertBlock(view, TABLE, TABLE.length - 7),
+    run: (view) => insertBlock(view, TABLE, TABLE.length - 7, true),
   },
   {
     id: 'codeblock',

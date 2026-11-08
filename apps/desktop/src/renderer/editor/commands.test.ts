@@ -89,6 +89,15 @@ describe('the note editor commands (NOTE-02, NOTE-03, D-82)', () => {
     );
   });
 
+  it('leaves a blank line after an inserted table, so the text after it is no row of it (D-144)', () => {
+    const table = '| Column | Column | Column |\n| --- | --- | --- |\n|  |  |  |';
+    expect(run('table', 'above', 0)).toBe(`${table}\n\nabove`);
+    expect(run('table', 'a\n\nb', 2)).toBe(`a\n\n${table}\n\nb`);
+    expect(run('table', 'a\n\n\nb', 2)).toBe(`a\n\n${table}\n\nb`);
+    expect(run('table', 'a\n', 2)).toBe(`a\n\n${table}`);
+    expect(run('table', 'ab', 1)).toBe(`a\n\n${table}\n\nb`);
+  });
+
   it('knows code, where the slash menu never opens', () => {
     const { view } = editor('text `a/b` and\n```\nx / y\n```\n', 0);
     expect(inCode(view.state, 7)).toBe(true);
