@@ -146,6 +146,35 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
     expect(typed.doc.toString()).toBe(`${TABLE}\n\na- item`);
   });
 
+  it('never makes a line with a pipe a row by an edit that writes no pipe (the editing fuzz)', () => {
+    // A quote or list item right under a table, with pipes in it: text typed before its mark, or
+    // the mark deleted, would make it a row of the table; it goes below a blank line instead.
+    for (const [under, at, edited] of [
+      ['> | c | d |', { from: 0, insert: 'a' }, 'a> | c | d |'],
+      ['- x | y', { from: 0, insert: 'a' }, 'a- x | y'],
+      ['- x | y', { from: 0, to: 2 }, 'x | y'],
+    ] as const) {
+      const doc = `${TABLE}\n${under}\n\nEnd`;
+      const offset = TABLE.length + 1;
+      const change = {
+        ...at,
+        from: at.from + offset,
+        ...('to' in at ? { to: at.to + offset } : {}),
+      };
+      const s = edit(state(doc), change, 'insert' in at ? 'input.type' : 'delete.backward');
+      expect(s.doc.toString()).toBe(`${TABLE}\n\n${edited}\n\nEnd`);
+      expect(sources(s)).toEqual([TABLE]);
+    }
+    // A pipe written there is a row, as GFM says.
+    const row = edit(
+      state(`${TABLE}\n> x`),
+      { from: TABLE.length + 1, to: TABLE.length + 3, insert: '| ' },
+      'input.type',
+    );
+    expect(row.doc.toString()).toBe(`${TABLE}\n| x`);
+    expect(sources(row)).toEqual([`${TABLE}\n| x`]);
+  });
+
   it('is one undo step, and leaves undo, redo and the table’s own edits alone', () => {
     const doc = `${TABLE}\n\n${PICTURE}`;
     const blank = TABLE.length + 1;

@@ -1511,6 +1511,10 @@ export const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
   const tree =
     ensureSyntaxTree(next, Math.min(next.doc.length, last + 4000), 50) ?? syntaxTree(next);
   const breaks: { from: number; insert: string }[] = [];
+  let wrotePipe = false;
+  tr.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
+    if (inserted.toString().includes('|')) wrotePipe = true;
+  });
   for (const { table: old, inList } of near.values()) {
     const from = tr.changes.mapPos(old.from, 1);
     const end = tr.changes.mapPos(old.to, -1);
@@ -1567,8 +1571,12 @@ export const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
       }
       continue;
     }
+    // A row is written with a pipe: a line that already had one (a quote's or list item's, under
+    // the table) and turns into a row by an edit that wrote none (text typed before its mark, the
+    // mark deleted) is kept out too (Proposed).
     const joined = table.rows.find(
-      (row) => row.from > end && !hasRowPipe(next.doc.sliceString(row.from, row.to)),
+      (row) =>
+        row.from > end && (!wrotePipe || !hasRowPipe(next.doc.sliceString(row.from, row.to))),
     );
     if (!joined) continue;
     // In a list item, a line typed at the margin under its table keeps to the item.

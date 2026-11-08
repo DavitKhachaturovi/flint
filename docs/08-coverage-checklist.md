@@ -1112,6 +1112,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 44 | A table's Undo toast goes with its note's editor (another note opened, mini mode's tab changed), as the drag's question does | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
 | 45 | A click under a table, ↓ and Esc never write to a read-only note (a newer format, or locked while another window edits it, D-109): the caret only moves | NOTE-10 · Fixed (1.2.0, second preview) | D-109, D-144 |
 | 46 | The caret on the line under a table skips only the prefix the table's rows have: under a table outside any container, at the line's start (spaces there never make the text code) | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
+| 47 | An edit that writes no `|` never makes a line a table's row (text typed before a quote's or list item's mark under a table, the mark deleted): the line goes below the blank line | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 02, D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 
