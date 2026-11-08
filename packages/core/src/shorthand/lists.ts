@@ -86,40 +86,77 @@ function byRecentThenSidebar(lists: readonly ListInfo[]): (a: ListInfo, b: ListI
  * 3. otherwise a new list named exactly as typed, if Windows accepts the name.
  */
 export function resolveList(name: string, lists: readonly ListInfo[]): ListResolution {
-  const normalized = normalizeListName(name);
-  const same = lists.filter((list) => normalizeListName(list.name) === normalized);
-  const sameTasks = same.filter((list) => list.mode === 'tasks');
-  if (sameTasks.length > 0) {
-    const exact = sameTasks.find((list) => list.name === name) ?? sameTasks[0];
-    if (exact) return { kind: 'existing', list: exact };
-  }
-  const note = same[0];
-  if (note) return { kind: 'note', list: note };
+  return listResolver(lists)(name);
+}
 
-  const taskLists = lists.filter((list) => list.mode === 'tasks');
-  const order = byRecentThenSidebar(lists);
-  if (normalized.length >= 2) {
-    const prefixed = taskLists
-      .filter((list) => normalizeListName(list.name).startsWith(normalized))
-      .sort(order);
-    const first = prefixed[0];
-    if (first) return { kind: 'close-match', list: first, name };
-  }
-  const typos = taskLists
-    .map((list) => {
-      const candidate = normalizeListName(list.name);
-      return {
-        list,
-        distance: editDistance(normalized, candidate),
-        limit: candidate.length <= 4 ? 1 : 2,
-      };
-    })
-    .filter(({ distance, limit }) => distance <= limit)
-    .sort((a, b) => a.distance - b.distance || order(a.list, b.list));
-  const typo = typos[0];
-  if (typo) return { kind: 'close-match', list: typo.list, name };
+/**
+ * `resolveList` for many names against the same lists: the lists' normalized names and sidebar
+ * positions are worked out once, not once per name. A pasted line can hold thousands of `##`
+ * tokens and a long name after `##` (CodeQL js/polynomial-redos), and it is parsed on every
+ * keystroke, so the cost of one name must not grow with the length of every list's name.
+ */
+export function listResolver(lists: readonly ListInfo[]): (name: string) => ListResolution {
+  // Every list by its normalized name (in sidebar order); the task lists also by the first
+  // character and by the length of that name, so a name is only compared with lists it can match.
+  const byName = new Map<string, ListInfo[]>();
+  const byFirst = new Map<string, { list: ListInfo; normalized: string }[]>();
+  const byLength = new Map<number, { list: ListInfo; normalized: string }[]>();
+  const add = <K, V>(map: Map<K, V[]>, key: K, value: V): void => {
+    const values = map.get(key);
+    if (values) values.push(value);
+    else map.set(key, [value]);
+  };
+  const position = new Map<ListInfo, number>();
+  lists.forEach((list, index) => {
+    const normalized = normalizeListName(list.name);
+    add(byName, normalized, list);
+    if (list.mode === 'tasks') {
+      add(byFirst, normalized.charAt(0), { list, normalized });
+      add(byLength, normalized.length, { list, normalized });
+    }
+    if (!position.has(list)) position.set(list, index);
+  });
+  // byRecentThenSidebar, with the sidebar position looked up instead of searched for.
+  const order = (a: ListInfo, b: ListInfo): number =>
+    (a.recentRank ?? Infinity) - (b.recentRank ?? Infinity) ||
+    (position.get(a) ?? -1) - (position.get(b) ?? -1);
 
-  return isValidListName(name) ? { kind: 'new', name } : { kind: 'invalid-name', name };
+  return (name) => {
+    const normalized = normalizeListName(name);
+    const same = byName.get(normalized) ?? [];
+    const sameTasks = same.filter((list) => list.mode === 'tasks');
+    if (sameTasks.length > 0) {
+      const exact = sameTasks.find((list) => list.name === name) ?? sameTasks[0];
+      if (exact) return { kind: 'existing', list: exact };
+    }
+    const note = same[0];
+    if (note) return { kind: 'note', list: note };
+
+    if (normalized.length >= 2) {
+      const prefixed = (byFirst.get(normalized.charAt(0)) ?? [])
+        .filter((entry) => entry.normalized.startsWith(normalized))
+        .map(({ list }) => list)
+        .sort(order);
+      const first = prefixed[0];
+      if (first) return { kind: 'close-match', list: first, name };
+    }
+    // The distance is at least the difference in length (and the limit at most 2), so only names
+    // up to 2 characters longer or shorter are compared: the table costs both lengths multiplied.
+    const typos: { list: ListInfo; distance: number }[] = [];
+    for (let length = normalized.length - 2; length <= normalized.length + 2; length += 1) {
+      for (const { list, normalized: candidate } of byLength.get(length) ?? []) {
+        const limit = candidate.length <= 4 ? 1 : 2;
+        if (Math.abs(normalized.length - candidate.length) > limit) continue;
+        const distance = editDistance(normalized, candidate);
+        if (distance <= limit) typos.push({ list, distance });
+      }
+    }
+    typos.sort((a, b) => a.distance - b.distance || order(a.list, b.list));
+    const typo = typos[0];
+    if (typo) return { kind: 'close-match', list: typo.list, name };
+
+    return isValidListName(name) ? { kind: 'new', name } : { kind: 'invalid-name', name };
+  };
 }
 
 /**

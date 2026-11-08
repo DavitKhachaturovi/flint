@@ -1,8 +1,8 @@
-import { codeSpanRanges, rangeContaining } from '../format/code-spans.js';
+import { codeSpanRanges } from '../format/code-spans.js';
 import { readPriority, type Priority } from '../format/fields.js';
 import type { LocalDateTime } from '../time/local-datetime.js';
 import { describeTime, matchTime } from '../time/parse.js';
-import { normalizeListName, resolveList, type ListInfo, type ListResolution } from './lists.js';
+import { listResolver, normalizeListName, type ListInfo, type ListResolution } from './lists.js';
 
 /**
  * Capture shorthand (CAP-03): `!h` priority, `##list` list (D-25), `@<time>` reminder (REM-02).
@@ -59,25 +59,35 @@ const LIST_NAME = /^[\p{L}\p{N}_.-]+/u;
 /** The most words a list name after `##` is looked for in (D-87). */
 const MAX_NAME_WORDS = 8;
 
+/** The normalized names of the lists (and notes) whose names have several words (D-87). */
+function multiWordNames(lists: readonly ListInfo[]): ReadonlySet<string> {
+  return new Set(
+    lists.filter((list) => /\s/.test(list.name.trim())).map((list) => normalizeListName(list.name)),
+  );
+}
+
 /**
  * D-87: the longest run of two or more words after `##` that spells an existing list's (or note's)
  * name exactly, ignoring case, spaces and hyphens (D-25), ending at a word boundary; its length in
  * `text`, or 0. `##new list 2` finds "new list 2" even when "new list 1" exists too.
  */
-function multiWordName(text: string, lists: readonly ListInfo[]): number {
-  const names = new Set(
-    lists.filter((list) => /\s/.test(list.name.trim())).map((list) => normalizeListName(list.name)),
-  );
+function multiWordName(text: string, names: ReadonlySet<string>): number {
   if (names.size === 0) return 0;
   // The first words, separated by spaces or tabs (not line breaks).
   const words = /^\S+(?:[ \t]+\S+){0,7}/.exec(text)?.[0] ?? '';
-  const ends: number[] = [];
-  for (const match of words.matchAll(/\S+/g)) ends.push(match.index + match[0].length);
-  for (let count = Math.min(ends.length, MAX_NAME_WORDS); count >= 2; count--) {
-    const end = ends[count - 1] ?? 0;
-    if (names.has(normalizeListName(text.slice(0, end)))) return end;
+  // Word by word, each normalized once: the same as normalizing each run of words, because the
+  // spaces and tabs between them are removed, never compose with a neighbour (NFC) and end a word
+  // for lowercasing (the final sigma). A pasted line can hold thousands of `##` (D-143).
+  let joined = '';
+  let count = 0;
+  let longest = 0;
+  for (const match of words.matchAll(/\S+/g)) {
+    joined += normalizeListName(match[0]);
+    count += 1;
+    if (count > MAX_NAME_WORDS) break;
+    if (count >= 2 && names.has(joined)) longest = match.index + match[0].length;
   }
-  return 0;
+  return longest;
 }
 
 interface Found {
@@ -98,15 +108,47 @@ function isSpace(char: string | undefined): boolean {
   return char !== undefined && /\s/.test(char);
 }
 
-/** Recognises shorthand tokens at word boundaries, outside inline code (CAP-03). */
+/**
+ * `name` without its trailing dots (`##infra.` ends a sentence), in one pass from the end. Not
+ * `/\.+$/`: that regex restarts at every dot, so a long run of dots not at the end of the name
+ * (`##.....x`) took quadratic time on every keystroke (CodeQL js/polynomial-redos).
+ */
+function withoutTrailingDots(name: string): string {
+  let end = name.length;
+  while (end > 0 && name[end - 1] === '.') end--;
+  return name.slice(0, end);
+}
+
+/**
+ * Recognises shorthand tokens at word boundaries, outside inline code (CAP-03). Linear in the
+ * line's length: it runs on every keystroke and a pasted line can be long (docs/05 §4).
+ */
 function scan(line: string, context: ShorthandContext): { found: Found[]; escapes: number[] } {
   const code = codeSpanRanges(line);
   const found: Found[] = [];
   const escapes: number[] = [];
+  // Worked out once per line, not once per `##` token: a pasted line can repeat a token many times.
+  const longNames = multiWordNames(context.lists);
+  // The lists' normalized names are worked out on the first `##`, then each name once.
+  let resolver: ((name: string) => ListResolution) | undefined;
+  const resolved = new Map<string, ListResolution>();
+  const resolve = (name: string): ListResolution => {
+    let list = resolved.get(name);
+    if (!list) {
+      resolver ??= listResolver(context.lists);
+      list = resolver(name);
+      resolved.set(name, list);
+    }
+    return list;
+  };
+  // The code spans are sorted and don't overlap, and `index` only grows: `next` is the first span
+  // that doesn't end at or before `index`, so each span is passed once.
+  let next = 0;
   let index = 0;
   while (index < line.length) {
-    const span = rangeContaining(index, code);
-    if (span) {
+    let span = code[next];
+    while (span && span[1] <= index) span = code[++next];
+    if (span && span[0] <= index) {
       index = span[1];
       continue;
     }
@@ -138,19 +180,19 @@ function scan(line: string, context: ShorthandContext): { found: Found[]; escape
       }
     } else if (char === '#' && line.startsWith('##', index)) {
       // D-87: an existing list's name of several words first, then the one-word rules (D-25).
-      const long = multiWordName(line.slice(index + 2), context.lists);
+      const long = multiWordName(line.slice(index + 2), longNames);
       if (long > 0) {
         const end = index + 2 + long;
         const name = line.slice(index + 2, end);
-        found.push({ kind: 'list', start: index, end, list: resolveList(name, context.lists) });
+        found.push({ kind: 'list', start: index, end, list: resolve(name) });
         index = end;
         continue;
       }
       const match = LIST_NAME.exec(line.slice(index + 2));
-      const name = (match?.[0] ?? '').replace(/\.+$/, '');
+      const name = withoutTrailingDots(match?.[0] ?? '');
       if (name !== '') {
         const end = index + 2 + name.length;
-        found.push({ kind: 'list', start: index, end, list: resolveList(name, context.lists) });
+        found.push({ kind: 'list', start: index, end, list: resolve(name) });
         index = end;
         continue;
       }
