@@ -48,6 +48,8 @@ const WIDE = `---\nflint: 1\nid: wide\nmode: note\n---\nWide.\n\n${WIDE_ROW('h')
 /** D-144: a table without edge pipes. */
 const PLAIN_TABLE = 'Name | Age\n--- | ---\nAlex | 30';
 const PLAIN = `---\nflint: 1\nid: plain\nmode: note\n---\nPlain.\n\n${PLAIN_TABLE}\n\nEnd.\n`;
+/** D-144: a note that ends with a table (and its line break). */
+const ENDING = `---\nflint: 1\nid: ending\nmode: note\n---\nIntro.\n\n${INSERTED}\n`;
 /** D-144: two tables, a paragraph between them (each table's height must count exactly). */
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
 
@@ -94,6 +96,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
   await writeFile(join(flint, 'Twice.md'), TWICE);
   await writeFile(join(flint, 'Plain.md'), PLAIN);
+  await writeFile(join(flint, 'Ending.md'), ENDING);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -925,4 +928,20 @@ test('a table without edge pipes: Enter and Tab add a row that keeps its cells, 
   await expect(cell(2, 0)).toHaveText('r');
   await expect(cell(2, 1)).toHaveText('s');
   await undoAll();
+});
+
+test('Backspace under a table that ends the note leaves the text as it is, the caret in its last cell (D-144)', async () => {
+  const ending = (): Promise<string> => readFile(join(flint, 'Ending.md'), 'utf8');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Ending' }).first().click();
+  await expect(cell(1, 0)).toHaveText('test');
+  for (const key of ['Backspace', 'Control+Backspace']) {
+    await main.locator('.note-editor .cm-fl-table-wrap + .cm-line').click();
+    await main.keyboard.press(key);
+    await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
+    expect(await ending()).toBe(ENDING);
+    await main.keyboard.type('zq');
+    await expect.poll(ending).toBe(ENDING.replace('| test |  |  |', '| test |  | zq |'));
+    await main.keyboard.press('Control+z');
+    await expect.poll(ending).toBe(ENDING);
+  }
 });

@@ -1101,6 +1101,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 33 | Selecting cells: a drag, Shift+click or Shift+arrows select a rectangle (the anchor keeps the ring, the others a soft fill, fading); Ctrl+C copies tab-separated text and a markdown table (a Flint note pastes it as a table); Delete / Backspace / Ctrl+X clear in one undo step of their own (never joined with typing just before) with an Undo toast; tab-separated text pasted into a cell fills cells, growing the table (new rows and columns fade in); Clear selected cells in the palette and the menu; `setCells` / `clearCells` linear in the rows (a 5,000-row paste under 500 ms) with a randomised test, short rows included; in the motion census | NOTE-10 · Built (1.2.0, second preview; Proposed) | 02, 03 §3, D-144 |
 | 34 | A click anywhere on the line under a table lands on that line (the table's block has no vertical margin, which CodeMirror's height map would leave out) | NOTE-10 · Fixed (1.2.0, second preview) | D-144 |
 | 35 | A table without edge pipes keeps its cells: a new empty row written with both edge pipes, so a grow paste, Enter and Tab work there; a randomised grow test over any table | NOTE-10 · Fixed (1.2.0, second preview; Proposed) | 04 §4, D-144 |
+| 36 | Backspace on the empty line under a table that ends the note: the text unchanged, the caret at the end of the last cell | NOTE-10 · Fixed (1.2.0, second preview) | 02, 03 §3, D-144 |
 
 ## BR. 1.1.1: security alerts (8 Nov 2026)
 

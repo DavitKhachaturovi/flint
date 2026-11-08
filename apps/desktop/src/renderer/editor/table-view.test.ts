@@ -192,6 +192,19 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
     expect(cut.doc.toString()).toBe(doc);
   });
 
+  it('leaves a note that ends with a table as it is on Backspace under it: the caret into the last cell', () => {
+    const doc = `Intro.\n\n${TABLE}\n`;
+    for (const command of [deleteCharBackward, deleteGroupBackward]) {
+      const s = parsed(run(command, caret(state(doc, [history()]), doc.length)));
+      expect(s.doc.toString()).toBe(doc);
+      expect(cellAt(s, s.selection.main.head)).toMatchObject({ row: 1, column: 2 });
+    }
+    // Delete at the end of its last row (shown raw) leaves it too.
+    expect(parsed(run(deleteCharForward, caret(state(doc), doc.length - 1))).doc.toString()).toBe(
+      doc,
+    );
+  });
+
   it('keeps text out of tables in Source mode too (only the guard, no drawing)', () => {
     const doc = `${TABLE}\n\n${PICTURE}`;
     const source = parsed(

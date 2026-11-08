@@ -1466,6 +1466,12 @@ export const keepTextOutOfTables = EditorState.transactionFilter.of((tr) => {
         breaks.push({ from: tail, insert: content && !whole ? `\n${blank}\n` : '\n' });
         continue;
       }
+      // Only the line break after a table that ends the note (Backspace on the empty line under
+      // it): the text as it was, the caret into the last cell, as documented (docs/02 NOTE-10).
+      if (whole && rest === '' && tail === next.doc.length) {
+        breaks.push({ from: tail, insert: '\n' });
+        continue;
+      }
     }
     if (!table || !stands) {
       // Gone, its text as it was: the line now under it reads as a heading's underline (`-`,
