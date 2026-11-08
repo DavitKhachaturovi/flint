@@ -57,6 +57,8 @@ const TAIL = `---\nflint: 1\nid: tail\nmode: note\n---\nFirst line here.\n\nSeco
 const HEADING = `---\nflint: 1\nid: heading\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |\n# Heading\n`;
 /** D-144: a read-only note (a newer format) that ends with a table, no line break after it. */
 const NEWER = `---\nflint: 2\nid: newer\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |`;
+/** D-144: a table outside any container, a line of four spaces under it. */
+const SPACES = `---\nflint: 1\nid: spaces\nmode: note\n---\nIntro.\n\n| a | b |\n| - | - |\n| c | d |\n    \nbelow\n`;
 /** D-144: a table with a short row (only its first cell). */
 const SHORT = `---\nflint: 1\nid: short\nmode: note\n---\nShort.\n\n| a | b | c |\n| - | - | - |\n| 1 |\n| 2 | 3 | 4 |\n\nEnd.\n`;
 const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
@@ -109,6 +111,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Short.md'), SHORT);
   await writeFile(join(flint, 'Heading.md'), HEADING);
   await writeFile(join(flint, 'Newer.md'), NEWER);
+  await writeFile(join(flint, 'Spaces.md'), SPACES);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -1161,4 +1164,31 @@ test('a click under a read-only note’s table never changes its text: no line i
   await frames();
   expect(await under.count()).toBe(0);
   expect(await read()).toBe(NEWER);
+});
+
+test('a click under a table, a line of spaces under it: the text starts that line, a paragraph (D-144)', async () => {
+  const read = (): Promise<string> => readFile(join(flint, 'Spaces.md'), 'utf8');
+  await main.locator('.nav:not(.flip-ghost)', { hasText: 'Spaces' }).first().click();
+  await expect(cell(1, 1)).toHaveText('d');
+  for (const how of ['click', 'down'] as const) {
+    if (how === 'click') {
+      const edges = await table().boundingBox();
+      if (!edges) throw new Error('no table');
+      await main.mouse.click(edges.x + 10, edges.y + edges.height + 12);
+    } else {
+      await cell(1, 1).click();
+      await main.keyboard.press('ArrowDown');
+    }
+    await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
+    await main.keyboard.type('Q');
+    // Not after the spaces: four of them would make it an indented code block.
+    await expect.poll(read).toBe(SPACES.replace('| c | d |\n    \n', '| c | d |\n\nQ    \n'));
+    await expect(line('Q')).not.toHaveClass(/cm-fl-code/);
+    for (let tries = 0; tries < 4 && (await read()) !== SPACES; tries++) {
+      const now = await read();
+      await main.keyboard.press('Control+z');
+      await expect.poll(read).not.toBe(now);
+    }
+    await expect.poll(read).toBe(SPACES);
+  }
 });

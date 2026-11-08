@@ -1117,10 +1117,11 @@ function goTo(
 
 /**
  * Leaves the table for the line above or below it (Esc: below, making one if there is none).
- * Below, the caret goes after that line's quote marks and indentation (a table in a quote: the
- * text stays in the quote); where the line under the table isn't empty (a heading right under it)
- * or there is none and `make` is set, an empty line is made for it, in a quote the quote's `>`
- * (D-144, Proposed). A read-only note is never written: the caret only moves.
+ * Below, the caret goes after as much of that line's prefix as the table's rows have (a table in a
+ * quote: the text stays in the quote; a table outside any container: the line's start); where the
+ * line under the table isn't empty (a heading right under it) or there is none and `make` is set,
+ * an empty line is made for it, in a quote the quote's `>` (D-144, Proposed). A read-only note is
+ * never written: the caret only moves.
  */
 function leave(
   view: EditorView,
@@ -1141,10 +1142,13 @@ function leave(
   }
   const next = table.to < doc.length ? doc.lineAt(table.to + 1) : null;
   const indent = table.rows[table.rows.length - 1]?.indent ?? '';
-  const prefix = next ? containerPrefix(next.text) : '';
-  if (next && next.text.slice(prefix.length).trim() === '') {
+  if (next && next.text.slice(containerPrefix(next.text).length).trim() === '') {
+    // Only as much of the line's prefix as the table's own (its quote marks, its list item's
+    // indent): under a table outside any container, four spaces would make the text code.
+    let skip = 0;
+    while (skip < indent.length && next.text[skip] === indent[skip]) skip++;
     view.dispatch({
-      selection: { anchor: next.from + prefix.length },
+      selection: { anchor: next.from + skip },
       scrollIntoView: true,
       userEvent: 'select',
     });
