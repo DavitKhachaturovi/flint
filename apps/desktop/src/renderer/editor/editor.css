@@ -234,8 +234,10 @@
 .cm-fl-table-wrap {
   max-width: 100%;
   overflow-x: auto;
-  /* The handles' gutter (below) is the space under the table. */
-  margin: 2px 0 0;
+  /* The handles' gutter (below) is the space under the table. Padding, never a vertical margin:
+     CodeMirror's height map leaves a block widget's margins out, so clicks under the table would
+     land a line too low (D-144). */
+  padding-top: 2px;
 }
 
 .cm-fl-table {

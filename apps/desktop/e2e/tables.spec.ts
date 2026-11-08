@@ -45,6 +45,8 @@ const WIDE_ROW = (word: string): string =>
 const GRID = '| A  | B  | C  |\n| --- | --- | --- |\n| a1 | b1 | c1 |\n| a2 | b2 | c2 |';
 const GRID_NOTE = `---\nflint: 1\nid: grid\nmode: note\n---\nGrid.\n\n${GRID}\n\nEnd.\n`;
 const WIDE = `---\nflint: 1\nid: wide\nmode: note\n---\nWide.\n\n${WIDE_ROW('h')}\n|${' --- |'.repeat(14)}\n${WIDE_ROW('c')}\n\nEnd.\n`;
+/** D-144: two tables, a paragraph between them (each table's height must count exactly). */
+const TWICE = `---\nflint: 1\nid: twice\nmode: note\n---\nIntro.\n\n${INSERTED}\n\nmiddle\n\n${INSERTED}\n\nabove\n`;
 
 let dataDirectory: string;
 let flint: string;
@@ -87,6 +89,7 @@ test.beforeAll(async () => {
   await writeFile(join(flint, 'Quoted.md'), QUOTED);
   await writeFile(join(flint, 'Wide.md'), WIDE);
   await writeFile(join(flint, 'Grid.md'), GRID_NOTE);
+  await writeFile(join(flint, 'Twice.md'), TWICE);
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(join(flint, 'attachments', 'pic.png'), PIXEL);
   const env: Record<string, string> = {};
@@ -414,6 +417,46 @@ test('a click under or beside a table, off its cells and handles, puts the caret
     await expect.poll(file).toBe(after);
     await main.keyboard.press('Control+z');
     await expect.poll(file).toBe(NOTE);
+  }
+});
+
+test('a click near the bottom of the line under a table lands on that line, under one table or two (D-144)', async () => {
+  // A vertical margin on a table's block would be left out of the editor's height map: clicks
+  // under the table landed a line too low (on the picture's line, or "above").
+  const cases = [
+    ['Pictures', PICTURES, 0, `${INSERTED}\n\n${PICTURE}`],
+    ['Twice', TWICE, 0, `${INSERTED}\n\nmiddle`],
+    ['Twice', TWICE, 1, `${INSERTED}\n\nabove`],
+  ] as const;
+  let open = '';
+  for (const [name, source, index, around] of cases) {
+    const read = (): Promise<string> => readFile(join(flint, `${name}.md`), 'utf8');
+    if (open !== name) {
+      await main.locator('.nav:not(.flip-ghost)', { hasText: name }).first().click();
+      await expect(editor()).toContainText('above');
+      open = name;
+    }
+    const under = main.locator('.note-editor .cm-fl-table-wrap + .cm-line').nth(index);
+    // Laid out and at rest (the picture loaded, no table still easing to its size).
+    let last = '';
+    await expect
+      .poll(async () => {
+        const now = JSON.stringify(await under.boundingBox());
+        const same = now === last;
+        last = now;
+        return same;
+      })
+      .toBe(true);
+    const box = await under.boundingBox();
+    if (!box) throw new Error('no line under the table');
+    const after = source.replace(around, around.replace('\n\n', '\n\nw\n'));
+    for (const dy of [Math.min(20, box.height - 3), box.height - 2]) {
+      await main.mouse.click(box.x + 10, box.y + dy);
+      await main.keyboard.type('w');
+      await expect.poll(read).toBe(after);
+      await main.keyboard.press('Control+z');
+      await expect.poll(read).toBe(source);
+    }
   }
 });
 
