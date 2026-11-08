@@ -1115,3 +1115,11 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | A note's line chosen in Ctrl+K flashes once it is drawn, not after a fixed 60 ms | NAV-01 · Fixed (1.1.1) | D-143 |
 | 10 | A note's line from Ctrl+K: the words searched for lit as Ctrl+F's current match (the line's text on a loose match), then fading; gone at the first edit | NAV-01 · Fixed (1.1.1) | 09, D-143 |
 | 11 | A note opened again after another note gets its own editor (D-115's kept editor only for its own ID step); a change from outside is not an undo step | NOTE-01, D-115 · Fixed (1.1.1) | D-143 |
+
+## BT. Go to from the composer's toast (D-147)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A task the composer sends to another list (`##list`): "Added to <list>" with Go to <list> and Undo; Go to opens the list, the task selected, scrolled into view and flashed (Restore's path, D-98) | CAP-05 · Built (1.2.0) | 02, D-147, `smoke.spec.ts` |
+| 2 | The same for a list's new row typed below a task | CAP-05 · Built (1.2.0; Proposed) | 02, D-147 |
+| 3 | Mini mode's composer: Go to opens the main window at the list, the task selected and flashed; mini stays | MINI-01 · Built (1.2.0; Proposed) | 02, D-147, `mini.spec.ts` |
