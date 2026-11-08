@@ -342,4 +342,12 @@ test('a pasted picture: the caret is beside it at once, not inside it while it l
   await expect
     .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
     .toMatch(/After the picture\.\n\n?!\[\]\(attachments\/[\w-]+\.png\)\n?$/);
+  // Its size changing later for any reason (a "File not found" card in its place, a video's
+  // player): the caret follows at once, with no key or click (D-144).
+  await image.evaluate((element: HTMLImageElement) => {
+    element.style.width = '240px';
+    element.style.height = '80px';
+  });
+  await expect.poll(() => image.evaluate((element) => element.clientWidth)).toBe(240);
+  await expect.poll(gap, { timeout: 2_000 }).toBeLessThanOrEqual(8);
 });

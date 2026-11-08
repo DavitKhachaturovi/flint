@@ -105,10 +105,14 @@ const flintHighlight = HighlightStyle.define([
 
 /**
  * D-144: a picture or video has its size only once it has loaded (until then the 64 px
- * placeholder). Its load says so, so the caret drawn beside it (`pictureCaret`) and the editor's
- * line heights are measured again at once, not on the next key or click.
+ * placeholder), and changes it when a "File not found" card takes its place. A ResizeObserver on
+ * it says so, so the caret drawn beside it (`pictureCaret`) and the editor's line heights are
+ * measured again at once, not on the next key or click.
  */
 const mediaSized = StateEffect.define<null>();
+
+/** Each drawn picture's observer, disconnected with its widget. */
+const resizing = new WeakMap<HTMLElement, ResizeObserver>();
 
 class ImageWidget extends WidgetType {
   readonly src: string;
@@ -126,12 +130,19 @@ class ImageWidget extends WidgetType {
     const holder = document.createElement('span');
     holder.className = 'cm-fl-image';
     holder.append(mediaElement(this.src, this.alt));
-    const sized = (): void => {
-      if (holder.isConnected) view.dispatch({ effects: mediaSized.of(null) });
-    };
-    holder.querySelector('img')?.addEventListener('load', sized, { once: true });
-    holder.querySelector('video')?.addEventListener('loadedmetadata', sized, { once: true });
+    // Any change of its size: loaded, a "File not found" card or a player in its place.
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        if (holder.isConnected) view.dispatch({ effects: mediaSized.of(null) });
+      });
+      observer.observe(holder);
+      resizing.set(holder, observer);
+    }
     return holder;
+  }
+  override destroy(dom: HTMLElement): void {
+    resizing.get(dom)?.disconnect();
+    resizing.delete(dom);
   }
   override ignoreEvent(): boolean {
     return false;
