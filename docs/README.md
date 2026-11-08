@@ -22,7 +22,7 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 ## Status
 
 - **Phase:** M9 (ship). M1 to M8 are complete; the current state is in [06 §0](06-roadmap-and-open-questions.md).
-- **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg` and `flint-taskbar-24.svg` (D-74).
+- **Logo:** `assets/icon/flint-icon-512.svg` (final), with the small in-app variant `flint-icon-16.svg` and the taskbar and tray variants `flint-taskbar-16.svg`, `-24`, `-32` and `-48` (D-74, D-148).
 - **Visual design:** dark mode only for v1; see [09](09-visual-design.md) and `docs/design/`.
 - **Repository:** [github.com/DavitKhachaturovi/flint](https://github.com/DavitKhachaturovi/flint) (public, one branch `main`), cloned at `C:\Forge\flint-repo` (D-135) (`C:\Forge\flint` is Davit's own Flint folder).
 - **Target platform (v1):** Windows x64, an unsigned one-click `.exe` installer published on GitHub Releases from 1.0.0 (D-135). macOS and ARM come later.

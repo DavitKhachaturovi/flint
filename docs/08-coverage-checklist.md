@@ -1125,3 +1125,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | A note's line chosen in Ctrl+K flashes once it is drawn, not after a fixed 60 ms | NAV-01 · Fixed (1.1.1) | D-143 |
 | 10 | A note's line from Ctrl+K: the words searched for lit as Ctrl+F's current match (the line's text on a loose match), then fading; gone at the first edit | NAV-01 · Fixed (1.1.1) | 09, D-143 |
 | 11 | A note opened again after another note gets its own editor (D-115's kept editor only for its own ID step); a change from outside is not an undo step | NOTE-01, D-115 · Fixed (1.1.1) | D-143 |
+
+## BU. App icon detail at small sizes (9 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Taskbar and tray icons: the master's facets at every small size, a hairline outline with a lit upper edge; logos drawn at 16, 24, 32 and 48 px, each `.ico` size from the nearest | UI-07 · Built (1.2.0) | 09 §8, D-148 |

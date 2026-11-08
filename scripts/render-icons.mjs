@@ -13,30 +13,32 @@ const resources = join(root, 'apps', 'desktop', 'resources');
 /** [source SVG, CSS size, device scale, output] */
 const TRAY = [
   ['flint-taskbar-16.svg', 16, 1, 'tray-16.png'],
-  ['flint-taskbar-16.svg', 16, 2, 'tray-32.png'],
-  ['flint-taskbar-24.svg', 24, 2, 'tray-48.png'],
+  ['flint-taskbar-32.svg', 32, 1, 'tray-32.png'],
+  ['flint-taskbar-48.svg', 48, 1, 'tray-48.png'],
 ];
 
 /**
  * The sizes in `icon.ico`: Windows' title bar, taskbar and Start sizes at 100–400 % scaling
  * (docs/09 §8). Everything up to 96 px comes from the taskbar logos, drawn to one rule (D-74): a
  * full-bleed tile with the master logo's corner proportions and a rim that stays visible on the dark
- * taskbar, the leaf spanning 65 % of its diagonal; 256 px from the 512 px master. The in-app logos
- * (flint-icon-16.svg, the master) are not used here.
+ * taskbar, the leaf spanning 65 % of its diagonal; 256 px from the 512 px master. Each size comes
+ * from the nearest logo drawn for it (D-148: 16, 24, 32 and 48 px, all with the master's facets and
+ * a hairline outline), so no small drawing is stretched. The in-app logos (flint-icon-16.svg, the
+ * master) are not used here.
  */
 const ICO = [
   [16, 'flint-taskbar-16.svg'],
   [20, 'flint-taskbar-24.svg'],
   [24, 'flint-taskbar-24.svg'],
-  [30, 'flint-taskbar-24.svg'],
-  [32, 'flint-taskbar-24.svg'],
-  [36, 'flint-taskbar-24.svg'],
-  [40, 'flint-taskbar-24.svg'],
-  [48, 'flint-taskbar-24.svg'],
-  [60, 'flint-taskbar-24.svg'],
-  [64, 'flint-taskbar-24.svg'],
-  [72, 'flint-taskbar-24.svg'],
-  [96, 'flint-taskbar-24.svg'],
+  [30, 'flint-taskbar-32.svg'],
+  [32, 'flint-taskbar-32.svg'],
+  [36, 'flint-taskbar-32.svg'],
+  [40, 'flint-taskbar-48.svg'],
+  [48, 'flint-taskbar-48.svg'],
+  [60, 'flint-taskbar-48.svg'],
+  [64, 'flint-taskbar-48.svg'],
+  [72, 'flint-taskbar-48.svg'],
+  [96, 'flint-taskbar-48.svg'],
   [256, 'flint-icon-512.svg'],
 ];
 
