@@ -481,7 +481,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ### NOTE-09 — Source mode (v1.1, D-141)
 - A per-note toggle that shows the whole note as raw markdown in the same editor, with Flint's font: an escape hatch when the live preview gets in the way. The file never changes.
 - In the Ctrl+K palette and as a checked item in the note's right-click menu, next to Monospace; remembered per note on this machine like Monospace (UI state). Also in mini mode's Note tab; Monospace still applies in it; switching crossfades (off with reduce-motion). Not for task bodies.
-- **Shortcut: open.** Recommended Ctrl+Shift+E (Ctrl+E is inline code, D-106). Decided, not built yet.
+- **Shortcut: Ctrl+Shift+E** (grill Q5; pairs with Monospace's Ctrl+Shift+M; Ctrl+E stays inline code, D-106, built with this work). Decided, not built yet.
 
 ### NOTE-10 — Tables (v1.1, D-141)
 - GFM tables (`| Column | … |`) render as real tables in the note editor instead of raw text. Edits write back only the bytes that changed: the alignment row, padding and escaped pipes stay as they were.

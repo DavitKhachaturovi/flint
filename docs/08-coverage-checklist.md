@@ -1063,9 +1063,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Numbered markers always in the gray mono look | NOTE-01 · Decided (1.1.0) | D-141 |
 | 4 | The checkbox's tick centred | NOTE-01 · Decided (1.1.0) | D-141 |
 | 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Decided (1.1.0) | 02, D-141 |
-| 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; its shortcut open (Ctrl+Shift+E recommended) | NOTE-09 · Decided (1.1.0), shortcut open | 02, 03 §3, D-141 |
+| 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; Ctrl+Shift+E | NOTE-09 · Decided (1.1.0) | 02, 03 §3, D-141 |
 | 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Decided (1.1.0) | 04 §4, D-141 |
-| 8 | Renumbering and nesting indents for numbered lists | NOTE-01 · Open (grill Q5, Q6) | 06 §0 |
+| 8 | Renumbering and nesting indents for numbered lists | NOTE-01 · Open (grill Q6, Q7) | 06 §0 |
 | 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.1.0), details open | 02, D-141, 06 §0 |
 | 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), scrambled shape-only fixtures of real notes (after Davit's review), the real folder local-only (`FLINT_CORPUS`), randomised editing tests | NOTE-01 · Decided (1.1.0) | D-141 |
-| 11 | Ctrl+E for inline code (decided in D-106, never built) | NOTE-02 · Decided, not built | 03 §3, 06 §0 |
+| 11 | Ctrl+E for inline code (decided in D-106, never built), built with this work | NOTE-02 · Decided (1.1.0) | 03 §3, D-141 |

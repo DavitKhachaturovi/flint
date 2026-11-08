@@ -154,8 +154,8 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Bold / italic in the editor | Ctrl+B / Ctrl+I | Proposed (D-82) |
 | Paste as plain text in the editor | Ctrl+Shift+V | Proposed (D-82) |
 | Formatting context menu | Right-click | Decided |
-| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor; Ctrl+E for inline code not built yet) |
-| Source mode for this note (NOTE-09) | Ctrl+Shift+E (Ctrl+E is inline code) | Open (D-141; recommended, to be confirmed) |
+| Bold / italic / inline code / link | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+K with text selected → link (`[text]()`) | Decided (D-106: Ctrl+K opens the palette unless text is selected in an editor; Ctrl+E for inline code not built yet; D-141: built with the live-preview work) |
+| Source mode for this note (NOTE-09) | Ctrl+Shift+E (pairs with Monospace's Ctrl+Shift+M; Ctrl+E is inline code) | Decided (D-141, grill Q5; not built yet) |
 | Step into a marker or embedded object (show its raw markdown) | ← from just after it, → from just before it | Decided (D-141, not built yet) |
 
 ### Mouse
