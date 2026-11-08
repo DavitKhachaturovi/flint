@@ -1060,21 +1060,21 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 |---|---|---|---|
 | 1 | Rebuild Flint's live-preview layer on the syntax tree (no live-preview library; ProseMirror, Milkdown, Tiptap ruled out) | NOTE-01 · Decided (1.1.0) | D-141 |
 | 2 | Block markers and embedded objects show raw only with the caret strictly inside; inline formatting inside or at its edge; ← / → step in; clicks and selections never reveal | NOTE-01 · Built (1.1.0 step 2) | 02, 03 §3, D-141 |
-| 3 | Numbered markers always in the gray mono look | NOTE-01 · Built (1.1.0 step 2) | D-141 |
-| 4 | The checkbox's tick centred: the shared task-row checkbox in its compact size (17 px), the same tick, hover, press and check-pop | NOTE-01 · Built (1.1.0 step 4) | D-141 |
+| 3 | A list's number is plain text in the note's font, with the caret on its line or not | NOTE-01 · Built (1.1.0) | D-142 |
+| 4 | The checkbox: the shared task-row checkbox in its compact size (17 px) with the row's 12 px tick, centred; hover, press and check-pop | NOTE-01 · Built (1.1.0) | D-141, D-142 |
 | 5 | Edit markdown in every embedded object's right-click menu | NOTE-01, MEDIA-01 · Built (1.1.0 step 2) | 02, D-141 |
 | 6 | Source mode per note: palette, right-click menu next to Monospace, mini's Note tab, crossfade, not for task bodies; Ctrl+Shift+E | NOTE-09 · Built (1.1.0 step 5) | 02, 03 §3, D-141 |
-| 7 | Any `N.` line starts a list (parser extension); the GitHub / Reading-view difference recorded | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
-| 8 | Renumbering: only the edited list, after Flint's structural edits, one undo step, first number and delimiter kept, nested lines shifted when a number's width changes; never on open, typing or outside changes | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
-| 8a | Nesting indents: Tab to the parent's text column with the subtree, Shift+Tab back, nested numbers join or start at 1, tabs only where the list already uses them; Tab on the first item nudges (Shift+Tab on a top-level item nudges: Proposed) | NOTE-01 · Built (1.1.0 step 3) | 04 §4, D-141 |
+| 7 | Any `N.` line starts a list (parser extension) | NOTE-01 · Reverted after testing (as in 1.0.1) | 04 §4, D-142 |
+| 8 | Renumbering by Flint after structural edits | NOTE-01 · Reverted after testing (as in 1.0.1) | 04 §4, D-142 |
+| 8a | Nesting at the parent's text column, the first-item nudge | NOTE-01 · Reverted after testing (Tab indents two spaces, as in 1.0.1) | 04 §4, D-142 |
 | 9 | Tables rendered; edge drag adds or removes columns and rows, a warning before deleting content; only changed bytes written | NOTE-10 · Decided (1.2.0) | 02, D-141, 06 §0 |
 | 9a | Editing a table: cells in place, Tab / Enter / Shift+Enter / arrows / Esc as in 03 §3, one editor at a time, the note's own undo, Ctrl+F into cells, whole-table selections, sideways scroll; in notes, mini's Note tab and task bodies (edited and rendered) | NOTE-10 · Decided (1.2.0) | 02, 03 §3, D-141 |
 | 9b | Writing a table back: only the edited cell's bytes, padding kept, `\|` escaping, pasted line breaks as spaces, short rows grow to the edited cell, extra cells kept, new rows and columns in the existing style, line endings kept | NOTE-10 · Decided (1.2.0) | 04 §4, D-141 |
 | 9c | Align table: right-click menu and palette, the whole table re-padded in one undo step (details and the toast Proposed) | NOTE-10 · Decided (1.2.0) | 02, 04 §4, D-141 |
 | 9d | A table's size and shape: edge-drag handles (one column or row per step, at the end, dimmed before it goes, Esc cancels, minimum one column and the header), the inline warning for drags that remove text; Add row above / below, Add column left / right, Delete row / column / table with an Undo toast, in the menu and palette | NOTE-10 · Decided (1.2.0) | 02, D-141 |
 | 9e | Reordering table rows and columns by drag | NOTE-10 · Later | D-141 |
-| 9f | Motion: markers, renumbering and Align table instant (in the census as such); the indent glide, the first-item nudge, the checkbox pop, table rows and columns, the drag's dimming, the active cell's ring, the warning and Source mode animated; every action in the motion census | NOTE-01, NOTE-09 · Decided (1.1.0); NOTE-10 (1.2.0) | D-141 |
-| 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), scrambled shape-only fixtures of real notes (after Davit's review), the real folder local-only (`FLINT_CORPUS`), randomised editing tests; decorations checked against the syntax tree at every caret position, real-folder failures without note text, the scrambler's surviving-word check | NOTE-01 · Built (1.1.0 step 1; the scrambled copies await Davit's review) | D-141 |
+| 9f | Motion: markers and Align table instant (in the census as such); the checkbox pop, table rows and columns, the drag's dimming, the active cell's ring, the warning and Source mode animated; every action in the motion census | NOTE-01, NOTE-09 · Decided (1.1.0); NOTE-10 (1.2.0) | D-141 |
+| 10 | Editor test corpus: CommonMark and GFM spec examples (CC BY-SA, own folder), the real notes folder local-only (`FLINT_CORPUS`, read-only, no note text printed), randomised editing tests; decorations checked against the syntax tree at every caret position; no copies of real notes in the repository | NOTE-01 · Built (1.1.0) | D-141, D-142 |
 | 10a | Long fuzzing: `npm run fuzz` on demand (a time budget) and a nightly scheduled GitHub Actions run, core's format fuzz and the editor's, the seed printed | NOTE-01 · Built (1.1.0 step 1) | 05, D-141 |
 | 11 | Ctrl+E for inline code (decided in D-106, never built), built with this work | NOTE-02 · Built (1.1.0 step 5) | 03 §3, D-141 |
 | 12 | Two releases: 1.1.0 the reliable live preview (corpus, reveal rule, Edit markdown, lists, checkbox, Source mode, Ctrl+E, nightly fuzzing), 1.2.0 tables; each a local installer for Davit first, released only after his OK | NOTE-01, NOTE-09, NOTE-10 · Decided | 06 §0, D-141 |
@@ -1084,4 +1084,6 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 16 | A picture drawn with the caret beside it; raw (the picture after it) with the caret inside its markdown | NOTE-01, MEDIA-01 · Built (1.1.0 step 2) | D-141 |
 | 17 | A click before a hidden line prefix puts the caret after it; a bullet click places the caret | NOTE-01 · Built (1.1.0 step 2) | D-141 |
 | 18 | Source mode and Monospace in the palette while a note is open | NOTE-09, NOTE-06 · Built (1.1.0 step 5; Monospace's: Proposed) | 02, D-141 |
-| 19 | Text formatting (Bold, Italic, Code…) as palette commands | NOTE-02 · Open (a question for Davit) | 06 §0, D-141 |
+| 19 | Text formatting (Bold, Italic, Code…) as palette commands | NOTE-02 · Not doing: a deliberate exception to D-106 | 02, D-142 |
+| 20 | One caret beside a drawn picture (the browser's hidden there, Flint's at the real position) | NOTE-01, MEDIA-01 · Built (1.1.0) | 02, D-142 |
+| 21 | The colleague's first name in the published history left as is; the fix in the next push; the local hooks widened (with a local test) | — · Decided | D-142 |

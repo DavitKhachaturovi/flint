@@ -314,11 +314,9 @@ export function buildPreview(input: PreviewInput): PreviewItem[] {
           case 'ListMark': {
             const marker = markers.get(node.from);
             if (!marker) return;
-            // Numbered markers always have the gray mono look (D-141 Q3).
-            if (marker.kind === 'number') {
-              mark(node.from, node.to, 'cm-fl-mark cm-fl-number');
-              return;
-            }
+            // D-141 (after Davit's test): a number is plain text in the note's font, the same
+            // with the caret on its line or not.
+            if (marker.kind === 'number') return;
             if (strictlyInside(marker.from, marker.to)) {
               mark(node.from, node.to, 'cm-fl-mark');
               return;

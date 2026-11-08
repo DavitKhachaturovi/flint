@@ -9,7 +9,7 @@ import { blockMarkers, type PreviewItem } from './preview.js';
  * The reveal rule (D-141 Q3) on every CommonMark and GFM example at every caret position: block
  * markers and embedded objects stay drawn unless an empty caret is strictly inside them; inline
  * formatting shows raw exactly while the caret is inside it or at its edge; a selection reveals
- * nothing; numbered markers keep their gray mono look.
+ * nothing; numbered markers are plain text in the note's font (Davit, after testing 1.1.0).
  */
 
 interface Example {
@@ -50,10 +50,15 @@ function revealProblems(state: EditorState): string[] {
   for (const marker of blockMarkers(state)) {
     const inside = caret !== null && caret > marker.from && caret < marker.to;
     if (marker.kind === 'number') {
-      const mono = items.some(
-        (i) => i.kind === 'mark' && i.className.includes('cm-fl-mark') && i.from === marker.from,
+      // Plain text in the note's font, with the caret on its line or not: nothing touches it.
+      const touched = items.some(
+        (i) =>
+          !('at' in i) &&
+          i.from < marker.to &&
+          i.to > marker.from &&
+          !(i.kind === 'mark' && i.from < marker.from),
       );
-      if (!mono) found.push(`number ${marker.from} without its mono look`);
+      if (touched) found.push(`number ${marker.from} styled, hidden or replaced`);
       continue;
     }
     const isDrawn = drawn(items, marker.from, marker.to);

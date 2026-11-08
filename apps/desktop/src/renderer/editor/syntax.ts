@@ -38,24 +38,5 @@ export const Highlight: MarkdownConfig = {
   ],
 };
 
-/**
- * Numbered lines start lists (D-141 Q4, docs/04 §4): a line `N.` or `N)` followed by a space ends
- * the paragraph above it, so it starts or continues a list as in Obsidian's editor (a bare `2.`
- * waits for its space, so typing it doesn't flip the line). CommonMark lets only `1.` interrupt a paragraph; GitHub and Obsidian's Reading view show
- * `text` + `2. item` as one paragraph (a known difference). Display only: the file never changes.
- */
-export const NumberedLines: MarkdownConfig = {
-  parseBlock: [
-    {
-      name: 'NumberedLine',
-      parse: () => false,
-      endLeaf: (_cx, line, leaf) =>
-        leaf.content !== '' &&
-        line.indent < line.baseIndent + 4 &&
-        /^\d{1,9}[.)][ \t]/.test(line.text.slice(line.pos)),
-    },
-  ],
-};
-
 /** The extensions every Flint markdown parser uses. */
-export const NOTE_SYNTAX: readonly MarkdownConfig[] = [Highlight, NumberedLines];
+export const NOTE_SYNTAX: readonly MarkdownConfig[] = [Highlight];

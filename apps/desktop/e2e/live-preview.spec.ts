@@ -129,10 +129,11 @@ test('block markers stay drawn beside the caret; ← steps into one, → back ou
   await expect(line('Heading')).toHaveText('## Heading');
 });
 
-test('numbered markers keep their gray mono look, with and without the caret (D-141 Q3)', async () => {
-  await expect(editor().locator('.cm-fl-number')).toHaveCount(2);
+test("numbers are plain text in the note's font, the same with the caret on the line or not (D-141)", async () => {
+  await line('First item').click();
+  expect(await line('One').evaluate((element) => element.innerHTML)).toBe('1. One');
   await caretAtEnd('One');
-  await expect(line('One').locator('.cm-fl-number')).toHaveText('1.');
+  expect(await line('One').evaluate((element) => element.innerHTML)).toBe('1. One');
 });
 
 test('a picture stays drawn beside the caret; ← steps into its markdown (D-141 Q3, problem 3)', async () => {
@@ -143,6 +144,24 @@ test('a picture stays drawn beside the caret; ← steps into its markdown (D-141
   await main.keyboard.press('ArrowLeft');
   await expect(picture.locator('.cm-fl-image img')).toHaveCount(1);
   await expect(picture).not.toContainText('![picture]');
+  // One caret, where the cursor is: Flint's, the browser's hidden beside the picture (D-141).
+  const carets = main.locator('.note-editor .cm-fl-caret');
+  await expect(carets).toHaveCount(1);
+  await expect(editor()).toHaveClass(/cm-fl-caret-hidden/);
+  const caret = await carets.boundingBox();
+  const image = await picture.locator('.cm-fl-image img').boundingBox();
+  expect(caret && image).toBeTruthy();
+  if (caret && image) expect(Math.abs(caret.x - (image.x + image.width))).toBeLessThanOrEqual(8);
+  // Right before it, likewise; away from it, the browser's own caret again.
+  await main.keyboard.press('Home');
+  await expect(carets).toHaveCount(1);
+  const before = await carets.boundingBox();
+  if (before && image) expect(Math.abs(before.x - image.x)).toBeLessThanOrEqual(8);
+  await main.keyboard.press('End');
+  await main.keyboard.press('ArrowRight');
+  await expect(carets).toHaveCount(0);
+  await expect(editor()).not.toHaveClass(/cm-fl-caret-hidden/);
+  await main.keyboard.press('ArrowLeft');
   // ← again: inside its markdown, which shows raw (the picture after it).
   await main.keyboard.press('ArrowLeft');
   await expect(picture).toContainText('![picture](attachments/image-01.png)');
@@ -167,42 +186,6 @@ test("a picture's Edit markdown reveals its raw link with the caret in the addre
     .toContain('![picture](attachments/image-01.png)');
 });
 
-test('Tab nests a numbered item at its parent’s text column, Shift+Tab takes it back; the first item nudges (D-141 Q6, Q7)', async () => {
-  await caretAtEnd('Two');
-  await main.keyboard.press('Tab');
-  await expect
-    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
-    .toContain('\n1. One\n   1. Two\n');
-  await main.keyboard.press('Shift+Tab');
-  await expect
-    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
-    .toContain('\n1. One\n2. Two\n');
-  // The list's first item has nothing above to nest under: the text stays as it is.
-  await caretAtEnd('One');
-  await main.keyboard.press('Tab');
-  await main.keyboard.press('Shift+Tab');
-  expect(await readFile(join(flint, 'Preview.md'), 'utf8')).toContain('\n1. One\n2. Two\n');
-  // Moving a line renumbers the list in the same step (Alt+↑ as a page event, D-93).
-  await caretAtEnd('Two');
-  await main.evaluate(() =>
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'ArrowUp',
-        code: 'ArrowUp',
-        altKey: true,
-        bubbles: true,
-      }),
-    ),
-  );
-  await expect
-    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
-    .toContain('\n1. Two\n2. One\n');
-  await main.keyboard.press('Control+z');
-  await expect
-    .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
-    .toContain('\n1. One\n2. Two\n');
-});
-
 test("the checkbox is the task row's in its compact size, its tick centred; a click ticks it (D-141 Q8)", async () => {
   await line('First item').click();
   const box = line('A task').locator('.cm-fl-task-box .check');
@@ -214,6 +197,8 @@ test("the checkbox is the task row's in its compact size, its tick centred; a cl
     .poll(() => readFile(join(flint, 'Preview.md'), 'utf8'))
     .toContain('\n- [x] A task\n');
   await expect(box).toHaveClass(/\bon\b/);
+  // The tick fills the box as the task row's does: its 12 px tick (D-141, after Davit's test).
+  expect(Math.round((await box.locator('svg').boundingBox())?.width ?? 0)).toBe(12);
   // The tick sits in the box's centre (by geometry, not margins).
   const outer = await box.boundingBox();
   const tick = await box.locator('svg').boundingBox();

@@ -184,8 +184,7 @@ function setLineKind(view: EditorView, kind: LineKind): void {
   view.dispatch({
     changes: set,
     selection: state.selection.map(set, 1),
-    // D-141 Q6: a structural edit (a numbered list it touches is renumbered).
-    userEvent: 'input.format.line',
+    userEvent: 'input.format',
   });
   view.focus();
 }

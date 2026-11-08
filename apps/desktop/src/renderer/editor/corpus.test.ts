@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { syntaxTree } from '@codemirror/language';
 import { describe, expect, it } from 'vitest';
 import { fromEditor, lineEndingOf, toEditor } from './line-endings.js';
@@ -8,10 +7,10 @@ import { noteState, problems, treeProblems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
 
 /**
- * The live preview on real-world notes (D-141 Q2, Q13): the scrambled shape-only copies committed
- * in `fixtures/notes/`, and, on this machine only, a real notes folder when `FLINT_CORPUS` points
- * at it (read-only; skipped on CI). Failures name a note by its number and give offsets and node
- * kinds only, never its name or text.
+ * The live preview on real-world notes (D-141 Q2, Q13): on this machine only, a real notes folder
+ * when `FLINT_CORPUS` points at it (read-only; skipped on CI). Nothing derived from real notes is
+ * in the repository (Davit, after the 1.1.0 preview). Failures name a note by its number and give
+ * offsets and node kinds only, never its name or text.
  */
 
 function notesIn(folder: string): string[] {
@@ -70,14 +69,9 @@ function checkAll(files: readonly string[]): string[] {
   );
 }
 
-const FIXTURES = fileURLToPath(new URL('./fixtures/notes/', import.meta.url));
 const CORPUS = process.env['FLINT_CORPUS'];
 
 describe('the live preview on real-world notes (D-141 Q2, Q13)', () => {
-  it.skipIf(notesIn(FIXTURES).length === 0)('the scrambled copies in fixtures/notes', () => {
-    expect(checkAll(notesIn(FIXTURES))).toEqual([]);
-  });
-
   it.skipIf(!CORPUS)(
     'the notes folder in FLINT_CORPUS (local only, read-only)',
     () => {

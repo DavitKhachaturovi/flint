@@ -20,8 +20,10 @@ import {
 import {
   Decoration,
   EditorView,
+  RectangleMarker,
   ViewPlugin,
   WidgetType,
+  layer,
   keymap,
   placeholder as placeholderText,
   type DecorationSet,
@@ -48,8 +50,7 @@ import {
 import { slashCommands } from './slash.js';
 import { findInNote } from './find.js';
 import { blockMarkers, buildPreview } from './preview.js';
-import { nestItems, renumberAfterEdits } from './lists.js';
-import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
+import { durationMs, reducedMotion } from '../ui/motion.js';
 import { checkSvg } from '../ui/check.js';
 import { NOTE_SYNTAX } from './syntax.js';
 
@@ -154,7 +155,7 @@ class CheckboxWidget extends WidgetType {
     box.className = this.checked ? 'check on' : 'check';
     box.setAttribute('role', 'checkbox');
     box.setAttribute('aria-checked', String(this.checked));
-    if (this.checked) box.append(checkSvg(10));
+    if (this.checked) box.append(checkSvg(12));
     holder.append(box);
     return holder;
   }
@@ -326,6 +327,48 @@ const livePreview = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 );
 
+/**
+ * D-141 (after Davit's test of 1.1.0): right before or after a drawn picture the browser draws its
+ * own caret badly (at both ends of the picture). There Flint hides it and draws one caret, where
+ * the cursor really is. Only while the live preview is on (Source mode shows the markdown).
+ */
+function caretBesidePicture(view: EditorView): number | null {
+  const { state } = view;
+  const caret = state.selection.main;
+  if (!view.hasFocus || state.selection.ranges.length > 1 || !caret.empty) return null;
+  if (!view.plugin(livePreview)) return null;
+  const line = state.doc.lineAt(caret.head);
+  for (const marker of blockMarkers(state, [{ from: line.from, to: line.to }]))
+    if (marker.kind === 'image' && (caret.head === marker.from || caret.head === marker.to))
+      return caret.head;
+  return null;
+}
+
+const pictureCaret: Extension = [
+  layer({
+    above: true,
+    class: 'cm-fl-caret-layer',
+    markers: (view) => {
+      const at = caretBesidePicture(view);
+      if (at === null) return [];
+      return RectangleMarker.forRange(
+        view,
+        'cm-fl-caret',
+        EditorSelection.cursor(at, view.state.selection.main.assoc || 1),
+      );
+    },
+    update: (update) =>
+      update.selectionSet ||
+      update.docChanged ||
+      update.focusChanged ||
+      update.viewportChanged ||
+      update.geometryChanged,
+  }),
+  EditorView.contentAttributes.of((view) =>
+    caretBesidePicture(view) === null ? null : { class: 'cm-fl-caret-hidden' },
+  ),
+];
+
 /** MEDIA-02: the note's pictures in the viewer, at this one. */
 function openInViewer(view: EditorView, image: HTMLImageElement): void {
   const all = [...view.contentDOM.querySelectorAll<HTMLImageElement>('.cm-fl-image img')];
@@ -407,7 +450,7 @@ export const previewMode = new Compartment();
 
 /** The live preview's parts: none in Source mode, where every line is its raw markdown. */
 export const sourceMode = (on: boolean): Extension =>
-  on ? [] : [livePreview, previewClicks, clicksDontReveal];
+  on ? [] : [livePreview, previewClicks, clicksDontReveal, pictureCaret];
 
 /** Everything the note editor is made of, for a new editor state. */
 export function editorExtensions(options: EditorOptions): Extension[] {
@@ -422,8 +465,7 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     syntaxHighlighting(flintHighlight),
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),
-      // D-141 Q7: in a list, Tab and Shift+Tab nest items; elsewhere they indent as before.
-      { key: 'Tab', run: listTab(1), shift: listTab(-1) },
+      { key: 'Tab', run: indentMore, shift: indentLess },
       // D-141 Q3: ← from just after a drawn marker or object, → from just before it, step in.
       { key: 'ArrowLeft', run: stepInto(-1) },
       { key: 'ArrowRight', run: stepInto(1) },
@@ -448,7 +490,6 @@ export function editorExtensions(options: EditorOptions): Extension[] {
       ...historyKeymap,
     ]),
     previewMode.of(sourceMode(options.source === true)),
-    renumberAfterEdits,
     findInNote(),
     ...(options.commands && !options.readOnly
       ? [slashCommands(options.commands), formatMenu(options.commands)]
@@ -653,61 +694,6 @@ function lineElement(view: EditorView, at: number): HTMLElement | null {
     (node instanceof HTMLElement ? node : node.parentElement)?.closest<HTMLElement>('.cm-line') ??
     null
   );
-}
-
-/** D-141 Q7: Tab (1) / Shift+Tab (-1) on list items: they move with what is nested under them and
- * glide to their new indent (Q12); an impossible move nudges the line (D-87). Elsewhere, the
- * usual indent. */
-function listTab(direction: 1 | -1): (view: EditorView) => boolean {
-  return (view) => {
-    const nesting = nestItems(view.state, direction);
-    if (nesting.kind === 'none') return (direction > 0 ? indentMore : indentLess)(view);
-    if (nesting.kind === 'impossible') {
-      const line = lineElement(view, view.state.selection.main.head);
-      if (line) nudgeElement(line, direction > 0 ? 'right' : 'left');
-      return true;
-    }
-    const before = nesting.starts.map((at) => view.coordsAtPos(at)?.left ?? null);
-    const changes = view.state.changes(nesting.changes);
-    view.dispatch({
-      changes,
-      userEvent: direction > 0 ? 'input.indent' : 'delete.dedent',
-      scrollIntoView: true,
-    });
-    if (reducedMotion()) return true;
-    const moved = nesting.starts.map((at, index) => ({
-      from: changes.mapPos(at, 1),
-      to: changes.mapPos(nesting.ends[index] ?? at, 1),
-      was: before[index] ?? null,
-    }));
-    view.requestMeasure({
-      read: () =>
-        moved.map(({ from, to, was }) => {
-          const doc = view.state.doc;
-          const now = view.coordsAtPos(Math.min(from, doc.length))?.left ?? null;
-          const lines: HTMLElement[] = [];
-          for (
-            let at = doc.lineAt(from).number;
-            at <= doc.lineAt(Math.min(to, doc.length)).number;
-            at++
-          ) {
-            const element = lineElement(view, doc.line(at).from);
-            if (element) lines.push(element);
-          }
-          return { shift: was === null || now === null ? 0 : was - now, lines };
-        }),
-      write: (measured) => {
-        for (const { shift, lines } of measured)
-          if (Math.abs(shift) >= 1)
-            for (const line of lines)
-              line.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], {
-                duration: durationMs('--fl-dur-base', 200),
-                easing: 'cubic-bezier(.2, .9, .3, 1)',
-              });
-      },
-    });
-    return true;
-  };
 }
 
 /** D-141 Q3: ← from just after a drawn block marker or object, → from just before it, put the caret

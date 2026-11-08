@@ -153,7 +153,7 @@ async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
   );
   await writeFile(
     join(flint, 'Plans.md'),
-    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n1. Pack\n2. Travel\n\n- [ ] Book the hotel\n',
+    '---\nflint: 1\nid: plans\nmode: note\n---\n# Plans\n\n## Spring\n\nTrips.\n\n![](attachments/dot.png)\n\n## Summer\n\nBeach.\n\n- [ ] Book the hotel\n',
   );
   await mkdir(join(flint, 'attachments'), { recursive: true });
   await writeFile(
@@ -362,18 +362,6 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   for (let at = 0; at < 'Spring'.length; at++) await main.keyboard.press('ArrowLeft');
   await step(main, 'A note: ← steps into a heading’s marks', { instant: 'D-141 Q3, D-75' }, () =>
     main.keyboard.press('ArrowLeft'),
-  );
-  // D-141 Q7, Q12: Tab nests a list item, gliding to its indent; on the first item it nudges.
-  await main.locator('.main .note-card .cm-line', { hasText: 'Travel' }).click();
-  await step(main, 'A note: Tab nests a list item (it glides)', 'motion', () =>
-    main.keyboard.press('Tab'),
-  );
-  await step(main, 'A note: Shift+Tab takes it back (it glides)', 'motion', () =>
-    main.keyboard.press('Shift+Tab'),
-  );
-  await main.locator('.main .note-card .cm-line', { hasText: 'Pack' }).click();
-  await step(main, 'A note: Tab on a list’s first item (a nudge)', 'motion', () =>
-    main.keyboard.press('Tab'),
   );
   // D-141 Q8: the note's checkbox pops as a task row's, the text fades to muted and back.
   const hotel = main.locator('.main .note-card .cm-line', { hasText: 'Book the hotel' });

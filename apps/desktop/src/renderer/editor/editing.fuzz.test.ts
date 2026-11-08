@@ -13,7 +13,6 @@ import { ensureSyntaxTree } from '@codemirror/language';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { nestItems, renumberAfterEdits } from './lists.js';
 import { noteState, problems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
 
@@ -88,28 +87,11 @@ type Step =
   | { readonly kind: 'delete'; readonly at: number; readonly length: number }
   | { readonly kind: 'command'; readonly at: number; readonly name: keyof typeof COMMANDS };
 
-/** Tab / Shift+Tab as the editor does them (D-141 Q7): list items nest, other lines indent. */
-const listTab =
-  (direction: 1 | -1): StateCommand =>
-  ({ state, dispatch }) => {
-    const nesting = nestItems(state, direction);
-    if (nesting.kind === 'none')
-      return (direction > 0 ? indentMore : indentLess)({ state, dispatch });
-    if (nesting.kind === 'move')
-      dispatch(
-        state.update({
-          changes: nesting.changes,
-          userEvent: direction > 0 ? 'input.indent' : 'delete.dedent',
-        }),
-      );
-    return true;
-  };
-
 const COMMANDS = {
   enter: insertNewlineContinueMarkup,
   backspace: deleteMarkupBackward,
-  tab: listTab(1),
-  shiftTab: listTab(-1),
+  tab: indentMore,
+  shiftTab: indentLess,
   altUp: moveLineUp,
   altDown: moveLineDown,
   undo,
@@ -169,7 +151,7 @@ describe('randomised editing in the note editor (D-141 Q13)', () => {
         fc.array(step, { minLength: 1, maxLength: 25 }),
         (lines, steps) => {
           const text = lines.join('\n');
-          let state = noteState(text, 0, 0, [history(), renumberAfterEdits]);
+          let state = noteState(text, 0, 0, [history()]);
           for (const each of steps) {
             state = apply(state, each);
             for (const focused of [true, false]) {

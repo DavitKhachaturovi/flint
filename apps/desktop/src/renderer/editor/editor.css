@@ -187,8 +187,38 @@
   cursor: pointer;
 }
 
+/* D-141 (after Davit's test): the tick fills the box as the task row's does: the row's own 12 px
+   tick, not the compact variant's 10 px. */
+.cm-fl-task-box.fl-compact .check svg {
+  width: 12px;
+  height: 12px;
+}
+
 .cm-fl-done {
   color: var(--fl-text-muted);
+}
+
+/* D-141: beside a drawn picture, one caret where the cursor is (the browser's own is hidden there). */
+.cm-content.cm-fl-caret-hidden {
+  caret-color: transparent;
+}
+
+.cm-fl-caret {
+  border-left: 1.5px solid var(--fl-accent);
+  pointer-events: none;
+  animation: fl-caret-blink 1.06s steps(1) infinite;
+}
+
+@keyframes fl-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-fl-caret {
+    animation: none;
+  }
 }
 
 /* Images inline (MEDIA-01): from the Flint folder only; a click opens the lightbox. */
