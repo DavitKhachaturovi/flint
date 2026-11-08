@@ -2,6 +2,13 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.1.0 (8 Nov 2026)
+
+- **Notes stay tidy while you write:** bullets, checkboxes, headings and pictures no longer turn into raw markdown just because the cursor is on their line. To edit one, press ← right after it (or → right before it), or right-click a picture and choose **Edit markdown**.
+- **Source mode:** press **Ctrl+Shift+E** (or right-click → Source mode, or Ctrl+K) to see a note's raw markdown; press it again to go back. Flint remembers it per note.
+- **Checklists in notes look like your tasks:** the same checkbox as the task list, and a ticked item is dimmed and struck through.
+- **Ctrl+E** makes the selected word inline `code`. List numbers now look like the rest of the text.
+
 ## 1.0.1 (8 Nov 2026)
 
 - **Smoother updates:** after Restart now, Flint steps out of the way at once and a notification tells you it reopens by itself in about a minute.

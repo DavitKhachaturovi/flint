@@ -2,6 +2,14 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.1.0 (8 Nov 2026)
+
+- **The live preview, rebuilt (D-141, D-142):** its decisions are one pure function on CodeMirror's syntax tree (`editor/preview.ts`). Block markers (bullets, checkboxes, headings, quotes, task-field chips) and embedded objects (pictures, videos, files) stay drawn with the caret beside them and show raw only with the caret strictly inside; inline formatting shows raw with the caret inside it or at its edge; ← / → step into a marker; clicks and selections never reveal. A picture's (video's, file's) right-click menu has **Edit markdown**. The raw link no longer shows beside a picture on the cursor's line, and the caret beside a picture is one text-sized caret at its real position.
+- **Source mode (NOTE-09):** a note's whole raw markdown, per note on this machine: Ctrl+Shift+E, the note's right-click menu (next to Monospace), the Ctrl+K palette (with Monospace beside it) and mini mode's Note tab; switching fades the text over. **Ctrl+E** wraps the selection or the word at the caret in backticks (Format ▸ Code).
+- **Checklists in notes:** the task row's checkbox in its compact size with the row's 12 px tick, centred; ticking pops it, and the item's text is dimmed and struck through. List numbers are plain text in the note's font. Numbered lists behave as in 1.0.1 (a parser extension, renumbering and nesting were tried in the previews and taken out after testing).
+- **Fixed:** a link whose address starts on the next line could stop a note from drawing; formatting inside a link's text showed raw; a note with Windows line endings had all of them rewritten on its first edit.
+- **Tests:** the CommonMark 0.31.2 and GFM extension examples at every caret position, a local-only check on a real notes folder (`FLINT_CORPUS`), randomised editing; `npm run fuzz` for long fuzzing on demand and a nightly fuzz workflow (`fuzz.yml`). Text formatting stays out of the palette, a deliberate exception to D-106.
+
 ## 1.0.1 (8 Nov 2026)
 
 - **Restart to update (D-140):** Flint now hides at once and shows a notification that it is updating and reopens by itself in about a minute, instead of a window that stops responding. The minute is Windows checking the new, not yet signed, version the first time it starts.
