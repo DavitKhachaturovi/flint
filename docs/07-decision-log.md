@@ -1426,7 +1426,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Review (one round, data and format, D-145):** `hasRowPipe` (fixed, above); the e2e undo waited for nothing (each Ctrl+Z now waits for its write). Kept: the protective space stays if the backslash is later removed (ordinary padding).
 
 ### D-155 — CodeQL on pushes to `next` too
-- **Date:** 9 Nov 2026 · **Status:** Decided (Davit).
+- **Date:** 9 Nov 2026 · **Status:** Done (Davit: the default setup turned off, `codeql.yml` pushed after 1.3.1). Until `codeql.yml` reaches `main` with the next release, `main` and the weekly scan have no CodeQL run (a workflow runs from the branch that has it; the schedule from the default branch).
 - GitHub's default CodeQL setup scans `main`, pull requests and once a week, so D-154's alerts showed up only after the release. `codeql.yml` (advanced setup) scans pushes to `main` and `next`, pull requests and weekly, with the default setup's languages (JavaScript/TypeScript, the workflows) and query suite; actions pinned by commit SHA (`github/codeql-action` v4.39.1, the newest at least 7 days old, D-30). GitHub processes it only with the default setup turned off (a repository setting, Davit's OK).
 
 ### D-156 — The flaky-test batch: each test waits for what it checks (D-145)
