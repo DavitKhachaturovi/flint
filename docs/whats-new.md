@@ -2,6 +2,11 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.2.1 (9 Nov 2026)
+
+- **Typing in tables is reliable:** keys you type right after clicking a cell, or after moving into a table with Backspace or the arrow keys, always go into that cell.
+- **No slowdown on unusual titles:** a very long task title full of bracketed text no longer makes Flint pause when you save or change it.
+
 ## 1.2.0 (9 Nov 2026)
 
 - **Tables in your notes:** a markdown table now shows as a real table. Click a cell to edit it; Tab, Enter and the arrow keys move between cells, and Esc leaves the table.

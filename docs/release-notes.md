@@ -2,6 +2,12 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.2.1 (9 Nov 2026)
+
+- **Tables (NOTE-10, D-152):** a table cell takes the keys in the same step it lights up. Arriving from the note's own text (a click, Backspace under a table, ↓ from the line above) the cell's editor used to take the focus a frame later, so keys typed in that moment went into the note under the table, and on a slow machine a key right after a click (Home, Shift+↓) could be undone by the click's caret arriving late. The focus and the click's caret now come before the next key. The table tests no longer wait for a cell's focus; they type right after the key.
+- **Performance (D-153):** escaping a title with deeply nested field-like text (`[ a :: ` repeated before `[priority:: high]`) took about 8 s at 50,000 characters, when such a title was typed or a task with one was changed. The escaping now stops after 16 passes and escapes every bracket with `::` after it instead: 30–70 ms, and the same output as before for every title that needs no more (titles people type need one to three).
+- **CI (D-150):** the checks run once per commit, on pushes to `next` and pull requests; a release commit is `next`'s green commit, so it is no longer run three times (next, main, the tag).
+
 ## 1.2.0 (9 Nov 2026)
 
 - **Tables (NOTE-10; D-141 Q9–Q12, D-144, D-149):** GFM tables are drawn in the note editor, mini mode's Note tab and task bodies, and edited cell by cell in place (Tab, Enter, Shift+Enter, the arrows, Esc; undo, Ctrl+F and copy through the note's own text), writing only the edited cell's bytes (Align table re-pads on request). The edge drag adds or removes columns and rows (the "+" chips beside the right and bottom edges, a ghost of what it adds or takes, a toast with Delete and Cancel before text is removed); Add / Delete row and column and Delete table in the menu and the palette; selecting cells (drag, Shift+click, Shift+arrows), Ctrl+C as tab-separated text, Delete with one undo step, a pasted block filling and growing the table. Text typed, pasted or deleted under a table stays out of it (GFM would make it a row), also in Source mode, quotes and list items; a click under a table lands on the line clicked; a new empty row always gets both edge pipes. No slash menu in a cell (a `/` is just a slash; a menu for cells is planned).

@@ -4,6 +4,8 @@
 
 A fresh session can continue from this section, CLAUDE.md and the documents it points to.
 
+**1.2.1 (9 Nov 2026), on `next`, waiting for Davit's OK on the preview:** CI once per commit (D-150), a table cell takes the keys in the same step it lights up (D-152), the title escape stops after 16 passes (D-153). Then 1.3.0, Give to Claude (D-151).
+
 **State.** **1.2.0** is the latest release (9 Nov 2026; bumped on `next`, `main` fast-forwarded to it once CI was green, Davit tags `v1.2.0`): tables in notes (NOTE-10: D-141, D-144, D-149; no slash menu in a cell), Go to <list> in the composer's toast (D-147), the task-line reader in linear time (D-146), the highlighter's linear matchers (D-143), the app icon's detail at small sizes (D-148). 1.1.1 (D-143) before it. Work goes on `next` (D-145).
 
 **Postponed, start here (Davit, 9 Nov 2026):**
