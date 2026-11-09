@@ -82,10 +82,12 @@ export interface GiveEffects {
  * Gives a task to Claude: the link (or, for a prompt too long for one, the clipboard and a link
  * with a note, D-151), then the folder first among the recent ones and, asked for, the list's.
  * The clipboard is written only once the link has opened, so a refused link leaves it as it was.
+ * The settings are read once the link has opened (`current`), so a folder set or forgotten in
+ * the meantime isn't undone.
  */
 export async function giveToClaude(
   request: GiveToClaudeRequest,
-  settings: Settings,
+  current: () => Settings,
   effects: GiveEffects,
 ): Promise<{ outcome: GiveToClaudeOutcome; changes: Partial<Settings> | null }> {
   if (!(await folderExists(request.folder))) return { outcome: 'no-folder', changes: null };
@@ -97,6 +99,7 @@ export async function giveToClaude(
     return { outcome: 'not-installed', changes: null };
   }
   if (handoff.via === 'clipboard') await effects.copy(request.prompt);
+  const settings = current();
   const changes: Partial<Settings> = {
     claudeRecentFolders: withRecent(settings.claudeRecentFolders, request.folder),
     ...(request.makeDefault && request.list !== null

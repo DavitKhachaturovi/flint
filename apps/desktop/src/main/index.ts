@@ -1420,7 +1420,7 @@ async function start(): Promise<void> {
     if (!owns(event.sender)) return null;
     const request = readGiveRequest(value);
     if (!request) return null;
-    const { outcome, changes } = await giveToClaude(request, settingsFile.current, {
+    const { outcome, changes } = await giveToClaude(request, () => settingsFile.current, {
       installed: claudeInstalled,
       open: async (url) => {
         // Only the link `planHandoff` built: claude://code/new, nothing else (D-151).

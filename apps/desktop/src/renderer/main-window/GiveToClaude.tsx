@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElemen
 import {
   CLAUDE_PROMPT_LIMIT,
   buildPrompt,
+  folderName,
   planHandoff,
   type PromptTask,
 } from '../../shared/claude.js';
@@ -33,11 +34,6 @@ interface FolderRow {
 }
 type Row = FolderRow | { readonly kind: 'choose' };
 
-const nameOf = (path: string): string =>
-  path
-    .replace(/[\\/]+$/, '')
-    .split(/[\\/]/)
-    .pop() ?? path;
 const count = (value: number): string => value.toLocaleString('en-US');
 
 export function promptTask(task: TaskRow, parent: TaskRow | null): PromptTask {
@@ -73,10 +69,13 @@ export function GiveToClaude(props: GiveToClaudeProps): ReactElement {
   }, []);
   useLayoutEffect(() => card.current?.focus(), []);
 
+  // By the list's id, not its object: the window makes a new one on every render, and a refresh
+  // behind the card must never move the folder picked.
+  const listId = list?.id ?? null;
   const rows = useMemo((): Row[] => {
     if (!state) return [];
     const missing = new Set(state.missing.map((path) => path.toLowerCase()));
-    const own = list ? state.folders[list.id] : undefined;
+    const own = listId !== null ? state.folders[listId] : undefined;
     const folders: FolderRow[] = [];
     const add = (path: string, tag: FolderRow['tag']): void => {
       if (folders.some((row) => row.path.toLowerCase() === path.toLowerCase())) return;
@@ -85,13 +84,14 @@ export function GiveToClaude(props: GiveToClaudeProps): ReactElement {
     if (own) add(own, 'list');
     for (const path of state.recent) add(path, 'recent');
     return [...folders, { kind: 'choose' }];
-  }, [state, list]);
+  }, [state, listId]);
 
-  // The first folder that is still there (else Choose a folder…) is picked when the card opens.
+  // The first folder that is still there (else Choose a folder…) is picked once the folders load.
   useEffect(() => {
     const first = rows.findIndex((row) => row.kind === 'choose' || !row.missing);
     setSelected(Math.max(0, first));
-  }, [rows]);
+    // Only when they load (`rows` follows `state`): never again while the card is open.
+  }, [state]);
 
   const prompt = useMemo(
     () => (state ? buildPrompt(promptTask(task, parent), state.flintFolder) : ''),
@@ -106,6 +106,8 @@ export function GiveToClaude(props: GiveToClaudeProps): ReactElement {
   );
 
   const close = (then?: () => void): void => {
+    // Once closing, the card takes nothing more (a second Enter, an Esc losing the toast).
+    if (leaving) return;
     pending.current = then ?? null;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
     else setLeaving(true);
@@ -117,28 +119,30 @@ export function GiveToClaude(props: GiveToClaudeProps): ReactElement {
     then?.();
   };
 
+  /** Gives once: after a give that worked the card only closes. */
   const give = async (folder: string, makeDefault: boolean): Promise<void> => {
-    if (busy.current) return;
     busy.current = true;
-    const outcome = await window.flintMain.giveToClaude({
-      prompt,
-      folder,
-      list: list?.id ?? null,
-      makeDefault,
-    });
-    busy.current = false;
+    let outcome: GiveToClaudeOutcome | null = null;
+    try {
+      outcome = await window.flintMain.giveToClaude({ prompt, folder, list: listId, makeDefault });
+    } finally {
+      if (!outcome) busy.current = false;
+    }
     if (outcome) close(() => onGiven(outcome, folder));
   };
   const choose = async (makeDefault: boolean): Promise<void> => {
-    if (busy.current) return;
     busy.current = true;
-    const path = await window.flintMain.chooseClaudeFolder(near?.path ?? null);
-    busy.current = false;
-    card.current?.focus();
+    let path: string | null;
+    try {
+      path = await window.flintMain.chooseClaudeFolder(near?.path ?? null);
+    } finally {
+      busy.current = false;
+      card.current?.focus();
+    }
     if (path) await give(path, makeDefault);
   };
   const run = (row: Row | undefined, makeDefault: boolean): void => {
-    if (!row || !state) return;
+    if (!row || !state || busy.current || leaving) return;
     if (row.kind === 'choose') void choose(makeDefault);
     else if (!row.missing) void give(row.path, makeDefault);
   };
@@ -206,7 +210,7 @@ export function GiveToClaude(props: GiveToClaudeProps): ReactElement {
               >
                 {row.kind === 'folder' ? (
                   <>
-                    <span className="palette-text">{nameOf(row.path)}</span>
+                    <span className="palette-text">{folderName(row.path)}</span>
                     <span className="palette-detail give-path" title={row.path}>
                       {row.path}
                     </span>

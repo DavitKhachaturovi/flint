@@ -6,6 +6,7 @@ import {
   buildPrompt,
   claudeLink,
   estimateTokens,
+  folderName,
   planHandoff,
 } from './claude.js';
 
@@ -82,6 +83,33 @@ describe('the prompt made from a task (TASK-18, D-151)', () => {
         '',
       ].join('\n'),
     );
+  });
+});
+
+describe('attachment links with parentheses or a title (D-151)', () => {
+  it('keeps the whole name in angle brackets, and a title after the path', () => {
+    const body = [
+      '[r](<attachments/report (1).pdf>)',
+      '![s](attachments/a.png "The shot")',
+      '[t](<attachments/b c.png> "Two words")',
+    ].join('\n');
+    expect(buildPrompt({ title: 't', body, subtasks: [] }, FLINT)).toBe(
+      [
+        '# t',
+        '',
+        '[r](<C:\\Users\\Alex\\Flint\\attachments\\report (1).pdf>)',
+        '![s](<C:\\Users\\Alex\\Flint\\attachments\\a.png> "The shot")',
+        '[t](<C:\\Users\\Alex\\Flint\\attachments\\b c.png> "Two words")',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('names a folder by its last part, a drive by itself', () => {
+    expect(folderName('C:\\Code\\acme-web')).toBe('acme-web');
+    expect(folderName('C:\\Code\\acme-web\\')).toBe('acme-web');
+    expect(folderName('D:/work/contoso')).toBe('contoso');
+    expect(folderName('C:\\')).toBe('C:\\');
   });
 });
 

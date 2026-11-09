@@ -619,17 +619,6 @@ export function SettingsScreen(props: {
         />
       </Section>
 
-      {/* TASK-18, D-151: Give to Claude: each list's folder, and the recent ones. */}
-      <Section id="claude" filter={filter}>
-        <Row
-          name="Give to Claude"
-          note="Flint opens Claude Code with the task in its composer. Flint sends nothing itself; you review it and send it from Claude."
-          filter={filter}
-          words="claude code give ai agent folder project privacy"
-        />
-        <ClaudeFolders lists={props.claudeLists} onFolders={props.onClaudeFolders} />
-      </Section>
-
       {/* NAV-08, D-128: Windows' clipboard history in the side panel and its picker. */}
       <Section id="clipboard" filter={filter}>
         <Row
@@ -646,6 +635,17 @@ export function SettingsScreen(props: {
             }}
           />
         </Row>
+      </Section>
+
+      {/* TASK-18, D-151: Give to Claude: each list's folder, and the recent ones. */}
+      <Section id="claude" filter={filter}>
+        <Row
+          name="Give to Claude"
+          note="Flint opens Claude Code with the task in its composer. Flint sends nothing itself; you review it and send it from Claude."
+          filter={filter}
+          words="claude code give ai agent folder project privacy"
+        />
+        <ClaudeFolders lists={props.claudeLists} onFolders={props.onClaudeFolders} />
       </Section>
 
       <Section id="data" filter={filter}>

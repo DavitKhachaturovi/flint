@@ -43,7 +43,7 @@ describe('giving a task to Claude (TASK-18, D-151)', () => {
     const { opened, copied, effects } = recorder();
     const result = await giveToClaude(
       { prompt: '# Fix it\n', folder, list: 'unicorn', makeDefault: false },
-      settings({ claudeRecentFolders: ['C:\\Code\\other', folder.toUpperCase()] }),
+      () => settings({ claudeRecentFolders: ['C:\\Code\\other', folder.toUpperCase()] }),
       effects,
     );
     expect(result.outcome).toBe('opened');
@@ -56,7 +56,7 @@ describe('giving a task to Claude (TASK-18, D-151)', () => {
     const { effects } = recorder();
     const result = await giveToClaude(
       { prompt: 'x', folder, list: 'unicorn', makeDefault: true },
-      settings({ claudeFolders: { errands: 'C:\\Code\\e' } }),
+      () => settings({ claudeFolders: { errands: 'C:\\Code\\e' } }),
       effects,
     );
     expect(result.changes?.claudeFolders).toEqual({ errands: 'C:\\Code\\e', unicorn: folder });
@@ -67,7 +67,7 @@ describe('giving a task to Claude (TASK-18, D-151)', () => {
     const prompt = 'a'.repeat(CLAUDE_PROMPT_LIMIT + 1);
     const result = await giveToClaude(
       { prompt, folder, list: null, makeDefault: false },
-      settings(),
+      () => settings(),
       effects,
     );
     expect(result.outcome).toBe('copied');
@@ -81,7 +81,7 @@ describe('giving a task to Claude (TASK-18, D-151)', () => {
       const prompt = 'a'.repeat(CLAUDE_PROMPT_LIMIT + 1);
       const result = await giveToClaude(
         { prompt, folder, list: null, makeDefault: true },
-        settings(),
+        () => settings(),
         effects,
       );
       expect(result).toEqual({ outcome: 'not-installed', changes: null });
@@ -94,7 +94,7 @@ describe('giving a task to Claude (TASK-18, D-151)', () => {
     const gone = join(folder, 'gone');
     const result = await giveToClaude(
       { prompt: 'x', folder: gone, list: null, makeDefault: false },
-      settings(),
+      () => settings(),
       effects,
     );
     expect(result.outcome).toBe('no-folder');
@@ -139,7 +139,7 @@ describe('the folders remembered (D-151)', () => {
       claudeFolders: { unicorn: 'C:\\Code\\u', bad: 'relative', '': 'C:\\x', n: 3 },
       claudeRecentFolders: [
         'C:\\a',
-        'C:\\a',
+        'c:\\A',
         'nope',
         7,
         '\\\\server\\share',

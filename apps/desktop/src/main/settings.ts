@@ -161,7 +161,12 @@ function readClaudeFolders(value: unknown): Record<string, string> {
 
 function readRecentFolders(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.filter(isAbsoluteFolder))].slice(0, CLAUDE_RECENT_FOLDERS);
+  // Once each, whatever the letter case (Windows paths), the first one kept.
+  const seen = new Set<string>();
+  return value
+    .filter(isAbsoluteFolder)
+    .filter((path) => !seen.has(path.toLowerCase()) && seen.add(path.toLowerCase()))
+    .slice(0, CLAUDE_RECENT_FOLDERS);
 }
 
 const isDays = (value: unknown): value is number =>

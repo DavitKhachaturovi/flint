@@ -98,7 +98,7 @@ import { onboardingOnce, Walkthrough, WhatsNew, type TourEnd } from './Onboardin
 import { TipLayer, tipHappened, useFrontAdds } from './Tips.js';
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
 import { GiveToClaude } from './GiveToClaude.js';
-import { CLAUDE_DOWNLOAD_URL } from '../../shared/claude.js';
+import { CLAUDE_DOWNLOAD_URL, folderName } from '../../shared/claude.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
@@ -442,6 +442,11 @@ export function App(): ReactElement {
     });
   }, []);
   useEffect(refreshClaudeFolders, [refreshClaudeFolders]);
+  // A card whose task went (deleted, moved by a change from outside) closes for good, so it never
+  // comes back on its own when the task does.
+  useEffect(() => {
+    if (claudeTask !== null && view && !findRow(view, claudeTask)) setClaudeTask(null);
+  }, [claudeTask, view]);
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -2610,12 +2615,7 @@ export function App(): ReactElement {
       const state = await window.flintMain.setClaudeFolder(list.id, path);
       if (!state) return;
       setClaudeFolders(state.folders);
-      const name =
-        path
-          .replace(/[\\/]+$/, '')
-          .split(/[\\/]/)
-          .pop() ?? path;
-      showToast(`${list.name} gives to Claude in ${name}`, false);
+      showToast(`${list.name} gives to Claude in ${folderName(path)}`, false);
     },
     [claudeFolders, showToast],
   );
@@ -5742,11 +5742,7 @@ export function App(): ReactElement {
                 refreshClaudeFolders();
               }}
               onGiven={(outcome, folder) => {
-                const name =
-                  folder
-                    .replace(/[\\/]+$/, '')
-                    .split(/[\\/]/)
-                    .pop() ?? folder;
+                const name = folderName(folder);
                 if (outcome === 'opened') showToast(`Given to Claude · ${name}`, false);
                 else if (outcome === 'copied')
                   showToast('Copied: paste it into Claude with Ctrl+V', false);

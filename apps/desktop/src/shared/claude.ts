@@ -66,8 +66,13 @@ function oneLine(text: string): string {
   return text.replace(/\s*[\r\n]+\s*/g, ' ').trim();
 }
 
-/** A markdown link's target in the Flint folder (`attachments/…`) or a linked file (`file:///…`). */
-const LINK_TARGET = /\]\(<?((?:attachments\/|file:\/\/\/)[^)>\n]*)>?\)/g;
+/**
+ * A markdown link's target in the Flint folder (`attachments/…`) or a linked file (`file:///…`):
+ * in angle brackets (`<attachments/a (1).png>`, which may hold spaces and parentheses) or bare,
+ * then an optional title (`"…"`), kept as it is.
+ */
+const LINK_TARGET =
+  /\]\((?:<((?:attachments\/|file:\/\/\/)[^>\n]*)>|((?:attachments\/|file:\/\/\/)[^)\s]*))((?:[ \t]+"[^"\n]*")?)\)/g;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
 /** Makes attachment and linked-file links absolute Windows paths, outside fenced code. */
@@ -85,10 +90,18 @@ function absoluteLinks(markdown: string, flintFolder: string): string {
       if (fence !== null) return line;
       return line.replace(
         LINK_TARGET,
-        (_, target: string) => `](<${absolutePath(target, flintFolder)}>)`,
+        (_, angled: string | undefined, bare: string | undefined, title: string) =>
+          `](<${absolutePath(angled ?? bare ?? '', flintFolder)}>${title})`,
       );
     })
     .join('\n');
+}
+
+/** A folder's own name, for the card and the toasts (`C:\Code\acme-web` → `acme-web`; `C:\` stays). */
+export function folderName(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '');
+  if (/^[A-Za-z]:$/.test(trimmed) || trimmed === '') return path;
+  return trimmed.split(/[\\/]/).pop() ?? path;
 }
 
 function absolutePath(target: string, flintFolder: string): string {
