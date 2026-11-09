@@ -514,7 +514,9 @@ test('the Note tab: made on the first keystroke, one window edits it at a time (
   await mini.waitForTimeout(400);
   expect((await readdir(flint)).length).toBe(before);
   await mini.locator('.mini-note-head .tool').click();
-  await expect(mini.locator('.fl-menu-item', { hasText: 'New quick note' })).toBeDisabled();
+  await expect(
+    mini.locator('.fl-menu .fl-menu-item', { hasText: 'New quick note' }),
+  ).toBeDisabled();
   await mini.keyboard.press('Escape');
   await editor.click();
   await mini.keyboard.type('Sticky from mini');
@@ -568,7 +570,7 @@ test('the Note tab: a reminder never takes the caret, typing goes on; D/S/O stay
 test('the Note tab: a title before any text; a removed empty note never leaves the tab dead (D-110)', async () => {
   // New quick note (the current one has text), then a title first: the note is made with it.
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'New quick note' }).click();
   const title = mini.locator('.quick-title-input');
   await expect(title).toBeEnabled();
   await expect(title).toHaveValue('');
@@ -581,7 +583,7 @@ test('the Note tab: a title before any text; a removed empty note never leaves t
   // Another new one, typed into and emptied again, then left: it is removed after a moment,
   // while the tab is shown again; the tab still takes the title and the text.
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'New quick note' }).click();
   const editor = mini.locator('.mini-editor .cm-content');
   await editor.click();
   await mini.keyboard.type('x');
@@ -606,7 +608,7 @@ test('the Note tab: a title before any text; a removed empty note never leaves t
 test('the Note tab: a title first, then Enter: the caret goes on into the text, one note (D-115)', async () => {
   await mini.keyboard.press('Control+3');
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'New quick note' }).click();
   const title = mini.locator('.quick-title-input');
   await expect(title).toHaveValue('');
   const before = (await readdir(flint)).length;
@@ -668,7 +670,7 @@ ${name} text here.
   await expect(main.locator('.nav', { hasText: 'Music' })).toBeVisible();
   await mini.keyboard.press('Control+3');
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'Open a note…' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'Open a note…' }).click();
   const picker = mini.locator('.fl-picker');
   await expect(picker).toBeVisible();
   await expect(picker.locator('.fl-picker-search')).toBeFocused();
@@ -694,7 +696,9 @@ ${name} text here.
   await expect(mini.locator('.quick-title .subtitle')).toContainText('Note ·');
   await expect(mini.locator('.quick-title-input')).toHaveValue('Plan');
   await mini.locator('.mini-note-head .tool').click();
-  await expect(mini.locator('.fl-menu-item', { hasText: 'Keep as a note' }).last()).toBeDisabled();
+  await expect(
+    mini.locator('.fl-menu .fl-menu-item', { hasText: 'Keep as a note' }).last(),
+  ).toBeDisabled();
   await mini.keyboard.press('Escape');
   // The caret is in the note (where Ctrl+1 is a heading): the tab by a click.
   await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
@@ -706,7 +710,7 @@ test("the Note tab: a quick note made here, opened again after another note: its
   const editor = mini.locator('.mini-editor .cm-content');
   await expect(editor).toContainText('Plan text here.');
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'New quick note' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'New quick note' }).click();
   await expect(mini.locator('.quick-title-input')).toHaveValue('');
   await editor.click();
   await mini.keyboard.type('Mini alpha text');
@@ -722,7 +726,7 @@ test("the Note tab: a quick note made here, opened again after another note: its
   const alpha = (await alphaFile()) ?? '';
   // Another note (Plan), its editor marked, then the quick note again: a new editor.
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'Open a note…' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'Open a note…' }).click();
   await mini.keyboard.type('plan');
   await expect(mini.locator('.fl-picker .fl-picker-label')).toHaveText(['Plan']);
   await mini.keyboard.press('Enter');
@@ -731,7 +735,7 @@ test("the Note tab: a quick note made here, opened again after another note: its
     (element as HTMLElement).dataset.e2eNote = 'plan';
   });
   await mini.locator('.mini-note-head .tool').click();
-  await mini.locator('.fl-menu-item', { hasText: 'Mini alpha' }).click();
+  await mini.locator('.fl-menu .fl-menu-item', { hasText: 'Mini alpha' }).click();
   await expect(editor).toContainText('Mini alpha text');
   await expect(mini.locator('.mini-editor .cm-editor[data-e2e-note]')).toHaveCount(0);
   await editor.click();
