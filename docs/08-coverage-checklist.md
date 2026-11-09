@@ -1208,3 +1208,6 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | The capture queued in main until mini's page takes it; inserted once the note's text has loaded and the note is this window's to edit | MINI-02 · Done (1.4.0) | D-157, `mini.ts`, `NoteEditor.tsx` |
 | 4 | The list tab: its list's name and a chevron; a click on the active tab or the chevron opens the list picker (Inbox in, the shown list out, no New list, notes out) | MINI-03 · Done (1.4.0) | 02, 03, D-158, `MiniApp.tsx` |
 | 5 | The choice remembered in `mini-state.json`; a gone list falls back to Inbox; composer, keys and the rest on the chosen list; the name fades in | MINI-03 · Done (1.4.0) | D-158, `mini.spec.ts` |
+| 6 | Click-through: menus, pickers and the editor's tooltips outside the card take clicks while open, measured every frame; the region shrinks back | MINI-01 · Done (1.4.0) | D-159, `stage.ts`, `mini.spec.ts` |
+| 7 | The header never overflows (the list tab's name shortens first; the buttons stay); the minimum width 320 px | MINI-01 · Done (1.4.0) | D-160, `mini.css`, `mini-size.ts`, `mini.spec.ts` |
+| 8 | Reset size only when the visible size differs from the default (a taller limit over short content is no resize) | MINI-01 · Done (1.4.0) | D-160, `stage.ts`, `mini.spec.ts` |

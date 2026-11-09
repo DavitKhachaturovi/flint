@@ -43,6 +43,7 @@ type Hooks = {
   miniVisible?: () => boolean;
   toasts: string[];
   closedToasts?: string[];
+  miniSurface?: { rects: Box[] };
 };
 /** A test hook: called when it is a function, else its value. */
 const hook = (name: keyof Hooks): Promise<unknown> =>
@@ -259,7 +260,8 @@ test("the card: mockup 05's look on a transparent window, the main window's part
         .find((each) => each.getTitle() === 'Flint mini')
         ?.getSize(),
     ),
-  ).toEqual([804, 824]);
+    // 520 (the widest card) + 200 (D-160: the hang-side edge's reach, max − min) + 2 × 32 (shadow).
+  ).toEqual([784, 824]);
   expect(await mini.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
@@ -1047,6 +1049,121 @@ test('the list tab shows any task list: a click on the active tab (or its chevro
   await expect(tab).toHaveText('Inbox');
   await expect(row('Inbox thing one')).toHaveCount(1);
   await expect.poll(() => readFile(stateFile, 'utf8')).toContain('"listId": null');
+  await mini.keyboard.press('Control+1');
+});
+
+/** D-159: the rects mini's page last told main it takes clicks over (page pixels). */
+const surfaceRects = async (): Promise<Box[]> => {
+  const surface = (await hook('miniSurface')) as { rects?: Box[] } | undefined;
+  return surface?.rects ?? [];
+};
+/** Whether one reported rect holds the whole element. */
+const takesClicks = async (target: ReturnType<Page['locator']>): Promise<boolean> => {
+  const box = await target.boundingBox();
+  if (!box) return false;
+  const rects = await surfaceRects();
+  return rects.some(
+    (rect) =>
+      rect.x <= box.x + 0.5 &&
+      rect.y <= box.y + 0.5 &&
+      rect.x + rect.width >= box.x + box.width - 0.5 &&
+      rect.y + rect.height >= box.y + box.height - 0.5,
+  );
+};
+
+test('whatever opens outside the card takes clicks too: the list picker, the Note tab’s ⋯ menu, a row’s menu; the region shrinks back when it closes (D-159)', async () => {
+  await mini.keyboard.press('Control+2');
+  const tab = mini.locator('.mini-tabs .mini-tab-list');
+  await expect(tab).toHaveClass(/\bon\b/);
+  await expect.poll(async () => (await surfaceRects()).length).toBe(1);
+  await tab.click();
+  const picker = mini.locator('.fl-picker');
+  await expect(picker.locator('.fl-picker-search')).toBeFocused();
+  await expect.poll(() => takesClicks(picker)).toBe(true);
+  // Typing changes the rows, so the picker's height: still covered.
+  await mini.keyboard.type('Zzz');
+  await expect(picker.locator('.fl-picker-empty')).toBeVisible();
+  await expect.poll(() => takesClicks(picker)).toBe(true);
+  await mini.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
+  await expect.poll(async () => (await surfaceRects()).length).toBe(1);
+  // The Note tab's ⋯ menu.
+  await mini.keyboard.press('Control+3');
+  await mini.locator('.mini-note-head .tool').click();
+  const menu = mini.locator('.fl-menu');
+  await expect(menu).toBeVisible();
+  await expect.poll(() => takesClicks(menu)).toBe(true);
+  await mini.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => (await surfaceRects()).length).toBe(1);
+  // A row's right-click menu.
+  await mini.keyboard.press('Control+1');
+  await row('Inbox thing two').click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await expect.poll(() => takesClicks(menu)).toBe(true);
+  await mini.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => (await surfaceRects()).length).toBe(1);
+});
+
+test('the header never overflows: a long list name shortens first, the buttons stay at the minimum width; a taller limit over short content is no resize, on the Note tab it is (D-160)', async () => {
+  await mini.keyboard.press('Control+1');
+  await expect(mini.locator('.mini-tabs .trash-tab.on')).toHaveText('Today');
+  await mini.waitForTimeout(800);
+  const today = await cardBox();
+  expect(today.width).toBe(364);
+  expect(today.height).toBeLessThan(460);
+  // A taller limit over short content: nothing visible changes, so no reset button.
+  // (A height drag starts from the card's visible height: the limit becomes that plus the drag.)
+  await resize('edge-bottom', 0, 160);
+  expect((await cardBox()).height).toBe(today.height);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(0);
+  // The Note tab takes the limit: there the size differs, and Reset size brings it back.
+  await mini.keyboard.press('Control+3');
+  await expect.poll(async () => (await cardBox()).height).toBe(today.height + 160);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(1);
+  await mini.locator('.mini-reset.on').click();
+  await expect.poll(async () => (await cardBox()).height).toBe(460);
+  await expect(mini.locator('.mini-reset.on')).toHaveCount(0);
+  // A list with a long name in the tab, at the narrowest width: the name shortens, the buttons stay.
+  await writeFile(
+    join(flint, 'Service metrics api gateway.md'),
+    '---\nflint: 1\nid: svcmetrics\nmode: tasks\n---\n- [ ] Long name task [id:: lm1]\n',
+  );
+  await expect(main.locator('.nav', { hasText: 'Service metrics api gateway' })).toHaveCount(1);
+  await mini.keyboard.press('Control+2');
+  const tab = mini.locator('.mini-tabs .mini-tab-list');
+  await tab.click();
+  await mini.keyboard.type('Service');
+  await mini.locator('.fl-picker .fl-picker-row', { hasText: 'Service metrics' }).click();
+  await expect(tab).toHaveText('Service metrics api gateway');
+  await expect(row('Long name task')).toHaveCount(1);
+  await resize('edge-left', 80, 0);
+  await expect.poll(async () => (await cardBox()).width).toBe(320);
+  const card = await cardBox();
+  const head = mini.locator('.mini-head');
+  expect(await head.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+    true,
+  );
+  for (const label of ['Hide mini mode', 'Always on top (on)', 'Reset size']) {
+    const button = mini.locator(`.mini-head [aria-label="${label}"]`);
+    await expect(button).toBeVisible();
+    const box = await button.boundingBox();
+    expect(box).not.toBeNull();
+    if (box) {
+      expect(box.x).toBeGreaterThanOrEqual(card.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width + 0.5);
+    }
+  }
+  expect(
+    await tab.locator('.mini-tab-name').evaluate((name) => name.scrollWidth > name.clientWidth),
+  ).toBe(true);
+  await mini.locator('.mini-reset.on').click();
+  await expect.poll(async () => (await cardBox()).width).toBe(364);
+  // Inbox back for the tests after this one.
+  await tab.click();
+  await mini.locator('.fl-picker .fl-picker-row', { hasText: 'Inbox' }).click();
+  await expect(tab).toHaveText('Inbox');
   await mini.keyboard.press('Control+1');
 });
 

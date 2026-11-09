@@ -7,6 +7,7 @@ import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron';
 import { CLOCK_ARGUMENT, installTestClock } from '../shared/test-clock.js';
 import { writeFileAtomic } from './storage/atomic.js';
 import type { ClipboardHistoryRead } from './clipboard-history.js';
+import type { MiniSurface } from '../shared/ipc.js';
 import {
   monitorSetupKey,
   rememberBounds,
@@ -84,6 +85,8 @@ export interface E2EHooks {
   miniVisible?: () => boolean;
   /** D-109: the reminders whose toast mini mode's card took back. */
   closedToasts?: string[];
+  /** D-159: what mini's page last said it takes clicks over (the card, open menus and pickers). */
+  miniSurface?: MiniSurface;
   /**
    * MINI-02, D-157: the capture-into-note hotkey after its copy step (tests never send keys to
    * another app): what the selection was, as the hotkey would have read it.

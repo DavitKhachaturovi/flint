@@ -115,12 +115,25 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* D-160: the header never overflows: the list tab's name shortens first (an ellipsis), the other
+   tabs and the reset, pin and × buttons keep their size. */
 .mini-tabs {
+  flex: 0 1 auto;
+  min-width: 0;
   -webkit-app-region: no-drag;
 }
 
+.mini-tabs .trash-tab {
+  flex: 0 0 auto;
+}
+
+.mini-head > .tool {
+  flex: 0 0 auto;
+}
+
 .mini-head-space {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* The pin: filled while mini is on top, an outline when it isn't; the change eases. */
@@ -442,15 +455,19 @@ body {
 
 /* MINI-03, D-158: the list tab reads the list it shows; its chevron (and a click on the active tab)
    opens the list picker. A new name fades in. */
-.mini-tab-list {
+.mini-tabs .trash-tab.mini-tab-list {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  /* D-160: the one tab that gives way; never narrower than its ellipsis and chevron. */
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 150px;
   padding-right: 8px;
 }
 
 .mini-tab-name {
+  min-width: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

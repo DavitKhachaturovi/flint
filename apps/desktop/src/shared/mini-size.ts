@@ -3,7 +3,9 @@
  * width and one height limit for every tab (Today and Inbox fit their content up to the limit, the
  * Note tab always takes it). Mockup 05's card is the default.
  */
-export const MINI_WIDTH = { min: 300, initial: 364, max: 520 } as const;
+// D-160: the minimum fits the header at its shortest: Today, the list tab reduced to an ellipsis
+// and its chevron, Note, and the reset, pin and × buttons.
+export const MINI_WIDTH = { min: 320, initial: 364, max: 520 } as const;
 export const MINI_LIMIT = { min: 180, initial: 460, max: 760 } as const;
 
 /**

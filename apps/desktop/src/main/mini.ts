@@ -140,10 +140,20 @@ export function createMini(options: {
   } catch {
     // First use: the defaults.
   }
+  // D-160: one write at a time, with what `stored` holds when it runs: two saves in one tick (the
+  // tab and the list chosen together, D-158) used to write side by side, and the older could land
+  // last.
+  let saving: Promise<void> = Promise.resolve();
+  let saveQueued = false;
   const save = (): void => {
-    void writeFileAtomic(file, `${JSON.stringify(stored, null, 2)}\n`, {
-      tempDirectory: join(dirname(file), 'tmp'),
-    }).catch(() => undefined);
+    if (saveQueued) return;
+    saveQueued = true;
+    saving = saving.then(async () => {
+      saveQueued = false;
+      await writeFileAtomic(file, `${JSON.stringify(stored, null, 2)}\n`, {
+        tempDirectory: join(dirname(file), 'tmp'),
+      }).catch(() => undefined);
+    });
   };
   const displays = (): DisplayInfo[] =>
     screen.getAllDisplays().map((display): DisplayInfo => ({
@@ -415,6 +425,8 @@ export function createMini(options: {
       rects: Array.isArray(next.rects) ? next.rects.filter(isRect) : [],
       held: next.held === true,
     };
+    // D-159: the tests read what the page takes clicks over.
+    if (hooks) hooks.miniSurface = surface;
     if (window.isVisible()) watch();
   });
   ipcMain.on(Channels.miniResized, (event, value: unknown) => {

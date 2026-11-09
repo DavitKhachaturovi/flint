@@ -133,31 +133,66 @@ export function useStage(refs: {
     easing.addEventListener('finish', done);
     easing.addEventListener('cancel', done);
   }, [card, version]);
+  // D-160: the reset button shows only when the card's visible size differs from the default. On
+  // Today and the list tab the card is as tall as its content up to the limit, so a limit dragged
+  // taller than short content changes nothing visible: it doesn't count. The height the card would
+  // have at the default limit is known from what it has now: not reaching its limit, it is its
+  // content's height (taller than the default limit only if the limit lets it); at its limit, the
+  // content is at least that tall (at a smaller limit than the default, the default would show
+  // more of it).
+  const [heightDiffers, setHeightDiffers] = useState(false);
+  const limitRef = useRef(limit);
+  limitRef.current = limit;
+  const fullRef = useRef(full);
+  fullRef.current = full;
+  const judgeHeight = useCallback((): void => {
+    const element = card.current;
+    if (!element) return;
+    const height = element.offsetHeight;
+    const current = limitRef.current;
+    setHeightDiffers(
+      fullRef.current
+        ? current !== DEFAULT.limit
+        : height > DEFAULT.limit || (height >= current && current < DEFAULT.limit),
+    );
+  }, [card]);
+  useEffect(judgeHeight, [judgeHeight, limit, full, version]);
   useEffect(() => {
     const element = card.current;
     if (!element) return;
     const observer = new ResizeObserver(() => {
       lastHeight.current = element.offsetHeight;
+      judgeHeight();
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [card]);
+  }, [card, judgeHeight]);
 
   const corner = layout?.corner ?? 'top-right';
   const left = corner.endsWith('left');
   const top = corner.startsWith('top');
 
-  // Where clicks must reach the page: the card and its handles, open menus. Told to main a frame
-  // after anything moves (and while a button is held, wherever the pointer goes).
+  // Where clicks must reach the page: the card and its handles, and everything open outside the
+  // card (D-159: menus and pickers, which are children of the body beside the app's root, and the
+  // editor's tooltips such as the slash menu). Told to main a frame after anything moves (and
+  // while a button is held, wherever the pointer goes); while anything is open outside the card
+  // it is measured again every frame, since menus and pickers place themselves, grow with their
+  // rows and fade out, and only a change is sent.
   const held = useRef(false);
   const frame = useRef(0);
+  const sent = useRef('');
   const report = useCallback((): void => {
     cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
+    const tick = (): void => {
       const element = card.current;
       if (!element) return;
       const box = element.getBoundingClientRect();
       const topCorner = (layoutRef.current?.corner ?? 'top-right').startsWith('top');
+      const root = document.getElementById('root');
+      const overlays = [
+        ...[...document.body.children].filter((each) => each !== root),
+        ...document.querySelectorAll('.cm-tooltip'),
+      ];
       const rects = [
         {
           // The side handles and the one away from the corner; above a card in a top corner,
@@ -167,17 +202,26 @@ export function useStage(refs: {
           width: box.width + 2 * HANDLE,
           height: box.height + (topCorner ? HANDLE : TOP_HANDLE),
         },
-        ...[...document.querySelectorAll('.fl-menu')].map((menu) => {
-          const rect = menu.getBoundingClientRect();
-          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-        }),
+        ...overlays
+          .map((overlay) => {
+            const rect = overlay.getBoundingClientRect();
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          })
+          .filter((rect) => rect.width > 0 && rect.height > 0),
       ];
-      window.flintMini.surface({
+      const surface = {
         card: { width: box.width, height: box.height },
         rects,
         held: held.current,
-      });
-    });
+      };
+      const key = JSON.stringify(surface);
+      if (key !== sent.current) {
+        sent.current = key;
+        window.flintMini.surface(surface);
+      }
+      if (overlays.length > 0) frame.current = requestAnimationFrame(tick);
+    };
+    frame.current = requestAnimationFrame(tick);
   }, [card]);
   useEffect(() => {
     const observer = new ResizeObserver(report);
@@ -200,6 +244,7 @@ export function useStage(refs: {
     return () => {
       observer.disconnect();
       menus.disconnect();
+      cancelAnimationFrame(frame.current);
       window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
@@ -310,7 +355,8 @@ export function useStage(refs: {
     ],
     startResize,
     corner,
-    resized: size.width !== DEFAULT.width || size.limit !== DEFAULT.limit,
+    // D-160: by what is visible: the width, and the height only where the limit shows.
+    resized: size.width !== DEFAULT.width || heightDiffers,
     reset,
   };
 }
