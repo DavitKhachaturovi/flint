@@ -77,6 +77,16 @@ describe('settings (APP-11)', () => {
     });
   });
 
+  it("D-157: the hotkey into mini mode's note, Ctrl+Alt+X by default", () => {
+    expect(readSettings({})).toMatchObject({ miniSelectionHotkey: 'Control+Alt+X' });
+    expect(readSettings({ miniSelectionHotkey: 'Control+Alt+J' })).toMatchObject({
+      miniSelectionHotkey: 'Control+Alt+J',
+    });
+    expect(readSettings({ miniSelectionHotkey: 7 })).toMatchObject({
+      miniSelectionHotkey: 'Control+Alt+X',
+    });
+  });
+
   it("D-117: the last version whose What's new was shown; none before What's new", () => {
     expect(readSettings({}).lastSeenVersion).toBeNull();
     expect(readSettings({ lastSeenVersion: '0.8.16' }).lastSeenVersion).toBe('0.8.16');

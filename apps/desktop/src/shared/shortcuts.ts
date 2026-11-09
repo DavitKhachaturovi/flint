@@ -21,6 +21,11 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Ctrl+Shift+Space', action: 'Quick capture (changeable)' },
       { keys: 'Ctrl+Shift+X', action: 'Capture the selected text (changeable)' },
       { keys: 'Ctrl+Alt+Space', action: 'Show or hide mini mode (changeable)' },
+      // MINI-02, D-157: the selection into mini's note.
+      {
+        keys: 'Ctrl+Alt+X',
+        action: 'Capture the selected text into mini mode’s note (changeable)',
+      },
     ],
   },
   {
@@ -106,7 +111,9 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
     // MINI-01, D-109 (Q7): letters only while no text field has the caret.
     name: 'Mini mode',
     shortcuts: [
-      { keys: 'Ctrl+1 / 2 / 3', action: 'Today / Inbox / Note' },
+      { keys: 'Ctrl+1 / 2 / 3', action: 'Today / the list tab / Note' },
+      // MINI-03, D-158: the second tab shows any task list.
+      { keys: 'Click the list tab again', action: 'Choose the list it shows' },
       { keys: '↑ / ↓', action: 'Move the selection' },
       { keys: 'Space', action: 'Complete or reopen' },
       { keys: 'P', action: 'Pin to Today, or unpin' },

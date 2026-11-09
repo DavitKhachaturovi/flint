@@ -3,6 +3,7 @@ import {
   Channels,
   type MiniAlert,
   type MiniAlertAction,
+  type MiniCapture,
   type MiniLayout,
   type MiniResize,
   type MiniState,
@@ -73,7 +74,7 @@ const mini = {
   state(): Promise<MiniState> {
     return invoke(Channels.miniState) as Promise<MiniState>;
   },
-  setState(state: Partial<Pick<MiniState, 'tab' | 'noteId'>>): void {
+  setState(state: Partial<Pick<MiniState, 'tab' | 'listId' | 'noteId'>>): void {
     send(Channels.miniSetState, state);
   },
   /** The header's pin: always on top, or not. */
@@ -105,6 +106,14 @@ const mini = {
   },
   alertAction(id: string, action: MiniAlertAction): void {
     send(Channels.miniAlertAction, id, action);
+  },
+  /** MINI-02, D-157: a selection captured into the note waits (also sent as the page starts). */
+  onCapture(listener: () => void): void {
+    ipcRenderer.on(Channels.miniCapture, () => listener());
+  },
+  /** The captures waiting, in order; taken, so none is added twice. */
+  takeCaptures(): Promise<readonly MiniCapture[]> {
+    return invoke(Channels.miniTakeCaptures) as Promise<readonly MiniCapture[]>;
   },
   /** D-110: where the card sits in the transparent window, and how big it may be. */
   onLayout(listener: (layout: MiniLayout) => void): void {

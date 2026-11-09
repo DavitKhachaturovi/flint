@@ -69,6 +69,9 @@ export const Channels = {
   miniAlerts: 'mini:alerts',
   miniGetAlerts: 'mini:get-alerts',
   miniAlertAction: 'mini:alert-action',
+  /** MINI-02, D-157: main → mini: a capture waits; mini → main: the captures waiting, taken. */
+  miniCapture: 'mini:capture',
+  miniTakeCaptures: 'mini:take-captures',
   /**
    * D-110: mini mode's transparent stage. Main → mini: where the card sits in the window and how
    * big it may be; mini → main: the card's size and the places that take the pointer, a resize's
@@ -328,7 +331,8 @@ export interface HotkeyView {
   readonly registered: boolean;
 }
 
-export type HotkeyName = 'capture' | 'selection' | 'mini';
+/** APP-08: the global hotkeys; D-157: `miniSelection` captures the selection into mini's note. */
+export type HotkeyName = 'capture' | 'selection' | 'mini' | 'miniSelection';
 
 export type HotkeysView = Readonly<Record<HotkeyName, HotkeyView>>;
 
@@ -550,6 +554,8 @@ export interface SettingsView {
   readonly captureSelectionHotkey: string;
   /** D-109: mini mode (Settings → Mini mode) and the popup's sharing switch. */
   readonly miniHotkey: string;
+  /** MINI-02, D-157: capture the selected text into mini mode's note. */
+  readonly miniSelectionHotkey: string;
   readonly miniHideFromSharing: boolean;
   readonly popupHideFromSharing: boolean;
   readonly miniReminders: 'when-open' | 'always';
@@ -934,11 +940,25 @@ export interface SearchHit {
 /** MINI-01, D-109: mini mode's tabs. */
 export type MiniTab = 'today' | 'inbox' | 'note';
 
-/** What mini mode remembers (app data): its tab, the quick note shown, on top. */
+/** What mini mode remembers (app data): its tab, the list its second tab shows, the quick note shown, on top. */
 export interface MiniState {
   readonly tab: MiniTab;
+  /** MINI-03, D-158: the task list the second tab shows; null is Inbox. */
+  readonly listId: string | null;
   readonly noteId: string | null;
   readonly onTop: boolean;
+}
+
+/**
+ * MINI-02, D-157: a selection captured into mini mode's note (the hotkey), waiting for mini's page
+ * to take it: its text (null when nothing was selected), a hint to show (an admin window), and
+ * whether mini was just opened for it (then the editor takes the caret; else the focus stays
+ * where it was).
+ */
+export interface MiniCapture {
+  readonly text: string | null;
+  readonly hint: string | null;
+  readonly focus: boolean;
 }
 
 /** REM-06, D-109: a reminder waiting in mini mode's card (the toast fired too). */

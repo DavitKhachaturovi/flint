@@ -945,6 +945,111 @@ test('a slow second click on a selected row opens it; the bell turns a reminder 
   await expect(row('Call the vendor').locator('.reminder')).not.toHaveClass(/muted/);
 });
 
+/** D-157: the hotkey into mini's note after its copy step (tests never send keys to another app). */
+const captureIntoMini = (
+  selection: { kind: 'text'; text: string } | { kind: 'empty' | 'elevated' },
+): Promise<void> =>
+  app.evaluate((_electron, which) => {
+    type Hook = (s: typeof which) => void;
+    (globalThis as { __flintE2E?: { captureIntoMini?: Hook } }).__flintE2E?.captureIntoMini?.(
+      which,
+    );
+  }, selection);
+
+/** The note files' text, joined (the capture lands in whichever note the Note tab shows). */
+const notesText = async (): Promise<string> => {
+  const names = (await readdir(flint)).filter((name) => name.endsWith('.md'));
+  const texts = await Promise.all(names.map((name) => readFile(join(flint, name), 'utf8')));
+  return texts.join('\n=====\n');
+};
+
+test("Ctrl+Alt+X: the selection goes to the end of the Note tab's note as a paragraph, code fenced; open, mini keeps the focus where it was; hidden, it opens and takes it (MINI-02, D-157)", async () => {
+  await mini.keyboard.press('Control+1');
+  await expect(mini.locator('.mini-tabs .trash-tab.on')).toHaveText('Today');
+  const editor = mini.locator('.mini-editor .cm-content');
+  // Mini is on screen: the text goes in, the Note tab shows, nothing takes the caret.
+  await captureIntoMini({ kind: 'text', text: 'From the chat: ship on Friday' });
+  await expect(mini.locator('.mini-tabs .trash-tab.on')).toHaveText('Note');
+  await expect(editor).toContainText('From the chat: ship on Friday');
+  await expect.poll(notesText).toContain('From the chat: ship on Friday');
+  expect(
+    await mini.evaluate(() => document.activeElement?.classList.contains('cm-content') ?? false),
+  ).toBe(false);
+  // Code is fenced, after a blank line.
+  await captureIntoMini({ kind: 'text', text: 'const a = 1;\nfoo(a);\nbar(a);\n' });
+  await expect
+    .poll(notesText)
+    .toMatch(
+      /From the chat: ship on Friday\r?\n\r?\n```\r?\nconst a = 1;\r?\nfoo\(a\);\r?\nbar\(a\);\r?\n```/,
+    );
+  // Nothing selected: the Note tab, no message. An admin window: the popup's hint, as a toast.
+  await captureIntoMini({ kind: 'empty' });
+  await expect(mini.locator('.toast')).toHaveCount(0, { timeout: 10_000 });
+  await captureIntoMini({ kind: 'elevated' });
+  await expect(mini.locator('.toast')).toContainText('admin window');
+  // Hidden, mini opens for it and the caret goes after the text.
+  await hook('hideMini');
+  await expect.poll(() => hook('miniVisible')).toBe(false);
+  await captureIntoMini({ kind: 'text', text: 'Second thought' });
+  await expect.poll(() => hook('miniVisible')).toBe(true);
+  await expect(editor).toContainText('Second thought');
+  await expect
+    .poll(() =>
+      mini.evaluate(() => document.activeElement?.classList.contains('cm-content') ?? false),
+    )
+    .toBe(true);
+  await expect.poll(notesText).toMatch(/```\r?\n\r?\nSecond thought/);
+  await mini.keyboard.press('Control+1');
+});
+
+test('the list tab shows any task list: a click on the active tab (or its chevron) opens the picker, no New list; the choice is remembered and shown in the file (MINI-03, D-158)', async () => {
+  await mini.keyboard.press('Control+2');
+  const tab = mini.locator('.mini-tabs .mini-tab-list');
+  await expect(tab).toHaveClass(/\bon\b/);
+  await expect(tab).toHaveText('Inbox');
+  // The active tab, clicked: the picker; the list shown is left out, Inbox is not a "New list".
+  await tab.click();
+  const picker = mini.locator('.fl-picker');
+  await expect(picker.locator('.fl-picker-search')).toBeFocused();
+  await expect(picker.locator('.fl-picker-row', { hasText: 'Work' })).toHaveCount(1);
+  await expect(picker.locator('.fl-picker-row', { hasText: 'Inbox' })).toHaveCount(0);
+  await mini.keyboard.type('Zzz');
+  await expect(picker.locator('.fl-picker-row')).toHaveCount(0);
+  await expect(picker.locator('.fl-picker-empty')).toHaveText('No other task lists');
+  await mini.keyboard.press('Backspace');
+  await mini.keyboard.press('Backspace');
+  await mini.keyboard.press('Backspace');
+  await resetMotion();
+  await picker.locator('.fl-picker-row', { hasText: 'Work' }).click();
+  await expect(tab).toHaveText('Work');
+  await expect.poll(motion).toContain('animationend mini-tab-name mini-tab-name-in');
+  await expect(row('Not for mini')).toHaveCount(1);
+  await expect(row('Inbox thing one')).toHaveCount(0);
+  await expect(mini.locator('.composer-input')).toHaveAttribute('placeholder', 'Add to Work…');
+  const stateFile = join(dataDirectory, 'appdata', 'mini-state.json');
+  await expect.poll(() => readFile(stateFile, 'utf8')).toContain('"listId": "work"');
+  // The composer adds to the chosen list.
+  await mini.locator('.composer-input').click();
+  await mini.keyboard.type('Added from mini to Work');
+  await mini.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(join(flint, 'Work.md'), 'utf8'))
+    .toContain('- [ ] Added from mini to Work');
+  await expect(row('Added from mini to Work')).toHaveCount(1);
+  // From another tab, the chevron opens the picker; the pick shows the tab. Inbox comes back.
+  await mini.keyboard.press('Control+1');
+  await expect(mini.locator('.mini-tabs .trash-tab.on')).toHaveText('Today');
+  await mini.locator('.mini-tab-pick').click();
+  await expect(picker.locator('.fl-picker-row', { hasText: 'Inbox' })).toHaveCount(1);
+  await expect(picker.locator('.fl-picker-row', { hasText: 'Work' })).toHaveCount(0);
+  await picker.locator('.fl-picker-row', { hasText: 'Inbox' }).click();
+  await expect(tab).toHaveClass(/\bon\b/);
+  await expect(tab).toHaveText('Inbox');
+  await expect(row('Inbox thing one')).toHaveCount(1);
+  await expect.poll(() => readFile(stateFile, 'utf8')).toContain('"listId": null');
+  await mini.keyboard.press('Control+1');
+});
+
 test('× hides mini mode (fading out first); the palette and the cheat sheet know it (D-109, D-106, D-111)', async () => {
   await mini.locator('.tool[aria-label="Hide mini mode"]').click();
   await expect.poll(() => hook('miniVisible')).toBe(false);

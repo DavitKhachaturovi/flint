@@ -199,3 +199,21 @@ export function taskLabel(title: string, body: string, maxLength = 48): string {
     .find((text) => text !== '');
   return short(line ?? 'Untitled task');
 }
+
+/**
+ * MINI-02, D-157: what the capture-into-note hotkey adds at the end of mini mode's note: the
+ * selection as a paragraph of its own (a blank line before it, unless the note is empty or already
+ * ends in one), code, JSON and stack traces fenced as the popup fences them (CAP-06), plain text as
+ * it is. The text to insert at the end of `note`; empty when the selection has nothing in it.
+ */
+export function noteAppend(note: string, raw: string): string {
+  const block = blockFor(raw);
+  if (block.text.trim() === '') return '';
+  const text = isCodeBlock(block.kind)
+    ? fencedBlock(block.text.trim(), block.kind === 'json' ? 'json' : '')
+    : block.text.trimEnd();
+  const before = normalizeNewlines(note);
+  if (before.trim() === '') return text;
+  const gap = before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  return `${gap}${text}`;
+}

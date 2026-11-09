@@ -8,6 +8,7 @@ import {
   fencedBlock,
   isCodeBlock,
   normalizeNewlines,
+  noteAppend,
   taskLabel,
   titleFromPaste,
 } from './paste.js';
@@ -215,5 +216,26 @@ describe('the selection is the task (D-45)', () => {
     expect(taskLabel('', '```\nnot closed')).toBe('```');
     expect(taskLabel('', 'see ![shot](a b.png) here')).toBe('Screenshot');
     expect(taskLabel('', 'see ![shot] (a.png) here')).toBe('see ![shot] (a.png) here');
+  });
+});
+
+describe("capture into mini mode's note (MINI-02, D-157)", () => {
+  it('adds plain text as a paragraph of its own', () => {
+    expect(noteAppend('', 'a line')).toBe('a line');
+    expect(noteAppend('  \n', 'a line')).toBe('a line');
+    expect(noteAppend('first', 'a line')).toBe('\n\na line');
+    expect(noteAppend('first\n', 'a line')).toBe('\na line');
+    expect(noteAppend('first\n\n', 'a line')).toBe('a line');
+    expect(noteAppend('first\r\n', ' two\r\nlines \n')).toBe('\ntwo\nlines');
+  });
+
+  it('fences code, JSON and stack traces as the popup does', () => {
+    expect(noteAppend('notes', code)).toBe(`\n\n${fencedBlock(code)}`);
+    expect(noteAppend('', json)).toBe(fencedBlock(json, 'json'));
+    expect(noteAppend('', node)).toBe(fencedBlock(node));
+  });
+
+  it('adds nothing for an empty selection', () => {
+    expect(noteAppend('notes', '   \n\n')).toBe('');
   });
 });

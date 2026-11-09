@@ -415,7 +415,12 @@ export type ListPick = { readonly list: ListInfo } | { readonly newList: string 
 export function openListPicker(
   host: PickerHost,
   lists: readonly ListInfo[],
-  options: { readonly exclude?: string; readonly placeholder: string },
+  options: {
+    readonly exclude?: string;
+    readonly placeholder: string;
+    /** D-158: no "New list" row (choosing a list to show, not a place to send to); on by default. */
+    readonly newList?: boolean;
+  },
   onPick: (pick: ListPick) => void,
 ): void {
   const opened = openPanel(host, options.placeholder);
@@ -436,7 +441,7 @@ export function openListPicker(
     const found = suggestLists(typed, lists).filter((list) => list.id !== options.exclude);
     const rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
     const taken = lists.some((list) => normalizeListName(list.name) === normalizeListName(typed));
-    if (typed !== '' && !taken && isValidListName(typed))
+    if (options.newList !== false && typed !== '' && !taken && isValidListName(typed))
       rows.push(makeRow(`New list "${typed}"`, null, () => choose({ newList: typed }), listIcon()));
     box.replaceChildren(...rows.map((row) => row.button));
     if (rows.length === 0) box.append(element('p', 'fl-picker-empty', 'No other task lists'));

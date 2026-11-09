@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import type { EditorView } from '@codemirror/view';
+import { noteAppend } from '@flint/core/shorthand';
 import { MarkdownEditor } from '../editor/MarkdownEditor.js';
 import { useNoteEditing, type EditorWindow } from '../editor/note-editing.js';
 import type { ShowImage } from './Body.js';
@@ -47,8 +49,16 @@ export function NoteEditor(props: {
   readonly placeholder?: string;
   /** D-110: what is typed, as it is typed (mini's Note tab knows when the note is empty). */
   readonly onText?: (value: string) => void;
+  /**
+   * MINI-02, D-157: a selection captured into the note (mini's hotkey): added at the end as a
+   * paragraph of its own, code fenced, then saved at once; `focus`: the caret goes after it. One
+   * request at a time, answered with `onAppended`.
+   */
+  readonly append?: { readonly id: number; readonly text: string; readonly focus: boolean } | null;
+  readonly onAppended?: (id: number) => void;
 }): ReactElement {
   const { id, text, readOnly, onId, onImage, mono, focus, onFocused } = props;
+  const view = useRef<EditorView | null>(null);
   const me = props.window ?? 'main';
   const latest = useRef({ id, value: text, dirty: false });
   const timer = useRef<number | undefined>(undefined);
@@ -112,6 +122,34 @@ export function NoteEditor(props: {
     if (focused.current) claimRef.current();
   }, [id]);
 
+  // MINI-02, D-157: a captured selection goes at the end of the note, as a paragraph of its own
+  // (`noteAppend`), and is saved at once (a late read of the file must never show without it).
+  // While another window edits the note, the editing is claimed first; the text goes in once it has.
+  const appendRef = useRef(props.append);
+  appendRef.current = props.append;
+  const onAppendedRef = useRef(props.onAppended);
+  onAppendedRef.current = props.onAppended;
+  const appendId = props.append?.id;
+  useEffect(() => {
+    const request = appendRef.current;
+    const editor = view.current;
+    if (!request || !editor || appendId === undefined) return;
+    if (locked && !readOnly) {
+      claimRef.current();
+      return;
+    }
+    const doc = editor.state.doc.toString();
+    const insert = readOnly ? '' : noteAppend(doc, request.text);
+    editor.dispatch({
+      ...(insert !== '' && { changes: { from: doc.length, insert } }),
+      selection: { anchor: doc.length + insert.length },
+      scrollIntoView: true,
+    });
+    if (insert !== '') save();
+    if (request.focus) editor.focus();
+    onAppendedRef.current?.(request.id);
+  }, [appendId, locked, readOnly]);
+
   return (
     <>
       {editing.elsewhere && (
@@ -163,6 +201,9 @@ export function NoteEditor(props: {
           focused.current = true;
           editing.claim();
           if (focus) onFocused?.();
+        }}
+        onView={(editor) => {
+          view.current = editor;
         }}
       />
     </>

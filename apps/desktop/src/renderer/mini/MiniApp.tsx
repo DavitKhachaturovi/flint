@@ -18,8 +18,9 @@ import {
 } from '../../shared/ipc.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
-import { CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
-import { Composer } from '../ui/Composer.js';
+import { ChevronIcon, CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
+import { openListPicker } from '../pickers/pickers.js';
+import { Composer, listInfos } from '../ui/Composer.js';
 import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
 import { showQuestion, showUndoNotice, ToastView, useToast } from '../ui/Toast.js';
@@ -109,13 +110,24 @@ function todayRows(
   return { rows: [...pinned, ...coming], routes };
 }
 
-function inboxRows(view: ListView | null): { rows: TaskRow[]; routes: Map<string, Route> } {
+/** The list tab (Inbox, or the chosen list, MINI-03, D-158): its open top-level tasks. */
+function listRows(
+  view: ListView | null,
+  listId: string,
+): { rows: TaskRow[]; routes: Map<string, Route> } {
   const routes = new Map<string, Route>();
   const rows = openTasks(view).map((task) => {
-    routes.set(task.key, { listId: INBOX_ID, homeId: INBOX_ID });
+    routes.set(task.key, { listId, homeId: listId });
     return todayTime(task);
   });
   return { rows, routes };
+}
+
+/** D-157: a selection captured into the Note tab, waiting for its editor. */
+interface Capture {
+  readonly id: number;
+  readonly text: string;
+  readonly focus: boolean;
 }
 
 export function MiniApp(): ReactElement {
@@ -123,8 +135,15 @@ export function MiniApp(): ReactElement {
   const [onTop, setOnTop] = useState(true);
   const [lists, setLists] = useState<readonly ListSummary[]>([]);
   const [today, setToday] = useState<ListView | null>(null);
+  // MINI-03, D-158: the list tab shows Inbox (null) or the chosen task list; its view.
+  const [listChoice, setListChoice] = useState<string | null>(null);
+  const listRef = useRef<string | null>(null);
+  listRef.current = listChoice;
   const [inbox, setInbox] = useState<ListView | null>(null);
   const [alerts, setAlerts] = useState<readonly MiniAlert[]>([]);
+  // MINI-02, D-157: selections captured into the Note tab, in order, until its editor takes them.
+  const [captures, setCaptures] = useState<readonly Capture[]>([]);
+  const captureSeq = useRef(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const { toast, showToast, hideToast } = useToast(TOAST_MS);
@@ -186,7 +205,7 @@ export function MiniApp(): ReactElement {
     const [nextLists, nextToday, nextInbox, nextNote] = await Promise.all([
       window.flintMain.lists(),
       window.flintMain.view(TODAY_ID),
-      window.flintMain.view(INBOX_ID),
+      window.flintMain.view(listRef.current ?? INBOX_ID),
       note ? window.flintMain.view(note) : Promise.resolve(null),
     ]);
     // D-107: a read that comes back after a newer one is dropped.
@@ -210,8 +229,29 @@ export function MiniApp(): ReactElement {
     void window.flintMini.state().then((state) => {
       setTabState(state.tab);
       setOnTop(state.onTop);
+      listRef.current = state.listId;
+      setListChoice(state.listId);
       setNoteId(state.noteId);
+      void refreshRef.current();
     });
+    // D-157: a selection captured into the note: waiting already (the page just started), or told.
+    const take = (): void => {
+      void window.flintMini.takeCaptures().then((items) => {
+        if (items.length === 0) return;
+        setTabRef.current('note');
+        for (const item of items) if (item.hint) showToastRef.current(item.hint, false);
+        setCaptures((waiting) => [
+          ...waiting,
+          ...items.map((item) => ({
+            id: ++captureSeq.current,
+            text: item.text ?? '',
+            focus: item.focus,
+          })),
+        ]);
+      });
+    };
+    window.flintMini.onCapture(take);
+    take();
     void Promise.all([window.flintMain.linkPatterns(), window.flintMain.builtInLinksOff()]).then(
       ([patterns, off]) => {
         setLinkPatterns(patterns);
@@ -289,16 +329,53 @@ export function MiniApp(): ReactElement {
     setSelected(null);
     window.flintMini.setState({ tab: next });
   };
+  const setTabRef = useRef(setTab);
+  setTabRef.current = setTab;
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+
+  // MINI-03, D-158: the list the second tab shows; one that is gone falls back to Inbox.
+  const shownList = listChoice ?? INBOX_ID;
+  const shownListName = lists.find((list) => list.id === shownList)?.name ?? 'Inbox';
+  useEffect(() => {
+    if (!listChoice || lists.length === 0 || lists.some((list) => list.id === listChoice)) return;
+    listRef.current = null;
+    setListChoice(null);
+    window.flintMini.setState({ listId: null });
+    void refreshRef.current();
+  }, [lists, listChoice]);
+  const chooseList = (id: string): void => {
+    const next = id === INBOX_ID ? null : id;
+    // Chosen from another tab (the chevron): the tab shows it.
+    if (tab !== 'inbox') setTab('inbox');
+    if (next === listChoice) return;
+    listRef.current = next;
+    setListChoice(next);
+    setSelected(null);
+    window.flintMini.setState({ listId: next });
+    void refreshRef.current();
+  };
+  /** The picker under the tab: every task list, most recently used first; Inbox to come back. */
+  const pickList = (button: HTMLElement): void => {
+    openListPicker(
+      { anchor: button.getBoundingClientRect(), returnFocus: null, trigger: button },
+      listInfos(lists.filter((list) => list.mode === 'tasks')),
+      { exclude: shownList, placeholder: 'Show a list…', newList: false },
+      (pick) => {
+        if ('list' in pick) chooseList(pick.list.id);
+      },
+    );
+  };
 
   const { rows, routes } =
     tab === 'today'
       ? todayRows(today, now)
       : tab === 'inbox'
-        ? inboxRows(inbox)
+        ? listRows(inbox, shownList)
         : { rows: [], routes: new Map<string, Route>() };
   const safeSelected = rows.some((row) => row.key === selected) ? selected : null;
   const routeOf = (key: string): Route =>
-    routes.get(key) ?? { listId: tab === 'today' ? TODAY_ID : INBOX_ID, homeId: INBOX_ID };
+    routes.get(key) ?? { listId: tab === 'today' ? TODAY_ID : shownList, homeId: shownList };
   // Done: in Completed, or (Today's pinned, D-92) still among the items, faded.
   const doneIn = (view: ListView | null): string[] => [
     ...(view?.completed ?? []).map((task) => task.key),
@@ -462,7 +539,7 @@ export function MiniApp(): ReactElement {
       ?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'instant' : 'smooth' });
   }, [safeSelected]);
 
-  const listId = tab === 'today' ? TODAY_ID : INBOX_ID;
+  const listId = tab === 'today' ? TODAY_ID : shownList;
   const add = async (text: string, chooseNewList: boolean): Promise<void> => {
     const outcome = await window.flintMain.change(listId, {
       kind: 'add',
@@ -484,7 +561,7 @@ export function MiniApp(): ReactElement {
   const quick = lists.find((list) => list.id === noteId) ?? null;
   const stage = useStage({
     card: cardRef,
-    version: `${tab}:${noteId ?? ''}`,
+    version: `${tab}:${shownList}:${noteId ?? ''}`,
     full: tab === 'note',
   });
   useShowMotion(cardRef);
@@ -496,20 +573,54 @@ export function MiniApp(): ReactElement {
         <span className="mini-grip" aria-hidden="true" />
         <header className="mini-head">
           <div className="trash-tabs mini-tabs" role="tablist" aria-label="Mini mode">
-            {TABS.map((each, index) => (
-              <button
-                key={each.id}
-                type="button"
-                role="tab"
-                aria-selected={tab === each.id}
-                className={tab === each.id ? 'trash-tab on' : 'trash-tab'}
-                title={`${each.name} (Ctrl+${index + 1})`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => setTab(each.id)}
-              >
-                {each.name}
-              </button>
-            ))}
+            {TABS.map((each, index) => {
+              // MINI-03, D-158: the second tab is the list it shows: a click on it while it is the
+              // active tab, or on its chevron at any time, opens the list picker.
+              const isList = each.id === 'inbox';
+              const name = isList ? shownListName : each.name;
+              return (
+                <button
+                  key={each.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === each.id}
+                  className={[
+                    'trash-tab',
+                    tab === each.id ? 'on' : '',
+                    isList ? 'mini-tab-list' : '',
+                  ].join(' ')}
+                  title={
+                    isList
+                      ? `${name} (Ctrl+${index + 1}) · click again to choose a list`
+                      : `${each.name} (Ctrl+${index + 1})`
+                  }
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    if (!isList) {
+                      setTab(each.id);
+                      return;
+                    }
+                    const onChevron =
+                      event.target instanceof Element && event.target.closest('.mini-tab-pick');
+                    if (tab === each.id || onChevron) pickList(event.currentTarget);
+                    else setTab(each.id);
+                  }}
+                >
+                  {isList ? (
+                    <>
+                      <span key={name} className="mini-tab-name">
+                        {name}
+                      </span>
+                      <span className="mini-tab-pick" aria-hidden="true">
+                        <ChevronIcon size={11} />
+                      </span>
+                    </>
+                  ) : (
+                    each.name
+                  )}
+                </button>
+              );
+            })}
           </div>
           <span className="mini-head-space" />
           {/* D-111: back to the default size, while the size differs from it. */}
@@ -560,16 +671,19 @@ export function MiniApp(): ReactElement {
         />
 
         <div className="mini-body" ref={body}>
-          <div className={tab === 'note' ? 'mini-view note' : 'mini-view'} key={tab}>
+          <div
+            className={tab === 'note' ? 'mini-view note' : 'mini-view'}
+            key={tab === 'inbox' ? `inbox:${shownList}` : tab}
+          >
             {tab !== 'note' && rows.length === 0 && (
               <p className="empty">
-                {tab === 'today' ? 'Nothing pinned for today.' : 'Inbox is empty.'}
+                {tab === 'today' ? 'Nothing pinned for today.' : `${shownListName} is empty.`}
               </p>
             )}
             {tab !== 'note' && (
               <MiniList
                 rows={rows}
-                scope={`${tab}:${(tab === 'today' ? today : inbox) ? 'ready' : 'loading'}`}
+                scope={`${tab}:${shownList}:${(tab === 'today' ? today : inbox) ? 'ready' : 'loading'}`}
                 selected={safeSelected}
                 draggable={movable}
                 isDone={(key) => doneKeys.has(key)}
@@ -605,6 +719,10 @@ export function MiniApp(): ReactElement {
                   void window.flintMain.keepQuickNote(noteId).then(() => setKept(true));
                 }}
                 onToast={showToast}
+                capture={captures[0] ?? null}
+                onCaptured={(id) =>
+                  setCaptures((waiting) => waiting.filter((each) => each.id !== id))
+                }
               />
             )}
           </div>
@@ -617,7 +735,7 @@ export function MiniApp(): ReactElement {
             listId={listId}
             lists={lists}
             inputRef={composer}
-            placeholder={tab === 'today' ? 'Add to Today…' : 'Add to Inbox…'}
+            placeholder={tab === 'today' ? 'Add to Today…' : `Add to ${shownListName}…`}
             onAdd={add}
           />
         )}

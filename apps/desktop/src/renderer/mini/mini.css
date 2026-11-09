@@ -439,3 +439,39 @@ body {
   right: -8px;
   cursor: nesw-resize;
 }
+
+/* MINI-03, D-158: the list tab reads the list it shows; its chevron (and a click on the active tab)
+   opens the list picker. A new name fades in. */
+.mini-tab-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 150px;
+  padding-right: 8px;
+}
+
+.mini-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: mini-tab-name-in var(--fl-dur-fast) ease-out;
+}
+
+@keyframes mini-tab-name-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+.mini-tab-pick {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--fl-text-faint);
+  transition: color var(--fl-dur-fast) ease;
+}
+
+.mini-tab-list:hover .mini-tab-pick,
+.mini-tab-list.on .mini-tab-pick {
+  color: var(--fl-text-muted);
+}

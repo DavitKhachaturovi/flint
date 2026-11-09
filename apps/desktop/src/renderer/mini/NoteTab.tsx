@@ -26,6 +26,9 @@ export function NoteTab(props: {
   readonly onSwitch: (id: string) => void;
   readonly onKeep: () => void;
   readonly onToast: (text: string, undo: boolean) => void;
+  /** MINI-02, D-157: a selection captured into the note, waiting; answered with `onCaptured`. */
+  readonly capture: { readonly id: number; readonly text: string; readonly focus: boolean } | null;
+  readonly onCaptured: (id: number) => void;
 }): ReactElement {
   const { noteId, view, quick, quickNotes, notes, kept, onMade, onSwitch, onKeep, onToast } = props;
   /** D-122: a note opened with Open a note… (not a quick note): its name is its title. */
@@ -187,6 +190,10 @@ export function NoteTab(props: {
           onImage={() => undefined}
           onText={setTyped}
           create={make}
+          // D-157: only once the note's text is here (or there is no note yet): an insertion into
+          // an editor still waiting for its text would be saved over it.
+          append={noteId === '' || loaded ? props.capture : null}
+          onAppended={props.onCaptured}
         />
       )}
     </div>

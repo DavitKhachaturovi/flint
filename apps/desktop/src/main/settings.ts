@@ -51,6 +51,12 @@ export interface Settings {
    * exception to D-44's no-Alt rule (it pairs with the capture hotkey).
    */
   readonly miniHotkey: string;
+  /**
+   * MINI-02, D-157: capture the selected text into mini mode's note. Ctrl+Alt+X by default, mini's
+   * pair to Ctrl+Alt+Space (the same Alt exception); on layouts where AltGr stands for Ctrl+Alt,
+   * AltGr+X types a character in some apps, so Settings says to change it then.
+   */
+  readonly miniSelectionHotkey: string;
   /** D-109: mini mode left out of screen shares and recordings (on by default). */
   readonly miniHideFromSharing: boolean;
   /** D-109: the capture popup too (on by default). */
@@ -106,6 +112,7 @@ export function defaultSettings(development = false): Settings {
     keepDailyDays: 30,
     animationSpeed: 'normal',
     miniHotkey: 'Control+Alt+Space',
+    miniSelectionHotkey: 'Control+Alt+X',
     miniHideFromSharing: true,
     popupHideFromSharing: true,
     miniReminders: 'when-open',
@@ -216,6 +223,12 @@ export function readSettings(stored: Stored, development = false): Settings {
       defaults.animationSpeed,
     ),
     miniHotkey: pick(stored, 'miniHotkey', isString, defaults.miniHotkey),
+    miniSelectionHotkey: pick(
+      stored,
+      'miniSelectionHotkey',
+      isString,
+      defaults.miniSelectionHotkey,
+    ),
     miniHideFromSharing: pick(
       stored,
       'miniHideFromSharing',

@@ -25,8 +25,18 @@ beforeEach(() => {
 
 const create = () =>
   new HotkeyRegistry(
-    { capture: 'Control+Shift+Space', selection: 'Control+Shift+X', mini: 'Control+Alt+Space' },
-    { capture: () => undefined, selection: () => undefined, mini: () => undefined },
+    {
+      capture: 'Control+Shift+Space',
+      selection: 'Control+Shift+X',
+      mini: 'Control+Alt+Space',
+      miniSelection: 'Control+Alt+X',
+    },
+    {
+      capture: () => undefined,
+      selection: () => undefined,
+      mini: () => undefined,
+      miniSelection: () => undefined,
+    },
   );
 
 describe('rebindable hotkeys with conflict detection (APP-08)', () => {
@@ -50,6 +60,7 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     });
     expect([...registered.keys()].sort()).toEqual([
       'Control+Alt+Space',
+      'Control+Alt+X',
       'Control+Shift+Space',
       'Control+Shift+X',
     ]);
@@ -60,6 +71,7 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     expect(hotkeys.rebind('capture', 'Control+Shift+K')).toEqual({ kind: 'saved' });
     expect([...registered.keys()].sort()).toEqual([
       'Control+Alt+Space',
+      'Control+Alt+X',
       'Control+Shift+K',
       'Control+Shift+X',
     ]);
@@ -82,6 +94,20 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     expect(hotkeys.rebind('mini', 'Control+Alt+M')).toEqual({ kind: 'saved' });
   });
 
+  it("D-157: the hotkey into mini mode's note, Ctrl+Alt+X by default, differs from the other three", () => {
+    const hotkeys = create();
+    expect(hotkeys.get('miniSelection')).toEqual({
+      accelerator: 'Control+Alt+X',
+      registered: true,
+    });
+    expect(hotkeys.rebind('miniSelection', 'Control+Alt+Space')).toEqual({
+      kind: 'same-as-other',
+    });
+    expect(hotkeys.rebind('selection', 'Control+Alt+X')).toEqual({ kind: 'same-as-other' });
+    expect(hotkeys.rebind('miniSelection', 'Control+Alt+J')).toEqual({ kind: 'saved' });
+    expect(registered.has('Control+Alt+X')).toBe(false);
+  });
+
   it('while recording, nothing fires, yet a taken combination is still found', () => {
     owned.add('Control+Alt+K');
     const hotkeys = create();
@@ -94,6 +120,7 @@ describe('rebindable hotkeys with conflict detection (APP-08)', () => {
     expect([...registered.keys()].sort()).toEqual([
       'Control+Alt+J',
       'Control+Alt+Space',
+      'Control+Alt+X',
       'Control+Shift+Space',
     ]);
   });

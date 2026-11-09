@@ -84,6 +84,13 @@ export interface E2EHooks {
   miniVisible?: () => boolean;
   /** D-109: the reminders whose toast mini mode's card took back. */
   closedToasts?: string[];
+  /**
+   * MINI-02, D-157: the capture-into-note hotkey after its copy step (tests never send keys to
+   * another app): what the selection was, as the hotkey would have read it.
+   */
+  captureIntoMini?: (
+    selection: { kind: 'text'; text: string } | { kind: 'empty' | 'elevated' },
+  ) => void;
   /** DATA-07, D-104: the folder the picker returns (no dialog), and where Flint would restart. */
   pickFolder?: string;
   relaunched?: string;

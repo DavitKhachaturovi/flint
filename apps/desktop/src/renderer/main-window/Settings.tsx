@@ -175,13 +175,25 @@ const DOES: Record<HotkeyName, string> = {
   capture: 'opens the capture popup',
   selection: 'captures the selected text',
   mini: 'shows or hides mini mode',
+  miniSelection: 'adds the selected text to mini mode’s note',
 };
 
-/** D-109: each global hotkey's row. */
+/** D-109: each global hotkey's row; D-157: the fourth, into mini mode's note. */
 const HOTKEY_ROWS: Readonly<Record<HotkeyName, string>> = {
   capture: 'Quick capture',
   selection: 'Capture the selected text',
   mini: 'Show or hide mini mode',
+  miniSelection: 'Capture the selected text into mini mode’s note',
+};
+
+/** What each row says at rest. */
+const HOTKEY_NOTES: Readonly<Record<HotkeyName, string>> = {
+  capture: 'Works over any app, even in a full-screen call. Click to change.',
+  selection: 'Works over any app, even in a full-screen call. Click to change.',
+  mini: 'Works over any app, even in a full-screen call. Click to change.',
+  // D-157: on layouts where AltGr stands for Ctrl+Alt, AltGr+X types a character in some apps.
+  miniSelection:
+    'Adds it to the end of the Note tab, code as a code block. If AltGr+X types a character on your keyboard layout, choose another combination. Click to change.',
 };
 
 function explain(outcome: RebindOutcome, name: HotkeyName, accelerator: string): string {
@@ -413,7 +425,7 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="capture" filter={filter}>
-        {(['capture', 'selection', 'mini'] as const).map((name) => (
+        {(['capture', 'selection', 'mini', 'miniSelection'] as const).map((name) => (
           <Row
             key={name}
             name={HOTKEY_ROWS[name]}
@@ -425,7 +437,7 @@ export function SettingsScreen(props: {
                   ? `${displayAccelerator(hotkeys[name].accelerator)} is used by another app, so it doesn't work. Choose another.`
                   : recording === name
                     ? 'Esc cancels.'
-                    : 'Works over any app, even in a full-screen call. Click to change.');
+                    : HOTKEY_NOTES[name]);
               // D-89: a new message fades in (keyed by its text).
               return (
                 <span

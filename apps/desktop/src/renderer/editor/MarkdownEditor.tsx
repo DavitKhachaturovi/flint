@@ -41,6 +41,8 @@ export function MarkdownEditor(props: {
   readonly onBlur?: (text: string) => void;
   /** D-107: the editor took the focus (a caret asked for has arrived). */
   readonly onFocus?: () => void;
+  /** D-157: the editor's view once it exists (null when it goes), for an insertion from outside. */
+  readonly onView?: (view: EditorView | null) => void;
   /**
    * D-109: shown read-only for now (another window edits the note), yet still focusable, so a click
    * into it can take the editing over.
@@ -146,9 +148,11 @@ export function MarkdownEditor(props: {
       }),
     });
     view.current = editor;
+    latest.current.onView?.(editor);
     if (autoFocus) editor.focus();
     return () => {
       view.current = null;
+      latest.current.onView?.(null);
       editor.destroy();
     };
     // The editor is made once; its handlers are read through `latest`.

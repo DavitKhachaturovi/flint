@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import {
   Channels,
+  type MiniCapture,
   type MiniLayout,
   type MiniState,
   type MiniSurface,
@@ -54,6 +55,8 @@ interface Place {
 /** What mini mode remembers (`mini-state.json` in app data). */
 interface StoredMini {
   tab: MiniTab;
+  /** MINI-03, D-158: the task list the second tab shows (null: Inbox). */
+  listId: string | null;
   noteId: string | null;
   /** Per monitor setup. */
   places: Record<string, Place>;
@@ -94,7 +97,13 @@ export interface Mini {
   readonly hide: () => void;
   readonly toggle: () => void;
   readonly state: () => MiniState;
-  readonly setState: (state: Partial<Pick<MiniState, 'tab' | 'noteId'>>) => void;
+  readonly setState: (state: Partial<Pick<MiniState, 'tab' | 'listId' | 'noteId'>>) => void;
+  /**
+   * MINI-02, D-157: a selection captured into the note: kept until the page takes it (the page
+   * may still be loading, or its listeners not yet on), the page told one waits.
+   */
+  readonly capture: (capture: MiniCapture) => void;
+  readonly takeCaptures: () => readonly MiniCapture[];
   readonly setOnTop: (onTop: boolean) => void;
   readonly setHideFromSharing: (hide: boolean) => void;
   /** Only once it exists. */
@@ -113,7 +122,7 @@ export function createMini(options: {
   readonly log: (message: string) => void;
 }): Mini {
   const file = join(app.getPath('userData'), 'mini-state.json');
-  let stored: StoredMini = { tab: 'today', noteId: null, places: {} };
+  let stored: StoredMini = { tab: 'today', listId: null, noteId: null, places: {} };
   try {
     const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<StoredMini>;
     const places: Record<string, Place> = {};
@@ -124,6 +133,7 @@ export function createMini(options: {
       }
     stored = {
       tab: parsed.tab === 'inbox' || parsed.tab === 'note' ? parsed.tab : 'today',
+      listId: typeof parsed.listId === 'string' && parsed.listId !== '' ? parsed.listId : null,
       noteId: typeof parsed.noteId === 'string' ? parsed.noteId : null,
       places,
     };
@@ -448,6 +458,8 @@ export function createMini(options: {
   // D-111: hiding plays the card's fade out: the focus goes back at once, clicks pass through, and
   // the window hides when the fade is over (shown again meanwhile, it simply stays).
   let hiding: NodeJS.Timeout | undefined;
+  /** D-157: selections captured into the note, until the page takes them. */
+  const captures: MiniCapture[] = [];
   /** The window in front before mini took the focus (it gets it back when mini hides). */
   let previous = 0n;
   /** D-114: the last other window in front while mini was shown without the focus. */
@@ -513,12 +525,23 @@ export function createMini(options: {
       if (window?.isVisible() && !hiding) hide();
       else show(true);
     },
-    state: () => ({ tab: stored.tab, noteId: stored.noteId, onTop: options.onTop() }),
+    state: () => ({
+      tab: stored.tab,
+      listId: stored.listId,
+      noteId: stored.noteId,
+      onTop: options.onTop(),
+    }),
     setState: (state) => {
       if (state.tab) stored.tab = state.tab;
+      if (state.listId !== undefined) stored.listId = state.listId;
       if (state.noteId !== undefined) stored.noteId = state.noteId;
       save();
     },
+    capture: (capture) => {
+      captures.push(capture);
+      send(Channels.miniCapture);
+    },
+    takeCaptures: () => captures.splice(0),
     setOnTop: (onTop) => {
       if (window) applyOnTop(window, onTop);
     },

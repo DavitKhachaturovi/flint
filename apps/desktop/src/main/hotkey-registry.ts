@@ -9,9 +9,15 @@ import { acceleratorKeys } from './hotkeys.js';
  * says so. App-internal shortcuts of other apps (e.g. VS Code's) can't be detected this way.
  */
 
-export type HotkeyName = 'capture' | 'selection' | 'mini';
+/** D-157: `miniSelection` captures the selection into mini mode's note. */
+export type HotkeyName = 'capture' | 'selection' | 'mini' | 'miniSelection';
 
-export const HOTKEY_NAMES: readonly HotkeyName[] = ['capture', 'selection', 'mini'];
+export const HOTKEY_NAMES: readonly HotkeyName[] = [
+  'capture',
+  'selection',
+  'mini',
+  'miniSelection',
+];
 
 export type RebindResult =
   | { readonly kind: 'saved' }
@@ -36,6 +42,7 @@ export class HotkeyRegistry {
       capture: { accelerator: accelerators.capture, registered: false },
       selection: { accelerator: accelerators.selection, registered: false },
       mini: { accelerator: accelerators.mini, registered: false },
+      miniSelection: { accelerator: accelerators.miniSelection, registered: false },
     };
     for (const name of HOTKEY_NAMES) this.register(name);
   }

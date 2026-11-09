@@ -50,7 +50,12 @@ import { TipsFile } from './tips.js';
 import { UPDATE_VIEW_OFF, type UpdateView } from '../shared/updates.js';
 import { UpdateService, isUpdateRequest, testUpdater, type UpdaterLike } from './updates.js';
 import { DraftFile } from './capture/drafts.js';
-import { captureSelection, restoreClipboard, saveClipboard } from './capture/selection.js';
+import {
+  captureSelection,
+  restoreClipboard,
+  saveClipboard,
+  type Selection,
+} from './capture/selection.js';
 import { SnapshotStore } from './storage/snapshots.js';
 import { zipFolder } from './storage/zip.js';
 import { displayAccelerator } from '../shared/accelerator.js';
@@ -1258,6 +1263,7 @@ async function start(): Promise<void> {
       flintFolder: folder.folder,
       captureHotkey: current.captureHotkey,
       captureSelectionHotkey: current.captureSelectionHotkey,
+      miniSelectionHotkey: current.miniSelectionHotkey,
       miniHotkey: current.miniHotkey,
       miniHideFromSharing: current.miniHideFromSharing,
       popupHideFromSharing: current.popupHideFromSharing,
@@ -1806,32 +1812,65 @@ async function start(): Promise<void> {
   });
 
   // CAP-07, R-2: copy what is selected in the app in front, then open the popup with it.
+  // D-157: the same copy step serves the hotkey into mini mode's note; one copy runs at a time.
   let selecting = false;
-  const onSelectionHotkey = (): void => {
-    const keys = acceleratorKeys(hotkeys.get('selection').accelerator);
+  const readSelection = (
+    name: 'selection' | 'miniSelection',
+    then: (selection: Selection | 'failed', hotkeyAt: number) => void,
+  ): void => {
+    const keys = acceleratorKeys(hotkeys.get(name).accelerator);
     if (selecting || !keys) return;
     selecting = true;
     const hotkeyAt = epochNow();
     captureSelection(keys)
       .then((selection) => {
-        log(`capture-selection: ${selection.kind}`);
-        if (selection.kind === 'text') return capturePrefilled(selection.text, hotkeyAt);
-        if (selection.kind === 'elevated') {
-          popup.show(hotkeyAt, {
-            hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
-          });
-          // D-68: nothing selected just opens the popup, without a message.
-        } else popup.show(hotkeyAt);
-        return undefined;
+        log(`capture-selection (${name}): ${selection.kind}`);
+        then(selection, hotkeyAt);
       })
       .catch((error: unknown) => {
-        log(`capture-selection failed: ${String(error)}`);
-        popup.show(hotkeyAt, { hint: "Couldn't read the selection; paste with Ctrl+V" });
+        log(`capture-selection (${name}) failed: ${String(error)}`);
+        then('failed', hotkeyAt);
       })
       .finally(() => {
         selecting = false;
       });
   };
+  const onSelectionHotkey = (): void =>
+    readSelection('selection', (selection, hotkeyAt) => {
+      if (selection === 'failed') {
+        popup.show(hotkeyAt, { hint: "Couldn't read the selection; paste with Ctrl+V" });
+      } else if (selection.kind === 'text') {
+        void capturePrefilled(selection.text, hotkeyAt);
+      } else if (selection.kind === 'elevated') {
+        popup.show(hotkeyAt, {
+          hint: "Couldn't read selection from an admin window; paste with Ctrl+V",
+        });
+        // D-68: nothing selected just opens the popup, without a message.
+      } else popup.show(hotkeyAt);
+    });
+  /**
+   * MINI-02, D-157: the selection into mini mode's note. A hidden mini opens on the Note tab and
+   * takes the keyboard (the caret after the text); one already on screen gets the text, and the
+   * focus stays where it was. Nothing selected: the Note tab, no message (D-68); an admin window:
+   * the popup's hint, as a toast.
+   */
+  const captureIntoMini = (selection: Selection | 'failed'): void => {
+    const wasHidden = !mini.visible();
+    if (wasHidden) mini.show(true);
+    mini.setState({ tab: 'note' });
+    mini.capture({
+      text: selection !== 'failed' && selection.kind === 'text' ? selection.text : null,
+      hint:
+        selection === 'failed'
+          ? "Couldn't read the selection; paste with Ctrl+V"
+          : selection.kind === 'elevated'
+            ? "Couldn't read selection from an admin window; paste with Ctrl+V"
+            : null,
+      focus: wasHidden,
+    });
+  };
+  const onMiniSelectionHotkey = (): void =>
+    readSelection('miniSelection', (selection) => captureIntoMini(selection));
 
   // APP-08: the hotkeys, rebindable with conflict detection; D-109: mini mode's third.
   const hotkeys = new HotkeyRegistry(
@@ -1839,8 +1878,14 @@ async function start(): Promise<void> {
       capture: settings.captureHotkey,
       selection: settings.captureSelectionHotkey,
       mini: settings.miniHotkey,
+      miniSelection: settings.miniSelectionHotkey,
     },
-    { capture: onCaptureHotkey, selection: onSelectionHotkey, mini: () => mini.toggle() },
+    {
+      capture: onCaptureHotkey,
+      selection: onSelectionHotkey,
+      mini: () => mini.toggle(),
+      miniSelection: onMiniSelectionHotkey,
+    },
   );
   /** A hotkey another app owns must never fail silently: the tray says so (APP-08). */
   const hotkeyWarning = (): string | null => {
@@ -1853,9 +1898,12 @@ async function start(): Promise<void> {
     const miniKey = hotkeys.get('mini');
     if (!miniKey.registered)
       return `${displayAccelerator(miniKey.accelerator)} is taken: change the mini mode hotkey…`;
+    const miniSelection = hotkeys.get('miniSelection');
+    if (!miniSelection.registered)
+      return `${displayAccelerator(miniSelection.accelerator)} is taken: change the mini note hotkey…`;
     return null;
   };
-  for (const name of ['capture', 'selection', 'mini'] as const) {
+  for (const name of ['capture', 'selection', 'mini', 'miniSelection'] as const) {
     const state = hotkeys.get(name);
     log(
       state.registered
@@ -1950,6 +1998,7 @@ async function start(): Promise<void> {
           capture: hotkeys.get('capture'),
           selection: hotkeys.get('selection'),
           mini: hotkeys.get('mini'),
+          miniSelection: hotkeys.get('miniSelection'),
         }
       : null,
   );
@@ -1964,7 +2013,7 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.mainHotkeysRebind, (event, name: unknown, accelerator: unknown) => {
     if (!owns(event.sender)) return null;
     if (
-      (name !== 'capture' && name !== 'selection' && name !== 'mini') ||
+      (name !== 'capture' && name !== 'selection' && name !== 'mini' && name !== 'miniSelection') ||
       typeof accelerator !== 'string'
     )
       return null;
@@ -1978,7 +2027,9 @@ async function start(): Promise<void> {
             ? { captureHotkey: accelerator }
             : name === 'selection'
               ? { captureSelectionHotkey: accelerator }
-              : { miniHotkey: accelerator },
+              : name === 'mini'
+                ? { miniHotkey: accelerator }
+                : { miniSelectionHotkey: accelerator },
         )
         .catch((error: unknown) => log(`hotkey not saved: ${String(error)}`));
     }
@@ -2088,12 +2139,18 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.miniState, (event) => (mini.owns(event.sender) ? mini.state() : null));
   ipcMain.on(Channels.miniSetState, (event, state: unknown) => {
     if (!mini.owns(event.sender) || typeof state !== 'object' || state === null) return;
-    const { tab, noteId } = state as { tab?: unknown; noteId?: unknown };
+    const { tab, listId, noteId } = state as { tab?: unknown; listId?: unknown; noteId?: unknown };
     mini.setState({
       ...((tab === 'today' || tab === 'inbox' || tab === 'note') && { tab: tab }),
+      // D-158: the list the second tab shows (null: Inbox).
+      ...(((typeof listId === 'string' && listId !== '') || listId === null) && { listId }),
       ...((typeof noteId === 'string' || noteId === null) && { noteId }),
     });
   });
+  // MINI-02, D-157: mini's page takes the captures waiting for its note.
+  ipcMain.handle(Channels.miniTakeCaptures, (event) =>
+    mini.owns(event.sender) ? mini.takeCaptures() : [],
+  );
   ipcMain.handle(Channels.miniSetOnTop, async (event, onTop: unknown) => {
     if (!mini.owns(event.sender) || typeof onTop !== 'boolean')
       return settingsFile.current.miniOnTop;
@@ -2116,6 +2173,8 @@ async function start(): Promise<void> {
   if (hooks) {
     hooks.showMini = () => mini.show(true);
     hooks.hideMini = () => mini.hide();
+    // D-157: the hotkey into mini's note after its copy step (tests never send keys to other apps).
+    hooks.captureIntoMini = (selection) => captureIntoMini(selection);
     hooks.miniVisible = () => mini.visible();
     hooks.closedToasts = [];
   }
