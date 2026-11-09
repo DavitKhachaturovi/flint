@@ -82,8 +82,20 @@ const editCell = async (row: number, column: number): Promise<void> => {
  */
 const tableBox = async (): Promise<{ x: number; y: number; width: number; height: number }> => {
   await expect(table()).toHaveCount(1);
-  await expect.poll(async () => (await table().boundingBox()) !== null).toBe(true);
-  const box = await table().boundingBox();
+  // D-156: the box the poll saw, once the same twice running (the table settled where it is):
+  // asked for again afterwards, a table drawn anew meanwhile had none ("no table" on CI).
+  type Box = { x: number; y: number; width: number; height: number };
+  let box: Box | null = null;
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = await table().boundingBox();
+      const same = now !== null && JSON.stringify(now) === last;
+      last = JSON.stringify(now);
+      box = now;
+      return same;
+    })
+    .toBe(true);
   if (!box) throw new Error('no table');
   return box;
 };

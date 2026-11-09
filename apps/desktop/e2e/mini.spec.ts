@@ -895,7 +895,8 @@ test('a long Inbox (a scrollbar) to Note and back: nothing moves sideways, no sc
   });
   // To Note and back, each once the tab has changed; the frames are read once all are recorded.
   await mini.keyboard.press('Control+3');
-  await expect(mini.locator('.mini-view.note')).toHaveCount(1);
+  // The Note tab drawn in full (its head's ⋯ is what the frames measure), not only switched to.
+  await expect(mini.locator('.mini-view.note .mini-note-head .tool')).toBeVisible();
   await mini.keyboard.press('Control+2');
   await expect(mini.locator('.mini-view .row', { hasText: 'Long inbox 30' })).toHaveCount(1);
   await mini.evaluate(() => {
