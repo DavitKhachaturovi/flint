@@ -8,7 +8,7 @@ A fresh session can continue from this section, CLAUDE.md and the documents it p
 
 **Postponed, start here (Davit, 9 Nov 2026):**
 - **First, before anything else (why CI went red so often on 9 Nov):** (1) ~~A table cell takes the keys a moment after it lights up~~ **Done (D-152, 1.2.1):** the cell's editor takes the focus in a microtask, before the next key; the tests' waits are gone and the Backspace tests type right after the key. (2) ~~CI runs each release commit three times~~ **Done (D-150):** `ci.yml` runs on pushes to `next` and on pull requests only (`release.yml` checks CI by commit SHA, which `next`'s run provides).
-- **1.2.1:** the slow title escape: `escapeFieldOpenersFully` (D-146 "Found, not fixed") repeats its escaping until nothing changes, about 8 s at 50,000 characters on nested field-like titles, reached when a typed title is saved and from a file's changed task whose title doesn't read back as it is. One pass, the same output, with the format's round-trip tests and a review round (file format, D-145).
+- **1.2.1:** ~~the slow title escape~~ **Done (D-153):** at most 16 passes, then every bracket with `::` after it escaped; 30–70 ms instead of 8 s at 50,000 characters; the same output wherever 16 passes do.
 - **1.3.0: Give to Claude** (TASK-18, D-151, decided 9 Nov 2026): after 1.2.1. Spec in 02 TASK-18, the measured link limits in D-151.
 - **Next batch:** the read-only note's table: a click on any cell makes the header's first cell active instead of the one clicked (D-149). The edge drag's Delete does nothing, silently, when the table's size changed while its question was up; its cancel with mini mode's tab change is untested end to end.
 - **The flaky-test batch:** everything in the list below, fixed together (D-145).

@@ -787,3 +787,181 @@ describe('the linear task-line reader reads exactly as the old one (D-146)', () 
     TIMEOUT,
   );
 });
+
+/** How many passes of the old escaping change the title before nothing does (D-153). */
+function oldEscapePasses(title: string, flintOnly: boolean): number {
+  let current = title;
+  for (let passes = 0; ; passes++) {
+    const next = escapeFieldOpeners(current, flintOnly);
+    if (next === current) return passes;
+    current = next;
+  }
+}
+
+/** A title written alone on a task line reads back as exactly that title, with no fields. */
+function readsBackAsTitle(title: string): boolean {
+  const content = parseTaskContent(title);
+  return (
+    content.title === title.replace(/^[ \t]+|[ \t]+$/g, '') &&
+    Object.keys(content.fields).length === 0 &&
+    content.unknown.length === 0
+  );
+}
+
+/** `escaped` is `title` with backslashes added before some `[` and `(`, and nothing else. */
+function onlyOpenersEscaped(title: string, escaped: string): boolean {
+  let at = 0;
+  for (let index = 0; index < escaped.length; index++) {
+    if (escaped[index] === title[at]) at++;
+    else if (escaped[index] !== '\\' || !'[('.includes(escaped[index + 1] ?? '')) return false;
+  }
+  return at === title.length;
+}
+
+/**
+ * D-153: on nested field-like text each pass of the escaping undid one layer, so `escapeTitle` took
+ * 8 s at 50,000 characters (`[ a :: ` repeated before `[priority:: high]`), and the writer the
+ * same on a title that needed it. After 16 passes that still change something, the title gets the
+ * last resort (escapeEverything): each shape below now takes 30 to 70 ms (16 linear passes, the
+ * writer two sets of them). The limit leaves about 20 times that for a slow runner under the
+ * suite's load, while the old escaping (6 to 9 s on each) still fails every one.
+ */
+describe('nested field-like titles: the escaping stays fast (D-153)', () => {
+  const size = 50_000;
+  const LIMIT_MS = 1_000;
+  const chain = (piece: string, last = '[priority:: high]'): string =>
+    `${piece.repeat(Math.ceil(size / piece.length))}${last}`;
+
+  it.each([
+    ['[ a :: repeated before a Flint field', chain('[ a :: ')],
+    ['( a :: repeated before a Flint field', chain('( a :: ', '(priority:: high)')],
+    ['both brackets, nested', chain('[ a :: ( b :: ')],
+    ['before an unknown field', chain('[ a :: ', '[due:: 2026-11-02]')],
+  ])(
+    '%s',
+    (_, title) => {
+      escapeTitle(title.slice(-1000)); // Warms the JIT.
+      expect(elapsed(() => escapeTitle(title))).toBeLessThan(LIMIT_MS);
+      const content: TaskContent = { title, fields: {}, unknown: [], blockId: null };
+      expect(elapsed(() => formatTaskContent(content))).toBeLessThan(LIMIT_MS);
+      // Still nothing in it reads as a field, and the writer's line reads back as the same task.
+      expect(readsBackAsTitle(escapeTitle(title))).toBe(true);
+      const line = formatTaskContent({ ...content, fields: { completion: COMPLETION } });
+      const reread = parseTaskContent(line);
+      expect(reread.fields.completion?.value).toEqual(COMPLETED_AT);
+      expect(reread.unknown).toEqual([]);
+      expect(Object.keys(reread.fields)).toEqual(['completion']);
+    },
+    10_000,
+  );
+
+  it('keeps the old output while 16 passes do (15 layers), and escapes more only beyond', () => {
+    for (const layers of [1, 2, 3, 8, 15, 16]) {
+      const title = `${'[ a :: '.repeat(layers)}[priority:: high]`;
+      expect(oldEscapePasses(title, false)).toBe(layers + 1);
+      if (layers + 1 <= 16) expect(escapeTitle(title)).toBe(oldEscapeTitle(title));
+    }
+    for (const layers of [16, 17, 40]) {
+      const title = `${'[ a :: '.repeat(layers)}[priority:: high]`;
+      const escaped = escapeTitle(title);
+      expect(readsBackAsTitle(escaped)).toBe(true);
+      // Every opener escaped (the last resort), and nothing else changed: \[ renders as [.
+      expect(escaped.replaceAll('\\[', '[')).toBe(title);
+      expect(onlyOpenersEscaped(title, escaped)).toBe(true);
+    }
+  });
+
+  // Titles over 16 passes deep (a 17-layer chain first), then random pieces with backticks,
+  // backslashes, Flint fields and a block ID: the fallback escapes only brackets.
+  const deep = fc
+    .array(
+      fc.constantFrom(
+        '[ a :: ',
+        '( a :: ',
+        '[priority:: high]',
+        '[due:: x]',
+        ']',
+        ')',
+        '`',
+        '``',
+        '`code`',
+        '\\',
+        ' ',
+        'x',
+        ' ^abc',
+      ),
+      { maxLength: 40 },
+    )
+    .map((pieces) => `${'[ a :: '.repeat(17)}${pieces.join('')}[priority:: high]`);
+
+  it(
+    'over 16 passes: only brackets are escaped, and the title reads back',
+    () => {
+      fc.assert(
+        fc.property(deep, (title) => {
+          const typed = escapeTitle(title);
+          expect(onlyOpenersEscaped(title, typed)).toBe(true);
+          expect(readsBackAsTitle(typed)).toBe(true);
+          const done: TaskContent = {
+            title,
+            fields: { completion: COMPLETION },
+            unknown: [],
+            blockId: null,
+          };
+          const reread = parseTaskContent(formatTaskContent(done));
+          expect(Object.keys(reread.fields)).toEqual(['completion']);
+          expect(reread.unknown).toEqual([]);
+        }),
+        { numRuns: RUNS },
+      );
+    },
+    TIMEOUT,
+  );
+
+  // Titles built from nested field-like pieces, often many passes deep.
+  const nested = fc
+    .array(
+      fc.constantFrom(
+        '[ a :: ',
+        '( a :: ',
+        '[ a :: ',
+        '[b:: ',
+        '[priority:: high]',
+        '(priority::low)',
+        '[id:: abcd]',
+        '[due:: x]',
+        ']',
+        ')',
+        ' ',
+        '\\',
+        '`',
+        'x',
+      ),
+      { maxLength: 60 },
+    )
+    .map((pieces) => pieces.join(''));
+
+  it(
+    'matches the old escaping wherever it took 16 passes or fewer, and always reads back',
+    () => {
+      fc.assert(
+        fc.property(nested, (title) => {
+          const typed = escapeTitle(title);
+          if (oldEscapePasses(title, false) <= 16) expect(typed).toBe(oldEscapeTitle(title));
+          expect(readsBackAsTitle(typed)).toBe(true);
+          const content: TaskContent = { title, fields: {}, unknown: [], blockId: null };
+          const flintPasses = oldEscapePasses(title, true);
+          const allPasses = oldEscapePasses(title, false);
+          if (flintPasses <= 16 && allPasses <= 16)
+            expect(formatTaskContent(content)).toBe(oldFormatTaskContent(content));
+          const done = { ...content, fields: { completion: COMPLETION } };
+          const reread = parseTaskContent(formatTaskContent(done));
+          expect(Object.keys(reread.fields)).toEqual(['completion']);
+          expect(reread.unknown).toEqual([]);
+        }),
+        { numRuns: RUNS },
+      );
+    },
+    TIMEOUT,
+  );
+});

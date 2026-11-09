@@ -593,23 +593,41 @@ function escapeFieldOpeners(title: string, flintOnly: boolean): string {
 }
 
 /**
+ * D-153: how many escaping passes `escapeFieldOpenersFully` makes before its last resort. Each pass
+ * undoes one layer of nesting; titles people type need one to three.
+ */
+const ESCAPE_PASSES = 16;
+
+/**
  * Escaping one opener can turn an outer bracket into a field (`[ a :: [priority:: high]`), so
  * repeat until nothing changes. Each pass escapes at least one more opener, so this ends.
+ *
+ * D-153: but on nested field-like text each pass may escape only one more opener (`[ a :: `
+ * repeated before `[priority:: high]`: 8 s at 50,000 characters). A title that needs more than
+ * `ESCAPE_PASSES` passes gets every bracket with `::` after it escaped instead, in one linear pass
+ * (`escapeEverything`'s openers only: its backticks and `^id` stay as they are), so nothing in it
+ * can read as a field. The output is the same as before for every title that needs no more
+ * passes; a deeper one is escaped more than it strictly needs, and still reads back and renders
+ * the same (`\[` shows as `[`).
  */
 function escapeFieldOpenersFully(title: string, flintOnly: boolean): string {
   let current = title;
-  for (;;) {
+  for (let pass = 0; pass < ESCAPE_PASSES; pass++) {
     const next = escapeFieldOpeners(current, flintOnly);
     if (next === current) return current;
     current = next;
   }
+  // The pass that would confirm the last one changed nothing.
+  if (escapeFieldOpeners(current, flintOnly) === current) return current;
+  return escapeEverything(current, false);
 }
 
 /**
  * Last resort: every bracket that has `::` after it, backticks that don't pair up, and a trailing
  * `^id` that would read as a block ID. Nothing in the title can then start a field or a code span.
+ * With `all` false only the brackets (D-153): nothing in the title can start a field.
  */
-function escapeEverything(title: string): string {
+function escapeEverything(title: string, all = true): string {
   const code = codeSpanRanges(title);
   const indexes: number[] = [];
   // A bracket has `::` after it when the last `::` starts after it (D-146: not a search each).
@@ -627,10 +645,11 @@ function escapeEverything(title: string): string {
       index = span[1] - 1;
       continue;
     }
-    if (char === '`') indexes.push(index);
-    else if ((char === '[' || char === '(') && lastSeparator > index) indexes.push(index);
+    if (char === '`') {
+      if (all) indexes.push(index);
+    } else if ((char === '[' || char === '(') && lastSeparator > index) indexes.push(index);
   }
-  const block = BLOCK_ID.exec(title);
+  const block = all ? BLOCK_ID.exec(title) : null;
   if (block && !rangeContaining(block.index, code))
     indexes.push(block.index + (block[1] ?? '').length);
   return insertBackslashes(title, indexes);
@@ -643,7 +662,9 @@ function escapeEverything(title: string): string {
  * The written line must read back as the same task. When the title contains text that would then be
  * read as a field (a repeated Flint field that was visible text, say), the least escaping that
  * makes it read back correctly is applied; unescaped text is preferred so Dataview keeps seeing
- * the fields it saw before.
+ * the fields it saw before. D-153: except in a title whose escaping needs more than 16 passes
+ * (about 16 layers of nested field-like text), where every bracket with `::` after it is escaped
+ * (see `escapeFieldOpenersFully`).
  *
  * Each escaped form is worked out only when the one before it doesn't read back (D-146): a task
  * read from a file and then changed (completed, pinned) usually reads back with its title as it

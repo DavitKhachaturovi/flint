@@ -1158,11 +1158,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 |---|---|---|---|
 | 1 | Taskbar and tray icons: the master's facets at every small size, a hairline outline with a lit upper edge; logos drawn at 16, 24, 32 and 48 px, each `.ico` size from the nearest | UI-07 · Built (1.2.0) | 09 §8, D-148 |
 
-## BV. CI once per commit (9 Nov 2026)
+## BV. 1.2.1: CI once per commit, the cell-focus race, the title escape (9 Nov 2026)
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | 1 | `ci.yml` on pushes to `next` and pull requests only; the release gate is `next`'s run of the same commit | — · Done (1.2.1) | 05 §6, D-150 |
+| 2 | A table cell takes the keys in the same step it lights up (a click, Backspace or ↓ from the note); the tests' focus waits gone, keys typed right after the key | NOTE-10 · Done (1.2.1) | D-152, `tables.spec.ts` |
+| 3 | The title escape: at most 16 passes, then every bracket with `::` after it; 30–70 ms instead of 8 s at 50,000 characters; the same output wherever 16 passes do | — · Done (1.2.1) | 04 §3, D-153, `fields.linear.test.ts` |
 
 ## BW. Give to Claude (9 Nov 2026, grill Q1–Q9)
 
