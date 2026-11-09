@@ -138,8 +138,18 @@ export function tableAt(
   return null;
 }
 
-/** A row's line written with a pipe that isn't escaped (`\|`): a line meant as a table row. */
-export const hasRowPipe = (line: string): boolean => /(?:^|[^\\])\|/.test(line);
+/**
+ * A row's line written with a pipe that isn't escaped: a line meant as a table row. D-154: a pipe
+ * is escaped after an odd run of backslashes only (`\|`, not `\\|`), as `readRow` reads it.
+ */
+export function hasRowPipe(line: string): boolean {
+  let backslashes = 0;
+  for (const char of line) {
+    if (char === '|' && backslashes % 2 === 0) return true;
+    backslashes = char === '\\' ? backslashes + 1 : 0;
+  }
+  return false;
+}
 
 /** Every table in the document (or in a range of it). */
 export function tablesIn(state: EditorState, from = 0, to = state.doc.length): ParsedTable[] {
@@ -158,15 +168,29 @@ export function tablesIn(state: EditorState, from = 0, to = state.doc.length): P
 }
 
 /**
- * A cell's text as written: line breaks as spaces (a cell holds none, Q9) and every `|` escaped.
- * Backslashes right before a pipe, or at the end, are doubled, so no pipe ends up unescaped and
- * the table keeps its shape whatever is typed.
+ * A cell's text as written, the inverse of how a cell reads (`TableCell.text`: each `\|` read as
+ * `|`): line breaks as spaces (a cell holds none, Q9); a `|` after an even run of backslashes (none,
+ * or `\\`) gets one more, so it stays inside the cell; one already escaped (after an odd run) is
+ * left as it is. Every other backslash is written as typed. D-154: backslashes before a pipe and at
+ * the end used to be doubled, which reading never undid, so they doubled again at every write.
  */
-export const escapeCell = (text: string): string =>
-  text
-    .replace(/\r\n?|\n/g, ' ')
-    .replace(/(\\*)\|/g, (_match, slashes: string) => `${slashes}${slashes}\\|`)
-    .replace(/\\+$/, (slashes) => slashes + slashes);
+export function escapeCell(text: string): string {
+  let written = '';
+  let backslashes = 0;
+  for (const char of text.replace(/\r\n?|\n/g, ' ')) {
+    if (char === '|' && backslashes % 2 === 0) written += '\\';
+    written += char;
+    backslashes = char === '\\' ? backslashes + 1 : 0;
+  }
+  return written;
+}
+
+/** Whether `text` ends in an odd run of backslashes: it would escape a pipe right after it. */
+function endsEscaping(text: string): boolean {
+  let backslashes = 0;
+  for (let at = text.length - 1; at >= 0 && text[at] === '\\'; at--) backslashes++;
+  return backslashes % 2 === 1;
+}
 
 /** Text that would start a block (a list, a heading, a quote, a fence…) at the start of a line. */
 const BLOCK_START = /^(?:[*+\->#=]|\d{1,9}[.)]|`{3}|~{3})/;
@@ -194,7 +218,13 @@ export function setCell(
       return [{ from: cell.from, to: cell.to, insert: ` ${written} ` }];
     }
     if (state.doc.sliceString(cell.textFrom, cell.textTo) === written) return [];
-    const changes: ChangeSpec[] = [{ from: cell.textFrom, to: cell.textTo, insert: written }];
+    // D-154: text ending in a backslash, right against the cell's pipe, would escape that pipe:
+    // a space goes between (the padding a cell usually has anyway).
+    const pipeAfter = column < target.cells.length - 1 || target.trailing;
+    const tight = pipeAfter && cell.textTo === cell.to && endsEscaping(written);
+    const changes: ChangeSpec[] = [
+      { from: cell.textFrom, to: cell.textTo, insert: tight ? `${written} ` : written },
+    ];
     // Without its edge pipe, GFM can't write an empty first or last cell (the row would lose a
     // cell), nor a first cell that starts like a block (`* `, `- `, `# `, `1. `… would end the
     // table). There the row gets that pipe: the smallest change that keeps the table.

@@ -204,6 +204,38 @@ test('a click edits a cell in place; only its bytes are written; Ctrl+Z undoes (
   expect(await file()).toBe(NOTE);
 });
 
+test('a Windows path and a pipe typed in a cell are written once, read back as typed (D-154)', async () => {
+  await editCell(1, 1);
+  // The cell's text selected (Ctrl+A is the note's whole text).
+  await main.keyboard.press('End');
+  await main.keyboard.press('Shift+Home');
+  // Each key goes where the caret is (the caret's place counts the escaping as it is written).
+  await main.keyboard.type('C:\\dir\\');
+  await expect.poll(file).toBe(NOTE.replace('| 30  |', '| C:\\dir\\  |'));
+  await main.keyboard.type('a|b');
+  await expect.poll(file).toBe(NOTE.replace('| 30  |', '| C:\\dir\\a\\|b  |'));
+  await expect(cell(1, 1).locator('.cm-content')).toHaveText('C:\\dir\\a|b');
+  // Left and edited again: nothing doubles.
+  await main.keyboard.press('Escape');
+  await editCell(1, 1);
+  await main.keyboard.press('End');
+  await main.keyboard.type('\\');
+  await expect.poll(file).toBe(NOTE.replace('| 30  |', '| C:\\dir\\a\\|b\\  |'));
+  await expect(cell(1, 1).locator('.cm-content')).toHaveText('C:\\dir\\a|b\\');
+  await main.keyboard.press('Escape');
+  await editCell(1, 0);
+  await main.keyboard.press('Escape');
+  await expect(cell(1, 1)).toHaveText('C:\\dir\\a|b\\');
+  // Undone step by step, each one waited for on disk (how many steps typing made isn't fixed).
+  for (let undo = 0; undo < 12; undo++) {
+    const before = await file();
+    if (before === NOTE) break;
+    await main.keyboard.press('Control+z');
+    await expect.poll(file).not.toBe(before);
+  }
+  await expect.poll(file).toBe(NOTE);
+});
+
 test('Tab goes to the next cell and, in the last one, adds a row in the table’s style (Q9)', async () => {
   await editCell(1, 0);
   await main.keyboard.press('Tab');

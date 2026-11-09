@@ -14,6 +14,8 @@ import {
   deleteColumn,
   deleteRow,
   deleteTable,
+  escapeCell,
+  hasRowPipe,
   parseTsv,
   setCell,
   setCells,
@@ -384,6 +386,98 @@ describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
   });
 });
 
+/**
+ * D-154: what a cell set to `text` reads back as: trimmed, line breaks as spaces, and nothing else
+ * changed, backslashes included, except that a `|` the text already escaped (after an odd run of
+ * backslashes) reads as a plain `|`, as GFM shows it.
+ */
+function readsAs(text: string): string {
+  let read = '';
+  let backslashes = 0;
+  for (const char of text.replace(/\r\n?|\n/g, ' ').trim()) {
+    if (char === '|' && backslashes % 2 === 1) read = read.slice(0, -1);
+    read += char;
+    backslashes = char === '\\' ? backslashes + 1 : 0;
+  }
+  return read;
+}
+
+describe('backslashes and pipes in a cell (D-154)', () => {
+  const DOC = '| a | b |\n| - | - |\n| x | y |';
+  const write = (doc: string, text: string, row = 1, column = 0): string => {
+    const { state: s, table: t } = table(doc);
+    return apply(s, setCell(s, t, row, column, text));
+  };
+
+  it('writes backslashes as typed, and reads them back so, however often written', () => {
+    for (const typed of ['C:\\', 'C:\\dir\\', '\\', 'x\\\\', 'a\\b', '\\\\server\\share']) {
+      let doc = write(DOC, typed);
+      expect(doc.split('\n')[2]).toBe(`| ${typed} | y |`);
+      for (let again = 0; again < 3; again++) {
+        const shown = table(doc).table.rows[1]?.cells[0]?.text ?? '';
+        expect(shown).toBe(typed);
+        doc = write(doc, shown);
+      }
+      expect(doc.split('\n')[2]).toBe(`| ${typed} | y |`);
+    }
+  });
+
+  it('escapes a pipe once, after any backslashes; an escaped one stays escaped', () => {
+    const cases: [typed: string, line: string, shown: string][] = [
+      ['a|b', '| a\\|b | y |', 'a|b'],
+      ['a\\\\|b', '| a\\\\\\|b | y |', 'a\\\\|b'],
+      ['C:\\dir\\\\|x', '| C:\\dir\\\\\\|x | y |', 'C:\\dir\\\\|x'],
+      // Already escaped: written as it is, read as a plain pipe (as GFM shows it).
+      ['a\\|b', '| a\\|b | y |', 'a|b'],
+      ['|', '| \\| | y |', '|'],
+    ];
+    for (const [typed, line, shown] of cases) {
+      const doc = write(DOC, typed);
+      expect(doc.split('\n')[2]).toBe(line);
+      const read = table(doc).table;
+      expect(read.rows[1]?.cells.map((cell) => cell.text)).toEqual([shown, 'y']);
+      expect(write(doc, shown)).toBe(doc);
+    }
+  });
+
+  it('puts a space between a trailing backslash and a pipe right after it', () => {
+    expect(write('|a|b|\n|-|-|\n|x|y|', 'C:\\')).toBe('|a|b|\n|-|-|\n|C:\\ |y|');
+    expect(write('|a|b|\n|-|-|\n|x|y|', 'C:\\\\')).toBe('|a|b|\n|-|-|\n|C:\\\\|y|');
+    // The last cell of a row without its edge pipe has no pipe after it.
+    expect(write('a | b\n--- | ---\nx | y', 'C:\\', 1, 1)).toBe('a | b\n--- | ---\nx | C:\\');
+    expect(table('|a|b|\n|-|-|\n|C:\\ |y|').table.rows[1]?.cells.map((cell) => cell.text)).toEqual([
+      'C:\\',
+      'y',
+    ]);
+  });
+
+  it('knows a real pipe from an escaped one, as a row reads it', () => {
+    expect(hasRowPipe('a | b')).toBe(true);
+    expect(hasRowPipe('a \\| b')).toBe(false);
+    // An even run: the backslashes are text, the pipe is real (a cell ending in `C:\\`).
+    expect(hasRowPipe('C:\\\\|y')).toBe(true);
+    expect(hasRowPipe('a \\\\\\| b')).toBe(false);
+    expect(hasRowPipe('|')).toBe(true);
+    expect(hasRowPipe('no pipe')).toBe(false);
+    expect(table('x|y\n---|---\nC:\\\\|y').table.rows[1]?.cells.map((c) => c.text)).toEqual([
+      'C:\\\\',
+      'y',
+    ]);
+  });
+
+  it('copies cells as markdown that reads back as they are', () => {
+    const markdown = cellsMarkdown([
+      ['C:\\dir\\', 'a|b'],
+      ['x\\\\|y', '\\'],
+    ]);
+    const read = table(markdown).table;
+    expect(read.rows.map((row) => row.cells.map((cell) => cell.text))).toEqual([
+      ['C:\\dir\\', 'a|b'],
+      ['x\\\\|y', '\\'],
+    ]);
+  });
+});
+
 describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
   const RUNS = Number(process.env['FLINT_EDITOR_FUZZ_RUNS'] ?? 300);
   const cellText = fc.string({
@@ -404,7 +498,8 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       let next = 0;
       const cell = (): string => {
         const [before, text, after] = cells[next++ % cells.length] ?? ['', '', ''];
-        const safe = text.replace(/\\/g, '').replace(/\|/g, '\\|');
+        // D-154: written as Flint writes a cell, backslashes and all.
+        const safe = escapeCell(text.trim());
         return `${before}${safe || 'x'}${after || ' '}`;
       };
       // A single column needs its edge pipes to be a table at all (else it is a heading).
@@ -462,8 +557,8 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
                 return;
               }
               const wanted = clear ? '' : (block[r - row]?.[c - column] ?? cell.text);
-              if (!wanted.includes('\\') && !cell.text.includes('\\'))
-                expect(now.text).toBe(wanted.trim());
+              // D-154: exactly as set, backslashes included.
+              expect(now.text).toBe(readsAs(wanted));
             }),
           );
           // A short row gets only the cells it needs for text: clearing never lengthens it.
@@ -500,7 +595,8 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
       let next = 0;
       const cell = (): string => {
         const [before, text, after] = cells[next++ % cells.length] ?? ['', '', ''];
-        const safe = text.replace(/\\/g, '').replace(/\|/g, '\\|');
+        // D-154: written as Flint writes a cell, backslashes and all.
+        const safe = escapeCell(text.trim());
         return `${before}${safe || 'x'}${after || ' '}`;
       };
       const piped = edges || columns === 1;
@@ -556,6 +652,20 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
     );
   }, 60_000);
 
+  it('a cell set to the text it shows changes nothing, in any table (D-154)', () => {
+    fc.assert(
+      fc.property(anyTableDoc, (doc) => {
+        const { state: s, table: t } = table(doc);
+        t.rows.forEach((row, r) =>
+          row.cells.forEach((cell, c) => {
+            expect(apply(s, setCell(s, t, r, c, cell.text))).toBe(doc);
+          }),
+        );
+      }),
+      { numRuns: RUNS },
+    );
+  }, 60_000);
+
   it('changes only the edited cell: every other cell and byte stays as it was', () => {
     fc.assert(
       fc.property(tableDoc, fc.nat(), fc.nat(), cellText, (doc, rowPick, columnPick, text) => {
@@ -573,8 +683,15 @@ describe('writing a table back, randomised (D-141 Q10, Q13)', () => {
         expect(table(result).table.columns).toBe(t.columns);
         const before = texts(doc);
         const after = texts(result);
-        // Without backslashes the cell reads back exactly as set (trimmed).
-        if (!text.includes('\\')) expect(after[row]?.[column]).toBe(text.trim());
+        // D-154: the cell reads back exactly as set (trimmed), backslashes included; set again to
+        // what it reads, nothing changes (backslashes never double from one write to the next).
+        expect(after[row]?.[column]).toBe(readsAs(text));
+        const again = table(result);
+        const rewritten = again.table.rows[row]?.cells[column];
+        if (rewritten)
+          expect(
+            apply(again.state, setCell(again.state, again.table, row, column, rewritten.text)),
+          ).toBe(result);
         after[row]?.splice(column, 1);
         before[row]?.splice(column, 1);
         expect(after).toEqual(before);

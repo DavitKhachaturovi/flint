@@ -37,6 +37,7 @@ import {
   deleteColumn,
   deleteRow,
   deleteTable,
+  escapeCell,
   hasRowPipe,
   parseTable,
   parseTsv,
@@ -1398,8 +1399,9 @@ function cellEditor(
           const shown = typed
             .trimStart()
             .slice(0, Math.max(0, update.state.selection.main.head - lead));
-          const offset =
-            shown.replace(/\|/g, '\\|').length + (cell && cell.textFrom === cell.textTo ? 1 : 0);
+          // The caret's place in the note: the text before it as `setCell` writes it (D-154: the
+          // same escaping, so a backslash before it, or a pipe, never shifts it).
+          const offset = escapeCell(shown).length + (cell && cell.textFrom === cell.textTo ? 1 : 0);
           view.dispatch({
             changes: set,
             selection: { anchor: Math.min(start + offset, set.newLength) },
