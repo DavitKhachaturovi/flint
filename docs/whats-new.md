@@ -2,6 +2,12 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.3.1 (10 Nov 2026)
+
+- **Backslashes in tables stay as you typed them:** a Windows path or a backslash before a | in a table cell no longer gains extra backslashes each time the cell is saved. If a cell already shows doubled backslashes, remove the extra ones once.
+- **Lists edited by other programs are safer:** while another program is writing a list, Flint shows it read-only for a moment instead of a blank page, and never writes over that program's work.
+- **Smoother pasting from Excel:** a very large cell pastes into a table without slowing down.
+
 ## 1.3.0 (9 Nov 2026)
 
 - **Give a task to Claude:** right-click a task (or select it and press **G**) and choose **Give to Claude**. Claude Code opens in the Claude app with the task's title, notes and subtasks ready in its message box, for you to review and send.

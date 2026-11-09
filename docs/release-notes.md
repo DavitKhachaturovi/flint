@@ -2,6 +2,14 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.3.1 (10 Nov 2026)
+
+- **Tables (NOTE-10, D-154):** a cell's backslashes are written once. A cell ending in a backslash (a Windows path such as `C:\dir\`) or with one right before a pipe had its backslashes doubled at every write since 1.2.0 (`C:\dir\\`, then more), and typing a backslash could show two. Found from three CodeQL "incomplete escaping" alerts. The randomised table tests now write backslashes and check that every cell reads back exactly as set. Cells already doubled can't be told from intended double backslashes and aren't changed: remove the extra ones once; they don't come back.
+- **Lists read while another program writes them (DATA-06, D-156):** a list whose file was held for a moment (a virus scanner on a new file) or emptied while another program wrote it lost its ID until the next read, and opened as a blank page. It now keeps its ID and what Flint had, read-only ("being written") until the file reads again, so no edit can write it back without its header.
+- **Pasting from Excel (NOTE-10, D-156):** one large quoted cell is read in linear time (it took superlinear time).
+- **Capture popup (CAP-02, D-156):** after a capture the popup empties only if it still holds what was sent, so text typed into it meanwhile is never cleared.
+- **Tests and CI (D-155, D-156):** the flaky-test batch: each test waits for what it checks (linear-time checks by growth in a timing pass of their own, editor tests parse to the end, end-to-end steps wait for the UI); test windows keep drawing off-screen. CodeQL scans pushes to `next` too.
+
 ## 1.3.0 (9 Nov 2026)
 
 - **Give to Claude (TASK-18, D-151):** a task's right-click menu, G, Ctrl+K and the side panel's task details open a palette-style card that hands the task to Claude Code in the Claude desktop app, through its documented link (`claude://code/new?q=…&folder=…`): Claude opens with the prompt in its composer, not sent, and asks to confirm the folder. The prompt is the task's own words in markdown: the title as a heading, the notes, the subtasks with their state and notes, attachment links made absolute paths; no fields, no preamble. A subtask gives itself with a `Part of:` line.
