@@ -147,6 +147,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **Known limitation:** Windows blocks simulated input into elevated (administrator) windows, e.g. an admin PowerShell or terminal, when Flint is not elevated. When the copy fails, open the popup empty with a short hint ("Couldn't read selection from an admin window; paste with Ctrl+V") rather than failing silently.
 - **D-68:** when nothing at all was selected, the popup just opens, without a message (the admin-window hint above stays).
 - The same rules as CAP-06 apply to the selection (stack traces/JSON → highlighted code block in the selection area).
+- **D-157 (1.4.0):** the same copy step serves **Ctrl+Alt+X**, which sends the selection to mini mode's Note tab instead of the popup (MINI-02).
 
 ### CAP-08 — Draft persistence (v1)
 - If the user presses Esc or the popup loses focus, the title, the selection area and any pasted attachment are kept and restored the next time the popup opens.
@@ -633,6 +634,18 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **0.8.10 (D-111):** one size for every tab (the Note tab takes the full height), Reset size, resized from both sides after any move, nothing above a top-corner card takes the mouse, a softer shadow below; a slow second click opens; the bell mutes and unmutes (a muted reminder stays, struck); D/S/O whenever mini has the focus; mini and the capture popup fade in and out.
 - **Rebuilt (0.8.9, D-110):** on the main window's own components in a compact size (rows, selection glide, completion, drag, composer with chips, toast, tabs, editor, scrollbars, motion); a transparent window with mockup 05's card (364 px, height fitting its content up to 460 px, resizable from its handles, hanging from its snapped corner, a grip at the top); Today's next reminder on a card that turns into the alert; Alt+↑/↓ and drag reorder Today's pinned tasks and Inbox; the Note tab's title works before its text, and an empty note removed when it was left no longer leaves the tab dead.
 - **D-109:** mini mode and the main window can be open at once and stay in sync; Open in mini brings the main window forward at that place, mini stays; × hides mini to the tray. A third tab, **Note**, shows one quick note (NOTE-08) as a sticky note: the most recent one or a new one, a small menu to switch or start another, a title and Keep as a note, a compact editor with the live preview.
+
+### MINI-02 — Capture the selection into mini mode's note (v1, 1.4.0, D-157)
+- A fourth global hotkey, **Ctrl+Alt+X** by default (rebindable in Settings → Capture & hotkeys with the usual conflict check; in the `?` cheat sheet and Keyboard shortcuts), copies what is selected in the app in front exactly as Ctrl+Shift+X does (CAP-07: the keys released first, a simulated Ctrl+C, the clipboard put back) and adds it to the **end of the note the Note tab shows** as a paragraph of its own: a blank line before it unless the note is empty or already ends in one; code, JSON and stack traces fenced as the popup fences them (CAP-06); plain text as it is. With no note yet, a quick note is made for it. The text is saved at once.
+- **Focus:** a hidden mini opens on the Note tab and takes the keyboard, the caret after the text; one already on screen gets the text and the focus stays where it was (collecting several snippets in a row).
+- **Nothing selected:** mini shows the Note tab, no message (D-68's rule). **An admin window:** the popup's hint ("Couldn't read selection from an admin window; paste with Ctrl+V") as a toast. One copy runs at a time, shared with Ctrl+Shift+X.
+- **The default's caveats, on record:** Alt is Discord's push-to-talk key (accepted for Ctrl+Alt+Space, D-109; the Settings note says so when a hotkey with Alt is saved); on keyboard layouts where AltGr stands for Ctrl+Alt, AltGr+X typed in another app fires the hotkey (on the Georgian layout it types a rarely used character, Davit, 10 Nov 2026). The hotkey's row in Settings says to choose another combination then.
+- No palette command: mini's own actions have none (Open a note…, the pin; D-122), and the main window has no selection in another app to capture.
+
+### MINI-03 — The list tab shows any task list (v1, 1.4.0, D-158)
+- Mini mode's second tab reads the name of the task list it shows, **Inbox** by default, with a small chevron. A click on the tab while another tab is active switches to it; a click while it is the active tab, or on the chevron at any time, opens the **list picker** (CAP-11's: a search field, every task list most recently used first, D-25), with Inbox in it to come back, the list shown left out, no "New list" row (a list to show, not a place to send to), notes left out (the Note tab has them). Ctrl+2 only switches.
+- The choice is kept in mini's state file (`mini-state.json`, beside its tab and note); a list that is gone falls back to Inbox. Choosing a list here doesn't count as a recent use for `##list` and Move (only moves and captures do, D-25).
+- The composer adds to the chosen list ("Add to <list>…"), the keys, drag, Alt+↑/↓, the right-click menu and Open behave as on Inbox; its open top-level tasks are shown; "<list> is empty." when there are none. A new name fades in (D-89); the rows arrive as a page does.
 
 ---
 

@@ -44,6 +44,7 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 |---|---|---|
 | Open capture popup (CAP-01) | Ctrl+Shift+Space, rebindable (D-37) | Decided |
 | Capture selected text (CAP-07) | Ctrl+Shift+X, rebindable (D-37) | Decided |
+| Capture selected text into mini mode's note (MINI-02) | Ctrl+Alt+X, rebindable; the same Alt exception as mini's hotkey; on a layout where AltGr+X types a character, rebind it (D-157) | Decided |
 | Change a global hotkey (APP-08) | Settings → Capture & hotkeys, click the hotkey, press the new keys; Esc cancels | Decided (D-102; was the Hotkeys window of D-44) |
 | Change the Flint folder (DATA-07) | Settings → General → Change…, pick a folder, choose what to do in the row (the likeliest preselected), confirm; Flint restarts on it | Decided (D-104) |
 | Add a link pattern (NOTE-07) | Settings → Links → Add a link pattern, paste an example link, adjust the short form, Save | Decided (D-104) |
@@ -127,7 +128,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Action | Key | Status |
 |---|---|---|
 | Show or hide mini mode | Ctrl+Alt+Space, anywhere (changeable; D-109's exception to the no-Alt rule) | Decided |
-| Mini mode | Ctrl+1/2/3 tabs, ↑/↓, Space, P, Enter opens in the main window, N composer, D/S/O on a reminder card (letters only outside text fields), Esc never hides it (D-109); Alt+↑/↓ moves the selected task, and rows drag (D-110) | Decided |
+| Mini mode | Ctrl+1/2/3 tabs, ↑/↓, Space, P, Enter opens in the main window, N composer, D/S/O on a reminder card (letters only outside text fields), Esc never hides it (D-109); Alt+↑/↓ moves the selected task, and rows drag (D-110); a click on the active list tab, or its chevron, opens the list picker for the list it shows (D-158) | Decided |
 | Command palette / fuzzy search | Ctrl+K, or the sidebar header's search button (D-107; D-106's header pill removed); in a step, Esc or Backspace in the empty field goes back one step, Esc closes from the top | Decided |
 | Keyboard cheat sheet | `?` in Navigate state (D-106) | Decided |
 | Keyboard cheat sheet | ? (Navigate state) | Decided |

@@ -2,6 +2,11 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.4.0 (10 Nov 2026)
+
+- **Send selected text to mini mode's note:** select text in any app and press **Ctrl+Alt+X**. It lands at the end of the note in mini mode's Note tab; code comes in as a code block. If mini mode was hidden, it opens ready to type; if it was already on screen, you stay where you were. Change the keys in Settings → Capture & hotkeys.
+- **Mini mode shows any list:** click the Inbox tab again (or its small arrow) to pick another task list. The tab takes the list's name, adding and completing tasks work the same, and mini mode remembers your choice.
+
 ## 1.3.1 (10 Nov 2026)
 
 - **Backslashes in tables stay as you typed them:** a Windows path or a backslash before a | in a table cell no longer gains extra backslashes each time the cell is saved. If a cell already shows doubled backslashes, remove the extra ones once.

@@ -17,7 +17,7 @@ I built Flint for myself. I wanted one app that does both a real task list (like
 - **Capture from anywhere.** `Ctrl+Shift+Space` opens a tiny popup over any app; type and press Enter. `Ctrl+Shift+X` captures the text you've selected, in a browser, Teams or a terminal.
 - **Shorthand while you type.** `!h` sets priority, `@15:00` a reminder, `##work` a list, shown live as chips.
 - **Made for code.** Paste JSON, a stack trace or code and it becomes a code block with quiet grayscale highlighting. Screenshots paste straight in.
-- **Mini mode for calls.** `Ctrl+Alt+Space` opens a small always-on-top window with Today, Inbox and a note. It's left out of screen shares, and so is the capture popup.
+- **Mini mode for calls.** `Ctrl+Alt+Space` opens a small always-on-top window with Today, any task list (Inbox by default) and a note; `Ctrl+Alt+X` sends the text you've selected in any app to that note. It's left out of screen shares, and so is the capture popup.
 - **Your clipboard history, beside your tasks.** Windows' clipboard history (Win+V) in the side panel, one click to insert into whatever you're typing in Flint. Its contents stay hidden until you hover, so screen shares don't leak what you copied.
 - **Short links you define by example.** Paste one link and type how it should look (`AB#1234`, `PROJ-42`); Flint works out the pattern and links it everywhere, both ways.
 - **Plain markdown files.** Every list and note is a `.md` file in a folder you choose, readable in Obsidian (Dataview-compatible fields) or any editor. No account, no lock-in.

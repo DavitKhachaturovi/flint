@@ -33,6 +33,8 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Paste-to-capture (screenshot → attachment; stack trace/JSON → code block) | CAP-06 |
 | CLI later (`flint add … -p high`), also for AI models | CLI-01, D-15 |
 | Mini mode (always-on-top, Today or Inbox) | MINI-01 |
+| Ctrl+Alt+X: the selection into mini mode's note | MINI-02, D-157 |
+| Mini mode's list tab shows any task list | MINI-03, D-158 |
 | Fully keyboard-driven (Enter, Alt+↑/↓, 1/2/3/0, Space) | TASK-02, 03 §2–3 |
 | Expandable task body with small indicator | TASK-05, 03 §4 |
 | One level of subtasks (Tab) | TASK-04 |
@@ -1196,3 +1198,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | A list whose file can't be read just then keeps its ID (no blank page) | DATA-06 · Done (1.3.1) | D-156, `workspace.test.ts` |
 | 4 | Editor tests parse to the end (`parseFully`); workspace tests wait for their writes before cleanup | — · Done (1.3.1) | D-156 |
 | 5 | End-to-end: test windows draw and keep their timers off-screen; the pin's pop, the popup's field, a new note's editor and mini's recorder waited for | — · Done (1.3.1) | D-156 |
+
+## BZ. 1.4.0: the selection into mini's note, the list tab (10 Nov 2026, grill Q1–Q5)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Ctrl+Alt+X (rebindable, conflict check, Settings row with the AltGr caveat, cheat sheet): the selection into the end of the Note tab's note as a paragraph, code fenced, saved at once | MINI-02, CAP-07, APP-08 · Done (1.4.0) | 02, 03, D-157, `paste.ts` `noteAppend`, `mini.spec.ts` |
+| 2 | A hidden mini opens and takes the caret; an open one keeps the focus where it was; nothing selected: no message; an admin window: a toast | MINI-02 · Done (1.4.0) | D-157 |
+| 3 | The capture queued in main until mini's page takes it; inserted once the note's text has loaded and the note is this window's to edit | MINI-02 · Done (1.4.0) | D-157, `mini.ts`, `NoteEditor.tsx` |
+| 4 | The list tab: its list's name and a chevron; a click on the active tab or the chevron opens the list picker (Inbox in, the shown list out, no New list, notes out) | MINI-03 · Done (1.4.0) | 02, 03, D-158, `MiniApp.tsx` |
+| 5 | The choice remembered in `mini-state.json`; a gone list falls back to Inbox; composer, keys and the rest on the chosen list; the name fades in | MINI-03 · Done (1.4.0) | D-158, `mini.spec.ts` |
