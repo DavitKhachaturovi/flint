@@ -1,4 +1,6 @@
-# Flint CI (docs/05 §6, D-136): every push and pull request, on Windows like the app.
+# Flint CI (docs/05 §6, D-136): pushes to `next` and pull requests, on Windows like the app.
+# D-150: not on `main` or tags: a release commit is `next`'s green commit fast-forwarded, so one run
+# covers it (release.yml checks CI by commit SHA, whatever the branch).
 # D-145: the end-to-end tests are split across parallel runners (Playwright --shard), so a full run
 # takes minutes; CI green on a commit is the release gate (release.yml checks it).
 # Actions are pinned by commit SHA (the tag in the comment); update them deliberately.
@@ -6,6 +8,7 @@ name: CI
 
 on:
   push:
+    branches: [next]
   pull_request:
 
 permissions:

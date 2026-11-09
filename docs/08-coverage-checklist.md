@@ -1026,7 +1026,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Privacy row: "…Flint only contacts GitHub to check for updates, which you can turn off." | APP-09 · Done (0.9.1) | 02, D-136 |
 | 7 | Network guard: only GitHub's release hosts, HTTPS, the updater's own session, installed builds only; tests use a fake updater (zero endpoints) | APP-09 · Done (0.9.1) | 05, D-31, D-136 |
 | 8 | Unsigned updates: verifyUpdateCodeSignature false; HTTPS + SHA-512; signed manifests and code signing as follow-ups | APP-06 · Recorded | 05 §6, D-136 |
-| 9 | GitHub Actions: CI on every push and PR; release on v* tags with What's new as the text | — · Done (0.9.1) | 05 §6, D-136 |
+| 9 | GitHub Actions: CI on every push to `next` and PR (D-150); release on v* tags with What's new as the text | — · Done (0.9.1) | 05 §6, D-136 |
 | 10 | Motion: the status line and button fade, the toast rises and goes (in the census) | UI-10 · Done (0.9.1) | D-89, D-136 |
 
 ## BO. Performance checked, a clean quit (8 Nov 2026)
@@ -1157,3 +1157,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
 | 1 | Taskbar and tray icons: the master's facets at every small size, a hairline outline with a lit upper edge; logos drawn at 16, 24, 32 and 48 px, each `.ico` size from the nearest | UI-07 · Built (1.2.0) | 09 §8, D-148 |
+
+## BV. CI once per commit (9 Nov 2026)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | `ci.yml` on pushes to `next` and pull requests only; the release gate is `next`'s run of the same commit | — · Done (1.2.1) | 05 §6, D-150 |
