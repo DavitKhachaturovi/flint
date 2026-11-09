@@ -1402,3 +1402,7 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Not installed:** detected with `app.getApplicationNameForProtocol('claude://')` before opening, and from a refused open; a toast with Download (claude.com/download).
 - **Order (Davit):** D-150's CI change, then 1.2.1 (the cell-focus race and the slow title escape), then Give to Claude as 1.3.0, its pure parts written while the table specs run.
 - **Considered and not selected:** cutting a long prompt (loses the end of a thought); refusing it; an editable prompt in Flint (Claude's composer does that); the default folder in the list's frontmatter (a machine path in the markdown, a format change); a context line with list and priority.
+
+### D-152 — A table cell takes the keys in the same step it lights up (NOTE-10, D-144)
+- **Date:** 9 Nov 2026 · **Status:** Done (1.2.1).
+- Arriving from the note's own editor (a click, Backspace or ↓ into a table) the cell's editor took the focus a frame later (`requestAnimationFrame`), so keys typed in between went into the note, under the table; CI's slower runners did this again and again (D-145's flaky list). It now takes it in a microtask: after the note's update (focusing inside it would start another update inside that one), before the browser handles the next key. A click's caret still goes where the click was once the cell is laid out, unless keys already went in. The tests' waits for a cell's focus are gone; the two Backspace tests type in the step right after the key, and fail with a 150 ms late focus (checked).

@@ -553,23 +553,34 @@ class TableWidget extends WidgetType {
       holder.key = key;
       const editor = cellEditor(view, wrap, element, text, this.active.caret);
       holder.editor = editor;
-      // A key move from another cell takes the focus at once; a click, or coming from the note's
-      // own editor, after the note's update.
-      const fromNoteEditor = view.hasFocus || pendingClick !== null;
-      const focus = focusNextCell || fromNoteEditor || cellHadFocus;
+      // A key move from another cell takes the focus at once; a click (on any cell) or coming from
+      // the note's own editor, right after the note's update (`afterUpdate`).
+      const afterUpdate = view.hasFocus || pendingClick !== null;
+      const focus = focusNextCell || afterUpdate || cellHadFocus;
       focusNextCell = false;
       const click = pendingClick;
       pendingClick = null;
-      // From another cell the focus moves at once, so no key typed meanwhile is lost; from the
-      // note's own editor, after its update (its blur would start another update inside this one).
-      if (focus && !fromNoteEditor) editor.focus();
-      requestAnimationFrame(() => {
-        if (!editor.dom.isConnected) return;
-        if (focus && fromNoteEditor) editor.focus();
-        const at = click ? editor.posAtCoords(click) : null;
-        if (at !== null)
-          editor.dispatch({ selection: { anchor: at }, annotations: fromNote.of(true) });
-      });
+      // D-152: the cell takes the keys in the same step it lights up. A key move from another cell
+      // focuses it at once; otherwise a microtask does, right after the note's update (focusing
+      // inside it would blur the note and start another update inside this one) and before the
+      // browser handles the next key, so no key typed in between lands in the note. For a click
+      // that microtask runs before the press bubbles on; nothing above the widget handles it (its
+      // `ignoreEvent`, and `pressed` prevents the default).
+      if (focus) {
+        if (afterUpdate) queueMicrotask(() => focusIfShown(editor));
+        else editor.focus();
+      }
+      // A click's caret goes where the click was once the cell is laid out, unless keys have
+      // already gone into the cell meanwhile (its text changed; the focus may move the selection).
+      if (click) {
+        const start = editor.state.doc;
+        requestAnimationFrame(() => {
+          if (!editor.dom.isConnected || !editor.state.doc.eq(start)) return;
+          const at = editor.posAtCoords(click);
+          if (at !== null)
+            editor.dispatch({ selection: { anchor: at }, annotations: fromNote.of(true) });
+        });
+      }
       return;
     }
     // The same cell: follow the note when it changed from elsewhere (undo, a change from outside).
@@ -583,13 +594,16 @@ class TableWidget extends WidgetType {
     }
     if (focusNextCell) {
       focusNextCell = false;
-      requestAnimationFrame(() => {
-        if (editor.dom.isConnected) editor.focus();
-      });
+      // D-152: after the note's update, before the next key.
+      queueMicrotask(() => focusIfShown(editor));
     }
   }
 }
 
+/** Focuses a cell's editor that is still in the page (D-152). */
+function focusIfShown(editor: EditorView): void {
+  if (editor.dom.isConnected && !editor.hasFocus) editor.focus();
+}
 /** Where the last click on an inactive cell was: its editor puts the caret there. */
 let pendingClick: { x: number; y: number } | null = null;
 

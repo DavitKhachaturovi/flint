@@ -72,10 +72,9 @@ const editor = (): Locator => main.locator('.note-editor .cm-content').first();
 const table = (): Locator => main.locator('.note-editor .cm-fl-table');
 const cell = (row: number, column: number): Locator =>
   table().locator(`[data-row="${row}"][data-column="${column}"]`);
-/** A click into a cell; its editor takes the keys a moment later, so wait for that before typing. */
+/** A click into a cell; its editor takes the keys in the same step (D-152), so keys can follow. */
 const editCell = async (row: number, column: number): Promise<void> => {
   await cell(row, column).click();
-  await expect(cell(row, column).locator('.cm-content')).toBeFocused();
 };
 /**
  * The table's box, once one table is drawn: a note that was open before may still be leaving with
@@ -178,13 +177,28 @@ test('a table is drawn as a table, its pipes and delimiter row hidden (NOTE-10, 
 test('a click edits a cell in place; only its bytes are written; Ctrl+Z undoes (Q9, Q10)', async () => {
   await cell(1, 0).click();
   await expect(cell(1, 0)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(1, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('End');
   await main.keyboard.type('a');
   await expect.poll(file).toContain('| Alexa    | 30  |');
   expect(await file()).toBe(NOTE.replace('| Alex    |', '| Alexa    |'));
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
+  // The caret goes where the click was (D-152: also with keys typed right after): before the A.
+  const first = await cell(0, 1).evaluate((element) => {
+    const range = document.createRange();
+    const text = element.firstChild ?? element;
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    const box = range.getBoundingClientRect();
+    return { x: box.left + 1, y: box.top + box.height / 2 };
+  });
+  await main.mouse.click(first.x, first.y);
+  await expect(cell(0, 1)).toHaveClass(/cm-fl-cell-active/);
+  await main.keyboard.type('Q');
+  await expect.poll(file).toBe(NOTE.replace('| Age |', '| QAge |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
+  await cell(1, 0).click();
   // Shift+Enter: no line break in a cell, nothing written.
   await main.keyboard.press('Shift+Enter');
   expect(await file()).toBe(NOTE);
@@ -194,11 +208,9 @@ test('Tab goes to the next cell and, in the last one, adds a row in the table’
   await editCell(1, 0);
   await main.keyboard.press('Tab');
   await expect(cell(1, 1)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(1, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('Tab');
   await expect.poll(file).toContain(`${TABLE}\n|         |     |\n`);
   await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(2, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Sam');
   await expect.poll(file).toContain(`${TABLE}\n| Sam |     |\n`);
   await main.keyboard.press('Shift+Tab');
@@ -206,7 +218,6 @@ test('Tab goes to the next cell and, in the last one, adds a row in the table’
   // Enter: the cell below; on the last row, a new row.
   await main.keyboard.press('Enter');
   await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(2, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('Control+z');
   await main.keyboard.press('Control+z');
   await expect.poll(file).toBe(NOTE);
@@ -217,8 +228,12 @@ test('↓ from the line above goes into the header, ↑ leaves it, Esc leaves th
   await main.keyboard.press('End');
   await main.keyboard.press('ArrowDown');
   await main.keyboard.press('ArrowDown');
+  // D-152: keys typed right after it go into the header cell.
+  await main.keyboard.type('H');
   await expect(cell(0, 0)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(0, 0).locator('.cm-content')).toBeFocused();
+  await expect.poll(file).toBe(NOTE.replace('| Name    |', '| NameH    |'));
+  await main.keyboard.press('Control+z');
+  await expect.poll(file).toBe(NOTE);
   await main.keyboard.press('ArrowUp');
   await expect(table().locator('.cm-fl-cell-active')).toHaveCount(0);
   await editCell(1, 1);
@@ -644,10 +659,10 @@ test('Backspace under a table, Source mode and a table in a quote keep text out 
   for (const key of ['Backspace', 'Control+Backspace']) {
     await under.click();
     await main.keyboard.press(key);
+    // The keys go on into that cell, typed right after the key (D-152).
+    await main.keyboard.type('z');
     await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
     await expect(table().locator('.cm-fl-cell-active')).toHaveCount(1);
-    // The keys go on into that cell.
-    await main.keyboard.type('z');
     await expect.poll(pictures).toBe(PICTURES.replace('| test |  |  |', '| test |  | z |'));
     await main.keyboard.press('Control+z');
     await expect.poll(pictures).toBe(PICTURES);
@@ -1038,17 +1053,14 @@ test('a table without edge pipes: Enter and Tab add a row that keeps its cells, 
   await editCell(1, 0);
   await main.keyboard.press('Enter');
   await expect(cell(2, 0)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(2, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Zed');
   await expect.poll(plain).toBe(PLAIN.replace(PLAIN_TABLE, `${PLAIN_TABLE}\n| Zed |   |`));
   // Tab on to the next cell, and from the last cell a new row (never the row indented).
   await main.keyboard.press('Tab');
   await expect(cell(2, 1)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(2, 1).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('7');
   await main.keyboard.press('Tab');
   await expect(cell(3, 0)).toHaveClass(/cm-fl-cell-active/);
-  await expect(cell(3, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.type('Ann');
   await expect
     .poll(plain)
@@ -1072,12 +1084,10 @@ test('Backspace under a table that ends the note leaves the text as it is, the c
   await expect(cell(1, 0)).toHaveText('test');
   for (const key of ['Backspace', 'Control+Backspace']) {
     await main.locator('.note-editor .cm-fl-table-wrap + .cm-line').click();
+    // D-152: the keys typed right after it, with no wait, go into the cell it lights up.
     await main.keyboard.press(key);
-    await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
-    // Its editor takes the keys a moment after it lights up (on a slow runner, after the next key).
-    await expect(cell(1, 2).locator('.cm-content')).toBeFocused();
-    expect(await ending()).toBe(ENDING);
     await main.keyboard.type('zq');
+    await expect(cell(1, 2)).toHaveClass(/cm-fl-cell-active/);
     await expect.poll(ending).toBe(ENDING.replace('| test |  |  |', '| test |  | zq |'));
     await main.keyboard.press('Control+z');
     await expect.poll(ending).toBe(ENDING);

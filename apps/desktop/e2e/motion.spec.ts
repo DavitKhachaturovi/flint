@@ -407,8 +407,6 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'A table: a cell is edited (its ring fades in)', 'motion', () =>
     tableCell(1, 0).click(),
   );
-  // The cell's editor takes the keys a moment after the click.
-  await expect(tableCell(1, 0).locator('.cm-content')).toBeFocused();
   await step(main, 'A table: Tab (the ring glides to the next cell)', 'motion', () =>
     main.keyboard.press('Tab'),
   );
@@ -444,8 +442,6 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   // D-144: cells selected (Shift+→ from the end of the active cell): their soft fill fades in. By
   // key, so the pointer isn't over the cell (a colour change under it counts as its hover).
   await tableCell(1, 0).click();
-  // The cell's editor takes the keys a moment after the click.
-  await expect(tableCell(1, 0).locator('.cm-content')).toBeFocused();
   await main.keyboard.press('End');
   await step(main, 'A table: Shift+→ selects cells (their fill fades in)', 'motion', async () => {
     await main.keyboard.press('Shift+ArrowRight');
