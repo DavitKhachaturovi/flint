@@ -391,8 +391,9 @@ function submit(): void {
     .then(() => window.flintPopup.submit({ text, keyAt, chooseNewList, draft: current }))
     .then((ack) => {
       // D-27: the popup empties once the main process has the capture; the saved draft is
-      // cleared only after the write is confirmed.
-      if (ack.accepted) {
+      // cleared only after the write is confirmed. D-156: only of what was sent: typed or pasted
+      // into meanwhile (the answer late), what is in it now stays.
+      if (ack.accepted && JSON.stringify(draft()) === JSON.stringify(current)) {
         clear();
         showNotice(null);
       }

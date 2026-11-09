@@ -482,17 +482,27 @@ export function parseTsv(text: string): string[][] | null {
   for (;;) {
     let field = '';
     if (source[at] === '"') {
+      // D-156: the quoted part's pieces between quotes, joined once. Built a character at a time
+      // (`field += …`), a large quoted cell took superlinear time (V8 flattening the string).
       at++;
-      while (at < source.length) {
-        if (source[at] !== '"') field += source.charAt(at++);
-        else if (source[at + 1] === '"') {
-          field += '"';
-          at += 2;
+      const pieces: string[] = [];
+      for (;;) {
+        const quote = source.indexOf('"', at);
+        if (quote < 0) {
+          pieces.push(source.slice(at));
+          at = source.length;
+          break;
+        }
+        pieces.push(source.slice(at, quote));
+        if (source[quote + 1] === '"') {
+          pieces.push('"');
+          at = quote + 2;
         } else {
-          at++;
+          at = quote + 1;
           break;
         }
       }
+      field = pieces.join('');
     }
     let end = at;
     while (end < source.length && source[end] !== '\t' && source[end] !== '\n') end++;

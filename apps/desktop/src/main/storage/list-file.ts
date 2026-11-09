@@ -108,9 +108,20 @@ export class ListFile {
    */
   async reload(): Promise<ReloadOutcome> {
     const read = await readListFile(this.path);
-    if (read.kind === 'text' && read.text === this.diskText) return 'unchanged';
+    if (read.kind === 'text' && read.text === this.diskText) {
+      // D-156: back as it was (after being read empty while written, say): no longer read-only.
+      this.readOnly = readOnlyReason(read, this.document);
+      return 'unchanged';
+    }
     if (read.kind !== 'text') {
       this.readOnly = readOnlyReason(read, this.document);
+      return 'unreadable';
+    }
+    // D-156: a file with text read empty is being written by another program (it empties the
+    // file first): what Flint had is kept, read-only until the file reads with text again, so no
+    // edit writes the list back without its header over the other program's write.
+    if (read.text === '' && (this.diskText ?? '') !== '') {
+      this.readOnly = 'being written';
       return 'unreadable';
     }
     const fresh = parseDocument(read.text, { keySeed: this.path });

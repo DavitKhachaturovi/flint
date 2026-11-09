@@ -2490,7 +2490,20 @@ export class Workspace {
     const entries = await discoverLists(this.folder);
     for (const loaded of [...this.lists]) {
       const entry = entries.find((candidate) => candidate.path === loaded.entry.path);
-      if (entry) loaded.entry = entry;
+      // D-156: a known list whose file couldn't be read just then (held by another program, or
+      // empty while one writes it) keeps its ID and mode: taking the unread entry's turned it into
+      // another list (`file:<name>`) until the next read, and the window, asking for it by its ID,
+      // got nothing and showed a blank page.
+      if (entry)
+        loaded.entry = entry.unsettled
+          ? {
+              path: entry.path,
+              name: entry.name,
+              created: entry.created,
+              id: loaded.entry.id,
+              mode: loaded.entry.mode,
+            }
+          : entry;
       else this.lists.splice(this.lists.indexOf(loaded), 1);
     }
     for (const entry of entries) {

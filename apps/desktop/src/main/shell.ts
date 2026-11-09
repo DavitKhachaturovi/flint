@@ -63,7 +63,8 @@ export interface E2EHooks {
   reminderSound?: boolean;
   /** Links and files a click would open in the browser or their app, recorded instead. */
   readonly opened: string[];
-  showPopup?: () => void;
+  /** D-156: resolves once the popup has handled being shown (its focused frame reported). */
+  showPopup?: () => Promise<void>;
   /** A toast button's activation URL, as Windows would hand it over (REM-05). */
   activate?: (url: string) => void;
   /**

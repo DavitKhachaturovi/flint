@@ -20,6 +20,11 @@ export interface ListEntry {
   readonly id: string | null;
   readonly mode: ListMode;
   readonly created: number;
+  /**
+   * D-156: the file couldn't be read as text just then (held by another program, or empty while
+   * one writes it): its `id` and `mode` say nothing, so a list already known keeps its own.
+   */
+  readonly unsettled?: true;
 }
 
 export interface FolderReport {
@@ -48,6 +53,7 @@ export async function discoverLists(folder: string): Promise<ListEntry[]> {
       id: document.frontmatter?.id ?? null,
       mode: documentMode(document),
       created: (await stat(path)).birthtimeMs,
+      ...(read.kind !== 'text' || read.text === '' ? { unsettled: true as const } : {}),
     });
   }
   return lists;

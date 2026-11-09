@@ -228,6 +228,17 @@ process.on('uncaughtException', (error) => {
   );
 });
 
+// D-156: in end-to-end tests the windows sit off-screen, never focused. Chromium can then take a
+// window for occluded or in the background and stop drawing frames and slow its timers to one a
+// second, now and then, on a busy runner: a click waiting for a frame hung, short timers took
+// seconds. Test runs only (development builds, FLINT_E2E=1): the windows behave as visible ones.
+if (!app.isPackaged && process.env.FLINT_E2E === '1') {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-background-timer-throttling');
+}
+
 // APP-04: one Flint. A second launch, including a toast button's `flint://` activation, is routed here.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -1738,7 +1749,14 @@ async function start(): Promise<void> {
     },
   });
   const hooks = e2eHooks();
-  if (hooks) hooks.showPopup = () => popup.show(epochNow());
+  // D-156: resolves once the popup has taken in being shown (its "shown" handled, a frame drawn with
+  // the field focused, as it reports for R-1): a test acts on it from then on, not before.
+  if (hooks)
+    hooks.showPopup = () =>
+      new Promise<void>((resolve) => {
+        focusedWaiters.push(() => resolve());
+        popup.show(epochNow());
+      });
   if (hooks) {
     let kept: Awaited<ReturnType<typeof saveClipboard>> = null;
     hooks.saveClipboard = async () => {

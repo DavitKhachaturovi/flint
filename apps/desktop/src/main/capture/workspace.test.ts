@@ -18,11 +18,21 @@ beforeEach(async () => {
   folder = join(base, 'Flint');
   await prepareFlintFolder(folder, {});
 });
+/** The workspaces a test opened: their writes are waited for before the folder goes. */
+const opened: Workspace[] = [];
 afterEach(async () => {
+  // D-156: a workspace writes its bookkeeping (`.flint/meta.json`, Today's order) a moment after a
+  // change, through a temporary file; removing the folder meanwhile failed (ENOTEMPTY) or left the
+  // write to land in the next test's folder. Wait for them as a quit does (D-138).
+  await Promise.all(opened.splice(0).map((workspace) => workspace.settled()));
   await rm(base, { recursive: true, force: true });
 });
 
-const open = (): Promise<Workspace> => Workspace.open(folder, join(base, 'ui-state.json'));
+const open = async (): Promise<Workspace> => {
+  const workspace = await Workspace.open(folder, join(base, 'ui-state.json'));
+  opened.push(workspace);
+  return workspace;
+};
 const inbox = (): Promise<string> => readFile(join(folder, 'Inbox.md'), 'utf8');
 
 describe('capture to Inbox (CAP-01, CAP-02, D-27)', () => {
@@ -131,6 +141,29 @@ describe('##lists from capture (CAP-05, D-25)', () => {
 });
 
 describe('changes made outside Flint (DATA-06)', () => {
+  it('keeps a list’s ID while its file is read empty, mid-write (D-156)', async () => {
+    const path = join(folder, 'Palette.md');
+    const full = '---\nflint: 1\nid: plt1\nmode: tasks\n---\n- [ ] Renew it [id:: pl1]\n';
+    await writeFile(path, full);
+    const workspace = await open();
+    expect(workspace.view('plt1', now)?.name).toBe('Palette');
+    // Another program writing it: read just then, the file is empty.
+    await writeFile(path, '');
+    await workspace.fileChanged(path);
+    expect(workspace.listInfos().map((list) => list.id)).toContain('plt1');
+    expect(workspace.listInfos().map((list) => list.id)).not.toContain('file:Palette');
+    // What Flint had stays, read-only until the file has text again: no edit can write the list
+    // back without its header over the other program's write.
+    const held = workspace.view('plt1', now);
+    expect(held?.items).toHaveLength(1);
+    expect(held?.readOnly).toBe('being written');
+    // Written in full: as before.
+    await writeFile(path, full);
+    await workspace.fileChanged(path);
+    expect(workspace.view('plt1', now)?.items).toHaveLength(1);
+    expect(workspace.view('plt1', now)?.readOnly).toBeNull();
+  });
+
   it('picks up new, edited and removed lists', async () => {
     const workspace = await open();
     await writeFile(join(folder, 'Infra.md'), '---\nflint: 1\nid: inf1\nmode: tasks\n---\n');
