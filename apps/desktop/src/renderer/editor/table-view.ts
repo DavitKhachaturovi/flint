@@ -570,15 +570,31 @@ class TableWidget extends WidgetType {
         if (afterUpdate) queueMicrotask(() => focusIfShown(editor));
         else editor.focus();
       }
-      // A click's caret goes where the click was once the cell is laid out, unless keys have
-      // already gone into the cell meanwhile (its text changed; the focus may move the selection).
+      // D-152: a click's caret goes where the click was in the same step, before the next key
+      // (`posAtCoords` lays the new cell out at once). If the cell can't be measured yet, in the
+      // next frame instead, unless a key reached the cell meanwhile (End, Shift+↓, typing) or its
+      // text changed (a paste); not the selection, which the focus itself may move.
       if (click) {
         const start = editor.state.doc;
-        requestAnimationFrame(() => {
-          if (!editor.dom.isConnected || !editor.state.doc.eq(start)) return;
+        let keyed = false;
+        const key = (): void => {
+          keyed = true;
+        };
+        const place = (): boolean => {
+          if (!editor.dom.isConnected || keyed || !editor.state.doc.eq(start)) return true;
           const at = editor.posAtCoords(click);
-          if (at !== null)
-            editor.dispatch({ selection: { anchor: at }, annotations: fromNote.of(true) });
+          if (at === null) return false;
+          editor.dispatch({ selection: { anchor: at }, annotations: fromNote.of(true) });
+          return true;
+        };
+        editor.contentDOM.addEventListener('keydown', key, true);
+        queueMicrotask(() => {
+          if (place()) editor.contentDOM.removeEventListener('keydown', key, true);
+          else
+            requestAnimationFrame(() => {
+              editor.contentDOM.removeEventListener('keydown', key, true);
+              place();
+            });
         });
       }
       return;
