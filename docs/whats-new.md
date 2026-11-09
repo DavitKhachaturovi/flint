@@ -2,6 +2,13 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.3.0 (9 Nov 2026)
+
+- **Give a task to Claude:** right-click a task (or select it and press **G**) and choose **Give to Claude**. Claude Code opens in the Claude app with the task's title, notes and subtasks ready in its message box, for you to review and send.
+- **Each list remembers its project folder:** press **Shift+Enter** in the card, or right-click a list and choose **Claude folder**. Folders you used recently are offered too.
+- **See the size first:** the card shows how long the task is and roughly how many tokens. A very long task goes to your clipboard instead; paste it into Claude with Ctrl+V.
+- **Still private:** Flint only hands the task to the Claude app on your computer. Nothing leaves your machine unless you send it from Claude.
+
 ## 1.2.1 (9 Nov 2026)
 
 - **Typing in tables is reliable:** keys you type right after clicking a cell, or after moving into a table with Backspace or the arrow keys, always go into that cell.

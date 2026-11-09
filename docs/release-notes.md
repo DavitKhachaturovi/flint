@@ -2,6 +2,14 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.3.0 (9 Nov 2026)
+
+- **Give to Claude (TASK-18, D-151):** a task's right-click menu, G, Ctrl+K and the side panel's task details open a palette-style card that hands the task to Claude Code in the Claude desktop app, through its documented link (`claude://code/new?q=…&folder=…`): Claude opens with the prompt in its composer, not sent, and asks to confirm the folder. The prompt is the task's own words in markdown: the title as a heading, the notes, the subtasks with their state and notes, attachment links made absolute paths; no fields, no preamble. A subtask gives itself with a `Part of:` line.
+- **Folders:** the card offers the list's folder, up to five recent ones and Choose a folder…; Shift+Enter makes the folder the list's. A list's folder is also set from its right-click menu (Claude folder ›), the palette and Settings → Claude (Change…, Forget, Clear recent folders). Kept in Flint's settings on this machine, never in the Flint folder.
+- **Limits, measured on Windows:** Claude keeps the first 14,336 characters of a link's prompt, and Windows hands over a link of up to about 32,000 encoded characters (Flint stays under 30,000). The card shows the count and a rough token estimate first; a prompt over either limit goes to the clipboard instead, said before giving, and Claude opens with a note to paste it.
+- **Claude not installed:** a toast says so, with Download (claude.com/download).
+- **Privacy (APP-09):** Flint makes no request for this; it only hands a link to the Claude app on the computer. Settings → About's Privacy line says so: nothing leaves the machine unless it is sent from Claude.
+
 ## 1.2.1 (9 Nov 2026)
 
 - **Tables (NOTE-10, D-152):** a table cell takes the keys in the same step it lights up. Arriving from the note's own text (a click, Backspace under a table, ↓ from the line above) the cell's editor used to take the focus a frame later, so keys typed in that moment went into the note under the table, and on a slow machine a key right after a click (Home, Shift+↓) could be undone by the click's caret arriving late. The focus and the click's caret now come before the next key. The table tests no longer wait for a cell's focus; they type right after the key.
