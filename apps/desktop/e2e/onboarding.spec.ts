@@ -188,9 +188,18 @@ test('a fresh install: the walkthrough, each step moving on when it is done; Rem
   // 5: back on Inbox, the faint pin of the first task ringed; a click on it pins.
   await expect(main.locator('h1')).toContainText('Inbox');
   await expect(main.locator('.spotlight-ring')).toHaveCount(1);
+  // It settles in with a pop (D-89, D-122). D-156: the pop's start is waited for, not its class,
+  // which is there for about a second: polled on a slow runner, the check could miss it.
+  await main.evaluate(() => {
+    const page = window as { popped?: boolean };
+    page.popped = false;
+    document.addEventListener('animationstart', (event) => {
+      if (event.animationName === 'pin-pop') page.popped = true;
+    });
+  });
   await clickAt(main, '.main .row[data-key]:not(.done) .pin-hover');
-  // It settles in with a pop (D-89, D-122).
-  await expect(main.locator('.main .row .pin-ind.pinned-now')).toHaveCount(1);
+  await expect.poll(() => main.evaluate(() => (window as { popped?: boolean }).popped)).toBe(true);
+  await expect(main.locator('.main .row .pin-ind')).toHaveCount(1);
 
   // 6: the composer's bell; a reminder set moves it on.
   await expect(card).toContainText('6 / 8');

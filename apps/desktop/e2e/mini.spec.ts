@@ -852,13 +852,29 @@ test('a long Inbox (a scrollbar) to Note and back: nothing moves sideways, no sc
   await writeFile(join(flint, 'Inbox.md'), `${before.trimEnd()}\n${many.join('\n')}\n`);
   await mini.keyboard.press('Control+2');
   await expect(mini.locator('.mini-view .row', { hasText: 'Long inbox 30' })).toHaveCount(1);
-  await mini.waitForTimeout(600);
+  // D-156: measured once the new rows have settled (their motion over), not after a fixed wait.
+  // Only finite ones: an endless one (a caret's blink) never ends.
+  await expect
+    .poll(() =>
+      mini.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter((each) => each.effect?.getTiming().iterations !== Infinity).length,
+      ),
+    )
+    .toBe(0);
   // Its content width with the list scrolling: the same on every tab, every frame.
   const width = await mini.locator('.mini-view').evaluate((view) => view.clientWidth);
   await mini.evaluate(() => {
     const frames: { width: number; x: number | null; bar: boolean }[] = [];
     (window as unknown as { frames: typeof frames }).frames = frames;
-    const started = performance.now();
+    const state = window as unknown as { sampled: boolean; stop: boolean };
+    state.sampled = false;
+    state.stop = false;
+    // Until the test says the switch back has drawn, then 30 frames more (no fixed duration: a
+    // slow runner's switches take longer, and every frame of them is recorded).
+    let after = 0;
     const sample = (): void => {
       const view = document.querySelector<HTMLElement>('.mini-view');
       const body = document.querySelector('.mini-body') as HTMLElement;
@@ -871,14 +887,23 @@ test('a long Inbox (a scrollbar) to Note and back: nothing moves sideways, no sc
           getComputedStyle(body).overflowY !== 'hidden' &&
           body.scrollHeight > body.clientHeight,
       });
-      if (performance.now() - started < 1400) requestAnimationFrame(sample);
+      if (state.stop) after++;
+      if (after < 30) requestAnimationFrame(sample);
+      else state.sampled = true;
     };
     requestAnimationFrame(sample);
   });
+  // To Note and back, each once the tab has changed; the frames are read once all are recorded.
   await mini.keyboard.press('Control+3');
-  await mini.waitForTimeout(700);
+  await expect(mini.locator('.mini-view.note')).toHaveCount(1);
   await mini.keyboard.press('Control+2');
-  await mini.waitForTimeout(900);
+  await expect(mini.locator('.mini-view .row', { hasText: 'Long inbox 30' })).toHaveCount(1);
+  await mini.evaluate(() => {
+    (window as unknown as { stop: boolean }).stop = true;
+  });
+  await expect
+    .poll(() => mini.evaluate(() => (window as unknown as { sampled: boolean }).sampled))
+    .toBe(true);
   const frames = await mini.evaluate(
     () =>
       (window as unknown as { frames: { width: number; x: number | null; bar: boolean }[] }).frames,

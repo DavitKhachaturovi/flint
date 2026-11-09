@@ -12,12 +12,11 @@ import {
   undoDepth,
 } from '@codemirror/commands';
 import { deleteMarkupBackward, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
-import { ensureSyntaxTree } from '@codemirror/language';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import type { Command } from '@codemirror/view';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { noteState, problems } from './preview-checks.js';
+import { noteState, parseFully, problems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
 import { tablesIn, type ParsedTable } from './table.js';
 import { tables } from './table-view.js';
@@ -233,7 +232,7 @@ function apply(state: EditorState, each: Step): EditorState {
       userEvent: 'delete',
     }).state;
   else next = run(COMMANDS[each.name], placed);
-  ensureSyntaxTree(next, next.doc.length, 5000);
+  parseFully(next);
   return next;
 }
 

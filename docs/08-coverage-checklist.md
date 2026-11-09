@@ -1186,3 +1186,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | A table cell's backslashes written once: a pipe escaped after an even run, an escaped one kept, trailing backslashes as typed (a space before a tight pipe); the caret's place by the same writer; `hasRowPipe` by the run's parity | NOTE-10 · Done (1.3.1) | D-154, `table.test.ts`, `tables.spec.ts` |
 | 2 | The randomised table tests write backslashes; a cell's own text written back changes nothing, in any table | NOTE-10 · Done (1.3.1) | D-154 |
 | 3 | CodeQL (advanced setup, `codeql.yml`) on pushes to `main` and `next`, pull requests, weekly | — · Done (1.3.1) | D-155 |
+
+## BY. The flaky-test batch (9 Nov 2026, D-156)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Linear-time checks by growth from n to 4n (`expectLinear`), in a timing pass of their own (`*.timing.test.ts`, one file at a time) | — · Done (1.3.1) | D-156 |
+| 2 | `parseTsv`: a large quoted cell in linear time | NOTE-10 · Done (1.3.1) | D-156, `table.timing.test.ts` |
+| 3 | A list whose file can't be read just then keeps its ID (no blank page) | DATA-06 · Done (1.3.1) | D-156, `workspace.test.ts` |
+| 4 | Editor tests parse to the end (`parseFully`); workspace tests wait for their writes before cleanup | — · Done (1.3.1) | D-156 |
+| 5 | End-to-end: test windows draw and keep their timers off-screen; the pin's pop, the popup's field, a new note's editor and mini's recorder waited for | — · Done (1.3.1) | D-156 |

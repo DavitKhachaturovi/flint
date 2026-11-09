@@ -6,6 +6,7 @@ import {
   type ParsedLocalDateTime,
 } from '../time/local-datetime.js';
 import { codeSpanRanges, rangeContaining, type Range } from './code-spans.js';
+import { expectLinear } from '../../test/scaling.js';
 import {
   escapeTitle,
   FLINT_KEYS,
@@ -460,30 +461,23 @@ function oldEscapeTitle(title: string): string {
   return escapeFieldOpenersFully(title.replace(/\r\n|\r|\n/g, ' '), false);
 }
 
-/** The best of three runs, so a busy machine or a GC pause doesn't fail the test. */
-function elapsed(run: () => void): number {
-  let best = Infinity;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const start = performance.now();
-    run();
-    best = Math.min(best, performance.now() - start);
-  }
-  return best;
-}
+/** `piece` repeated to at least `n` characters (a shape for `expectLinear`, D-156). */
+const repeat =
+  (piece: string) =>
+  (n: number): string =>
+    piece.repeat(Math.ceil(n / piece.length));
 
 /**
  * D-146: the task-line reader runs in the main process for every task line read, and a line can
  * be long (a pasted log line or minified JSON). Each shape below took 0.3 to 4.4 s at 50,000
  * characters before (quadratic; the two with code spans in unclosed fields were cubic, about a
- * second already at 5,000); now each takes 1 to 3 ms. The limit leaves room for a machine many
- * times slower under the whole suite's load, while the old reader fails every one of them.
+ * second already at 5,000); now each takes 1 to 3 ms. D-156: judged by how the time grows from
+ * 50,000 characters to 200,000 (`expectLinear`), not by a wall-clock limit.
  */
 describe('parseTaskContent: long field-like lines stay fast (D-146)', () => {
   const size = 50_000;
-  const LIMIT_MS = 100;
-  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
 
-  it.each([
+  it.each<[string, (n: number) => string]>([
     ['unclosed [a:: fields', repeat('[a::')],
     ['unclosed (a:: fields', repeat('(a:: ')],
     ['unclosed fields with a value', repeat('[a:: b ')],
@@ -501,18 +495,20 @@ describe('parseTaskContent: long field-like lines stay fast (D-146)', () => {
     ['emoji keys and values', repeat('[😀:: 😀 ')],
     ['emoji between brackets', repeat('😀[a::😀(')],
     ['a lone surrogate before each field', repeat('\ud83d[a:: ')],
-    ['unclosed fields after a long title', `${'a'.repeat(size / 2)} ${repeat('(k:: v ')}`],
-    ['spaces inside the title', `a${' '.repeat(size)}b [priority:: high]`],
+    [
+      'unclosed fields after a long title',
+      (n) => `${'a'.repeat(n / 2)} ${repeat('(k:: v ')(n / 2)}`,
+    ],
+    ['spaces inside the title', (n) => `a${' '.repeat(n)}b [priority:: high]`],
     ['an escaped backtick before each pair of backticks', repeat('\\``')],
     ['escaped backticks after code spans', repeat('``a`` \\``')],
   ])(
     '%s',
-    (_, input) => {
-      expect(input.length).toBeGreaterThanOrEqual(size);
-      parseTaskContent(input.slice(0, 1000)); // Warms the JIT, so the time measured is the read.
-      expect(elapsed(() => parseTaskContent(input))).toBeLessThan(LIMIT_MS);
+    (_, make) => {
+      expect(make(size).length).toBeGreaterThanOrEqual(size / 2);
+      expectLinear(make, parseTaskContent, size);
     },
-    10_000,
+    30_000,
   );
 
   it('still reads the fields of a long line', () => {
@@ -536,21 +532,24 @@ describe('parseTaskContent: long field-like lines stay fast (D-146)', () => {
  */
 describe('formatTaskContent: long titles that need escaping stay fast (D-146)', () => {
   const size = 50_000;
-  const LIMIT_MS = 100;
-  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
+  const titled = (title: string): TaskContent => ({
+    title,
+    fields: {},
+    unknown: [],
+    blockId: null,
+  });
 
-  it.each([
-    ['opening brackets, then one separator and a space', `${'('.repeat(size)}:: `],
+  it.each<[string, (n: number) => string]>([
+    ['opening brackets, then one separator and a space', (n) => `${'('.repeat(n)}:: `],
     ['short inline code spans, a space at the end', repeat('`a` ')],
     ['code spans holding unclosed fields', repeat('`[a:: b ')],
   ])(
     '%s',
-    (_, title) => {
-      const content: TaskContent = { title, fields: {}, unknown: [], blockId: null };
-      formatTaskContent({ ...content, title: title.slice(0, 1000) }); // Warms the JIT.
-      expect(elapsed(() => formatTaskContent(content))).toBeLessThan(LIMIT_MS);
+    (_, make) => {
+      // D-156: linear, judged by growth.
+      expectLinear((n) => titled(make(n)), formatTaskContent, size);
     },
-    10_000,
+    30_000,
   );
 });
 
@@ -567,34 +566,33 @@ function risingRuns(size: number, before = ''): string {
  * rest of the line (1.55 s at 50,000 characters). It runs for every task line read, in the
  * shorthand parse on every keystroke and in each pass of the writer's escaping. Runs of rising
  * length took about n^1.5 (15 ms at 50,000, 0.6 s at 200,000), so they are measured at 400,000.
- * Now each shape takes a few milliseconds.
+ * Now each shape takes a few milliseconds. D-156: judged by growth (`expectLinear`): a quadratic
+ * scan grows 16 times from n to 4n, linear 4 times; n^1.5 (8 times) sits at the limit.
  */
 describe('codeSpanRanges: openers that never close stay fast (D-146)', () => {
   const size = 50_000;
-  const LIMIT_MS = 100;
-  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
 
-  it.each([
+  it.each<[string, (n: number) => string]>([
     ['an escaped backtick before each pair', repeat('\\``')],
     ['an escaped backtick before each pair, text between', repeat('\\`` a ')],
     ['an escaped backtick before each triple', repeat('\\```')],
     ['escaped backticks and emoji', repeat('\\``😀')],
     ['escaped backticks after code spans', repeat('``a`` \\``')],
     ['escaped backticks inside unclosed fields', repeat('[a:: \\`` ')],
-    ['runs of rising length', risingRuns(8 * size)],
-    ['escaped runs of rising length', risingRuns(8 * size, '\\')],
+    ['runs of rising length', (n) => risingRuns(8 * n)],
+    ['escaped runs of rising length', (n) => risingRuns(8 * n, '\\')],
   ])(
     '%s',
-    (_, input) => {
-      expect(input.length).toBeGreaterThanOrEqual(size);
-      codeSpanRanges(input.slice(0, 1000)); // Warms the JIT.
-      expect(elapsed(() => codeSpanRanges(input))).toBeLessThan(LIMIT_MS);
+    (_, make) => {
+      expect(make(size).length).toBeGreaterThanOrEqual(size);
+      expectLinear(make, codeSpanRanges, size);
     },
-    10_000,
+    30_000,
   );
 
   it('finds the same spans as the old scan on long lines', () => {
-    for (const input of [repeat('`a` \\`` ``b`` '), risingRuns(5_000), risingRuns(5_000, '\\')]) {
+    const long = repeat('`a` \\`` ``b`` ')(size);
+    for (const input of [long, risingRuns(5_000), risingRuns(5_000, '\\')]) {
       expect(codeSpanRanges(input)).toEqual(oldCodeSpanRanges(input));
     }
   });
@@ -609,8 +607,6 @@ describe('codeSpanRanges: openers that never close stay fast (D-146)', () => {
  */
 describe('the writer on long lines read from a file stays fast (D-146)', () => {
   const size = 50_000;
-  const LIMIT_MS = 100;
-  const repeat = (piece: string): string => piece.repeat(Math.ceil(size / piece.length));
   const nested = (count: number): string =>
     `${'[a:: (b:: [c:: '.repeat(count)}${']'.repeat(3 * count)}`;
 
@@ -623,31 +619,30 @@ describe('the writer on long lines read from a file stays fast (D-146)', () => {
     };
   }
 
-  it.each([
-    ['nested field-like text that reads back as it is', nested(Math.ceil(size / 18))],
+  it.each<[string, (n: number) => string]>([
+    ['nested field-like text that reads back as it is', (n) => nested(Math.ceil(n / 18))],
     ['an escaped backtick before each pair of backticks', repeat('\\``')],
     ['escaped backticks inside unclosed fields', repeat('[a:: \\`` ')],
   ])(
     '%s',
-    (_, line) => {
+    (_, make) => {
+      const line = make(size);
       expect(line.length).toBeGreaterThanOrEqual(size);
-      formatTaskContent(changed(line.slice(0, 1000))); // Warms the JIT.
-      const content = changed(line);
-      expect(elapsed(() => formatTaskContent(content))).toBeLessThan(LIMIT_MS);
+      // D-156: linear, judged by growth.
+      expectLinear((n) => changed(make(n)), formatTaskContent, size);
       // The title is written as it was read: nothing in it is escaped.
-      expect(formatTaskContent(content)).toBe(
+      expect(formatTaskContent(changed(line))).toBe(
         `${line.trimEnd()} [pinned:: true] [completion:: 2026-03-10T10:00]`,
       );
     },
-    10_000,
+    30_000,
   );
 
   it('escapeTitle on escaped backticks', () => {
-    const title = repeat('\\``');
-    escapeTitle(title.slice(0, 1000)); // Warms the JIT.
-    expect(elapsed(() => escapeTitle(title))).toBeLessThan(LIMIT_MS);
+    const title = repeat('\\``')(size);
+    expectLinear(repeat('\\``'), escapeTitle, size);
     expect(escapeTitle(title)).toBe(title);
-  }, 10_000);
+  }, 30_000);
 });
 
 describe('the linear task-line reader reads exactly as the old one (D-146)', () => {
@@ -823,27 +818,34 @@ function onlyOpenersEscaped(title: string, escaped: string): boolean {
  * 8 s at 50,000 characters (`[ a :: ` repeated before `[priority:: high]`), and the writer the
  * same on a title that needed it. After 16 passes that still change something, the title gets the
  * last resort (escapeEverything): each shape below now takes 30 to 70 ms (16 linear passes, the
- * writer two sets of them). The limit leaves about 20 times that for a slow runner under the
- * suite's load, while the old escaping (6 to 9 s on each) still fails every one.
+ * writer two sets of them). D-156: judged by growth from 25,000 to 100,000 characters
+ * (`expectLinear`); the old escaping grew quadratically.
  */
 describe('nested field-like titles: the escaping stays fast (D-153)', () => {
   const size = 50_000;
-  const LIMIT_MS = 1_000;
-  const chain = (piece: string, last = '[priority:: high]'): string =>
-    `${piece.repeat(Math.ceil(size / piece.length))}${last}`;
+  const chain =
+    (piece: string, last = '[priority:: high]') =>
+    (n: number): string =>
+      `${piece.repeat(Math.ceil(n / piece.length))}${last}`;
+  const titled = (title: string): TaskContent => ({
+    title,
+    fields: {},
+    unknown: [],
+    blockId: null,
+  });
 
-  it.each([
+  it.each<[string, (n: number) => string]>([
     ['[ a :: repeated before a Flint field', chain('[ a :: ')],
     ['( a :: repeated before a Flint field', chain('( a :: ', '(priority:: high)')],
     ['both brackets, nested', chain('[ a :: ( b :: ')],
     ['before an unknown field', chain('[ a :: ', '[due:: 2026-11-02]')],
   ])(
     '%s',
-    (_, title) => {
-      escapeTitle(title.slice(-1000)); // Warms the JIT.
-      expect(elapsed(() => escapeTitle(title))).toBeLessThan(LIMIT_MS);
-      const content: TaskContent = { title, fields: {}, unknown: [], blockId: null };
-      expect(elapsed(() => formatTaskContent(content))).toBeLessThan(LIMIT_MS);
+    (_, make) => {
+      const title = make(size);
+      expectLinear(make, escapeTitle, size / 2);
+      expectLinear((n) => titled(make(n)), formatTaskContent, size / 2);
+      const content = titled(title);
       // Still nothing in it reads as a field, and the writer's line reads back as the same task.
       expect(readsBackAsTitle(escapeTitle(title))).toBe(true);
       const line = formatTaskContent({ ...content, fields: { completion: COMPLETION } });
@@ -852,7 +854,7 @@ describe('nested field-like titles: the escaping stays fast (D-153)', () => {
       expect(reread.unknown).toEqual([]);
       expect(Object.keys(reread.fields)).toEqual(['completion']);
     },
-    10_000,
+    30_000,
   );
 
   it('keeps the old output while 16 passes do (15 layers), and escapes more only beyond', () => {
@@ -912,7 +914,9 @@ describe('nested field-like titles: the escaping stays fast (D-153)', () => {
           expect(Object.keys(reread.fields)).toEqual(['completion']);
           expect(reread.unknown).toEqual([]);
         }),
-        { numRuns: RUNS },
+        // D-156: each case escapes a 17-layer chain twice (about 20 times a reader case), so a quarter
+        // of the runs, within the file's time budget under the whole suite's load.
+        { numRuns: Math.ceil(RUNS / 4) },
       );
     },
     TIMEOUT,

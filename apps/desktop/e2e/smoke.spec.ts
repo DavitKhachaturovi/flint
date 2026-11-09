@@ -754,6 +754,8 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   await main.keyboard.press('Enter');
   await expect(main.locator('.note-editor')).toBeVisible();
   await main.locator('.note-editor').click();
+  // D-156: typed once the note's editor has the keys (a slow runner's new note settles later).
+  await expect(main.locator('.note-editor .cm-content')).toBeFocused();
   await main.keyboard.type('# Standup\nAlex: DNS');
   await expect
     .poll(() => readFile(join(flint, 'Scratch.md'), 'utf8'), { timeout: 5000 })
@@ -1656,17 +1658,33 @@ test('wide windows and the interface size (UI-12, D-81, D-82)', async () => {
   const popup = app.windows().find((page) => page.url().includes('capture-popup'));
   const popupRatio = await popup?.evaluate(() => window.devicePixelRatio);
   const before = await main.evaluate(() => window.innerWidth);
+  // D-156: each level pill is recorded as it appears (it shows for 1.5 s; a polled check on a
+  // slow runner could look before and after it), and each step waits for its own new pill.
+  await main.evaluate(() => {
+    const shown: string[] = [];
+    (window as unknown as { pills: string[] }).pills = shown;
+    new MutationObserver(() => {
+      const pill = document.querySelector('.zoom-pill');
+      const text = pill?.textContent ?? null;
+      if (pill && text && pill.getAttribute('data-seen') !== '1') {
+        pill.setAttribute('data-seen', '1');
+        shown.push(text);
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  const pills = (): Promise<string[]> =>
+    main.evaluate(() => [...(window as unknown as { pills: string[] }).pills]);
   await main.keyboard.press('Control+Equal');
-  await expect(main.locator('.zoom-pill')).toHaveText('110%');
+  await expect.poll(pills).toEqual(['110%']);
   await expect.poll(() => main.evaluate(() => window.innerWidth)).toBeLessThan(before * 0.95);
   // The popup has its own origin's zoom: it stays at 100 %.
   if (popup) expect(await popup.evaluate(() => window.devicePixelRatio)).toBe(popupRatio);
   await main.keyboard.press('Control+Minus');
-  await expect(main.locator('.zoom-pill')).toHaveText('100%');
+  await expect.poll(pills).toEqual(['110%', '100%']);
   await main.keyboard.press('Control+Minus');
-  await expect(main.locator('.zoom-pill')).toHaveText('90%');
+  await expect.poll(pills).toEqual(['110%', '100%', '90%']);
   await main.keyboard.press('Control+0');
-  await expect(main.locator('.zoom-pill')).toHaveText('100%');
+  await expect.poll(pills).toEqual(['110%', '100%', '90%', '100%']);
 });
 
 test('the context panel: Up next, pins, the selected task, back, a note outline, Ctrl+\\ and its button (NAV-07, TODAY-01, TASK-17, D-83, D-85)', async () => {

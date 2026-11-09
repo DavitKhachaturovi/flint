@@ -21,8 +21,18 @@ export function noteState(
     selection: EditorSelection.single(anchor, head),
     extensions: [markdown({ base: markdownLanguage, extensions: [...NOTE_SYNTAX] }), ...extra],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
+  parseFully(state);
   return state;
+}
+
+/**
+ * D-156: the whole document parsed, however long it takes. A time budget (`ensureSyntaxTree`'s
+ * third argument) on a busy machine left a test with half a syntax tree, the budget's failure
+ * unnoticed: no table found, a cell or a marker missing.
+ */
+export function parseFully(state: EditorState): void {
+  if (!ensureSyntaxTree(state, state.doc.length, Infinity))
+    throw new Error('the syntax tree could not be parsed');
 }
 
 export const preview = (state: EditorState, focused: boolean): PreviewItem[] =>

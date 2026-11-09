@@ -1,5 +1,5 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { ensureSyntaxTree } from '@codemirror/language';
+import { parseFully } from './preview-checks.js';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +19,7 @@ function editor(
     selection: EditorSelection.single(anchor, head),
     extensions: [markdown({ base: markdownLanguage })],
   });
-  ensureSyntaxTree(state, state.doc.length, 1000);
+  parseFully(state);
   const view = {
     get state() {
       return state;
@@ -30,7 +30,7 @@ function editor(
         first instanceof Transaction
           ? first.state
           : state.update(...(specs as TransactionSpec[])).state;
-      ensureSyntaxTree(state, state.doc.length, 1000);
+      parseFully(state);
     },
     focus() {},
   } as unknown as EditorView;

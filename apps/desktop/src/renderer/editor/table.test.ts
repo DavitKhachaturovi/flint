@@ -1,5 +1,5 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { ensureSyntaxTree } from '@codemirror/language';
+import { parseFully } from './preview-checks.js';
 import { EditorState, type ChangeSpec } from '@codemirror/state';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -33,7 +33,7 @@ function state(doc: string): EditorState {
     doc,
     extensions: [markdown({ base: markdownLanguage, extensions: [...NOTE_SYNTAX] })],
   });
-  ensureSyntaxTree(result, doc.length, 5000);
+  parseFully(result);
   return result;
 }
 function table(doc: string): { state: EditorState; table: ParsedTable } {
@@ -83,10 +83,7 @@ describe('reading a table (NOTE-10)', () => {
       ),
       { numRuns: 2000 },
     );
-    const started = performance.now();
-    containerPrefix(`${' \t>'.repeat(100_000)}x`);
-    containerPrefix(' '.repeat(200_000));
-    expect(performance.now() - started).toBeLessThan(500);
+    // Linear in time: table.timing.test.ts (D-156).
   });
 
   it('finds the table around a position, and none outside it', () => {
@@ -314,21 +311,11 @@ describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
     }
   });
 
-  it('sets, grows and clears thousands of rows in linear time (an Excel paste)', () => {
+  it('sets thousands of rows, growing the table (an Excel paste; its time: table.timing.test.ts)', () => {
     const { state: s, table: t } = table('| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |');
-    const block = Array.from({ length: 5000 }, (_, at) => [`r${at}`, 'x', 'y']);
-    let started = performance.now();
-    const grown = apply(s, setCells(s, t, 1, 0, block, true));
-    expect(performance.now() - started).toBeLessThan(500);
+    const rows = Array.from({ length: 5000 }, (_, at) => [`r${at}`, 'x', 'y']);
+    const grown = apply(s, setCells(s, t, 1, 0, rows, true));
     expect(grown.split('\n')).toHaveLength(5002);
-    const wide = Array.from({ length: 3000 }, () => ['p', 'q', 'r', 's', 't']);
-    started = performance.now();
-    apply(s, setCells(s, t, 1, 1, wide, true));
-    expect(performance.now() - started).toBeLessThan(500);
-    const big = table(grown);
-    started = performance.now();
-    clearCells(big.state, big.table, { top: 1, left: 0, bottom: 5000, right: 2 });
-    expect(performance.now() - started).toBeLessThan(500);
   });
 
   it('reads and writes tab-separated text as Excel and Sheets do', () => {
@@ -354,22 +341,6 @@ describe('blocks of cells: set, cleared, copied and pasted (D-144)', () => {
     // No tab and no line break: not a block (a paste into the cell as text).
     expect(parseTsv('just text')).toBeNull();
     expect(parseTsv('just text\r\n')).toBeNull();
-  });
-
-  it('reads pathological tab-separated text in linear time', () => {
-    const inputs = [
-      '"'.repeat(200_000),
-      '"\t'.repeat(100_000),
-      `"${'\t""'.repeat(70_000)}x`,
-      `${'"a\t"b\n'.repeat(40_000)}"`,
-      '\t'.repeat(200_000),
-      '\r\n'.repeat(100_000) + 'x',
-    ];
-    for (const input of inputs) {
-      const started = performance.now();
-      parseTsv(input);
-      expect(performance.now() - started).toBeLessThan(500);
-    }
   });
 
   it('writes cells as a GFM table, the first row its header', () => {

@@ -7,7 +7,7 @@ import {
   undo,
 } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { ensureSyntaxTree } from '@codemirror/language';
+import { parseFully } from './preview-checks.js';
 import { EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
 import { EditorView, type Command } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
@@ -28,7 +28,7 @@ function state(doc = DOC, extra: readonly Extension[] = []): EditorState {
       ...extra,
     ],
   });
-  ensureSyntaxTree(result, doc.length, 5000);
+  parseFully(result);
   return result;
 }
 
@@ -89,7 +89,7 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
   ): EditorState {
     const head = change.from + (change.insert?.length ?? 0);
     const next = s.update({ changes: change, selection: { anchor: head }, userEvent }).state;
-    ensureSyntaxTree(next, next.doc.length, 5000);
+    parseFully(next);
     return next;
   }
   const drawn = (s: EditorState): number => {
@@ -191,7 +191,7 @@ describe('text written below a table stays out of it (NOTE-10, D-144)', () => {
   });
 
   const parsed = (s: EditorState): EditorState => {
-    ensureSyntaxTree(s, s.doc.length, 5000);
+    parseFully(s);
     return s;
   };
   const caret = (s: EditorState, anchor: number): EditorState =>

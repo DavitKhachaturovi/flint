@@ -298,6 +298,9 @@ test('the capture popup fades in and out: main says hiding, hides after the fade
   await app.evaluate(() =>
     (globalThis as { __flintE2E?: { showPopup?: () => void } }).__flintE2E?.showPopup?.(),
   );
+  // D-156: typed once the popup has taken in being shown (its field focused, its draft applied),
+  // not before: once the field held " x" (8 Nov 2026).
+  await expect(popup.locator('#capture')).toBeFocused();
   await popup.locator('#capture').pressSequentially('x');
   await expect(popup.locator('#capture')).toHaveValue('x');
   if (await visible()) await popup.locator('#capture').press('Escape');
