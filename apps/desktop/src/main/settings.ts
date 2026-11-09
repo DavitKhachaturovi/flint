@@ -69,6 +69,13 @@ export interface Settings {
   readonly clipboardShowContents: boolean;
   /** APP-06, D-136: check GitHub Releases for updates automatically (on by default). */
   readonly checkForUpdates: boolean;
+  /**
+   * TASK-18, D-151: Give to Claude's folder per list (by the list's id), an absolute path on this
+   * machine; never in the Flint folder, which may travel to another machine.
+   */
+  readonly claudeFolders: Readonly<Record<string, string>>;
+  /** D-151: the folders given to most recently, newest first (five at most). */
+  readonly claudeRecentFolders: readonly string[];
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -108,6 +115,8 @@ export function defaultSettings(development = false): Settings {
     clipboardHistory: true,
     clipboardShowContents: false,
     checkForUpdates: true,
+    claudeFolders: {},
+    claudeRecentFolders: [],
   };
 }
 
@@ -129,6 +138,32 @@ const oneOf =
   (values: readonly number[]) =>
   (value: unknown): value is number =>
     typeof value === 'number' && values.includes(value);
+/** D-151: Give to Claude keeps at most this many recent folders. */
+export const CLAUDE_RECENT_FOLDERS = 5;
+
+/** An absolute Windows path (`C:\…` or `\\server\…`), as Give to Claude's folders must be. */
+export function isAbsoluteFolder(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length < 1024 &&
+    /^(?:[A-Za-z]:[\\/]|\\\\[^\\/])/.test(value) &&
+    !/[\0\r\n]/.test(value)
+  );
+}
+
+function readClaudeFolders(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const folders: Record<string, string> = {};
+  for (const [list, folder] of Object.entries(value as Record<string, unknown>))
+    if (list !== '' && isAbsoluteFolder(folder)) folders[list] = folder;
+  return folders;
+}
+
+function readRecentFolders(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(isAbsoluteFolder))].slice(0, CLAUDE_RECENT_FOLDERS);
+}
+
 const isDays = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 365;
 
@@ -205,6 +240,8 @@ export function readSettings(stored: Stored, development = false): Settings {
       isBoolean,
       defaults.clipboardShowContents,
     ),
+    claudeFolders: readClaudeFolders(stored['claudeFolders']),
+    claudeRecentFolders: readRecentFolders(stored['claudeRecentFolders']),
   };
 }
 

@@ -113,6 +113,14 @@ export interface E2EHooks {
   captureHiddenMs?: number[];
   /** D-136: the tray menu's labels, as they are now. */
   trayLabels?: () => string[];
+  /**
+   * TASK-18, D-151: the folder Give to Claude's picker returns (no dialog; null: cancelled), and
+   * Claude taken as not installed. Tests never ask Windows: no runner has Claude.
+   */
+  pickClaudeFolder?: string | null;
+  claudeMissing?: boolean;
+  /** D-93, D-151: text Flint would have put on the clipboard, recorded instead. */
+  copied?: string[];
 }
 
 export function e2eHooks(): E2EHooks | undefined {

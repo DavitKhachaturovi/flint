@@ -22,6 +22,9 @@ import {
   type FolderChange,
   type FolderChangeOutcome,
   type FolderChoice,
+  type ClaudeState,
+  type GiveToClaudeOutcome,
+  type GiveToClaudeRequest,
   type SearchHit,
   type HotkeyName,
   type HotkeysView,
@@ -245,6 +248,25 @@ export const main = {
   /** DATA-07, D-104: Windows' folder picker for a new Flint folder; null when cancelled. */
   chooseFolder(): Promise<FolderChoice | null> {
     return invoke(Channels.mainChooseFolder) as Promise<FolderChoice | null>;
+  },
+  /** TASK-18, D-151: Give to Claude's folders, and whether Claude is installed. */
+  claudeState(): Promise<ClaudeState | null> {
+    return invoke(Channels.mainClaudeState) as Promise<ClaudeState | null>;
+  },
+  /** D-151: Windows' folder picker for Claude, opening at `near`; null when cancelled. */
+  chooseClaudeFolder(near: string | null): Promise<string | null> {
+    return invoke(Channels.mainClaudeChooseFolder, near) as Promise<string | null>;
+  },
+  /** D-151: a list's folder for Claude set, or forgotten (null). */
+  setClaudeFolder(list: string, folder: string | null): Promise<ClaudeState | null> {
+    return invoke(Channels.mainClaudeSetFolder, list, folder) as Promise<ClaudeState | null>;
+  },
+  clearClaudeRecent(): Promise<ClaudeState | null> {
+    return invoke(Channels.mainClaudeClearRecent) as Promise<ClaudeState | null>;
+  },
+  /** D-151: hands the task to Claude: main builds the claude:// link from the prompt. */
+  giveToClaude(request: GiveToClaudeRequest): Promise<GiveToClaudeOutcome | null> {
+    return invoke(Channels.mainGiveToClaude, request) as Promise<GiveToClaudeOutcome | null>;
   },
   /** D-104: move to, start fresh in, or open `path`; Flint restarts when it worked. */
   changeFolder(path: string, how: FolderChange): Promise<FolderChangeOutcome | null> {

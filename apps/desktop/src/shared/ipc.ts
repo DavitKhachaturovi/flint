@@ -229,6 +229,12 @@ export const Channels = {
   mainUpdatesChanged: 'main:updates-changed',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
+  /** TASK-18, D-151: Give to Claude's folders, and the giving itself (a prompt, never a link). */
+  mainClaudeState: 'main:claude-state',
+  mainClaudeChooseFolder: 'main:claude-choose-folder',
+  mainClaudeSetFolder: 'main:claude-set-folder',
+  mainClaudeClearRecent: 'main:claude-clear-recent',
+  mainGiveToClaude: 'main:give-to-claude',
   /** Main → main window: the interface size changed (UI-12, D-81); the new zoom factor. */
   mainZoomed: 'main:zoomed',
   /** Main window → main: zoom in, out or back to 100 % (keys the main process didn't see first). */
@@ -503,6 +509,31 @@ export type SnapshotDiff =
 export const SNAPSHOTS_ID = '@snapshots';
 
 /** APP-11, D-100: what the Settings view shows and changes. */
+/** TASK-18, D-151: Give to Claude's folders on this machine, and whether Claude is installed. */
+export interface ClaudeState {
+  readonly installed: boolean;
+  /** For the prompt's absolute attachment paths. */
+  readonly flintFolder: string;
+  /** Each list's folder, by list id. */
+  readonly folders: Readonly<Record<string, string>>;
+  /** Newest first, five at most. */
+  readonly recent: readonly string[];
+  /** Folders among these that no longer exist (shown dimmed, "Not found"). */
+  readonly missing: readonly string[];
+}
+
+export interface GiveToClaudeRequest {
+  readonly prompt: string;
+  /** An absolute path. */
+  readonly folder: string;
+  /** The task's list, for Shift+Enter's "make this the list's folder". */
+  readonly list: string | null;
+  readonly makeDefault: boolean;
+}
+
+/** Opened with the prompt in the link; opened with it on the clipboard; Claude's link refused. */
+export type GiveToClaudeOutcome = 'opened' | 'copied' | 'not-installed' | 'no-folder';
+
 export interface SettingsView {
   readonly startWithWindows: boolean;
   readonly notifications: boolean;

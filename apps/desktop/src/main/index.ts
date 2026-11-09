@@ -38,6 +38,7 @@ import {
   type SettingsView,
   type ClipboardItemView,
   type ClipboardView,
+  type ClaudeState,
 } from '../shared/ipc.js';
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
@@ -57,7 +58,8 @@ import { HotkeyRegistry } from './hotkey-registry.js';
 import { acceleratorKeys } from './hotkeys.js';
 import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
-import { SettingsFile } from './settings.js';
+import { isAbsoluteFolder, SettingsFile } from './settings.js';
+import { claudeState, giveToClaude, readGiveRequest, withFolder } from './claude.js';
 import {
   displayKey,
   isZoomRequest,
@@ -1377,6 +1379,64 @@ async function start(): Promise<void> {
     }
     if (path === null) return null;
     return { ...(await checkFolder(path, folder.folder)), current: folder.folder };
+  });
+  // TASK-18, D-151: Give to Claude. Flint hands Windows a claude:// link it builds itself from the
+  // prompt and the folder; tests record it (and what would be copied) instead, and never ask
+  // Windows whether Claude is installed.
+  const claudeInstalled = (): boolean =>
+    testHooks
+      ? testHooks.claudeMissing !== true
+      : app.getApplicationNameForProtocol('claude://') !== '';
+  const currentClaudeState = (): Promise<ClaudeState> =>
+    claudeState(settingsFile.current, folder.folder, claudeInstalled());
+  ipcMain.handle(Channels.mainClaudeState, (event) =>
+    owns(event.sender) ? currentClaudeState() : null,
+  );
+  ipcMain.handle(Channels.mainClaudeChooseFolder, async (event, near: unknown) => {
+    if (!owns(event.sender)) return null;
+    if (testHooks && 'pickClaudeFolder' in testHooks) return testHooks.pickClaudeFolder ?? null;
+    const picked = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose a folder for Claude',
+      ...(isAbsoluteFolder(near) ? { defaultPath: near } : {}),
+      properties: ['openDirectory'],
+    });
+    const path = picked.canceled ? null : (picked.filePaths[0] ?? null);
+    return isAbsoluteFolder(path) ? path : null;
+  });
+  ipcMain.handle(Channels.mainClaudeSetFolder, async (event, list: unknown, path: unknown) => {
+    if (!owns(event.sender) || typeof list !== 'string' || list === '') return null;
+    if (path !== null && !isAbsoluteFolder(path)) return null;
+    await settingsFile.update({
+      claudeFolders: withFolder(settingsFile.current.claudeFolders, list, path),
+    });
+    return currentClaudeState();
+  });
+  ipcMain.handle(Channels.mainClaudeClearRecent, async (event) => {
+    if (!owns(event.sender)) return null;
+    await settingsFile.update({ claudeRecentFolders: [] });
+    return currentClaudeState();
+  });
+  ipcMain.handle(Channels.mainGiveToClaude, async (event, value: unknown) => {
+    if (!owns(event.sender)) return null;
+    const request = readGiveRequest(value);
+    if (!request) return null;
+    const { outcome, changes } = await giveToClaude(request, settingsFile.current, {
+      installed: claudeInstalled,
+      open: async (url) => {
+        // Only the link `planHandoff` built: claude://code/new, nothing else (D-151).
+        if (!url.startsWith('claude://code/new?')) throw new Error('not a Claude link');
+        if (testHooks) testHooks.opened.push(url);
+        else await shell.openExternal(url);
+      },
+      copy: async (text) => {
+        // D-93: tests never touch the real clipboard.
+        if (testHooks) (testHooks.copied ??= []).push(text);
+        else await clipboard.writeText(text);
+      },
+    });
+    if (changes) await settingsFile.update(changes);
+    log(`give to Claude: ${outcome}`);
+    return outcome;
   });
   ipcMain.handle(Channels.mainChangeFolder, async (event, path: unknown, how: unknown) => {
     if (
