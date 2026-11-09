@@ -329,6 +329,16 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
     await main.keyboard.press('Escape');
     await expect(main.locator('.cheat-sheet')).toHaveCount(0);
   });
+  // TASK-18, D-151: Give to Claude's card, the palette's motion.
+  await main.locator('.main .row').first().click();
+  await step(main, 'Give to Claude’s card opens (G)', 'motion', async () => {
+    await main.keyboard.press('g');
+    await expect(main.locator('.give-to-claude')).toBeVisible();
+  });
+  await step(main, 'It closes (Esc)', 'motion', async () => {
+    await main.keyboard.press('Escape');
+    await expect(main.locator('.give-to-claude')).toHaveCount(0);
+  });
   await step(main, 'Find opens (Ctrl+F)', 'motion', () => main.keyboard.press('Control+f'));
   await step(main, 'It closes (Esc)', 'motion', () => main.keyboard.press('Escape'));
   await step(main, 'What’s new opens', 'motion', async () => {

@@ -97,6 +97,8 @@ import { SETTINGS_SECTIONS, SettingsIndex, SettingsScreen } from './Settings.js'
 import { onboardingOnce, Walkthrough, WhatsNew, type TourEnd } from './Onboarding.js';
 import { TipLayer, tipHappened, useFrontAdds } from './Tips.js';
 import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from './Palette.js';
+import { GiveToClaude } from './GiveToClaude.js';
+import { CLAUDE_DOWNLOAD_URL } from '../../shared/claude.js';
 import { CheatSheet } from './CheatSheet.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
@@ -297,6 +299,15 @@ function findRow(view: ListView, key: string): TaskRow | null {
   return withSubtasks(tasks).find((row) => row.key === key) ?? null;
 }
 
+/** TASK-18, D-151: the task a subtask belongs to (null for a top-level task). */
+function findParent(view: ListView, key: string): TaskRow | null {
+  const tasks = [
+    ...view.items.flatMap((item) => (item.kind === 'task' ? [item.task] : [])),
+    ...view.completed,
+  ];
+  return tasks.find((task) => task.subtasks.some((subtask) => subtask.key === key)) ?? null;
+}
+
 /** The rows the keyboard moves through, top to bottom (Navigate state, docs/03 §2). */
 /** TASK-08, D-72, D-88: a temporary sort of a list's open tasks; the file's order stays. */
 type TempSort = 'priority' | 'reminder' | 'added';
@@ -421,6 +432,16 @@ export function App(): ReactElement {
   const listAnchor = useRef<string | null>(null);
   /** TASK-05, D-53: the task shown as a page instead of its list. */
   const [page, setPage] = useState<string | null>(null);
+  /** TASK-18, D-151: the task Give to Claude's card is open for. */
+  const [claudeTask, setClaudeTask] = useState<string | null>(null);
+  /** D-151: each list's folder for Claude (for the list menu's Claude folder ›). */
+  const [claudeFolders, setClaudeFolders] = useState<Readonly<Record<string, string>>>({});
+  const refreshClaudeFolders = useCallback((): void => {
+    void window.flintMain.claudeState().then((state) => {
+      if (state) setClaudeFolders(state.folders);
+    });
+  }, []);
+  useEffect(refreshClaudeFolders, [refreshClaudeFolders]);
   /** Small bodies shown inline under their rows, and the body being edited there (D-49). */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   /**
@@ -2288,6 +2309,8 @@ export function App(): ReactElement {
               },
             ]
           : []),
+        // TASK-18, D-151: hands the task to Claude Code in the Claude app.
+        { label: 'Give to Claude', hint: 'G', action: () => setClaudeTask(row.key) },
         'divider',
         {
           label: 'More',
@@ -2579,6 +2602,50 @@ export function App(): ReactElement {
   );
 
   /** D-55: a list's right-click menu; D-89: Inbox has a short one of its own (LIST-03). */
+  /** TASK-18, D-151: a list's folder for Claude chosen (Windows' picker) or forgotten. */
+  const chooseClaudeFolderFor = useCallback(
+    async (list: { readonly id: string; readonly name: string }): Promise<void> => {
+      const path = await window.flintMain.chooseClaudeFolder(claudeFolders[list.id] ?? null);
+      if (!path) return;
+      const state = await window.flintMain.setClaudeFolder(list.id, path);
+      if (!state) return;
+      setClaudeFolders(state.folders);
+      const name =
+        path
+          .replace(/[\\/]+$/, '')
+          .split(/[\\/]/)
+          .pop() ?? path;
+      showToast(`${list.name} gives to Claude in ${name}`, false);
+    },
+    [claudeFolders, showToast],
+  );
+  const forgetClaudeFolderFor = useCallback(
+    async (list: { readonly id: string; readonly name: string }): Promise<void> => {
+      const state = await window.flintMain.setClaudeFolder(list.id, null);
+      if (!state) return;
+      setClaudeFolders(state.folders);
+      showToast(`${list.name} has no Claude folder now`, false);
+    },
+    [showToast],
+  );
+  /** D-151: the list menu's Claude folder ›: the folder (shown), Choose… or Change…, Forget. */
+  const claudeFolderEntry = useCallback(
+    (list: ListSummary): MenuEntry => {
+      const current = claudeFolders[list.id];
+      return {
+        label: 'Claude folder',
+        submenu: [
+          ...(current ? [{ label: current, disabled: true }, 'divider' as const] : []),
+          {
+            label: current ? 'Change…' : 'Choose…',
+            action: () => void chooseClaudeFolderFor(list),
+          },
+          ...(current ? [{ label: 'Forget', action: () => void forgetClaudeFolderFor(list) }] : []),
+        ],
+      };
+    },
+    [claudeFolders, chooseClaudeFolderFor, forgetClaudeFolderFor],
+  );
   const listMenu = useCallback(
     (list: ListSummary, at: Point): void => {
       const done = (outcome: ListActionOutcome | null): void => {
@@ -2659,6 +2726,8 @@ export function App(): ReactElement {
               action: () =>
                 void window.flintMain.listAction({ kind: 'duplicate', id: list.id }).then(done),
             },
+            'divider',
+            claudeFolderEntry(list),
           ],
           at,
         );
@@ -2755,6 +2824,7 @@ export function App(): ReactElement {
           'divider',
           ...sorting,
           ...grouping,
+          ...(list.mode === 'tasks' ? ['divider' as const, claudeFolderEntry(list)] : []),
           'divider',
           {
             label: list.mode === 'note' ? 'Delete note' : 'Delete list',
@@ -2783,6 +2853,7 @@ export function App(): ReactElement {
       go,
       tempSort,
       sortTo,
+      claudeFolderEntry,
     ],
   );
 
@@ -2999,6 +3070,10 @@ export function App(): ReactElement {
         if (event.key === 'Escape') {
           event.preventDefault();
           leavePage();
+        } else if (key === 'g' && !event.shiftKey && !event.altKey) {
+          // TASK-18, D-151: G gives the page's task to Claude.
+          event.preventDefault();
+          setClaudeTask(page);
         }
         return;
       }
@@ -3086,6 +3161,10 @@ export function App(): ReactElement {
         const targets = marked.size > 1 ? rows.filter((other) => marked.has(other.key)) : [row];
         const tasks = targets.filter((task): task is TaskRow => task !== undefined);
         void pin(tasks, !tasks.every((task) => task.pinned));
+      } else if (key === 'g' && !event.shiftKey && !event.altKey && marked.size <= 1 && row) {
+        // TASK-18, D-151: G gives the selected task to Claude (completed ones too).
+        event.preventDefault();
+        setClaudeTask(row.key);
       } else if (key === 'r' && !event.shiftKey && marked.size <= 1 && open) {
         // REM-01, D-94: R sets or changes the selected task's reminder, in any list and in Today.
         event.preventDefault();
@@ -4190,6 +4269,27 @@ export function App(): ReactElement {
       { id: 'new:note', label: 'New note', run: () => setNaming({ kind: 'new', mode: 'note' }) },
       { id: 'new:group', label: 'New group', run: () => setNaming({ kind: 'newGroup' }) },
       { id: 'new:quick', label: 'Quick note', hint: 'Ctrl+Shift+J', run: () => newQuickNote() },
+      // TASK-18, D-151: the list's folder for Give to Claude.
+      ...(view?.mode === 'tasks' && view.id !== TODAY_ID
+        ? [
+            {
+              id: 'claude:folder',
+              label: 'Set Claude folder for this list…',
+              keywords: 'give to claude code folder project',
+              run: () => void chooseClaudeFolderFor(view),
+            },
+            ...(claudeFolders[view.id]
+              ? [
+                  {
+                    id: 'claude:forget',
+                    label: 'Forget Claude folder for this list',
+                    keywords: 'give to claude code folder project',
+                    run: () => void forgetClaudeFolderFor(view),
+                  },
+                ]
+              : []),
+          ]
+        : []),
       ...(view?.mode === 'tasks' && !pageTask && view.id !== TODAY_ID
         ? [
             {
@@ -4622,6 +4722,7 @@ export function App(): ReactElement {
         : null,
     onMenu: (at) => panelMenu(at),
     onOpenPage: openPage,
+    onGiveToClaude: setClaudeTask,
     onToggle: (key) => void toggle(key),
     onPin: (task, pinned) => void pin([task], pinned),
     onUnpin: (item) =>
@@ -5040,6 +5141,8 @@ export function App(): ReactElement {
                   find={settingsFind}
                   onToast={(text) => showToast(text, false)}
                   onSnapshots={() => openList(SNAPSHOTS_ID)}
+                  claudeLists={lists.filter((list) => list.mode === 'tasks')}
+                  onClaudeFolders={setClaudeFolders}
                   onReplayTour={() => startTour(0)}
                   onWhatsNew={() => setWhatsNew({ since: undefined })}
                   updates={updates}
@@ -5615,6 +5718,48 @@ export function App(): ReactElement {
           onClose={() => setPalette(false)}
         />
       )}
+      {/* TASK-18, D-151: Give to Claude's card. */}
+      {claudeTask &&
+        view &&
+        (() => {
+          const task = findRow(view, claudeTask);
+          if (!task) return null;
+          const parent = findParent(view, claudeTask);
+          const home = task.home ?? parent?.home;
+          const list = home
+            ? { id: home.listId, name: home.listName }
+            : view.id !== TODAY_ID
+              ? { id: view.id, name: view.name }
+              : null;
+          return (
+            <GiveToClaude
+              task={task}
+              parent={parent}
+              list={list}
+              onClose={() => {
+                setClaudeTask(null);
+                // Shift+Enter may have given the list its folder (the list's menu shows it).
+                refreshClaudeFolders();
+              }}
+              onGiven={(outcome, folder) => {
+                const name =
+                  folder
+                    .replace(/[\\/]+$/, '')
+                    .split(/[\\/]/)
+                    .pop() ?? folder;
+                if (outcome === 'opened') showToast(`Given to Claude · ${name}`, false);
+                else if (outcome === 'copied')
+                  showToast('Copied: paste it into Claude with Ctrl+V', false);
+                else if (outcome === 'no-folder') showToast(`${name} no longer exists`, false);
+                else
+                  showToast("Claude isn't installed, or Windows couldn't open it", false, {
+                    label: 'Download',
+                    run: () => window.flintMain.openLink(CLAUDE_DOWNLOAD_URL),
+                  });
+              }}
+            />
+          );
+        })()}
       {/* NAV-02, D-106: the `?` cheat sheet. */}
       {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
       {lightbox && (

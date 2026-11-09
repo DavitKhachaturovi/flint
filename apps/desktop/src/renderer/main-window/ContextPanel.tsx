@@ -27,6 +27,7 @@ import {
   HashIcon,
   ImageIcon,
   OpenPageIcon,
+  GiveToClaudeIcon,
   PinIcon,
   PlusIcon,
   ReminderBellIcon,
@@ -75,6 +76,8 @@ export interface PanelHandlers {
   /** D-85: the panel's right-click menu (Hide panel). */
   readonly onMenu: (at: { x: number; y: number }) => void;
   readonly onOpenPage: (key: string) => void;
+  /** TASK-18, D-151: Give to Claude's card for a task. */
+  readonly onGiveToClaude: (key: string) => void;
   readonly onToggle: (key: string) => void;
   readonly onTitle: (key: string, text: string) => void;
   readonly onPriority: (task: TaskRow, anchor: DOMRect) => void;
@@ -251,10 +254,11 @@ function PanelHead(props: {
   readonly meta?: string;
   readonly handlers: PanelHandlers;
   readonly openPage?: () => void;
+  readonly giveToClaude?: () => void;
   /** D-85: a back arrow to what the panel showed before (a task reached from a panel link). */
   readonly back?: boolean;
 }): ReactElement {
-  const { label, meta, handlers, openPage, back } = props;
+  const { label, meta, handlers, openPage, giveToClaude, back } = props;
   const onBack = handlers.onBack;
   return (
     <header className="panel-head">
@@ -271,6 +275,16 @@ function PanelHead(props: {
       <span className="panel-label">{label}</span>
       {meta && <span className="panel-meta">{meta}</span>}
       <span className="panel-actions">
+        {giveToClaude && (
+          <button
+            type="button"
+            className="panel-button"
+            title="Give to Claude (G)"
+            onClick={giveToClaude}
+          >
+            <GiveToClaudeIcon />
+          </button>
+        )}
         {openPage && (
           <button
             type="button"
@@ -316,6 +330,7 @@ function TaskDetails(props: {
         back={props.back}
         handlers={handlers}
         openPage={() => handlers.onOpenPage(task.key)}
+        giveToClaude={() => handlers.onGiveToClaude(task.key)}
       />
       <div className="panel-title-row">
         <button

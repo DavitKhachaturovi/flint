@@ -129,6 +129,14 @@ export const OpenPageIcon = ({ size = 14 }: IconProps): ReactElement =>
     <path key="c" d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />,
   ]);
 
+/** TASK-18, D-151: Give to Claude (a code prompt; no brand mark). */
+export const GiveToClaudeIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,
+    <path key="b" d="m7.5 9.5 3 2.5-3 2.5" />,
+    <path key="c" d="M13 15h3.5" />,
+  ]);
+
 export const PanelIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [
     <rect key="a" x="3" y="4" width="18" height="16" rx="3" />,

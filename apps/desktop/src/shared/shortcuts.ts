@@ -49,6 +49,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: '1 / 2 / 3 / 0', action: 'Priority low, medium, high, none' },
       { keys: 'P', action: 'Pin to Today, or unpin' },
       { keys: 'R', action: 'Set or change the reminder' },
+      { keys: 'G', action: 'Give to Claude (Claude Code)' },
       { keys: 'Alt+↑ / Alt+↓', action: 'Move the task up or down' },
       { keys: 'Tab / Shift+Tab', action: 'Make a subtask, or not' },
       { keys: '→ / ←', action: 'Open or close the notes' },

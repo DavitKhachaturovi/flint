@@ -667,7 +667,7 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
   // Right-click a task: its menu; Move to… opens the list picker; a new name makes a new list.
   await main.locator('.row', { hasText: 'Fix the gate' }).click({ button: 'right' });
   // D-91: in groups: Complete · Edit · Open as page / Priority ▸ · Reminder ▸ · Pin / Add ▸ /
-  // Move to… · Duplicate / More ▸ / Delete.
+  // Move to… · Duplicate · Give to Claude (D-151) / More ▸ / Delete.
   await expect(menuItems).toHaveText([
     'Complete',
     'Edit',
@@ -678,6 +678,7 @@ test('menus, delete to trash, move between lists, list and note actions (M4 step
     'Add',
     'Move to…',
     'Duplicate',
+    'Give to Claude',
     'More',
     'Delete',
   ]);
@@ -3149,9 +3150,9 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   // The Settings row above Trash opens the page; its index sits in the panel's place.
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
   await expect(main.locator('.settings-header h1')).toHaveText('Settings');
-  // D-109: Mini mode is the tenth section; D-128: Clipboard the eleventh.
-  await expect(main.locator('.settings-section')).toHaveCount(11);
-  await expect(main.locator('.settings-index-item')).toHaveCount(11);
+  // D-109: Mini mode is the tenth section; D-128: Clipboard the eleventh; D-151: Claude the twelfth.
+  await expect(main.locator('.settings-section')).toHaveCount(12);
+  await expect(main.locator('.settings-index-item')).toHaveCount(12);
   await main.locator('.settings-index-item', { hasText: 'Keyboard shortcuts' }).click();
   await expect(main.locator('#settings-shortcuts')).toBeInViewport();
   await expect(main.locator('#settings-shortcuts')).toContainText('Ctrl+Shift+J');
@@ -3274,7 +3275,7 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(main.locator('.settings-section')).toHaveCount(1);
   await expect(main.locator('.settings-section')).toHaveAttribute('aria-label', 'Reminders');
   await main.keyboard.press('Escape');
-  await expect(main.locator('.settings-section')).toHaveCount(11);
+  await expect(main.locator('.settings-section')).toHaveCount(12);
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('main-window'),

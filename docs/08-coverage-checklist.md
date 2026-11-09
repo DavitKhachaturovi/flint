@@ -1170,11 +1170,11 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | The prompt: title, notes, subtasks with state and notes, fields stripped, attachments absolute, untitled label, subtask with `Part of:` | TASK-18 · Planned (1.3.0) | 02, D-151 |
-| 2 | The link: `claude://code/new?q=…&folder=…`, only through `shell.openExternal`, only `claude://`; a refused open and a missing handler give the not-installed toast with Download | TASK-18 · Planned (1.3.0) | 02, D-151 |
-| 3 | Limits: 14,336 characters and 30,000 encoded; over either, the clipboard, said in the footer before giving | TASK-18 · Planned (1.3.0) | 02, D-151 |
-| 4 | The card: default, recent (5) and Choose a folder…, missing folders dimmed, Enter, Shift+Enter (default), Esc, the count and token estimate | TASK-18 · Planned (1.3.0) | 02, D-151 |
-| 5 | Entry points: right-click menu, palette, side panel task details, G in Navigate; not with several marked, mini, triage, popup or note rows | TASK-18 · Planned (1.3.0) | 02, D-151, D-106 |
-| 6 | Folders in `settings.json` by list id; the list's Claude folder › menu; Settings → Claude; the three palette commands | TASK-18 · Planned (1.3.0) | 02, D-151 |
-| 7 | Privacy row's sentence; no network request (the e2e network test unchanged) | APP-09 · Planned (1.3.0) | 02, D-151 |
-| 8 | Motion: the card as the palette's, the toast's | TASK-18 · Planned (1.3.0) | 03 §5, D-89 |
+| 1 | The prompt: title, notes, subtasks with state and notes, fields stripped, attachments absolute, untitled label, subtask with `Part of:` | TASK-18 · Built (1.3.0) | 02, D-151 |
+| 2 | The link: `claude://code/new?q=…&folder=…`, only through `shell.openExternal`, only `claude://`; a refused open and a missing handler give the not-installed toast with Download | TASK-18 · Built (1.3.0) | 02, D-151 |
+| 3 | Limits: 14,336 characters and 30,000 encoded; over either, the clipboard, said in the footer before giving | TASK-18 · Built (1.3.0) | 02, D-151 |
+| 4 | The card: default, recent (5) and Choose a folder…, missing folders dimmed, Enter, Shift+Enter (default), Esc, the count and token estimate | TASK-18 · Built (1.3.0) | 02, D-151 |
+| 5 | Entry points: right-click menu, palette, side panel task details, G in Navigate; not with several marked, mini, triage, popup or note rows | TASK-18 · Built (1.3.0) | 02, D-151, D-106 |
+| 6 | Folders in `settings.json` by list id; the list's Claude folder › menu; Settings → Claude; the three palette commands | TASK-18 · Built (1.3.0) | 02, D-151 |
+| 7 | Privacy row's sentence; no network request (the e2e network test unchanged) | APP-09 · Built (1.3.0) | 02, D-151 |
+| 8 | Motion: the card as the palette's, the toast's | TASK-18 · Built (1.3.0) | 03 §5, D-89 |

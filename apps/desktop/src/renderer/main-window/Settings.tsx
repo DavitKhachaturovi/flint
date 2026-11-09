@@ -18,6 +18,7 @@ import type {
   SettingsView,
   FolderChange,
   FolderChoice,
+  ClaudeState,
 } from '../../shared/ipc.js';
 import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
@@ -48,6 +49,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'today', name: 'Today & lists' },
   { id: 'links', name: 'Links' },
   { id: 'clipboard', name: 'Clipboard' },
+  { id: 'claude', name: 'Claude' },
   { id: 'data', name: 'Data' },
   { id: 'appearance', name: 'Appearance' },
   { id: 'shortcuts', name: 'Keyboard shortcuts' },
@@ -278,6 +280,9 @@ export function SettingsScreen(props: {
   readonly onLinkPatterns: (patterns: readonly LinkPattern[]) => void;
   /** D-105: the built-in recognizers turned off there. */
   readonly onBuiltInLinksOff: (off: readonly string[]) => void;
+  /** TASK-18, D-151: the task lists (Settings → Claude names them), and their folders changed. */
+  readonly claudeLists: readonly { readonly id: string; readonly name: string }[];
+  readonly onClaudeFolders: (folders: Readonly<Record<string, string>>) => void;
   /** D-102: the interface size now, and setting an exact one. */
   readonly zoom: number;
   readonly onZoom: (level: number) => void;
@@ -614,6 +619,17 @@ export function SettingsScreen(props: {
         />
       </Section>
 
+      {/* TASK-18, D-151: Give to Claude: each list's folder, and the recent ones. */}
+      <Section id="claude" filter={filter}>
+        <Row
+          name="Give to Claude"
+          note="Flint opens Claude Code with the task in its composer. Flint sends nothing itself; you review it and send it from Claude."
+          filter={filter}
+          words="claude code give ai agent folder project privacy"
+        />
+        <ClaudeFolders lists={props.claudeLists} onFolders={props.onClaudeFolders} />
+      </Section>
+
       {/* NAV-08, D-128: Windows' clipboard history in the side panel and its picker. */}
       <Section id="clipboard" filter={filter}>
         <Row
@@ -805,9 +821,9 @@ export function SettingsScreen(props: {
         {/* APP-09, D-16, D-132, D-136: stated plainly, first in About. */}
         <Row
           name="Privacy"
-          note="Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off."
+          note="Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude."
           filter={filter}
-          words="privacy telemetry network data account offline github updates"
+          words="privacy telemetry network data account offline github updates claude"
         />
         {/* APP-06, D-136: the version, what the updater is doing, and its one action. */}
         <Row
@@ -1312,6 +1328,85 @@ function LinkPatternList(props: {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/**
+ * TASK-18, D-151: the lists that have a folder for Claude (Change…, Forget), and Clear recent
+ * folders. A list gets its folder from its right-click menu, the palette, or Shift+Enter in the
+ * card.
+ */
+function ClaudeFolders(props: {
+  readonly lists: readonly { readonly id: string; readonly name: string }[];
+  readonly onFolders: (folders: Readonly<Record<string, string>>) => void;
+}): ReactElement {
+  const { lists, onFolders } = props;
+  const [state, setState] = useState<ClaudeState | null>(null);
+  useEffect(() => {
+    void window.flintMain.claudeState().then(setState);
+  }, []);
+  const changed = (next: ClaudeState | null): void => {
+    if (!next) return;
+    setState(next);
+    onFolders(next.folders);
+  };
+  if (!state) return <></>;
+  const missing = new Set(state.missing.map((path) => path.toLowerCase()));
+  const withFolder = lists.filter((list) => state.folders[list.id] !== undefined);
+  return (
+    <>
+      {withFolder.length === 0 ? (
+        <span className="settings-note claude-none">
+          No list has a folder yet: choose one from a list's right-click menu (Claude folder).
+        </span>
+      ) : (
+        <ul className="link-patterns claude-folders">
+          {withFolder.map((list) => {
+            const folder = state.folders[list.id] ?? '';
+            return (
+              <li key={list.id} className="link-pattern">
+                <span className="link-pattern-label">{list.name}</span>
+                <span className="claude-folder-path" title={folder}>
+                  {missing.has(folder.toLowerCase()) ? `${folder} (not found)` : folder}
+                </span>
+                <span className="link-pattern-actions">
+                  <button
+                    type="button"
+                    className="trash-action"
+                    onClick={() =>
+                      void window.flintMain.chooseClaudeFolder(folder).then((path) => {
+                        if (path)
+                          void window.flintMain.setClaudeFolder(list.id, path).then(changed);
+                      })
+                    }
+                  >
+                    Change…
+                  </button>
+                  <button
+                    type="button"
+                    className="trash-action"
+                    onClick={() =>
+                      void window.flintMain.setClaudeFolder(list.id, null).then(changed)
+                    }
+                  >
+                    Forget
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {state.recent.length > 0 && (
+        <button
+          type="button"
+          className="trash-action claude-clear"
+          onClick={() => void window.flintMain.clearClaudeRecent().then(changed)}
+        >
+          Clear recent folders
+        </button>
+      )}
     </>
   );
 }
