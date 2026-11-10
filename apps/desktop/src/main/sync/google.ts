@@ -9,7 +9,7 @@
  * The client ID of the Cloud project's Desktop app client (docs/06 §6, step 7; set 10 Nov 2026).
  * Empty, Settings → Sync would say "Not set up in this build".
  */
-export const GOOGLE_CLIENT_ID =
+export const GOOGLE_CLIENT_ID: string =
   '432838445401-sco8s20ttj1080svf3ta4v2daomu547k.apps.googleusercontent.com';
 
 /** The one scope: only files Flint created (non-sensitive, D-161). */
