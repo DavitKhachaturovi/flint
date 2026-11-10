@@ -30,6 +30,10 @@
       "types": "./dist/undo/index.d.ts",
       "default": "./dist/undo/index.js"
     },
+    "./sync": {
+      "types": "./dist/sync/index.d.ts",
+      "default": "./dist/sync/index.js"
+    },
     "./bench": {
       "types": "./dist/bench/index.d.ts",
       "default": "./dist/bench/index.js"
