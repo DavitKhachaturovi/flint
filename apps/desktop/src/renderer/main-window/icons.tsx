@@ -200,7 +200,11 @@ export const EyeOffIcon = ({ size = 14 }: IconProps): ReactElement =>
 
 const CLOUD = 'M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z';
 
-/** SYNC-01, D-161 (mockup 13): the cloud, and its marks for sync's states. */
+/**
+ * SYNC-01, D-161 (mockup 13): the cloud, and its marks for sync's states. The cloud is not
+ * symmetrical: its outline runs from x 2.5 to 22.8, so the marks are centred on its middle, 12.6
+ * (Davit saw the arrow a little to the left at 12).
+ */
 export type CloudMark = 'none' | 'check' | 'arrow' | 'slash' | 'alert';
 
 export const CloudIcon = ({
@@ -213,14 +217,14 @@ export const CloudIcon = ({
     [
       <path key="cloud" d={CLOUD} />,
       ...(mark === 'check'
-        ? [<path key="mark" className="cloud-mark" d="m9.5 13.5 2 2 3.5-3.5" />]
+        ? [<path key="mark" className="cloud-mark" d="m9.85 13.5 2 2 3.5-3.5" />]
         : []),
       ...(mark === 'arrow'
-        ? [<path key="mark" className="cloud-mark cloud-arrow" d="M12 11v5m-2-2 2 2 2-2" />]
+        ? [<path key="mark" className="cloud-mark cloud-arrow" d="M12.6 11v5m-2-2 2 2 2-2" />]
         : []),
       ...(mark === 'slash' ? [<path key="mark" className="cloud-mark" d="M4 4l16 16" />] : []),
       ...(mark === 'alert'
-        ? [<path key="mark" className="cloud-mark" d="M12 11v3M12 16.5v.01" />]
+        ? [<path key="mark" className="cloud-mark" d="M12.6 11v3M12.6 16.5v.01" />]
         : []),
     ],
     width,

@@ -56,10 +56,12 @@
   color: var(--fl-text-secondary);
 }
 
+/* SYNC-01 (Davit, 10 Nov 2026): a line that shows on the menu's own ground (the divider tone was
+   almost the menu's colour, so groups of items ran together). */
 .fl-menu-divider {
   height: 1px;
-  margin: 4px 6px;
-  background: var(--fl-edge-divider);
+  margin: 5px 6px;
+  background: var(--fl-edge-float);
 }
 
 /* D-76: a right-click menu only fades in. */
