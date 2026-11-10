@@ -58,5 +58,10 @@ export function folderUrl(id: string): string {
   return `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
 }
 
+/** Where a synced list's file opens in the browser (Drive shows the markdown). */
+export function fileUrl(id: string): string {
+  return `https://drive.google.com/file/d/${encodeURIComponent(id)}/view`;
+}
+
 /** Drive's trash in the browser (Restore it in Drive, D-161 Q8). */
 export const DRIVE_TRASH_URL = 'https://drive.google.com/drive/trash';

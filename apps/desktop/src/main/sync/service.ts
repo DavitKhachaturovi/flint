@@ -38,6 +38,7 @@ export interface SyncConnection {
   /** Opens a link in the browser (Open in Drive, Restore it in Drive). */
   open(url: string): void;
   folderUrl(id: string): string;
+  fileUrl(id: string): string;
   readonly trashUrl: string;
 }
 
@@ -333,6 +334,11 @@ export class SyncService {
         this.emit();
         return;
       case 'open-drive':
+        if (action.id !== undefined) {
+          const file = this.state.items[action.id];
+          if (file) this.options.connection.open(this.options.connection.fileUrl(file.fileId));
+          return;
+        }
         if (this.state.folderId)
           this.options.connection.open(this.options.connection.folderUrl(this.state.folderId));
         return;

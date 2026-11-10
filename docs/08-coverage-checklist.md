@@ -1222,7 +1222,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | Choose what syncs: On this PC and In Drive, not on this PC, grouped as the sidebar; both directions | SYNC-01 · Built (1.5.0) | 02, D-161 Q1, mockup 13 |
 | 5 | The status button (synced / syncing / offline / needs attention; plain before connecting → Settings → Sync) and its popover (state, what syncs, conflicts, problem and action, Sync settings…, Sync now) | SYNC-01 · Built (1.5.0) | 02, 09, mockup 13 |
 | 6 | Clouds on synced lists, notes and groups; the list and note header's sync line; Show: All / Synced only / Local only in the sort menu; Today unfiltered | SYNC-01, LIST-06, TODAY-01 · Built (1.5.0) | 02, D-161 |
-| 7 | Right-click Sync with Google Drive on lists, notes and groups (a group syncs its lists); palette commands | SYNC-01, UI-08, NAV-01 · Built (1.5.0) | 02, 03, D-106 |
+| 7 | Right-click Sync with Google Drive on lists, notes and groups (a group syncs its lists); Open in Google Drive for a synced list or note; palette commands | SYNC-01, UI-08, NAV-01 · Built (1.5.0) | 02, 03, D-106 |
 | 8 | Drive layout: My Drive › Flint (development: Flint (development)) mirroring the files, attachments/, .flint-sync/ (groups, items, removed); found by Drive ID | SYNC-01 · Built (1.5.0) | 04 §7, D-161 Q3 |
 | 9 | Per-PC sync state in app data: account.bin, state.json, base/ merge bases; .flint/ never uploaded; sidebar order, Today's order and snapshots per PC | SYNC-01, DATA-04 · Built (1.5.0) | 04 §7 |
 | 10 | Inbox merges by id; same-name lists stay separate ("Groceries 2"); colliding task IDs re-IDed; new task IDs 6 characters | SYNC-01 · Built (1.5.0) | 04 §3, §7, D-161 Q2 |

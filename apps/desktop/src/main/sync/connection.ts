@@ -4,7 +4,13 @@
  * in-process fake Drive and sign-in instead, so the network test still allows no endpoint at all.
  */
 import { FakeDrive } from '@flint/core/sync';
-import { DRIVE_TRASH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, folderUrl } from './google.js';
+import {
+  DRIVE_TRASH_URL,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  fileUrl,
+  folderUrl,
+} from './google.js';
 import { GoogleDrive } from './google-drive.js';
 import {
   AuthExpired,
@@ -55,6 +61,7 @@ export function googleConnection(fetch: Fetch, open: (url: string) => void): Syn
     revoke: (refreshToken) => revoke(refreshToken, fetch),
     open,
     folderUrl,
+    fileUrl,
     trashUrl: DRIVE_TRASH_URL,
   };
 }
@@ -73,6 +80,7 @@ export function testConnection(fake: FakeDrive, open: (url: string) => void): Sy
     revoke: () => Promise.resolve(),
     open,
     folderUrl,
+    fileUrl,
     trashUrl: DRIVE_TRASH_URL,
   };
 }

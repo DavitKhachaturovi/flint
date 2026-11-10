@@ -244,6 +244,16 @@ test('right-click → Sync with Google Drive: the list goes up, with its cloud a
   await expect(
     menu().getByRole('menuitemradio', { name: /Sync with Google Drive/ }),
   ).toHaveAttribute('aria-checked', 'true');
+  // Open in Google Drive: the list's own file, in the browser (recorded in tests).
+  await menu().getByText('Open in Google Drive', { exact: true }).click();
+  await expect
+    .poll(async () =>
+      (await hooks()).opened.filter((url) => url.includes('drive.google.com/file/d/')),
+    )
+    .toHaveLength(1);
+  // A list that doesn't sync has no such item.
+  await nav('Reading').click({ button: 'right' });
+  await expect(menu().getByText('Open in Google Drive', { exact: true })).toHaveCount(0);
   await main.keyboard.press('Escape');
 });
 

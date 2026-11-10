@@ -830,7 +830,7 @@ Opt-in sync of chosen lists, notes and groups between your PCs through **your ow
 **The sidebar and Today**
 - One sidebar with everything on this PC. Synced lists, notes and groups carry a small cloud icon after their name (a group's on its header; its lists keep theirs). A synced list's header says "Synced with Google Drive · 2 min ago" under the title, a synced note "Synced · 2 min ago" under its title (with the conflict chip when it has one).
 - **Filter:** the sort menu gets a second part, **Show: All / Synced only / Local only** (only while Drive is connected; machine UI state like the sort; Proposed). It filters lists, notes and groups; Inbox and Today always show.
-- **Per item:** "Sync with Google Drive" in the right-click menu of lists, notes and groups, checked while it syncs; on a synced item it opens the stop dialog. A group syncs everything in it.
+- **Per item:** "Sync with Google Drive" in the right-click menu of lists, notes and groups, checked while it syncs; on a synced item it opens the stop dialog. A group syncs everything in it. A synced list or note also has **Open in Google Drive** (its file in the browser; also in the palette as Open "<name>" in Google Drive; Davit's wish, 10 Nov 2026, Proposed).
 - **Today** always shows everything on this PC, synced or not, never affected by the sidebar's filter. Pins live in the task lines, so they carry across devices; Today's manual order and the rollover prompt's day stay per PC (D-161 Q3).
 
 **How it syncs**

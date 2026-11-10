@@ -551,6 +551,15 @@ export function App(): ReactElement {
           else void syncAct({ kind: 'start', id });
         },
       },
+      // D-161 (Proposed, Davit's wish): a synced list's or note's own file in Drive.
+      ...(on && mode !== 'group'
+        ? [
+            {
+              label: 'Open in Google Drive',
+              action: () => void syncAct({ kind: 'open-drive', id }),
+            },
+          ]
+        : []),
     ];
   };
   useEffect(() => {
@@ -4591,6 +4600,16 @@ export function App(): ReactElement {
                           keywords: 'sync google drive cloud start',
                           run: () => void syncAct({ kind: 'start', id: view.id }),
                         },
+                    ...(listSyncs(sync, view.id)
+                      ? [
+                          {
+                            id: 'sync:open-file',
+                            label: `Open "${view.name}" in Google Drive`,
+                            keywords: 'sync google drive open browser file web',
+                            run: () => void syncAct({ kind: 'open-drive', id: view.id }),
+                          },
+                        ]
+                      : []),
                   ]
                 : []),
             ]

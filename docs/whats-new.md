@@ -5,7 +5,7 @@ What the app shows in its **What's new** card after an update (APP-15, D-117). N
 ## 1.5.0 (10 Nov 2026)
 
 - **Sync with Google Drive:** keep lists and notes in step across your PCs, through your own Google Drive. Open Settings → Sync and choose **Connect Google Drive**, sign in in your browser, then pick **Everything** or **Only what I choose**.
-- **Choose what syncs:** right-click a list, note or group and choose **Sync with Google Drive** (a group syncs everything in it). Synced items show a small cloud; the cloud button beside Lists shows how sync is doing and has **Sync now**.
+- **Choose what syncs:** right-click a list, note or group and choose **Sync with Google Drive** (a group syncs everything in it). Synced items show a small cloud; the cloud button beside Lists shows how sync is doing and has **Sync now**. Right-click a synced list and choose **Open in Google Drive** to see it on the web.
 - **Nothing gets lost:** changes from two PCs are combined task by task. If the same lines of a note changed on both, both versions are kept and a card lets you pick one or keep both.
 - **Private by design:** only what you choose goes to a "Flint" folder in your own Drive, as plain markdown. Flint has no server, and everything still works offline.
 

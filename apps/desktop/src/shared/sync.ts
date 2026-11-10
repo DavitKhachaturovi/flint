@@ -100,7 +100,8 @@ export type SyncAction =
   /** The stop dialog: on this PC, or everywhere ("Also remove from Drive"). */
   | { readonly kind: 'stop'; readonly id: string; readonly everywhere: boolean }
   | { readonly kind: 'dismiss-notice'; readonly id: string }
-  | { readonly kind: 'open-drive' }
+  /** Open in Drive: the Flint folder, or (`id`) a synced list's or note's file. */
+  | { readonly kind: 'open-drive'; readonly id?: string }
   | { readonly kind: 'restore-in-drive' }
   | { readonly kind: 'new-folder' };
 
@@ -171,6 +172,8 @@ export function isSyncAction(value: unknown): value is SyncAction {
       return typeof action['id'] === 'string';
     case 'stop':
       return typeof action['id'] === 'string' && typeof action['everywhere'] === 'boolean';
+    case 'open-drive':
+      return action['id'] === undefined || typeof action['id'] === 'string';
     default:
       return true;
   }
