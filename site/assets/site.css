@@ -1,0 +1,770 @@
+/*
+ * flintnotes.app (WEB-01, D-162): the app's own tokens (tokens.css, copied from docs/design), its
+ * fonts, its grayscale. Structure after NestJS's site (a big hero, screens as the centrepiece, a
+ * feature grid); never its brand. Motion is small, never in the way, and off under reduce-motion.
+ */
+
+@font-face {
+  font-family: 'Onest';
+  src: url('fonts/Onest-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--fl-ground-window);
+}
+
+body {
+  margin: 0;
+  font-family: var(--fl-font-ui);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--fl-text-body);
+  background: var(--fl-ground-window);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  margin: 0 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 0.78em;
+  color: var(--fl-text-primary);
+  text-align: center;
+  vertical-align: 0.08em;
+}
+
+code {
+  font-family: var(--fl-font-mono);
+  font-size: 0.88em;
+  color: var(--fl-text-primary);
+}
+
+svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The bar at the top. */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  background: color-mix(in srgb, var(--fl-ground-window) 92%, transparent);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--fl-text-primary);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  font-size: 14.5px;
+}
+
+.nav-links a:not(.button) {
+  text-decoration: none;
+  color: var(--fl-text-secondary);
+  transition: color var(--fl-dur-fast, 120ms) ease;
+}
+
+.nav-links a:not(.button):hover {
+  color: var(--fl-text-highlight);
+}
+
+/* Buttons, as the app's. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: var(--fl-radius-button);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.button:hover {
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+
+.button:active {
+  transform: scale(0.97);
+}
+
+.button.primary {
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-primary-button);
+}
+
+.button.primary:hover {
+  background: var(--fl-text-highlight);
+}
+
+.button.small {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  font-size: var(--fl-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
+}
+
+.soft {
+  color: var(--fl-text-heading-soft);
+}
+
+.fine {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+/* The hero: the headline, and the capture popup typing beside it. */
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 96px 32px 72px;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: -60px 0 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--fl-edge-divider) 1px, transparent 1px),
+    linear-gradient(90deg, var(--fl-edge-divider) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, black 10%, transparent 70%);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(44px, 6.4vw, 76px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  color: var(--fl-text-highlight);
+}
+
+h2 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  color: var(--fl-text-highlight);
+}
+
+h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.lede {
+  max-width: 540px;
+  margin: 26px 0 32px;
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--fl-text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.capture-demo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.capture-card {
+  padding: 16px 16px 12px;
+  border-radius: var(--fl-radius-popup);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity 260ms ease;
+}
+
+.capture-card.sent {
+  transform: translateY(-10px) scale(0.98);
+  opacity: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-primary);
+  animation: chip-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.chip .stripe {
+  width: 4px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--fl-pri-high-color);
+}
+
+.chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+}
+
+.capture-input {
+  min-height: 44px;
+  margin: 14px 4px 10px;
+  font-size: var(--fl-size-capture);
+  color: var(--fl-text-highlight);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 22px;
+  margin-left: 1px;
+  vertical-align: -4px;
+  background: var(--fl-accent);
+  animation: blink 1.05s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.capture-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tools {
+  display: flex;
+  gap: 16px;
+  padding-left: 4px;
+  color: var(--fl-text-muted);
+}
+
+.target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--fl-text-secondary);
+}
+
+.send {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-primary-button);
+  transition: transform 140ms ease;
+}
+
+.send.pressed {
+  transform: scale(0.88);
+}
+
+.saved {
+  align-self: center;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-size: 14px;
+  color: var(--fl-text-primary);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+.saved.on {
+  opacity: 1;
+  transform: none;
+}
+
+.demo-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+/* The screens: the app's window, its tabs above. */
+.showcase {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px 96px;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: max-content;
+  margin: 0 auto 28px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--fl-ground-card);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+}
+
+.tabs button {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--fl-text-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.tabs button[aria-selected='true'] {
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  font-weight: 500;
+}
+
+.window {
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-sidebar);
+  box-shadow: var(--fl-shadow-float);
+}
+
+.window-bar {
+  display: flex;
+  gap: 6px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fl-edge-divider);
+}
+
+.window-bar span {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-ground-tile);
+}
+
+.window img {
+  width: 100%;
+  transition: opacity 220ms ease;
+}
+
+.window img.swapping {
+  opacity: 0;
+}
+
+.caption {
+  margin: 18px auto 0;
+  max-width: 640px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--fl-text-muted);
+}
+
+/* Features. */
+.features {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 72px 32px 96px;
+}
+
+.section-head {
+  margin-bottom: 40px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 26px;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-card);
+  box-shadow: var(--fl-shadow-card);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 220ms ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--fl-shadow-card-hover);
+}
+
+.card p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--fl-text-secondary);
+}
+
+.card.wide {
+  grid-column: span 2;
+}
+
+.card.mini-card {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.card.mini-card img {
+  flex: 0 1 300px;
+  min-width: 0;
+  margin: -16px -12px -22px 0;
+}
+
+.tile {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-heading-soft);
+}
+
+.tile svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Private: the promise beside a list file as it is on disk. */
+.private {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 72px 32px 96px;
+}
+
+.private-text p:not(.eyebrow) {
+  margin: 22px 0 24px;
+  font-size: 17px;
+  color: var(--fl-text-secondary);
+}
+
+.link {
+  color: var(--fl-text-primary);
+  text-underline-offset: 4px;
+}
+
+.link:hover {
+  color: var(--fl-text-highlight);
+}
+
+.file {
+  margin: 0;
+  padding: 26px 28px;
+  overflow-x: auto;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-card);
+  font-family: var(--fl-font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--fl-code-plain);
+}
+
+.file code {
+  font-size: inherit;
+  color: inherit;
+}
+
+.file .dim {
+  color: var(--fl-text-faint);
+}
+
+.file .field {
+  color: var(--fl-accent);
+}
+
+/* The last call. */
+.cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 64px 32px 112px;
+  text-align: center;
+}
+
+.cta p {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: var(--fl-text-secondary);
+}
+
+.cta .fine {
+  max-width: 460px;
+  margin-top: 8px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+  border-top: 1px solid var(--fl-edge-divider);
+  font-size: 13.5px;
+  color: var(--fl-text-muted);
+}
+
+.footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.footer a {
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--fl-text-highlight);
+}
+
+/* Things rise in a little as they come into view (the script marks them). */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms ease,
+    transform 600ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.reveal.seen {
+  opacity: 1;
+  transform: none;
+}
+
+/* The privacy page: a readable column. */
+.doc {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 64px 32px 96px;
+}
+
+.doc h1 {
+  font-size: clamp(38px, 5vw, 52px);
+}
+
+.doc .updated {
+  margin: 16px 0 40px;
+  font-family: var(--fl-font-mono);
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+.doc h2 {
+  margin: 48px 0 12px;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.doc p,
+.doc li {
+  font-size: 16px;
+  color: var(--fl-text-secondary);
+}
+
+.doc li {
+  margin: 6px 0;
+}
+
+.doc strong {
+  color: var(--fl-text-primary);
+}
+
+.doc .summary {
+  padding: 22px 26px;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-card);
+  box-shadow: var(--fl-shadow-card);
+}
+
+.doc .summary p {
+  margin: 0;
+  color: var(--fl-text-primary);
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .private {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  .hero {
+    padding-top: 56px;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card.wide,
+  .card.mini-card {
+    grid-column: auto;
+  }
+
+  .card.mini-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nav-links a:not(.button) {
+    display: none;
+  }
+
+  .tabs {
+    width: auto;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

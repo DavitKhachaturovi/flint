@@ -1237,3 +1237,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 19 | Tests: merges and the engine against the fake Drive (two PCs on one list and one note, offline edits, deletes, unsync with and without removal, linked files); end to end on the fake Drive | SYNC-01 · Built (1.5.0) | 05, D-161 |
 | 20 | Davit's Google setup (project, Drive API, consent screen In production, Desktop client ID) with a walkthrough | SYNC-01 · Built (1.5.0) | 06 §6 |
 | 21 | Motion: the status cloud's marks and the syncing arrow, dialogs, item clouds, resolved conflicts | SYNC-01, UI-10 · Built (1.5.0) | 03 §5, D-89 |
+
+## CB. The website flintnotes.app (10 Nov 2026, D-162)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Home page: hero, Download for Windows, screenshots on sample data, features, privacy promise, footer | WEB-01 · Built (1.5.0) | 02, D-162, `site/index.html` |
+| 2 | Privacy policy at /privacy/ in the app's words, the support address | WEB-01, APP-09 · Built (1.5.0) | 02, D-162, `site/privacy/index.html` |
+| 3 | No analytics, trackers, cookies or third-party requests; fonts self-hosted | WEB-01, APP-09 · Built (1.5.0) | 02, D-162 |
+| 4 | GitHub Pages from `site/` on pushes to main; custom domain, HTTPS, DNS and domain verifications | WEB-01 · Built (1.5.0); DNS and settings Davit's | 05 §6, 06 |
+| 5 | Consent screen Branding: support address, home page, privacy link, authorised domain; Publish app | SYNC-01, WEB-01 · Davit's, after the site is live | 06 §6 |

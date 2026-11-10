@@ -867,6 +867,14 @@ Opt-in sync of chosen lists, notes and groups between your PCs through **your ow
 
 **Privacy (APP-09):** notes go only to the user's own Google Drive, only for what they choose to sync; Flint has no server. The network guard allows Google's sign-in and API hosts only from sync's own session and only while Drive is connected or a sign-in is under way (05 §5).
 
+### WEB-01 — The website, flintnotes.app (1.5.0, D-162)
+- A small static site at **https://flintnotes.app** (Davit's domain), in the repository's `site/` folder, published by GitHub Pages. Two pages:
+  - **Home (`/`):** a hero with the app icon, the headline and **Download for Windows** (the latest installer on GitHub Releases); real screenshots of Flint on neutral sample data (never Davit's notes); the features worth showing (capture from anywhere, task lists and notes, Today, mini mode, Google Drive sync); the privacy promise; a footer with GitHub, release notes and the MIT license.
+  - **Privacy (`/privacy/`):** the policy Google's consent screen links to, in the app's own words (APP-09): notes stay on the PC unless synced; synced items go only to the user's own Google Drive, with access only to files Flint created; no Flint server, no telemetry, no accounts; how to disconnect and revoke access; contact `flintnotes.support@gmail.com`.
+- **Look:** NestJS's site as inspiration for structure only (a big confident hero, screenshots as the centrepiece, a feature grid, dark sections with generous spacing), never its brand: Flint's own grayscale tokens (`docs/design/tokens.css`), Onest and Geist Mono self-hosted, the app icon. No emoji. Motion per 03 §5: subtle, never in the way, off under reduce-motion.
+- **Keeps the app's promises:** no analytics, trackers, cookies or third-party requests (no Google Fonts, no CDN); plain HTML and CSS with a few lines of script, no build step and no new dependencies.
+- Not on the site for now (Davit, 10 Nov 2026): a blog, docs or a changelog page (release notes stay on GitHub).
+
 ## 11. CLI (Later)
 
 ### CLI-01 — Add tasks from the terminal (Later)

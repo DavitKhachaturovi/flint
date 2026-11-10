@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flint · Capture a thought in three seconds</title>
+    <meta
+      name="description"
+      content="Flint is a keyboard-first notes and task app for Windows. Press a hotkey from any app, type, press Enter: back to work in under three seconds. Free, open source, plain markdown."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta property="og:title" content="Flint" />
+    <meta
+      property="og:description"
+      content="Capture a thought in three seconds, without leaving what you're doing."
+    />
+    <meta property="og:url" content="https://flintnotes.app/" />
+    <meta property="og:image" content="https://flintnotes.app/assets/screens/list.png" />
+    <link rel="icon" href="assets/flint-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/site.css" />
+    <script src="assets/site.js" defer></script>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="./" aria-label="Flint, home">
+        <img src="assets/flint-icon.svg" alt="" width="30" height="30" />
+        <span>Flint</span>
+      </a>
+      <nav class="nav-links" aria-label="Site">
+        <a href="#features">Features</a>
+        <a href="#private">Privacy</a>
+        <a href="https://github.com/DavitKhachaturovi/flint">GitHub</a>
+        <a class="button small" href="https://github.com/DavitKhachaturovi/flint/releases/latest"
+          >Download</a
+        >
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-text">
+          <p class="eyebrow">Free and open source · Windows</p>
+          <h1>
+            <span class="soft">Write it down</span><br />
+            before it's gone.
+          </h1>
+          <p class="lede">
+            Flint is a keyboard-first notes and task app for developers. Press
+            <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd> from any app, type, press
+            <kbd>Enter</kbd>. Back to your call in under three seconds.
+          </p>
+          <div class="actions">
+            <a
+              class="button primary"
+              href="https://github.com/DavitKhachaturovi/flint/releases/latest"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />
+              </svg>
+              Download for Windows
+            </a>
+            <a class="button" href="https://github.com/DavitKhachaturovi/flint">View on GitHub</a>
+          </div>
+          <p class="fine">Windows 10 and 11, 64-bit · MIT license · No account</p>
+        </div>
+
+        <div class="capture-demo" aria-label="The capture popup: a task typed with shorthand">
+          <div class="capture-card" id="capture">
+            <div class="chips" id="chips"></div>
+            <div class="capture-input">
+              <span id="typed"></span><span class="caret" aria-hidden="true"></span>
+            </div>
+            <div class="capture-foot">
+              <span class="tools" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <path d="M5 21V4h12l-2 4 2 4H5" />
+                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />
+                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <path
+                    d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"
+                  />
+                </svg>
+              </span>
+              <span class="target"
+                ><span id="target">Inbox</span>
+                <span class="send" id="send" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24">
+                    <path d="M12 19V5m-6 6 6-6 6 6" />
+                  </svg>
+                </span>
+              </span>
+            </div>
+          </div>
+          <div class="saved" id="saved" role="status">Saved to Unicorn</div>
+          <p class="demo-hint">
+            <kbd>!h</kbd> priority · <kbd>##list</kbd> list · <kbd>@15:00</kbd> reminder
+          </p>
+        </div>
+      </section>
+
+      <section class="showcase" aria-label="Flint's main window">
+        <div class="tabs" role="tablist" aria-label="Screens">
+          <button role="tab" aria-selected="true" data-screen="list">Task lists</button>
+          <button role="tab" aria-selected="false" data-screen="note">Notes</button>
+          <button role="tab" aria-selected="false" data-screen="today">Today</button>
+          <button role="tab" aria-selected="false" data-screen="sync">Sync</button>
+        </div>
+        <figure class="window">
+          <div class="window-bar" aria-hidden="true"><span></span><span></span><span></span></div>
+          <img
+            id="screen"
+            src="assets/screens/list.png"
+            width="1440"
+            height="880"
+            alt="A task list in Flint: a task with its stack trace, subtasks, priorities and reminders."
+          />
+        </figure>
+        <p class="caption" id="caption">
+          Every line is a task: drag it, give it a priority, a reminder, notes and code.
+        </p>
+      </section>
+
+      <section class="features" id="features">
+        <div class="section-head">
+          <p class="eyebrow">What it does</p>
+          <h2>Small on purpose. <span class="soft">Fast everywhere.</span></h2>
+        </div>
+        <div class="grid">
+          <article class="card wide">
+            <div class="tile">
+              <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></svg>
+            </div>
+            <h3>Capture from anywhere</h3>
+            <p>
+              A pre-warmed popup opens over any app, even a full-screen call, with the cursor ready.
+              Select text anywhere and press <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>X</kbd> to capture
+              it, code and stack traces included.
+            </p>
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7" /></svg>
+            </div>
+            <h3>Shorthand, not forms</h3>
+            <p>
+              <code>!h ##backend @15:00</code> sets the priority, the list and a reminder while you
+              type.
+            </p>
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6M8 13h8M8 17h5"
+                />
+              </svg>
+            </div>
+            <h3>Task lists and notes</h3>
+            <p>
+              Lists where every line is a task, and notes with a live preview, tables and code
+              blocks.
+            </p>
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+              </svg>
+            </div>
+            <h3>Today and reminders</h3>
+            <p>
+              Pin what matters today. Reminders arrive as Windows notifications with Done and
+              Snooze.
+            </p>
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="6" width="18" height="12" rx="2" />
+                <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
+              </svg>
+            </div>
+            <h3>Keyboard first</h3>
+            <p>
+              <kbd>Ctrl</kbd><kbd>K</kbd> reaches every action. Arrows, Space and Enter do the rest.
+            </p>
+          </article>
+          <article class="card mini-card">
+            <div>
+              <div class="tile">
+                <svg viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <path d="M14 9h4" />
+                </svg>
+              </div>
+              <h3>Mini mode for calls</h3>
+              <p>
+                A small card on top of everything, hidden from screen sharing. <kbd>Ctrl</kbd
+                ><kbd>Alt</kbd><kbd>Space</kbd>
+              </p>
+            </div>
+            <img
+              src="assets/screens/mini.png"
+              width="412"
+              height="343"
+              alt="Mini mode: Today's tasks and the next reminder in a small floating card."
+              loading="lazy"
+            />
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z" />
+                <path d="m9.5 13.5 2 2 3.5-3.5" />
+              </svg>
+            </div>
+            <h3>Sync with your own Drive</h3>
+            <p>
+              Choose lists and notes to keep in step across your PCs, through a Flint folder in your
+              Google Drive.
+            </p>
+          </article>
+          <article class="card wide">
+            <div class="tile">
+              <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></svg>
+            </div>
+            <h3>Never lose a thought</h3>
+            <p>
+              Drafts are kept, writes are atomic, deletes go to Trash, and snapshots let you go
+              back.
+            </p>
+          </article>
+          <article class="card">
+            <div class="tile">
+              <svg viewBox="0 0 24 24">
+                <path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2Z" />
+              </svg>
+            </div>
+            <h3>Give a task to Claude</h3>
+            <p>
+              Hand a task, its notes and subtasks to Claude Code in one step, in the right project
+              folder.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="private" id="private">
+        <div class="private-text">
+          <p class="eyebrow">Your files, your machine</p>
+          <h2>Plain markdown in a folder you choose.</h2>
+          <p>
+            Every list is a <code>.md</code> file that opens in any editor. No account, no
+            telemetry, no Flint server. Flint only contacts GitHub to check for updates, and Google
+            Drive only if you turn on sync, for exactly what you choose.
+          </p>
+          <a class="link" href="privacy/">Read the privacy policy</a>
+        </div>
+        <pre
+          class="file"
+          aria-label="A Flint task list as a markdown file"
+        ><code><span class="dim">---
+flint: 1
+id: unicorn
+mode: tasks
+---</span>
+- [ ] Fix the login redirect loop <span class="field">[priority:: high]</span> <span class="field">[id:: t1]</span>
+- [ ] Review Alex's pull request <span class="field">[reminder:: 2026-03-10T15:00]</span>
+- [ ] Rotate the Contoso storage keys <span class="field">[pinned:: true]</span>
+
+## Completed
+- [x] Ship the hotfix <span class="field">[completion:: 2026-03-10T09:12]</span></code></pre>
+      </section>
+
+      <section class="cta">
+        <img src="assets/flint-icon.svg" alt="" width="64" height="64" />
+        <h2>Get Flint</h2>
+        <p>Free for Windows. Updates itself, quietly, when you quit.</p>
+        <a class="button primary" href="https://github.com/DavitKhachaturovi/flint/releases/latest"
+          >Download for Windows</a
+        >
+        <p class="fine">
+          Flint isn't code-signed yet: the first time, Windows may say it protected your PC. Choose
+          More info, then Run anyway.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>© 2026 Davit Khachaturovi · MIT license</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/DavitKhachaturovi/flint">GitHub</a>
+        <a href="https://github.com/DavitKhachaturovi/flint/releases">Release notes</a>
+        <a href="privacy/">Privacy</a>
+        <a href="mailto:flintnotes.support@gmail.com">flintnotes.support@gmail.com</a>
+      </nav>
+    </footer>
+  </body>
+</html>

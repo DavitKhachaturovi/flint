@@ -68,5 +68,19 @@ export default defineConfig(
       globals: { console: 'readonly', process: 'readonly', URL: 'readonly', fetch: 'readonly' },
     },
   },
+  {
+    // The website's few lines of script (WEB-01): a browser page.
+    files: ['site/**/*.js'],
+    languageOptions: {
+      parserOptions: { projectService: false },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        setTimeout: 'readonly',
+        Image: 'readonly',
+        IntersectionObserver: 'readonly',
+      },
+    },
+  },
   prettier,
 );
