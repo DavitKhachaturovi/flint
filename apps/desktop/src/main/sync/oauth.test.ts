@@ -85,6 +85,30 @@ describe('signIn (SYNC-01)', () => {
     expect(bodies).toEqual([]);
   });
 
+  it("says Google's reason when the exchange is refused", async () => {
+    const refused: Fetch = () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: 'invalid_request',
+            error_description: 'client_secret is missing.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    const pending = signIn(
+      'client',
+      (authUrl) => {
+        const params = new URL(authUrl).searchParams;
+        void browserReturns(
+          `${params.get('redirect_uri') ?? ''}?code=c&state=${params.get('state') ?? ''}`,
+        );
+      },
+      refused,
+    );
+    await expect(pending.result).rejects.toThrow('invalid_request: client_secret is missing.');
+  });
+
   it('can be cancelled while waiting for the browser', async () => {
     const { fetch } = tokenEndpoint();
     const pending = signIn('client', () => undefined, fetch);

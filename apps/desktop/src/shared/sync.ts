@@ -73,6 +73,8 @@ export interface SyncStatusView {
   readonly linked: Readonly<Record<string, Readonly<Record<string, SyncLinkedFile>>>>;
   /** This PC's name (Windows computer name). */
   readonly device: string;
+  /** Why the last Connect failed (Google's words), shown in Settings → Sync until the next try. */
+  readonly connectError: string | null;
 }
 
 /** What Chosen → Everything will do (D-161 Q9), for its question. */

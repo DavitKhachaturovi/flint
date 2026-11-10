@@ -361,7 +361,9 @@ export function SettingsScreen(props: {
           ? 'Not set up in this build.'
           : sync.phase === 'signing-in'
             ? 'Waiting for Google… Finish signing in in your browser.'
-            : 'Keep chosen lists and notes in step across your devices, through your own Drive.';
+            : sync.connectError
+              ? `Couldn't connect to Google Drive (${sync.connectError}). Try again; if it keeps failing, the log has the details.`
+              : 'Keep chosen lists and notes in step across your devices, through your own Drive.';
       return [
         <Row
           key="connect"

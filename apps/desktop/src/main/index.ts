@@ -2046,6 +2046,14 @@ async function start(): Promise<void> {
             if (!mainWindow.isDestroyed())
               mainWindow.webContents.send(Channels.mainSyncChanged, view);
           },
+          // Back from the browser: Flint in front again, on Settings → Sync (not in test runs,
+          // which never take the focus).
+          onSignInEnded: () => {
+            if (syncHooks || mainWindow.isDestroyed()) return;
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+          },
         });
   if (sync) {
     syncNetworkAllowed = () => sync.networkAllowed();
@@ -2074,6 +2082,7 @@ async function start(): Promise<void> {
     remoteGroups: [],
     linked: {},
     device: '',
+    connectError: null,
   };
   ipcMain.handle(Channels.mainSync, (event) =>
     owns(event.sender) && sync ? sync.status() : syncOff,

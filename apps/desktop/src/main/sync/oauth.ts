@@ -151,9 +151,13 @@ async function exchange(
     refresh_token?: string;
     expires_in?: number;
     error?: string;
+    error_description?: string;
   };
   if (!response.ok || !body.access_token || !body.refresh_token) {
-    throw new Error(body.error ?? `Sign-in failed (${response.status})`);
+    throw new Error(
+      [body.error, body.error_description].filter(Boolean).join(': ') ||
+        `Sign-in failed (${response.status})`,
+    );
   }
   return {
     refreshToken: body.refresh_token,

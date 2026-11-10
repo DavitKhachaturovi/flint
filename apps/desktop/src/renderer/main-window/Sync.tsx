@@ -40,6 +40,7 @@ export const SYNC_OFF: SyncStatusView = {
   remoteGroups: [],
   linked: {},
   device: '',
+  connectError: null,
 };
 
 /** Sync's status for any component (the sidebar's clouds, headers, the editor's conflict cards). */

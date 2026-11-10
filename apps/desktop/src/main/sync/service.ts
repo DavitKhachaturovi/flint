@@ -62,6 +62,8 @@ export interface SyncServiceOptions {
   readonly log: (message: string) => void;
   /** Called whenever the status changes (main sends it to the windows). */
   readonly onStatus: (status: SyncStatusView) => void;
+  /** The browser sign-in ended (done or failed): Flint comes back to the front. */
+  readonly onSignInEnded?: () => void;
 }
 
 export class SyncService {
@@ -74,6 +76,8 @@ export class SyncService {
   private lastReport: SyncReport | null = null;
   private conflicts: SyncConflict[] = [];
   private signing: { cancel(): void } | null = null;
+  /** Why the last sign-in failed, for Settings → Sync (cleared by the next try). */
+  private connectError: string | null = null;
   private running: Promise<void> | null = null;
   private queued = false;
   private changeTimer: NodeJS.Timeout | undefined;
@@ -264,6 +268,7 @@ export class SyncService {
       remoteGroups: report?.remoteGroups ?? this.state.groups,
       linked: this.state.linked,
       device: this.options.local.device,
+      connectError: this.connectError,
     };
   }
 
@@ -352,6 +357,7 @@ export class SyncService {
   private async connect(): Promise<void> {
     if (!this.options.connection.available || this.signing) return;
     this.phase = 'signing-in';
+    this.connectError = null;
     this.emit();
     const signIn = this.options.connection.signIn();
     this.signing = signIn;
@@ -369,11 +375,15 @@ export class SyncService {
       this.emit();
       if (this.state.mode !== null) await this.request();
     } catch (error) {
-      this.options.log(`sign-in: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.options.log(`sign-in: ${message}`);
+      if (!(error instanceof Error && error.name === 'SignInCancelled'))
+        this.connectError = message;
       this.phase = this.account ? (this.problem ? 'attention' : 'synced') : 'disconnected';
       this.emit();
     } finally {
       this.signing = null;
+      this.options.onSignInEnded?.();
     }
   }
 
