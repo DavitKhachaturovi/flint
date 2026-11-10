@@ -16,7 +16,7 @@ Traceability from everything agreed during design to where it is specified. Use 
 | Multiple lists of both modes | LIST-01 |
 | Images and videos | MEDIA-01…04 |
 | Save as markdown in a user-configurable location | DATA-07, 04 |
-| Sync via OneDrive (original idea) | Decided **not in v1**: D-03, 04 §7 |
+| Sync via OneDrive (original idea) | Decided **not in v1**: D-03, 04 §7; **Google Drive sync in 1.5.0** (SYNC-01, D-161), OneDrive through Graph Later |
 | Reminder on every task: button, set time, Windows notification or sound | REM-01, REM-06, D-07 |
 | Desktop app, easily installable .exe, Windows x64 first, macOS/ARM later | D-05, 05 §6–7 |
 | Future integrations through the CLI and the shared TypeScript packages | 05 §7, D-04 |
@@ -367,7 +367,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 5 | Collapsing next to the selection: no stray selection move | TASK-05, UI-04 · v1 · M4 (0.4.11 fixes) | D-78 |
 | 6 | Shift+Enter for notes in the composer and while editing a title; "Add notes" in the menu; hint | TASK-05 · v1 · M4 (0.4.11 fixes) | 02, 03 §3, D-78 |
 | 7 | "Priority ›" submenu in the task menu | UI-08 · v1 · M4 (0.4.11 fixes) | 02, D-78 |
-| 8 | Cloud sync via Google Drive, then OneDrive; OAuth PKCE, safeStorage, drive.file; per-task merge with tombstones; no iCloud | SYNC-01 · Later | 06 §3, D-78 |
+| 8 | Cloud sync via Google Drive, then OneDrive; OAuth PKCE, safeStorage, drive.file; per-task merge with tombstones; no iCloud | SYNC-01 · Google Drive in 1.5.0 (D-161, section CA); OneDrive Later | 06 §3, D-78, D-161 |
 | — | Drag to reorder moves into step 8 | TASK-01, LIST-05, LIST-06 · Done (0.4.14) | 06, D-78 |
 
 ## O. Feedback on 0.4.12 (1 Nov 2026)
@@ -1211,3 +1211,29 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 6 | Click-through: menus, pickers and the editor's tooltips outside the card take clicks while open, measured every frame; the region shrinks back | MINI-01 · Done (1.4.0) | D-159, `stage.ts`, `mini.spec.ts` |
 | 7 | The header never overflows (the list tab's name shortens first; the buttons stay); the minimum width 320 px | MINI-01 · Done (1.4.0) | D-160, `mini.css`, `mini-size.ts`, `mini.spec.ts` |
 | 8 | Reset size only when the visible size differs from the default (a taller limit over short content is no resize) | MINI-01 · Done (1.4.0) | D-160, `stage.ts`, `mini.spec.ts` |
+
+## CA. 1.5.0: Google Drive sync (10 Nov 2026, D-161, grill Q1–Q9)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | Settings → Sync: Connect Google Drive; connected: account (Sync now, Disconnect), What syncs, Chosen items (Choose…), Drive folder (Open in Drive), the privacy note | SYNC-01, APP-11 · Planned (1.5.0) | 02, 09, mockup 13 |
+| 2 | Sign-in in the default browser: OAuth for desktop, PKCE, loopback redirect open only while signing in; drive.file only; no client secret; refresh token in safeStorage; e-mail from Drive's about.get | SYNC-01 · Planned (1.5.0) | 05, D-161 |
+| 3 | First-time setup: What should sync? Everything / Only what I choose (preselected); new items follow it | SYNC-01 · Planned (1.5.0) | 02, D-161 |
+| 4 | Choose what syncs: On this PC and In Drive, not on this PC, grouped as the sidebar; both directions | SYNC-01 · Planned (1.5.0) | 02, D-161 Q1, mockup 13 |
+| 5 | The status button (synced / syncing / offline / needs attention; plain before connecting → Settings → Sync) and its popover (state, what syncs, conflicts, problem and action, Sync settings…, Sync now) | SYNC-01 · Planned (1.5.0) | 02, 09, mockup 13 |
+| 6 | Clouds on synced lists, notes and groups; the list and note header's sync line; Show: All / Synced only / Local only in the sort menu; Today unfiltered | SYNC-01, LIST-06, TODAY-01 · Planned (1.5.0) | 02, D-161 |
+| 7 | Right-click Sync with Google Drive on lists, notes and groups (a group syncs its lists); palette commands | SYNC-01, UI-08, NAV-01 · Planned (1.5.0) | 02, 03, D-106 |
+| 8 | Drive layout: My Drive › Flint (development: Flint (development)) mirroring the files, attachments/, .flint-sync/ (groups, items, removed); found by Drive ID | SYNC-01 · Planned (1.5.0) | 04 §7, D-161 Q3 |
+| 9 | Per-PC sync state in app data: account.bin, state.json, base/ merge bases; .flint/ never uploaded; sidebar order, Today's order and snapshots per PC | SYNC-01, DATA-04 · Planned (1.5.0) | 04 §7 |
+| 10 | Inbox merges by id; same-name lists stay separate ("Groceries 2"); colliding task IDs re-IDed; new task IDs 6 characters | SYNC-01 · Planned (1.5.0) | 04 §3, §7, D-161 Q2 |
+| 11 | Task merge per task by ID: done wins; values by later lastTouched (clamped to Drive's upload time / now); title conflict to the body's first line; body as text; subtasks by ID; later move; edited beats deleted; moved-and-edited | SYNC-01 · Planned (1.5.0) | 02, 04 §7, D-161 Q4 |
+| 12 | Notes and bodies merge as text; both versions kept in a [!conflict] callout; the card (Use <device>'s / Keep mine / Keep both), the header chip, the row marker, the popover's list; never conflict copies | SYNC-01 · Planned (1.5.0) | 02, 04 §7, 09, D-161 Q5 |
+| 13 | Deletes to Trash on every PC; stop syncing on this PC; Also remove from Drive (unticked; Stop syncing everywhere; Drive's trash); No longer synced: removed from Drive on another device | SYNC-01, DATA-02 · Planned (1.5.0) | 02, D-161 Q6 |
+| 14 | Linked large files: not synced, the crossed-out cloud and the two explanations; device name and size in .flint-sync; Copy into Flint to sync it | SYNC-01, MEDIA-03 · Planned (1.5.0) | 02, 04 §7, mockup 13 |
+| 15 | Drive problems never change local data: renamed or moved folder; trashed folder (Restore it in Drive / Start a new folder); sign in again; Drive full (text first, smallest attachments first); offline back-off | SYNC-01 · Planned (1.5.0) | 02, 05, D-161 Q8 |
+| 16 | Switching What syncs: Chosen → Everything previews and clears stopped-here; Everything → Chosen keeps the set; empty quick notes never uploaded; moving into a synced group syncs it (Undo) | SYNC-01 · Planned (1.5.0) | 02, D-161 Q9 |
+| 17 | Automatic: 5 s after a change, every 3 minutes, on wake and when back online; Sync now; one run at a time; never blocks the UI | SYNC-01 · Planned (1.5.0) | 02, 05 |
+| 18 | Network: Google's token and Drive hosts only from the sync session, only while connected or signing in; tests on a fake Drive; the network test still allows no endpoint; Privacy row updated | SYNC-01, APP-09 · Planned (1.5.0) | 02, 05, D-31, D-161 Q7 |
+| 19 | Tests: merges and the engine against the fake Drive (two PCs on one list and one note, offline edits, deletes, unsync with and without removal, linked files); end to end on the fake Drive | SYNC-01 · Planned (1.5.0) | 05, D-161 |
+| 20 | Davit's Google setup (project, Drive API, consent screen In production, Desktop client ID) with a walkthrough | SYNC-01 · Planned (1.5.0) | 06 §6 |
+| 21 | Motion: the status cloud's marks and the syncing arrow, dialogs, item clouds, resolved conflicts | SYNC-01, UI-10 · Planned (1.5.0) | 03 §5, D-89 |

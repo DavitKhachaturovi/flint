@@ -143,6 +143,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Back / forward on a precision touchpad (NAV-04) | Two-finger horizontal swipe | Decided (D-79) |
 | Interface size (UI-12) | Ctrl+= (Ctrl++) / Ctrl+− / Ctrl+0, remembered per display | Decided (D-81) |
 | Hide / show the context panel (NAV-07) | Ctrl+\, remembered per display | Decided (D-83) |
+| Google Drive sync (SYNC-01) | No shortcut: Ctrl+K has Sync now, Sync settings, Choose what syncs…, Connect Google Drive and, for the open list or note, Sync "<name>" with Google Drive / Stop syncing "<name>"… (D-106) | Decided (D-161) |
 | Paste from clipboard history (NAV-08) | Ctrl+Shift+H in the main window: a picker; Enter inserts, Shift+Enter captures as a task, Ctrl+C copies | Decided (D-128) |
 
 ### All text fields
@@ -252,6 +253,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - **The context panel (NAV-07, D-83):** it slides and fades in when it appears, its height eases when its content changes, and its content crossfades when the selection or state changes; nothing waits for it.
 - **Standing rule (D-89): motion is part of done.** Every UI change or action that is added comes with smooth, minimal motion for appearing, disappearing and changing state, following the rules above (never delays input, interruptible, off with reduce-motion). A feature isn't done without it, and its motion goes into the motion regression test (e2e, the animation recorder of D-79) where practical.
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
+- **Google Drive sync (SYNC-01, D-161):** the status button's cloud crossfades between its marks (~200 ms); while syncing, the arrow eases down and fades in a loop only while a run lasts (stopped under reduce-motion: a still arrow), never at idle; the popover, the setup, Choose and stop dialogs open and close as menus and dialogs do; an item's cloud fades in or out when it starts or stops syncing; a remote change that adds or removes rows animates them as local ones do; the conflict card fades and collapses when resolved; "No longer synced" fades in under the title.
 - No decorative motion (no idle animations, no bouncing icons).
 
 ---
@@ -270,4 +272,4 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 
 - Short, plain, friendly. No jargon in user-facing text.
 - Tell the truth about limitations (e.g. admin-window capture, Focus Assist, "Flint must be running for reminders").
-- The privacy promise is stated plainly: "Your notes never leave your machine."
+- The privacy promise is stated plainly: "Your notes never leave your machine." **D-161:** with sync: what you choose to sync goes only to your own Google Drive, and Flint has no server; the rest stays on this PC.

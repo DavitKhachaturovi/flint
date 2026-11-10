@@ -1,6 +1,6 @@
 # 04 — Data & Storage
 
-All user data is plain markdown in a folder the user chooses. No database, no server, no account.
+All user data is plain markdown in a folder the user chooses. No database, no server, no account. (**D-161:** Google Drive sync, SYNC-01, is opt-in and goes only to the user's own Drive; §7.)
 The task-line format (§3) uses the established **Dataview inline-field convention**, chosen for reliable parsing (D-20, decided). Changing it later requires a migration of users' files, so treat it as stable.
 
 ---
@@ -44,6 +44,7 @@ App data (not in the Flint folder):
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
+  sync\                         ← Google Drive sync: the encrypted account, state.json, the merge bases (SYNC-01, §7, D-161)
 %LOCALAPPDATA%\Flint\
   snapshots\                    ← local snapshots (DATA-04)
   logs\                         ← local logs only, never uploaded (APP-09)
@@ -97,7 +98,7 @@ The earlier draft used bare trailing tokens (`!high`, `⏰…`, `★`, `^id`) re
 ### Fields
 | Field | Values | Meaning | Feature |
 |---|---|---|---|
-| `id` | written: `[a-z0-9]{4,6}`; read: `[A-Za-z0-9_-]{1,32}` (D-21, D-29) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (D-29) | Today, reminders, undo, CLI |
+| `id` | written: `[a-z0-9]{4,6}` (6 from 1.5.0, D-161); read: `[A-Za-z0-9_-]{1,32}` (D-21, D-29) | Stable task ID, unique within the Flint folder: lists, notes, archive and Trash (D-29) | Today, reminders, undo, CLI |
 | `priority` | `low` / `medium` / `high` (absent = none) | Priority. Same value names as Obsidian Tasks (which also has `lowest`/`highest`; Flint reads those as `low`/`high`). | TASK-03 |
 | `reminder` | written: `YYYY-MM-DDTHH:MM` (local time); read: also `YYYY-MM-DD` and `…:SS` (D-29). A date-only value means 10:00 (D-69; 09:00 before, Q-02). | Reminder time | REM-01 |
 | `muted` | `true`, any letter case (absent = the reminder is on) (D-66) | The reminder is turned off: kept, shown faint, never fired | REM-12 |
@@ -235,10 +236,49 @@ mode: note
 
 ---
 
-## 7. Future: sync (not in v1)
+## 7. Google Drive sync (SYNC-01, 1.5.0, D-161)
 
-v1 has **no sync**. If sync is added later (OneDrive or otherwise), these lessons apply:
+The local Flint folder stays the source of truth; Drive holds a second copy that each PC merges with. Behaviour and wording are in 02 SYNC-01; this section is the data.
 
-- Folder-sync services can't merge concurrent edits. When the same file is edited on two machines before syncing, OneDrive keeps both and creates a conflict copy named after the machine (e.g. `Inbox-DESKTOP-7QK2M1B.md`), often unnoticed for a long time.
-- It works for **one person on several machines**; it is fragile for **several people editing the same list**.
-- Mitigations to build at that point: detect conflict-copy files and offer a merge view; merge task lists by task ID (union of tasks, a completed state wins); keep all app/UI state outside the synced folder (already the v1 design).
+### In Drive
+```
+My Drive/Flint/                 ← found by its Drive ID, so renaming or moving it changes nothing; development builds use "Flint (development)"
+  Inbox.md                      ← a synced list or note: the same file, the same name as on disk (byte for byte as the PC that wrote it last has it)
+  Groceries.md
+  attachments/                  ← attachments inside the Flint folder that a synced list or note links
+  .flint-sync/
+    groups.json                 ← synced groups: { "flint": 1, "groups": [ { "id": "g-k3f9", "name": "Personal", "lists": ["l7c2", "n4d8"] } ] }
+    items.json                  ← per synced list or note (by list ID): its file's Drive ID; per task ID `created` and `lastTouched`; the linked files of its lines: { "<file:/// target>": { "device": "DAVIT-LAPTOP", "size": 1932735283 } }
+    removed.json                ← what left Drive and why: { "<list ID>": { "how": "deleted" | "unsynced", "at": "<ISO time>", "device": "DAVIT-LAPTOP" } }, kept 90 days (Proposed)
+```
+- Only files Flint created are visible to it (`drive.file`); a file added to the folder by hand in Drive is not seen. Each file's Drive `appProperties` carry `flintId` (the list ID, or the attachment's file name), so Flint never matches by name alone.
+- **Deletes** move files to Drive's own trash (Google keeps them 30 days), never deleted for good, and are recorded in `removed.json`: `deleted` means "to Trash on every PC", `unsynced` means "each PC keeps its copy and stops syncing it". A file that disappears from Drive without a record (removed in Drive itself) counts as `unsynced`.
+- `.flint-sync/*.json` files are written whole with Drive's `If-Match`-style revision check (the file's `headRevisionId` read before; a changed one means read, merge, write again), so two PCs never overwrite each other's bookkeeping (Proposed).
+
+### On each PC (app data, never in the Flint folder)
+```
+%APPDATA%\Flint\sync\
+  account.bin                   ← the refresh token and account e-mail, encrypted with Electron safeStorage (DPAPI)
+  state.json                    ← the Drive folder ID, the mode (everything | chosen), the chosen items (list and group IDs), the items stopped on this PC, the Drive-side IDs and revisions last seen, the last sync time and status
+  base\<list ID>.md             ← the last synced version of each synced list or note: the base of the three-way merge
+```
+- Losing `base\` turns the next merge into a first meeting (02 SYNC-01: union by ID, both versions kept), never into lost data. Losing `state.json` is like a new connection. Snapshots, Trash, the archive, `today.json`'s order, the sidebar's order and `ui-state.json` stay per PC.
+- **Device name:** the Windows computer name (`os.hostname()`), upper case, used in conflict callouts and for linked files.
+
+### Merge rules (core, `packages/core/src/sync/`)
+- **Task lists:** three-way by task ID (D-161 Q4); the rules are in 02 SYNC-01. The result is written by the canonical writer, so lines nobody changed stay byte for byte. A **title conflict** keeps the other title as the body's first line: `Other version (DAVIT-LAPTOP): <title>` (indented as body text).
+- **Notes, bodies and non-task content:** a line-based three-way merge (diff3). Where both sides changed the same lines, this PC's lines stay and the other side's follow as a callout:
+  ```markdown
+  > [!conflict] Also changed on DAVIT-LAPTOP, 10 Nov 14:02
+  > Leave Saturday morning instead. The drive is about three hours.
+  ```
+  An empty other side reads `> (deleted these lines)`. Inside a fenced code block the callout goes after the fence (a callout inside code would be code). The format is plain markdown; Flint recognises `> [!conflict]` callouts (case-insensitive) for the card, the chip and the popover, and **Use … / Keep mine / Keep both** edit the text (02 SYNC-01).
+- **First meeting** (no base): task lists merge as a union by task ID (a task on both sides with different content is two tasks, the incoming one re-IDed; the same content is one); notes with different text keep both (this PC's text, then the other as a callout).
+- **Clocks:** a `lastTouched` from Drive later than the upload's server time (Drive's `modifiedTime`) is taken as that time; a local one later than now as now.
+- **Frontmatter:** keys merge one by one (Flint's `flint`, `id`, `mode`, `quick` and unknown keys alike), the later change winning; a mode change (LIST-04) on one side converts the merged result.
+
+### Task IDs (D-161 Q2)
+- From 1.5.0 Flint writes new task IDs with **6 characters** (`[a-z0-9]{6}`, still within 04 §3's 4–6), so independent PCs rarely pick the same one; existing IDs stay. A collision found while merging re-IDs the incoming task (its Today order and reminders bookkeeping follow it).
+
+### Lessons kept from the folder-sync idea
+- Folder-sync services (OneDrive) can't merge concurrent edits and create unnoticed conflict copies (`Inbox-DESKTOP-7QK2M1B.md`); that is why Flint syncs through Drive's API itself and never writes conflict copies. Keeping all app and UI state outside the synced data (already the v1 design) still applies.
