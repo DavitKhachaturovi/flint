@@ -21,6 +21,7 @@ I built Flint for myself. I wanted one app that does both a real task list (like
 - **Your clipboard history, beside your tasks.** Windows' clipboard history (Win+V) in the side panel, one click to insert into whatever you're typing in Flint. Its contents stay hidden until you hover, so screen shares don't leak what you copied.
 - **Short links you define by example.** Paste one link and type how it should look (`AB#1234`, `PROJ-42`); Flint works out the pattern and links it everywhere, both ways.
 - **Plain markdown files.** Every list and note is a `.md` file in a folder you choose, readable in Obsidian (Dataview-compatible fields) or any editor. No account, no lock-in.
+- **Sync through your own Google Drive.** Keep chosen lists, notes and groups in step across your PCs (or everything): plain `.md` files in a Flint folder in your Drive, merged task by task, and where two PCs changed the same lines of a note both versions are kept for you to pick. There's no Flint server, and Flint can only see the files it created.
 - **Today, pins and real reminders.** Pin tasks from any list into Today; reminders arrive as Windows notifications, also during Do Not Disturb (with Windows' default settings).
 - **Inbox triage.** Sort a pile of captures one task at a time with single keys.
 - **Hard to lose anything.** Automatic snapshots with a task-by-task compare and restore, plus a 30-day Trash.
@@ -32,7 +33,7 @@ Download the latest `Flint-Setup-x.y.z.exe` from [Releases](https://github.com/D
 
 ## Privacy
 
-Your notes never leave your machine. Flint sends no telemetry, needs no account, and only contacts GitHub to check for updates, which you can turn off.
+Your notes stay on your PC unless you turn on Google Drive sync, and then only what you choose goes to your own Google Drive; Flint has no server of its own. Flint sends no telemetry, and otherwise only contacts GitHub to check for updates, which you can turn off. The full policy: [flintnotes.app/privacy](https://flintnotes.app/privacy/).
 
 ## Development
 

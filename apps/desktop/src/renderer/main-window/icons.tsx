@@ -220,11 +220,11 @@ export const CloudIcon = ({
         ? [<path key="mark" className="cloud-mark" d="m9.85 13.5 2 2 3.5-3.5" />]
         : []),
       ...(mark === 'arrow'
-        ? [<path key="mark" className="cloud-mark cloud-arrow" d="M12.6 11v5m-2-2 2 2 2-2" />]
+        ? [<path key="mark" className="cloud-mark cloud-arrow" d="M12.6 10v5m-2-2 2 2 2-2" />]
         : []),
       ...(mark === 'slash' ? [<path key="mark" className="cloud-mark" d="M4 4l16 16" />] : []),
       ...(mark === 'alert'
-        ? [<path key="mark" className="cloud-mark" d="M12.6 11v3M12.6 16.5v.01" />]
+        ? [<path key="mark" className="cloud-mark" d="M12.6 9v3.5M12.6 15.5v.01" />]
         : []),
     ],
     width,

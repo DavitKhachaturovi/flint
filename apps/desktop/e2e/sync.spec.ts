@@ -197,9 +197,6 @@ test('before connecting, the status button opens Settings → Sync with Connect 
   await expect(section).toContainText(
     'Keep chosen lists and notes in step across your devices, through your own Drive.',
   );
-  await expect(section).toContainText(
-    'Only what you choose to sync goes to your own Google Drive. Nothing else leaves this PC, and Flint has no server of its own.',
-  );
   await expect(section.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
 });
 

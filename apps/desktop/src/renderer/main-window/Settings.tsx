@@ -392,14 +392,6 @@ export function SettingsScreen(props: {
             </button>
           )}
         </Row>,
-        <Row
-          key="privacy"
-          name=""
-          className="sync-privacy"
-          note="Only what you choose to sync goes to your own Google Drive. Nothing else leaves this PC, and Flint has no server of its own."
-          filter={filter}
-          words={`${words} privacy`}
-        />,
       ];
     }
     const letter = (sync.email ?? '?').slice(0, 1).toUpperCase();
@@ -505,14 +497,6 @@ export function SettingsScreen(props: {
           Open in Drive
         </button>
       </Row>,
-      <Row
-        key="privacy"
-        name=""
-        className="sync-privacy"
-        note="Only what you choose to sync goes to your own Google Drive. Nothing else leaves this PC, and Flint has no server of its own."
-        filter={filter}
-        words={`${words} privacy`}
-      />,
     ];
   };
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
