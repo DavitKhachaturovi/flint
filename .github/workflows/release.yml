@@ -84,10 +84,23 @@ jobs:
 
       # electron-builder uploads the installer, its .blockmap and latest.yml to that draft; the
       # release is published only after every file is there.
+      # SYNC-01, D-161: the Google client secret goes into the build (never into the repository);
+      # a release without it would ship with sync "Not set up in this build".
+      - name: Check the Google client secret is set
+        shell: bash
+        run: |
+          if [ -z "$FLINT_GOOGLE_CLIENT_SECRET" ]; then
+            echo "::error::The repository secret GOOGLE_CLIENT_SECRET is missing (docs/06 §6)."
+            exit 1
+          fi
+        env:
+          FLINT_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
       - name: Build the installer and upload it to the draft release
         run: npm run release -w @flint/desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLINT_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 
       - name: Publish the release with What's new as its text
         shell: bash

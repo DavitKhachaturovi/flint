@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
@@ -10,10 +11,29 @@ const coreAlias = [
   { find: /^@flint\/core$/, replacement: `${core}/index.ts` },
 ];
 
+/**
+ * SYNC-01, D-161: the Google client secret, injected at build time, never in the repository. A
+ * release build gets it from CI's `GOOGLE_CLIENT_SECRET` (as `FLINT_GOOGLE_CLIENT_SECRET`), a local
+ * build from `apps/desktop/.env.local` (git-ignored); without it sync says "Not set up in this
+ * build". Desktop apps can't keep it secret (Google says so): it only identifies Flint to Google.
+ */
+function googleClientSecret(): string {
+  if (process.env.FLINT_GOOGLE_CLIENT_SECRET) return process.env.FLINT_GOOGLE_CLIENT_SECRET;
+  try {
+    const text = readFileSync(resolve(root, '.env.local'), 'utf8');
+    return /^FLINT_GOOGLE_CLIENT_SECRET=(.*)$/m.exec(text)?.[1]?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
 // `--mode bench` builds the R-1 laptop benchmark (docs/06 §1, `npm run dist:bench`).
 export default defineConfig(({ mode }) => ({
   main: {
-    define: { __FLINT_BENCH_BUILD__: JSON.stringify(mode === 'bench') },
+    define: {
+      __FLINT_BENCH_BUILD__: JSON.stringify(mode === 'bench'),
+      __FLINT_GOOGLE_CLIENT_SECRET__: JSON.stringify(mode === 'bench' ? '' : googleClientSecret()),
+    },
     resolve: { alias: coreAlias },
     build: {
       externalizeDeps: { exclude: ['@flint/core'] },

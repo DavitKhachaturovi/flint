@@ -8,3 +8,5 @@ test-results/
 playwright-report/
 dist-installer/
 dist-bench/
+# SYNC-01, D-161: the Google client secret for local builds (never committed).
+.env.local

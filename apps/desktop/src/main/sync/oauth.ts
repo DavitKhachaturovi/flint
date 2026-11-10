@@ -10,6 +10,12 @@ import { AUTH_URL, DRIVE_SCOPE, REVOKE_URL, TOKEN_URL } from './google.js';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** The Desktop app client: its ID, and its secret (required by Google's token endpoint). */
+export interface Client {
+  readonly id: string;
+  readonly secret: string;
+}
+
 export interface Tokens {
   readonly refreshToken: string;
   readonly accessToken: string;
@@ -48,7 +54,7 @@ export interface SignIn {
  * Opens Google's sign-in in the browser (`open`) and waits for its answer on a loopback listener.
  * `fetch` is sync's own session (the network guard lets it reach Google's token host).
  */
-export function signIn(clientId: string, open: (url: string) => void, fetch: Fetch): SignIn {
+export function signIn(client: Client, open: (url: string) => void, fetch: Fetch): SignIn {
   const verifier = base64url(randomBytes(48));
   const challenge = base64url(createHash('sha256').update(verifier).digest());
   const state = base64url(randomBytes(24));
@@ -96,7 +102,7 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
         );
         return;
       }
-      exchange(clientId, code, verifier, redirect, fetch).then(resolve, reject);
+      exchange(client, code, verifier, redirect, fetch).then(resolve, reject);
     });
     server = listener;
     listener.on('error', (error) => {
@@ -107,7 +113,7 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
       const { port } = listener.address() as AddressInfo;
       redirect = `http://127.0.0.1:${port}/`;
       const params = new URLSearchParams({
-        client_id: clientId,
+        client_id: client.id,
         redirect_uri: redirect,
         response_type: 'code',
         scope: DRIVE_SCOPE,
@@ -129,7 +135,7 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
 }
 
 async function exchange(
-  clientId: string,
+  client: Client,
   code: string,
   verifier: string,
   redirect: string,
@@ -139,7 +145,8 @@ async function exchange(
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: clientId,
+      client_id: client.id,
+      ...(client.secret ? { client_secret: client.secret } : {}),
       code,
       code_verifier: verifier,
       grant_type: 'authorization_code',
@@ -174,16 +181,13 @@ export class AuthExpired extends Error {
 }
 
 /** A new access token from the refresh token; `AuthExpired` when Google refuses it (revoked). */
-export async function refresh(
-  clientId: string,
-  refreshToken: string,
-  fetch: Fetch,
-): Promise<Tokens> {
+export async function refresh(client: Client, refreshToken: string, fetch: Fetch): Promise<Tokens> {
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: clientId,
+      client_id: client.id,
+      ...(client.secret ? { client_secret: client.secret } : {}),
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }).toString(),

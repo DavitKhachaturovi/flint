@@ -2,6 +2,8 @@ import { get } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { signIn, type Fetch } from './oauth.js';
 
+const CLIENT = { id: 'client', secret: 'the-secret' };
+
 /**
  * SYNC-01, D-161: the sign-in's round trip through the loopback listener, as the browser makes it
  * after Google's consent. (Found on Davit's first real sign-in: the listener read its own port after
@@ -38,7 +40,7 @@ describe('signIn (SYNC-01)', () => {
     const { fetch, bodies } = tokenEndpoint();
     let page: Promise<string> = Promise.resolve('');
     const pending = signIn(
-      'client',
+      CLIENT,
       (authUrl) => {
         const params = new URL(authUrl).searchParams;
         expect(params.get('code_challenge_method')).toBe('S256');
@@ -57,13 +59,13 @@ describe('signIn (SYNC-01)', () => {
     expect(body?.get('grant_type')).toBe('authorization_code');
     expect(body?.get('code_verifier')).toMatch(/^[A-Za-z0-9_-]{43,}$/);
     expect(body?.get('redirect_uri')).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
-    expect(body?.has('client_secret')).toBe(false);
+    expect(body?.get('client_secret')).toBe('the-secret');
   });
 
   it('refuses an answer with the wrong state, and a declined consent', async () => {
     const { fetch, bodies } = tokenEndpoint();
     const wrong = signIn(
-      'client',
+      CLIENT,
       (authUrl) => {
         const redirect = new URL(authUrl).searchParams.get('redirect_uri') ?? '';
         void browserReturns(`${redirect}?code=the-code&state=forged`);
@@ -72,7 +74,7 @@ describe('signIn (SYNC-01)', () => {
     );
     await expect(wrong.result).rejects.toThrow('Sign-in failed');
     const declined = signIn(
-      'client',
+      CLIENT,
       (authUrl) => {
         const params = new URL(authUrl).searchParams;
         void browserReturns(
@@ -97,7 +99,7 @@ describe('signIn (SYNC-01)', () => {
         ),
       );
     const pending = signIn(
-      'client',
+      CLIENT,
       (authUrl) => {
         const params = new URL(authUrl).searchParams;
         void browserReturns(
@@ -111,7 +113,7 @@ describe('signIn (SYNC-01)', () => {
 
   it('can be cancelled while waiting for the browser', async () => {
     const { fetch } = tokenEndpoint();
-    const pending = signIn('client', () => undefined, fetch);
+    const pending = signIn(CLIENT, () => undefined, fetch);
     pending.cancel();
     await expect(pending.result).rejects.toThrow('Sign-in cancelled');
   });

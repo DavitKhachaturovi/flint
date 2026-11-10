@@ -12,6 +12,14 @@
 export const GOOGLE_CLIENT_ID: string =
   '432838445401-sco8s20ttj1080svf3ta4v2daomu547k.apps.googleusercontent.com';
 
+/**
+ * The Desktop client's secret, injected at build time (never in the repository): Google's token
+ * endpoint refuses a desktop client's exchange without it, PKCE or not (found 10 Nov 2026, D-161).
+ * It can't be kept secret in a desktop app and doesn't need to be: it opens nothing on its own.
+ */
+export const GOOGLE_CLIENT_SECRET: string =
+  typeof __FLINT_GOOGLE_CLIENT_SECRET__ === 'string' ? __FLINT_GOOGLE_CLIENT_SECRET__ : '';
+
 /** The one scope: only files Flint created (non-sensitive, D-161). */
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 

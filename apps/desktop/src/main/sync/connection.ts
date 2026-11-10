@@ -4,17 +4,28 @@
  * in-process fake Drive and sign-in instead, so the network test still allows no endpoint at all.
  */
 import { FakeDrive } from '@flint/core/sync';
-import { DRIVE_TRASH_URL, GOOGLE_CLIENT_ID, folderUrl } from './google.js';
+import { DRIVE_TRASH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, folderUrl } from './google.js';
 import { GoogleDrive } from './google-drive.js';
-import { AuthExpired, refresh, revoke, signIn, type Fetch, type Tokens } from './oauth.js';
+import {
+  AuthExpired,
+  refresh,
+  revoke,
+  signIn,
+  type Client,
+  type Fetch,
+  type Tokens,
+} from './oauth.js';
+
+const CLIENT: Client = { id: GOOGLE_CLIENT_ID, secret: GOOGLE_CLIENT_SECRET };
 import type { SyncConnection } from './service.js';
 
 /** The real one: Google's sign-in in the browser, the Drive API over `fetch` (sync's session). */
 export function googleConnection(fetch: Fetch, open: (url: string) => void): SyncConnection {
   return {
-    available: GOOGLE_CLIENT_ID !== '',
+    // Both halves, or the build says "Not set up in this build".
+    available: CLIENT.id !== '' && CLIENT.secret !== '',
     signIn() {
-      const pending = signIn(GOOGLE_CLIENT_ID, open, fetch);
+      const pending = signIn(CLIENT, open, fetch);
       const result = pending.result.then(async (tokens) => {
         const drive = new GoogleDrive({ fetch, token: () => Promise.resolve(tokens.accessToken) });
         return { email: await drive.email(), refreshToken: tokens.refreshToken };
@@ -28,7 +39,7 @@ export function googleConnection(fetch: Fetch, open: (url: string) => void): Syn
         token: async (fresh) => {
           if (!tokens || fresh || tokens.expires - Date.now() < 60_000) {
             try {
-              tokens = await refresh(GOOGLE_CLIENT_ID, refreshToken, fetch);
+              tokens = await refresh(CLIENT, refreshToken, fetch);
             } catch (error) {
               if (error instanceof AuthExpired) {
                 const { DriveError } = await import('@flint/core/sync');
