@@ -197,3 +197,35 @@ export const EyeOffIcon = ({ size = 14 }: IconProps): ReactElement =>
     <path key="b" d="M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 5.4-1.6" />,
     <path key="c" d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />,
   ]);
+
+const CLOUD = 'M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z';
+
+/** SYNC-01, D-161 (mockup 13): the cloud, and its marks for sync's states. */
+export type CloudMark = 'none' | 'check' | 'arrow' | 'slash' | 'alert';
+
+export const CloudIcon = ({
+  size = 13,
+  mark = 'none',
+  width = 2,
+}: IconProps & { readonly mark?: CloudMark; readonly width?: number }): ReactElement =>
+  svg(
+    size,
+    [
+      <path key="cloud" d={CLOUD} />,
+      ...(mark === 'check'
+        ? [<path key="mark" className="cloud-mark" d="m9.5 13.5 2 2 3.5-3.5" />]
+        : []),
+      ...(mark === 'arrow'
+        ? [<path key="mark" className="cloud-mark cloud-arrow" d="M12 11v5m-2-2 2 2 2-2" />]
+        : []),
+      ...(mark === 'slash' ? [<path key="mark" className="cloud-mark" d="M4 4l16 16" />] : []),
+      ...(mark === 'alert'
+        ? [<path key="mark" className="cloud-mark" d="M12 11v3M12 16.5v.01" />]
+        : []),
+    ],
+    width,
+  );
+
+/** SYNC-01, D-161 Q5: two versions side by side (the conflict card's header). */
+export const ConflictIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, <path d="M7 4v13M7 17l-3-3M7 17l3-3M17 20V7M17 7l-3 3M17 7l3 3" />);

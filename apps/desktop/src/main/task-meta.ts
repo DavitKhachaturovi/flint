@@ -85,6 +85,26 @@ export class TaskMetaFile {
     if (changed) this.schedule();
   }
 
+  /**
+   * SYNC-01, D-161 Q3: another PC's times for a task: the earlier `created` and the later
+   * `lastTouched` win (they are carried in Drive's bookkeeping, never in the markdown).
+   */
+  adopt(id: string, created: string | undefined, lastTouched: string | undefined): void {
+    if (id.startsWith('~') || (created === undefined && lastTouched === undefined)) return;
+    const known = this.tasks.get(id);
+    const first = [known?.created, created]
+      .filter((value): value is string => value !== undefined)
+      .sort()[0];
+    const last = [known?.lastTouched, lastTouched]
+      .filter((value): value is string => value !== undefined)
+      .sort()
+      .at(-1);
+    if (!first) return;
+    if (known && known.created === first && known.lastTouched === (last ?? first)) return;
+    this.tasks.set(id, { ...known, created: first, lastTouched: last ?? first });
+    this.schedule();
+  }
+
   /** D-85: a task saved from the capture popup. */
   captured(id: string, now: Date): void {
     const stamp = localStamp(now);

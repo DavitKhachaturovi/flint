@@ -23,6 +23,8 @@ export const RELEASE_TIMEOUT_MS = 1500;
 
 export class NoteEditors {
   private readonly owners = new Map<string, EditorWindow>();
+  /** SYNC-01: when each note was last typed in. */
+  private readonly typedAt = new Map<string, number>();
   private readonly waiting = new Map<string, (text: string | null) => void>();
 
   private readonly events: NoteEditorEvents;
@@ -67,6 +69,7 @@ export class NoteEditors {
 
   /** The owner typed: the other window shows it. */
   live(noteId: string, from: EditorWindow, text: string): void {
+    this.typedAt.set(noteId, Date.now());
     if (this.owners.get(noteId) === from) this.events.live(other(from), noteId, text);
   }
 
@@ -75,6 +78,15 @@ export class NoteEditors {
     if (this.owners.get(noteId) !== from) return;
     this.owners.delete(noteId);
     this.events.editor(noteId, null);
+  }
+
+  /**
+   * SYNC-01, D-161: typed in during the last few seconds (the editor saves 600 ms after typing
+   * stops), so a sync run leaves the note for its next run rather than land under unsaved typing.
+   */
+  busy(noteId: string, now = Date.now()): boolean {
+    const at = this.typedAt.get(noteId);
+    return at !== undefined && now - at < 3000;
   }
 
   /** A window went away (hidden, reloaded): it edits nothing. */

@@ -38,6 +38,120 @@ export function displayPath(link: string): string {
   }
 }
 
+/**
+ * SYNC-01, D-161: linked files of synced notes, as sync last recorded them (`file:///` target →
+ * the PC that has it and its size), and this PC's name. A linked file never syncs: its line shows a
+ * crossed-out cloud with the explanation (mockup 13).
+ */
+interface LinkedSync {
+  readonly device: string;
+  readonly size: number;
+}
+let linkedSync: ReadonlyMap<string, LinkedSync> = new Map();
+let thisDevice = '';
+export function setLinkedSync(files: ReadonlyMap<string, LinkedSync>, device: string): void {
+  linkedSync = files;
+  thisDevice = device;
+}
+
+/** Copy into Flint from the explanation: the editor that shows the line handles it (live preview). */
+let copyHandler: ((holder: HTMLElement, link: string) => boolean) | null = null;
+export function onCopyIntoFlint(handler: (holder: HTMLElement, link: string) => boolean): void {
+  copyHandler = handler;
+}
+
+function sizeLabel(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${unit === 0 ? value : value >= 10 ? Math.round(value) : Math.round(value * 10) / 10} ${units[unit]}`;
+}
+
+const elsewhere = (info: LinkedSync): boolean =>
+  info.device.toUpperCase() !== thisDevice.toUpperCase();
+
+/** The explanation under the crossed-out cloud: on this PC, or on another one. */
+function explain(holder: HTMLElement, anchor: HTMLElement, link: string, info: LinkedSync): void {
+  document.querySelector('.fl-sync-explain')?.remove();
+  const card = document.createElement('div');
+  card.className = 'fl-sync-explain';
+  card.setAttribute('role', 'dialog');
+  const title = document.createElement('span');
+  title.className = 'fl-sync-explain-title';
+  const text = document.createElement('span');
+  text.className = 'fl-sync-explain-text';
+  card.append(title, text);
+  if (elsewhere(info)) {
+    title.textContent = 'Not synced to this device';
+    text.textContent = `On ${info.device} this file is linked from outside the Flint folder, so it was never synced. To have it here, open this note on ${info.device} and choose Copy into Flint.`;
+  } else {
+    const path = displayPath(link);
+    const folder = path.includes('\\') ? path.slice(0, path.lastIndexOf('\\')) : path;
+    title.textContent = 'Not synced';
+    text.textContent = `This file is linked from outside the Flint folder (${folder}), so it stays on this PC. Other devices show this line with a note.`;
+    if (copyHandler) {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'fl-sync-explain-action';
+      action.textContent = 'Copy into Flint to sync it';
+      action.addEventListener('mousedown', (event) => event.preventDefault());
+      action.addEventListener('click', () => {
+        card.remove();
+        copyHandler?.(holder, link);
+      });
+      card.append(action);
+    }
+  }
+  const box = anchor.getBoundingClientRect();
+  card.style.left = `${Math.max(8, Math.min(box.left - 12, window.innerWidth - 352))}px`;
+  card.style.top = `${box.bottom + 8}px`;
+  document.body.append(card);
+  const close = (event: MouseEvent): void => {
+    if (card.contains(event.target as Node) || anchor.contains(event.target as Node)) return;
+    card.remove();
+    window.removeEventListener('mousedown', close, true);
+  };
+  window.addEventListener('mousedown', close, true);
+  anchor.addEventListener('mouseleave', () => {
+    window.setTimeout(() => {
+      if (!card.matches(':hover') && !anchor.matches(':hover') && card.dataset['pinned'] !== '1')
+        card.remove();
+    }, 250);
+  });
+  card.addEventListener('mouseleave', () => {
+    if (card.dataset['pinned'] !== '1') card.remove();
+  });
+}
+
+/** The crossed-out cloud and the chip's "1.8 GB · Linked" / "1.8 GB · on DAVIT-LAPTOP". */
+function markUnsynced(holder: HTMLElement, badge: HTMLElement, link: string): void {
+  const info = linkedSync.get(link);
+  if (!info) return;
+  badge.textContent = elsewhere(info)
+    ? `${sizeLabel(info.size)} · on ${info.device}`
+    : `${sizeLabel(info.size)} · Linked`;
+  const cloud = document.createElement('button');
+  cloud.type = 'button';
+  cloud.className = 'fl-media-cloud';
+  cloud.setAttribute('aria-label', elsewhere(info) ? 'Not synced to this device' : 'Not synced');
+  cloud.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z"></path><path d="M4 4l16 16"></path></svg>'; // constant markup
+  cloud.addEventListener('mousedown', (event) => event.preventDefault());
+  cloud.addEventListener('mouseenter', () => explain(holder, cloud, link, info));
+  cloud.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    explain(holder, cloud, link, info);
+    const card = document.querySelector<HTMLElement>('.fl-sync-explain');
+    if (card) card.dataset['pinned'] = '1';
+  });
+  badge.after(cloud);
+}
+
 const icon = (path: string): string =>
   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 const FILE_ICON = icon(
@@ -47,6 +161,19 @@ const PLAY_ICON = icon('<path d="m8 5 11 7-11 7Z"></path>');
 
 /** "File not found" (D-84), with the original path; replaces the media where it was. */
 function notFound(holder: HTMLElement, link: string): void {
+  const info = linkedSync.get(link);
+  if (info && elsewhere(info)) {
+    holder.classList.add('missing', 'elsewhere');
+    const box = document.createElement('span');
+    box.className = 'fl-media-missing';
+    const title = document.createElement('span');
+    title.className = 'fl-media-missing-title';
+    title.textContent = linkName(link);
+    box.append(title);
+    const kept = [...holder.querySelectorAll('.fl-media-badge, .fl-media-cloud')];
+    holder.replaceChildren(...kept, box);
+    return;
+  }
   holder.classList.add('missing');
   const box = document.createElement('span');
   box.className = 'fl-media-missing';
@@ -57,9 +184,9 @@ function notFound(holder: HTMLElement, link: string): void {
   path.className = 'fl-media-missing-path';
   path.textContent = displayPath(link);
   box.append(title, path);
-  // A linked file keeps its badge.
-  const badge = holder.querySelector('.fl-media-badge');
-  holder.replaceChildren(...(badge ? [badge] : []), box);
+  // A linked file keeps its badge (and, synced, its cloud).
+  const kept = [...holder.querySelectorAll('.fl-media-badge, .fl-media-cloud')];
+  holder.replaceChildren(...kept, box);
 }
 
 /** A video that can't play here: its default player instead (D-84). */
@@ -156,6 +283,7 @@ export function mediaElement(link: string, alt: string): HTMLElement {
     badge.textContent = 'Linked';
     badge.title = `Linked to ${displayPath(link)} (not copied into Flint)`;
     holder.append(badge);
+    markUnsynced(holder, badge, link);
   }
   if (src && isVideoLink(link)) {
     holder.classList.add('video');

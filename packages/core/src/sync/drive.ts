@@ -110,6 +110,11 @@ export interface LocalSide {
   readonly device: string;
   now(): number;
   items(): Promise<LocalItem[]>;
+  /**
+   * A list or note with typing not saved yet (an open note editor): this run leaves it alone and
+   * the next one, moments later, takes it, so a merge never lands under unsaved typing.
+   */
+  busy?(listId: string): boolean;
   read(listId: string): Promise<string | null>;
   /** Writes a list or note (creating it as `name`, or a free variant, when new); returns its name. */
   write(listId: string, text: string, name: string): Promise<string>;

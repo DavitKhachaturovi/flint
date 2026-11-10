@@ -2575,6 +2575,103 @@ export class Workspace {
     });
   }
 
+  /**
+   * SYNC-01, D-161: the lists and notes Google Drive sync may carry: those with a Flint ID (a file
+   * without Flint's header gets one when it is next edited in Flint, D-23), with their file, group
+   * and whether they are an empty quick note (never uploaded, D-161 Q9).
+   */
+  syncEntries(): {
+    readonly id: string;
+    readonly name: string;
+    readonly path: string;
+    readonly mode: ListMode;
+    readonly group: string | null;
+    readonly emptyQuick: boolean;
+  }[] {
+    const groups = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+    return this.lists
+      .filter(({ entry }) => entry.id !== null && !this.listId(entry).startsWith('file:'))
+      .map((loaded) => {
+        const id = this.listId(loaded.entry);
+        const group = groups.find((item) => item.kind === 'group' && item.lists.includes(id));
+        const text = serializeDocument(loaded.file.document).replace(
+          /^---\r?\n[\s\S]*?\r?\n---\r?\n/,
+          '',
+        );
+        return {
+          id,
+          name: id === INBOX_ID ? 'Inbox' : loaded.entry.name,
+          path: loaded.file.path,
+          mode: loaded.entry.mode === 'note' ? ('note' as const) : ('tasks' as const),
+          group: group?.id ?? null,
+          emptyQuick: this.isQuick(loaded) && text.trim() === '',
+        };
+      });
+  }
+
+  /** SYNC-01: the sidebar's groups (ID, name, lists in order). */
+  syncGroups(): { readonly id: string; readonly name: string; readonly lists: string[] }[] {
+    return arrange(this.sidebarFile, this.sidebarLists(), 'manual').flatMap((item) =>
+      item.kind === 'group' ? [{ id: item.id, name: item.name, lists: [...item.lists] }] : [],
+    );
+  }
+
+  /**
+   * SYNC-01, D-161 Q3: synced groups made so here: created (at the end of Lists), renamed, their
+   * lists set (lists that left a group stay ungrouped in its place); `removed` groups go, their
+   * lists staying. Not undoable: it is another PC's change, as an edit from outside Flint is.
+   */
+  applySyncGroups(
+    groups: readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly lists: readonly string[];
+    }[],
+    removed: readonly string[],
+  ): Promise<void> {
+    return this.serial(async () => {
+      let items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+      for (const id of removed) items = deleteGroup(items, id);
+      const known = new Set(this.syncEntries().map((entry) => entry.id));
+      for (const group of groups) {
+        const exists = items.some((item) => item.kind === 'group' && item.id === group.id);
+        if (!exists)
+          items = [...items, { kind: 'group', id: group.id, name: group.name, lists: [] }];
+        else items = renameGroup(items, group.id, group.name);
+        const current = items.find((item) => item.kind === 'group' && item.id === group.id);
+        const had = current?.kind === 'group' ? current.lists : [];
+        for (const list of had) {
+          if (group.lists.includes(list)) continue;
+          const index = items.findIndex((item) => item.kind === 'group' && item.id === group.id);
+          items = moveInSidebar(items, list, { group: null, index: index + 1 });
+        }
+        group.lists
+          .filter((list) => known.has(list))
+          .forEach((list, index) => {
+            items = moveInSidebar(items, list, { group: group.id, index });
+          });
+      }
+      const after = fromItems(items, this.sidebarFile.extra);
+      if (writeSidebar(after) !== writeSidebar(this.sidebarFile)) await this.saveSidebar(after);
+    });
+  }
+
+  /** SYNC-01: sync wrote or removed a file in the folder; read it now (DATA-06), as the watcher would. */
+  syncWritten(path: string): Promise<void> {
+    return this.fileChanged(path);
+  }
+
+  /** SYNC-01: the task IDs of a list, for the times sync carries (D-161 Q3). */
+  syncTaskIds(id: string): string[] {
+    const list = this.find(id);
+    return list ? [...allTasks(list.file.document)].map(({ task }) => task.key) : [];
+  }
+
+  /** SYNC-01: a list's file, by ID. */
+  syncPath(id: string): string | null {
+    return this.find(id)?.file.path ?? null;
+  }
+
   private find(id: string): Loaded | undefined {
     return this.lists.find(({ entry }) => this.listId(entry) === id);
   }

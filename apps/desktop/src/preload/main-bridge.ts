@@ -1,3 +1,4 @@
+import type { SyncAction, SyncEverythingPreview, SyncStatusView } from '../shared/sync.js';
 import { ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
 import type { TipId } from '../shared/tips.js';
@@ -225,6 +226,19 @@ export const main = {
   },
   onUpdatesChanged(listener: (view: UpdateView) => void): void {
     ipcRenderer.on(Channels.mainUpdatesChanged, (_event, view: UpdateView) => listener(view));
+  },
+  /** SYNC-01, D-161: Google Drive sync's status. */
+  syncStatus(): Promise<SyncStatusView> {
+    return invoke(Channels.mainSync) as Promise<SyncStatusView>;
+  },
+  syncAct(action: SyncAction): Promise<void> {
+    return invoke(Channels.mainSyncAction, action) as Promise<void>;
+  },
+  syncPreviewEverything(): Promise<SyncEverythingPreview> {
+    return invoke(Channels.mainSyncPreview) as Promise<SyncEverythingPreview>;
+  },
+  onSyncChanged(listener: (view: SyncStatusView) => void): void {
+    ipcRenderer.on(Channels.mainSyncChanged, (_event, view: SyncStatusView) => listener(view));
   },
   /** The main window came on screen. */
   onShown(listener: () => void): void {

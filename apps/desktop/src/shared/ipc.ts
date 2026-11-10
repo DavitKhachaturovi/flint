@@ -230,6 +230,12 @@ export const Channels = {
   mainUpdatesToastSeen: 'main:updates-toast-seen',
   /** Main → main window: the updater's view changed. */
   mainUpdatesChanged: 'main:updates-changed',
+  /** SYNC-01, D-161: Google Drive sync's status, an action, Chosen → Everything's preview. */
+  mainSync: 'main:sync',
+  mainSyncAction: 'main:sync-action',
+  mainSyncPreview: 'main:sync-preview',
+  /** Main → main window: sync's status changed. */
+  mainSyncChanged: 'main:sync-changed',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** TASK-18, D-151: Give to Claude's folders, and the giving itself (a prompt, never a link). */

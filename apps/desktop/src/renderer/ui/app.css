@@ -7396,3 +7396,597 @@ body[data-tour-step='5'] .main .row .pin-hover {
   line-height: 1.5;
   color: var(--fl-text-muted);
 }
+
+/* SYNC-01, D-161 (mockup 13): Google Drive sync. The status button left of the sort and +
+   buttons, its popover, the dialogs (setup, Choose what syncs, stop syncing), the clouds on synced
+   items, the header line and the conflict card. Motion: marks crossfade, the syncing arrow eases
+   down only while a run lasts, dialogs open as the palette does (D-89; off under reduce-motion). */
+.sync-button {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-tile);
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+
+.sync-button:hover,
+.sync-button.on {
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-highlight);
+}
+
+.sync-button svg {
+  display: block;
+}
+
+.sync-cloud {
+  display: flex;
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
+@keyframes sync-mark-in {
+  from {
+    opacity: 0.2;
+  }
+}
+
+.sync-button.phase-syncing .cloud-arrow {
+  animation: sync-arrow 1.1s ease-in-out infinite;
+}
+
+@keyframes sync-arrow {
+  0% {
+    transform: translateY(-2px);
+    opacity: 0.3;
+  }
+  60% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1px);
+    opacity: 0.3;
+  }
+}
+
+.sync-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-strong-bg);
+}
+
+.sync-popover {
+  position: fixed;
+  z-index: 40;
+  width: 280px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 14px;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  animation: palette-in var(--fl-dur-base) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sync-popover-head,
+.sync-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-popover-tile {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.sync-popover-state {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sync-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.sync-popover-detail {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-popover-summary {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-secondary);
+}
+
+.sync-popover-more {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.sync-popover-row {
+  text-align: left;
+  padding: 4px 0;
+  font-size: 12.5px;
+  color: var(--fl-text-primary);
+}
+
+.sync-popover-row:hover {
+  color: var(--fl-text-highlight);
+  text-decoration: underline;
+}
+
+.sync-problem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--fl-text-primary);
+}
+
+.sync-problem-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sync-popover-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quiet-button {
+  height: 34px;
+  padding: 0 4px;
+  border-radius: var(--fl-radius-button);
+  color: var(--fl-text-secondary);
+  transition: color var(--fl-dur-fast);
+}
+
+.quiet-button:hover {
+  color: var(--fl-text-highlight);
+}
+
+.primary-button.small,
+.secondary-button.small,
+.quiet-button.small {
+  height: 30px;
+  font-size: 13px;
+}
+
+.sync-layer .sync-dialog {
+  width: min(600px, 100%);
+  max-height: min(680px, 84vh);
+  padding: 24px;
+  gap: 16px;
+  outline: none;
+}
+
+.sync-layer .sync-choose {
+  width: min(560px, 100%);
+  padding: 22px;
+  gap: 12px;
+}
+
+.sync-layer .sync-stop {
+  width: min(440px, 100%);
+  padding: 18px;
+  gap: 12px;
+}
+
+.sync-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.sync-question {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fl-text-primary);
+}
+
+.sync-options {
+  display: flex;
+  gap: 12px;
+}
+
+.sync-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  text-align: left;
+  border-radius: 14px;
+  background: var(--fl-ground-card);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  transition:
+    background-color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+
+.sync-option.on {
+  background: var(--fl-ground-hover);
+  box-shadow: inset 0 0 0 1.5px var(--fl-accent);
+}
+
+.sync-option-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fl-text-primary);
+}
+
+.sync-option.on .sync-option-name {
+  color: var(--fl-text-highlight);
+}
+
+.radio {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fl-radius-pill);
+  border: 1.5px solid var(--fl-checkbox-border);
+  transition: border-color var(--fl-dur-fast);
+}
+
+.radio.on {
+  border-color: var(--fl-strong-bg);
+}
+
+.radio.on::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--fl-radius-pill);
+  background: var(--fl-strong-bg);
+  animation: sync-mark-in var(--fl-dur-fast) ease;
+}
+
+.sync-caption {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fl-text-muted);
+}
+
+.sync-dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-dialog-foot.split {
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--fl-edge-divider);
+}
+
+.sync-dialog-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.choose-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.choose-label {
+  padding: 8px 2px 2px;
+}
+
+.choose-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  color: var(--fl-text-primary);
+  text-align: left;
+  transition: background-color var(--fl-dur-fast);
+}
+
+.choose-row:hover:not(:disabled) {
+  background: var(--fl-ground-hover);
+}
+
+.choose-row.indented {
+  padding-left: 38px;
+}
+
+.choose-group {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-secondary);
+}
+
+.choose-count {
+  margin-left: auto;
+}
+
+.choose-box {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
+  color: var(--fl-strong-fg);
+  transition:
+    background-color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+
+.choose-box.on {
+  background: var(--fl-strong-bg);
+  box-shadow: none;
+}
+
+.choose-box.on.implied {
+  background: var(--fl-text-muted);
+}
+
+.sync-stop-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.sync-stop-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fl-text-secondary);
+}
+
+.sync-stop-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 11px;
+  background: var(--fl-ground-card);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  text-align: left;
+}
+
+.sync-stop-option .choose-box {
+  margin-top: 1px;
+}
+
+.sync-stop-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sync-stop-option-name {
+  font-size: 13.5px;
+  color: var(--fl-text-primary);
+}
+
+/* Clouds on synced items (sidebar rows and group headers), fading in when an item starts syncing. */
+.nav-cloud {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--fl-text-muted);
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
+.nav-cloud svg {
+  display: block;
+}
+
+/* The header line of a synced list or note, and "No longer synced". */
+.sync-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--fl-text-muted);
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
+.note-card .sync-line {
+  font-size: 13px;
+}
+
+.sync-chip {
+  height: 22px;
+  margin-left: 8px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--fl-radius-check);
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-primary);
+  font-size: 12px;
+}
+
+.sync-chip:hover {
+  color: var(--fl-text-highlight);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+
+.sync-notice-dismiss {
+  margin-left: 4px;
+  color: var(--fl-text-faint);
+}
+
+.sync-notice-dismiss:hover {
+  color: var(--fl-text-primary);
+}
+
+/* Settings → Sync: the account's letter tile, and the privacy note on the well. */
+.sync-account {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.sync-settings-tile {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.settings-lead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.sync-privacy {
+  background: var(--fl-ground-well);
+  border-radius: 0 0 var(--fl-radius-card) var(--fl-radius-card);
+}
+
+.sync-folder-path {
+  font-family: var(--fl-font-mono);
+}
+
+/* The conflict card in a note (D-161 Q5): this PC's lines stay above it; the other version on the
+   well with its three buttons. */
+.cm-fl-conflict {
+  margin: 6px 0;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 12px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  font-family: var(--fl-font-ui);
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
+.cm-fl-conflict-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--fl-text-secondary);
+}
+
+.cm-fl-conflict-text {
+  white-space: pre-wrap;
+  color: var(--fl-text-primary);
+}
+
+.cm-fl-conflict-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* The crossed-out cloud on a linked file that doesn't sync, and its explanation. */
+.fl-media-cloud {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--fl-text-primary);
+  cursor: default;
+}
+
+.fl-sync-explain {
+  position: fixed;
+  z-index: 45;
+  width: 340px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-family: var(--fl-font-ui);
+  animation: palette-in var(--fl-dur-base) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.fl-sync-explain-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.fl-sync-explain-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fl-text-secondary);
+}
+
+.fl-sync-explain-action {
+  align-self: flex-start;
+  font-size: 12.5px;
+  color: var(--fl-text-primary);
+}
+
+.fl-sync-explain-action:hover {
+  color: var(--fl-text-highlight);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-button.phase-syncing .cloud-arrow,
+  .sync-cloud,
+  .nav-cloud,
+  .sync-line,
+  .sync-popover,
+  .cm-fl-conflict,
+  .fl-sync-explain,
+  .radio.on::after {
+    animation: none;
+  }
+}

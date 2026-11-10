@@ -16,6 +16,7 @@ import {
   powerMonitor,
   protocol as schemes,
   screen,
+  safeStorage,
   session,
   shell,
 } from 'electron';
@@ -136,6 +137,13 @@ import {
 } from './toast.js';
 import { clipboardSequence, VirtualKey } from './win32.js';
 import { classifyPaste } from '@flint/core/shorthand';
+import { FakeDrive } from '@flint/core/sync';
+import { googleConnection, testConnection } from './sync/connection.js';
+import { isSyncRequest, SYNC_SESSION } from './sync/google.js';
+import { WorkspaceSide } from './sync/local.js';
+import { SyncService } from './sync/service.js';
+import { SyncStore } from './sync/store.js';
+import { isSyncAction, type SyncStatusView } from '../shared/sync.js';
 
 /**
  * Who this build is (D-33). The installed AppUserModelID must match the installer's Start Menu
@@ -299,6 +307,10 @@ function serveRenderer(): void {
  * updater's own session (electron-updater's) may reach GitHub's release hosts over HTTPS, and only
  * that session.
  */
+/** SYNC-01: whether sync's session may reach Google now (set once sync is set up). */
+let syncNetworkAllowed: () => boolean = () => false;
+let syncSessionRef: Electron.Session | null = null;
+
 function blockNetwork(updates: boolean): void {
   const devServer = devServerUrl ? new URL(devServerUrl).origin : null;
   let updaterSession: Electron.Session | null = null;
@@ -310,6 +322,12 @@ function blockNetwork(updates: boolean): void {
         devServer !== null &&
         (url.origin === devServer || url.origin === devServer.replace(/^http/, 'ws'));
       if (local || dev) return respond({});
+      // SYNC-01, D-161: Google's token and Drive hosts, only from sync's own session, only while
+      // Drive is connected or a sign-in is under way (05 §5).
+      if (isSyncRequest(details.url) && syncNetworkAllowed()) {
+        syncSessionRef ??= session.fromPartition(SYNC_SESSION, { cache: false });
+        if (target === syncSessionRef) return respond({});
+      }
       if (updates && isUpdateRequest(details.url)) {
         updaterSession ??= session.fromPartition(UPDATER_SESSION, { cache: false });
         if (target === updaterSession) return respond({});
@@ -1978,6 +1996,97 @@ async function start(): Promise<void> {
     })
     .catch((error: unknown) => log(`updater not set up: ${String(error)}`));
   powerMonitor.on('resume', () => updates?.resumed());
+
+  // SYNC-01, D-161: Google Drive sync. The installed build uses "My Drive › Flint", development
+  // builds "Flint (development)"; test runs a fake Drive in this process (no network); the
+  // benchmark build none.
+  const syncHooks = e2eHooks();
+  const syncFake = syncHooks ? new FakeDrive() : null;
+  const syncSession = session.fromPartition(SYNC_SESSION, { cache: false });
+  syncSessionRef = syncSession;
+  const openExternal = (url: string): void => {
+    if (syncHooks) syncHooks.opened.push(url);
+    else void shell.openExternal(url);
+  };
+  const syncConnection = syncFake
+    ? testConnection(syncFake, openExternal)
+    : googleConnection((url, init) => syncSession.fetch(url, init), openExternal);
+  const sync =
+    BUILD === 'bench'
+      ? null
+      : new SyncService({
+          store: new SyncStore(join(app.getPath('userData'), 'sync'), {
+            encrypt: (text) =>
+              syncHooks || !safeStorage.isEncryptionAvailable()
+                ? Buffer.from(text, 'utf8')
+                : safeStorage.encryptString(text),
+            decrypt: (data) =>
+              syncHooks || !safeStorage.isEncryptionAvailable()
+                ? data.toString('utf8')
+                : safeStorage.decryptString(data),
+          }),
+          connection: syncConnection,
+          local: new WorkspaceSide({
+            workspace: () => workspace,
+            busy: (listId) => noteEditors.busy(listId),
+          }),
+          folderName: BUILD === 'installed' ? 'Flint' : 'Flint (development)',
+          items: () =>
+            Promise.resolve(
+              workspace.syncEntries().map((entry) => ({
+                id: entry.id,
+                name: entry.name,
+                mode: entry.mode,
+                group: entry.group,
+              })),
+            ),
+          groups: () => Promise.resolve(workspace.syncGroups()),
+          log,
+          onStatus: (view) => {
+            if (!mainWindow.isDestroyed())
+              mainWindow.webContents.send(Channels.mainSyncChanged, view);
+          },
+        });
+  if (sync) {
+    syncNetworkAllowed = () => sync.networkAllowed();
+    workspace.onChange(() => sync.changed());
+    powerMonitor.on('resume', () => sync.wake());
+    app.on('before-quit', () => void sync.close());
+    if (syncHooks && syncFake) {
+      syncHooks.syncDrive = syncFake;
+      syncHooks.syncNow = () => sync.request();
+    }
+    void sync.start().catch((error: unknown) => log(`sync not started: ${String(error)}`));
+  }
+  const syncOff: SyncStatusView = {
+    phase: 'unavailable',
+    email: null,
+    lastSync: null,
+    folderId: null,
+    folderPath: null,
+    mode: null,
+    synced: [],
+    syncedGroups: [],
+    notices: [],
+    problem: null,
+    conflicts: [],
+    remoteOnly: [],
+    remoteGroups: [],
+    linked: {},
+    device: '',
+  };
+  ipcMain.handle(Channels.mainSync, (event) =>
+    owns(event.sender) && sync ? sync.status() : syncOff,
+  );
+  ipcMain.handle(Channels.mainSyncAction, async (event, action: unknown) => {
+    if (!owns(event.sender) || !sync || !isSyncAction(action)) return;
+    await sync.act(action);
+  });
+  ipcMain.handle(Channels.mainSyncPreview, async (event) =>
+    owns(event.sender) && sync
+      ? sync.previewEverything()
+      : { start: 0, fromDrive: 0, stoppedHere: 0 },
+  );
   ipcMain.handle(Channels.mainUpdates, (event) =>
     owns(event.sender) ? (updates?.view() ?? UPDATE_VIEW_OFF) : UPDATE_VIEW_OFF,
   );

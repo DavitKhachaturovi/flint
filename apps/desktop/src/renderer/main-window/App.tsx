@@ -66,6 +66,29 @@ import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/me
 
 import { NoteEditor } from './NoteEditor.js';
 import { NoteTitle } from './NoteTitle.js';
+import {
+  ChooseDialog,
+  ProblemRow,
+  SetupDialog,
+  StopDialog,
+  SyncButton,
+  SyncContext,
+  SyncQuestion,
+  act as syncAct,
+  chosenNames,
+  everythingText,
+  groupSyncs,
+  isConnected,
+  listSyncs,
+  syncSummary,
+  useMinute,
+  useSync,
+  useSyncStatus,
+} from './Sync.js';
+import { CloudIcon } from './icons.js';
+import { setConflictDevice } from '../editor/conflict-view.js';
+import { setLinkedSync } from '../media/media.js';
+import { syncedAgo, type SyncEverythingPreview } from '../../shared/sync.js';
 import { Triage, type TriageMemory } from './Triage.js';
 import {
   ContextPanel,
@@ -478,6 +501,58 @@ export function App(): ReactElement {
     window.flintMain.onShown(() => setOnScreen(true));
     window.flintMain.onHidden(() => setOnScreen(false));
   }, []);
+  // SYNC-01, D-161: Google Drive sync's status, its dialogs, and the sidebar's Show filter (this
+  // machine's, like the sort).
+  const sync = useSync();
+  const minute = useMinute();
+  const [syncDialog, setSyncDialog] = useState<SyncDialogState | null>(null);
+  const [syncFilter, setSyncFilterState] = useState<SyncFilter>(() => {
+    try {
+      const saved = window.localStorage.getItem('flint.syncFilter');
+      return saved === 'synced' || saved === 'local' ? saved : 'all';
+    } catch {
+      return 'all';
+    }
+  });
+  const setSyncFilter = useCallback((filter: SyncFilter): void => {
+    setSyncFilterState(filter);
+    try {
+      window.localStorage.setItem('flint.syncFilter', filter);
+    } catch {
+      // A convenience: safe to lose.
+    }
+  }, []);
+  useEffect(() => setConflictDevice(sync.device), [sync.device]);
+  // MEDIA-03, D-161: what sync knows of linked files (the crossed-out cloud and its explanation).
+  useEffect(() => {
+    const files = new Map<string, { device: string; size: number }>();
+    for (const list of Object.values(sync.linked))
+      for (const [target, info] of Object.entries(list)) files.set(target, info);
+    setLinkedSync(files, sync.device);
+  }, [sync.linked, sync.device]);
+  // Right after connecting: What should sync?
+  useEffect(() => {
+    if (sync.phase === 'setup') setSyncDialog((current) => current ?? { kind: 'setup' });
+  }, [sync.phase]);
+  /** The right-click menu's "Sync with Google Drive" for a list, note or group (checked while it syncs). */
+  const syncMenu = useRef<
+    (id: string, name: string, mode: 'tasks' | 'note' | 'group', lists?: number) => MenuEntry[]
+  >(() => []);
+  syncMenu.current = (id, name, mode, lists) => {
+    if (!isConnected(sync)) return [];
+    const on = mode === 'group' ? groupSyncs(sync, id) : listSyncs(sync, id);
+    return [
+      'divider',
+      {
+        label: 'Sync with Google Drive',
+        checked: on,
+        action: () => {
+          if (on) setSyncDialog({ kind: 'stop', id, name, mode, lists: lists ?? 0 });
+          else void syncAct({ kind: 'start', id });
+        },
+      },
+    ];
+  };
   useEffect(() => {
     if (updates.phase !== 'ready' || updates.toastSeen || !onScreen) return;
     void window.flintMain.updatesToastSeen();
@@ -2463,15 +2538,34 @@ export function App(): ReactElement {
     (at: Point): void => {
       const current = sidebarView?.sort ?? 'manual';
       openMenu(
-        (Object.keys(SORT_LABELS) as SidebarSort[]).map((sort) => ({
-          label: SORT_LABELS[sort],
-          checked: sort === current,
-          action: () => void sidebarChange({ kind: 'sort', sort }),
-        })),
+        [
+          ...(Object.keys(SORT_LABELS) as SidebarSort[]).map((sort) => ({
+            label: SORT_LABELS[sort],
+            checked: sort === current,
+            action: () => void sidebarChange({ kind: 'sort', sort }),
+          })),
+          // SYNC-01, D-161: Synced only / Local only, a filter here rather than separate modes.
+          ...(isConnected(sync)
+            ? [
+                'divider' as const,
+                ...(
+                  [
+                    ['all', 'Show all'],
+                    ['synced', 'Synced only'],
+                    ['local', 'Local only'],
+                  ] as const
+                ).map(([filter, label]) => ({
+                  label,
+                  checked: syncFilter === filter,
+                  action: () => setSyncFilter(filter),
+                })),
+              ]
+            : []),
+        ],
         at,
       );
     },
-    [sidebarView, sidebarChange],
+    [sidebarView, sidebarChange, sync, syncFilter, setSyncFilter],
   );
 
   /** LIST-05: a group folds away or opens; this machine remembers it. */
@@ -2522,6 +2616,7 @@ export function App(): ReactElement {
               setNaming({ kind: 'newGroup' });
             },
           },
+          ...syncMenu.current(group.id, group.name, 'group', group.lists.length),
           'divider',
           {
             label: 'Delete group',
@@ -2728,6 +2823,7 @@ export function App(): ReactElement {
             },
             'divider',
             claudeFolderEntry(list),
+            ...syncMenu.current(list.id, 'Inbox', 'tasks'),
           ],
           at,
         );
@@ -2825,6 +2921,7 @@ export function App(): ReactElement {
           ...sorting,
           ...grouping,
           ...(list.mode === 'tasks' ? ['divider' as const, claudeFolderEntry(list)] : []),
+          ...syncMenu.current(list.id, list.name, list.mode),
           'divider',
           {
             label: list.mode === 'note' ? 'Delete note' : 'Delete list',
@@ -4445,6 +4542,69 @@ export function App(): ReactElement {
         keywords: 'clipboard history hide contents private screen sharing',
         run: () => showClipboardContents(false),
       },
+      // SYNC-01, D-161: Google Drive sync (D-106: every action has its command).
+      ...(sync.phase === 'unavailable'
+        ? []
+        : isConnected(sync)
+          ? [
+              {
+                id: 'sync:now',
+                label: 'Sync now',
+                keywords: 'sync google drive cloud upload download',
+                run: () => void syncAct({ kind: 'sync-now' }),
+              },
+              {
+                id: 'sync:settings',
+                label: 'Sync settings',
+                keywords: 'sync google drive cloud settings account',
+                run: () => openSettings('sync'),
+              },
+              ...(sync.mode === 'chosen'
+                ? [
+                    {
+                      id: 'sync:choose',
+                      label: 'Choose what syncs…',
+                      keywords: 'sync google drive choose chosen items lists notes groups',
+                      run: () => setSyncDialog({ kind: 'choose' }),
+                    },
+                  ]
+                : []),
+              ...(view && view.id !== TODAY_ID && !view.id.startsWith('@')
+                ? [
+                    listSyncs(sync, view.id)
+                      ? {
+                          id: 'sync:stop',
+                          label: `Stop syncing "${view.name}"…`,
+                          keywords: 'sync google drive stop unsync local',
+                          run: () =>
+                            setSyncDialog({
+                              kind: 'stop',
+                              id: view.id,
+                              name: view.name,
+                              mode: view.mode === 'note' ? 'note' : 'tasks',
+                              lists: 0,
+                            }),
+                        }
+                      : {
+                          id: 'sync:start',
+                          label: `Sync "${view.name}" with Google Drive`,
+                          keywords: 'sync google drive cloud start',
+                          run: () => void syncAct({ kind: 'start', id: view.id }),
+                        },
+                  ]
+                : []),
+            ]
+          : [
+              {
+                id: 'sync:connect',
+                label: 'Connect Google Drive',
+                keywords: 'sync google drive cloud connect sign in account',
+                run: () => {
+                  openSettings('sync');
+                  void syncAct({ kind: 'connect' });
+                },
+              },
+            ]),
       // APP-06, D-136: the check shows its progress in Settings → About (errors never as a toast).
       {
         id: 'app:check-updates',
@@ -4784,999 +4944,1152 @@ export function App(): ReactElement {
     },
   };
 
-  return (
-    <div className="app">
-      <div className="sidebar-drag" aria-hidden="true" />
-      <aside
-        ref={sidebar}
-        className="sidebar"
-        onMouseDown={startSidebarDrag}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          newListMenu({ x: event.clientX, y: event.clientY });
-        }}
-      >
-        <Glide
-          card={sidebar}
-          target={listId === TRASH_ID || listId === SETTINGS_ID ? null : listId}
-          version={[lists, naming, sidebarView]}
-          className="nav-glide"
-        />
-        <div className="brand">
-          <img src={flintIcon} alt="" />
-          <span>Flint</span>
-          {/* NAV-01, D-107: the palette from the mouse (Ctrl+K from the keyboard). */}
-          <PaletteButton onOpen={() => setPalette(true)} />
-        </div>
-        {/* TODAY-01 (M6, D-89): Today first, with its open pinned tasks. */}
-        <NavItem
-          list={{
-            id: TODAY_ID,
-            name: 'Today',
-            mode: 'tasks',
-            open: sidebarView?.today ?? 0,
-            inbox: false,
-          }}
-          active={listId === TODAY_ID}
-          icon={<SunIcon />}
-          onSelect={() => openList(TODAY_ID)}
-          onMenu={(at) =>
-            listMenu({ id: TODAY_ID, name: 'Today', mode: 'tasks', open: 0, inbox: false }, at)
-          }
-        />
-        {inbox && (
-          <NavItem
-            list={inbox}
-            active={listId === inbox.id}
-            icon={<InboxIcon />}
-            onSelect={() => openList(inbox.id)}
-            onMenu={(at) => listMenu(inbox, at)}
-          />
-        )}
-        {/* NOTE-08, D-99: a quick note in one click; the untitled ones listed below it. */}
-        <button
-          type="button"
-          className="nav quick-new"
-          title="Quick note (Ctrl+Shift+J)"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => newQuickNoteRef.current()}
-        >
-          <span className="tile">
-            <PlusIcon />
-          </span>
-          <span className="nav-name">Quick note</span>
-          <span className="nav-hint">Ctrl+Shift+J</span>
-        </button>
-        {quickNotes.length > 0 && (
-          <div className="quick-notes" aria-label="Quick notes">
-            <div className="section-label quick-label">
-              <span>Quick notes</span>
-            </div>
-            {quickNotes.map((list) =>
-              naming?.kind === 'rename' && naming.id === list.id ? (
-                <NameField
-                  key={list.id}
-                  flip={`list:${list.id}`}
-                  initial=""
-                  placeholder="Title"
-                  icon={<NoteIcon />}
-                  problem={namingProblem}
-                  onSubmit={(name) => void submitName(name)}
-                  onLeave={(name) => void submitName(name, true)}
-                  onCancel={() => setNaming(null)}
-                />
-              ) : (
-                <NavItem
-                  key={list.id}
-                  list={{ ...list, name: list.quick?.label ?? list.name }}
-                  active={listId === list.id}
-                  icon={<NoteIcon />}
-                  onSelect={() => openList(list.id)}
-                  onMenu={(at) => quickMenu(list, at)}
-                  onRename={() => {
-                    setNamingProblem(null);
-                    setNaming({ kind: 'rename', id: list.id, name: list.name });
-                  }}
-                />
-              ),
-            )}
-          </div>
-        )}
-        <div className="section-label lists-label">
-          <span>Lists</span>
+  /**
+   * SYNC-01, D-161: under a synced list's title "Synced with Google Drive · 2 min ago" (a note's:
+   * "Synced · 2 min ago" with its conflicts), or the quiet "No longer synced" note.
+   */
+  function syncLine(id: string, kind: 'list' | 'note'): ReactElement | null {
+    if (sync.notices.includes(id)) {
+      return (
+        <span className="sync-line">
+          <CloudIcon size={13} mark="slash" />
+          No longer synced: removed from Drive on another device
           <button
             type="button"
-            className="sort-lists"
-            aria-label="Sort lists"
-            title={`Sort: ${SORT_LABELS[sidebarView?.sort ?? 'manual']}`}
-            onClick={(event) => {
-              const box = event.currentTarget.getBoundingClientRect();
-              sortMenu({ x: box.left, y: box.bottom + 4 });
-            }}
+            className="sync-notice-dismiss"
+            aria-label="Dismiss"
+            title="Dismiss"
+            onClick={() => void syncAct({ kind: 'dismiss-notice', id })}
           >
-            <SortIcon />
+            ×
           </button>
+        </span>
+      );
+    }
+    if (!listSyncs(sync, id)) return null;
+    const ago = syncedAgo(sync.lastSync, minute);
+    const conflicts = sync.conflicts.find((entry) => entry.listId === id)?.count ?? 0;
+    return (
+      <span className="sync-line">
+        <CloudIcon size={13} />
+        {kind === 'list' ? `Synced with Google Drive · ${ago}` : `Synced · ${ago}`}
+        {conflicts > 0 && (
           <button
-            ref={addButton}
             type="button"
-            className="add-list"
-            aria-label="New list or note"
-            title="New list or note (Ctrl+Shift+N)"
-            onClick={(event) => {
-              const box = event.currentTarget.getBoundingClientRect();
-              newListMenu({ x: box.left, y: box.bottom + 4 });
-            }}
+            className="sync-chip"
+            onClick={() =>
+              document
+                .querySelector('.cm-fl-conflict')
+                ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            }
           >
-            <PlusIcon />
+            {conflicts === 1 ? '1 conflict' : `${conflicts} conflicts`}
           </button>
-        </div>
-        {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
-        {naming?.kind === 'newGroup' && (
-          <div className="naming-group" data-flip="naming:group">
-            {groupNameField('', 'new-group')}
-          </div>
         )}
-        {sidebarItems.map((item) => {
-          if (item.kind === 'list') {
-            const list = listById.get(item.id);
-            return list ? navList(list) : null;
-          }
-          const collapsed = sidebarView?.collapsed.includes(item.id) ?? false;
-          return (
-            <NavGroup
-              key={item.id}
-              group={item}
-              collapsed={collapsed}
-              focused={sidebarFocus === item.id}
-              header={
-                naming?.kind === 'renameGroup' && naming.id === item.id
-                  ? groupNameField(item.name, `rename-${item.id}`)
-                  : null
-              }
-              onToggle={() => toggleGroup(item.id)}
-              onMenu={(at) => groupMenu(item, at)}
-              onRename={() => {
-                setNamingProblem(null);
-                setNaming({ kind: 'renameGroup', id: item.id, name: item.name });
-              }}
-            >
-              {item.lists.map((id) => {
-                const list = listById.get(id);
-                return list ? navList(list) : null;
-              })}
-              {/* D-98: a new list or note named right where it will be, at the end of the group. */}
-              {naming?.kind === 'new' && naming.group === item.id && (
-                <NameField
-                  flip="naming:list"
-                  key={`new-${naming.mode}-${item.id}`}
-                  initial=""
-                  placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
-                  icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-                  problem={namingProblem}
-                  onSubmit={(name) => void submitName(name)}
-                  onLeave={(name) => void submitName(name, true)}
-                  onCancel={() => setNaming(null)}
-                />
-              )}
-            </NavGroup>
-          );
-        })}
-        {naming?.kind === 'new' && !naming.group && (
-          <NameField
-            flip="naming:list"
-            key={`new-${naming.mode}`}
-            initial=""
-            placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
-            icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-            problem={namingProblem}
-            onSubmit={(name) => void submitName(name)}
-            onLeave={(name) => void submitName(name, true)}
-            onCancel={() => setNaming(null)}
-          />
-        )}
-        {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
-        {/* D-103: room for the fade above the foot, so the last list isn't dimmed at the end. */}
-        <div className="sidebar-foot-space" aria-hidden="true" />
-        <div className="sidebar-foot">
-          {/* APP-11, D-100, D-103: Settings and Trash, side by side. */}
-          <FootButton
-            id={SETTINGS_ID}
-            name="Settings"
-            active={listId === SETTINGS_ID}
-            icon={<SettingsIcon />}
-            onSelect={() => openList(SETTINGS_ID)}
-          />
-          <FootButton
-            id={TRASH_ID}
-            name="Trash"
-            active={listId === TRASH_ID}
-            icon={<TrashIcon />}
-            onSelect={() => openList(TRASH_ID)}
-          />
-        </div>
-        {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
-      </aside>
+      </span>
+    );
+  }
 
-      <main className="main">
-        <div className="titlebar">
-          {/* NAV-07, D-85: shows or hides the panel whenever the window can fit it. */}
-          {/* MINI-01, D-109: mini mode, beside the main window (left of the panel toggle). */}
+  /** SYNC-01: whether the sidebar's Show filter lets a list through (Today and Inbox always show). */
+  function shownByFilter(id: string): boolean {
+    if (syncFilter === 'all' || !isConnected(sync)) return true;
+    return syncFilter === 'synced' ? listSyncs(sync, id) : !listSyncs(sync, id);
+  }
+
+  return (
+    <SyncContext.Provider value={sync}>
+      <div className="app">
+        <div className="sidebar-drag" aria-hidden="true" />
+        <aside
+          ref={sidebar}
+          className="sidebar"
+          onMouseDown={startSidebarDrag}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            newListMenu({ x: event.clientX, y: event.clientY });
+          }}
+        >
+          <Glide
+            card={sidebar}
+            target={listId === TRASH_ID || listId === SETTINGS_ID ? null : listId}
+            version={[lists, naming, sidebarView]}
+            className="nav-glide"
+          />
+          <div className="brand">
+            <img src={flintIcon} alt="" />
+            <span>Flint</span>
+            {/* NAV-01, D-107: the palette from the mouse (Ctrl+K from the keyboard). */}
+            <PaletteButton onOpen={() => setPalette(true)} />
+          </div>
+          {/* TODAY-01 (M6, D-89): Today first, with its open pinned tasks. */}
+          <NavItem
+            list={{
+              id: TODAY_ID,
+              name: 'Today',
+              mode: 'tasks',
+              open: sidebarView?.today ?? 0,
+              inbox: false,
+            }}
+            active={listId === TODAY_ID}
+            icon={<SunIcon />}
+            onSelect={() => openList(TODAY_ID)}
+            onMenu={(at) =>
+              listMenu({ id: TODAY_ID, name: 'Today', mode: 'tasks', open: 0, inbox: false }, at)
+            }
+          />
+          {inbox && (
+            <NavItem
+              list={inbox}
+              active={listId === inbox.id}
+              icon={<InboxIcon />}
+              onSelect={() => openList(inbox.id)}
+              onMenu={(at) => listMenu(inbox, at)}
+            />
+          )}
+          {/* NOTE-08, D-99: a quick note in one click; the untitled ones listed below it. */}
           <button
             type="button"
-            className="mini-toggle"
-            aria-label="Mini mode"
-            title="Mini mode (Ctrl+Alt+Space)"
+            className="nav quick-new"
+            title="Quick note (Ctrl+Shift+J)"
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => window.flintMain.toggleMini()}
+            onClick={() => newQuickNoteRef.current()}
           >
-            <MiniIcon />
+            <span className="tile">
+              <PlusIcon />
+            </span>
+            <span className="nav-name">Quick note</span>
+            <span className="nav-hint">Ctrl+Shift+J</span>
           </button>
-          {wide && view && (
+          {quickNotes.length > 0 && (
+            <div className="quick-notes" aria-label="Quick notes">
+              <div className="section-label quick-label">
+                <span>Quick notes</span>
+              </div>
+              {quickNotes.map((list) =>
+                naming?.kind === 'rename' && naming.id === list.id ? (
+                  <NameField
+                    key={list.id}
+                    flip={`list:${list.id}`}
+                    initial=""
+                    placeholder="Title"
+                    icon={<NoteIcon />}
+                    problem={namingProblem}
+                    onSubmit={(name) => void submitName(name)}
+                    onLeave={(name) => void submitName(name, true)}
+                    onCancel={() => setNaming(null)}
+                  />
+                ) : (
+                  <NavItem
+                    key={list.id}
+                    list={{ ...list, name: list.quick?.label ?? list.name }}
+                    active={listId === list.id}
+                    icon={<NoteIcon />}
+                    onSelect={() => openList(list.id)}
+                    onMenu={(at) => quickMenu(list, at)}
+                    onRename={() => {
+                      setNamingProblem(null);
+                      setNaming({ kind: 'rename', id: list.id, name: list.name });
+                    }}
+                  />
+                ),
+              )}
+            </div>
+          )}
+          <div className="section-label lists-label">
+            <span>Lists</span>
+            {sync.phase !== 'unavailable' && (
+              <SyncButton
+                status={sync}
+                lists={lists}
+                onSettings={() => openSettings('sync')}
+                onOpen={(id) => openList(id)}
+              />
+            )}
             <button
               type="button"
-              className={panelHidden ? 'panel-toggle' : 'panel-toggle on'}
-              aria-label={panelHidden ? 'Show the panel' : 'Hide the panel'}
-              aria-pressed={!panelHidden}
-              title={panelHidden ? 'Show the panel (Ctrl+\\)' : 'Hide the panel (Ctrl+\\)'}
-              onClick={togglePanel}
+              className="sort-lists"
+              aria-label="Sort lists"
+              title={`Sort: ${SORT_LABELS[sidebarView?.sort ?? 'manual']}`}
+              onClick={(event) => {
+                const box = event.currentTarget.getBoundingClientRect();
+                sortMenu({ x: box.left, y: box.bottom + 4 });
+              }}
             >
-              <PanelIcon />
+              <SortIcon />
             </button>
-          )}
-        </div>
-        <div
-          className="scroller"
-          ref={scroller}
-          onMouseDown={(event) => {
-            // NAV-07, D-85: a click on blank space (not on a row) clears the selection.
-            if (event.button !== 0 || view?.mode !== 'tasks' || pageTask) return;
-            if ((event.target as Element).closest(BLANK_EXCEPT)) return;
-            setSelected(null);
-            setMarked(NOTHING);
-          }}
-          onContextMenu={(event) => {
-            if (event.defaultPrevented || (event.target as Element).closest(BLANK_EXCEPT)) return;
-            const sorts = sortItems();
-            const panel = panelItem();
-            const items: MenuEntry[] = [
-              ...sorts,
-              ...(sorts.length > 0 && panel.length > 0 ? ['divider' as const] : []),
-              ...panel,
-            ];
-            if (items.length === 0) return;
-            event.preventDefault();
-            openMenu(items, { x: event.clientX, y: event.clientY });
-          }}
-        >
-          {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
-          <div
-            className={
-              panelState || todayColumn || trashPanel || snapshotPanel || settingsPanel
-                ? `pair ${pairSize ?? ''}`
-                : 'pair single'
-            }
-            style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
-          >
-            {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
-            <div
-              ref={content}
-              className={[
-                'content',
-                view?.mode === 'note' ? 'note-page' : '',
-                pageTask ? 'task-page' : '',
-                heading ?? '',
-              ].join(' ')}
-              // D-114: triage is a page of Inbox's: in and out of it slide as pages do.
-              key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}/${view && triage === view.id ? 'triage' : ''}`}
+            <button
+              ref={addButton}
+              type="button"
+              className="add-list"
+              aria-label="New list or note"
+              title="New list or note (Ctrl+Shift+N)"
+              onClick={(event) => {
+                const box = event.currentTarget.getBoundingClientRect();
+                newListMenu({ x: box.left, y: box.bottom + 4 });
+              }}
             >
-              {view && pageTask && (
-                <TaskPage
-                  key={pageTask.key}
-                  task={pageTask}
-                  readOnly={view.readOnly !== null}
-                  onBack={leavePage}
-                  onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
-                  onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
-                  onAddSubtask={() => addSubtask(pageTask)}
-                  onImage={showImage}
-                  onRemovePart={(body, kind) => removePart(pageTask.key, body, kind)}
-                >
-                  {pageRows.length > 0 && (
-                    <section
-                      className="card tasks page-subtasks"
-                      aria-label="Subtasks"
-                      ref={pageCard}
-                      onMouseDown={(event) => startRowDrag(event, pageCard.current)}
-                    >
-                      <Glide
-                        card={pageCard}
-                        target={glideTarget}
-                        version={[pageTask, editing]}
-                        editing={editing !== null}
-                      />
-                      {pageRows}
-                    </section>
-                  )}
-                </TaskPage>
-              )}
-
-              {/* NAV-06, D-88, D-89: the find bar, level with the title row, then 16 px below the
-              window's top as the list scrolls (where the context panel sticks). */}
-              {view?.mode === 'tasks' && !pageTask && finding > 0 && (
-                <ListFind
-                  key={finding}
-                  rows={visibleRows(shownView, true)}
-                  root={scroller.current}
-                  version={[view, expanded, completedOpen, tempSort]}
-                  onJump={(match) => {
-                    // A match in a folded place opens it (Completed, a body under its row).
-                    if (
-                      view.completed.some(
-                        (task) =>
-                          task.key === match.row.key ||
-                          task.subtasks.some((sub) => sub.key === match.row.key),
-                      )
-                    )
-                      setCompletedOpen(true);
-                    if (match.where === 'body' && !panelShownRef.current)
-                      setExpanded((current) => new Set([...current, match.row.key]));
-                    followSelection.current = 'smooth';
-                    setMarked(NOTHING);
-                    setSelected(match.row.key);
-                    // D-89: the match's row lights up a moment as the jump lands.
-                    window.requestAnimationFrame(() => {
-                      const row = scroller.current?.querySelector(
-                        `.row[data-key="${CSS.escape(match.row.key)}"]`,
-                      );
-                      if (row) flash(row);
-                    });
-                  }}
-                  onClose={() => setFinding(0)}
-                />
-              )}
-
-              {/* APP-11, D-100: Settings. */}
-              {listId === SETTINGS_ID && !pageTask && (
-                <SettingsScreen
-                  find={settingsFind}
-                  onToast={(text) => showToast(text, false)}
-                  onSnapshots={() => openList(SNAPSHOTS_ID)}
-                  claudeLists={lists.filter((list) => list.mode === 'tasks')}
-                  onClaudeFolders={setClaudeFolders}
-                  onReplayTour={() => startTour(0)}
-                  onWhatsNew={() => setWhatsNew({ since: undefined })}
-                  updates={updates}
-                  onLinkPatterns={(patterns) => {
-                    setLinkPatterns(patterns);
-                    setPatternsLoaded((count) => count + 1);
-                  }}
-                  onBuiltInLinksOff={(off) => {
-                    setBuiltInLinksOff(off);
-                    setPatternsLoaded((count) => count + 1);
-                  }}
-                  zoom={zoomFactor}
-                  onZoom={(level) => void window.flintMain.zoom(level)}
-                />
-              )}
-              {/* DATA-04, D-97: the Snapshots view. */}
-              {listId === SNAPSHOTS_ID && !pageTask && (
-                <SnapshotsScreen
-                  version={lists}
-                  onRestored={(label) => showToast(label, true)}
-                  openFile={snapshotOpen}
-                  page={snapshotOpen && !snapshotWide ? snapshotDiffView(true) : null}
-                  onOpenFile={(id, path, when) =>
-                    void window.flintMain.snapshotDiff(id, path).then((diff) => {
-                      if (diff) setSnapshotOpen({ id, path, when, diff });
-                    })
-                  }
-                />
-              )}
-              {/* DATA-02, TASK-06, D-97: the Trash view. */}
-              {listId === TRASH_ID && !pageTask && (
-                <TrashScreen
-                  view={trash}
-                  open={trashOpen}
-                  asPage={!trashWide}
-                  onOpen={(id) =>
-                    void window.flintMain.trashPreview(id).then((preview) => setTrashOpen(preview))
-                  }
-                  onClose={() => setTrashOpen(null)}
-                  onRestoreToEdit={restoreToEdit}
-                  onSnapshots={() => openList(SNAPSHOTS_ID)}
-                  onExport={() => void window.flintMain.exportFolder()}
-                  tabRequest={trashTab}
-                  onRestore={(id) =>
-                    void window.flintMain.restoreFromTrash(id).then((restored) => {
-                      // D-98: it stays in Trash; the toast offers the way to it.
-                      if (restored)
-                        showToast(restored.label, true, {
-                          label: `Go to ${restored.listName}`,
-                          run: () => goToRestored(restored),
-                        });
-                    })
-                  }
-                  onDelete={(id) =>
-                    void window.flintMain.deleteFromTrash(id).then((done) => {
-                      if (done) showToast('Deleted for good', false);
-                    })
-                  }
-                  onEmpty={() =>
-                    void window.flintMain.emptyTrash().then((count) => {
-                      if (count > 0) showToast('Trash emptied', false);
-                    })
-                  }
-                  onRestoreArchived={(id, key) =>
-                    void window.flintMain.restoreArchived(id, key).then((label) => {
-                      if (label) showToast(label, true);
-                    })
-                  }
-                />
-              )}
-              {/* TODAY-01, TODAY-02, TODAY-03 (M6, D-89, mockup 03): the greeting, the rollover
-                  prompt and today's reminders, above the composer and Focus. */}
-              {view && !pageTask && view.id === TODAY_ID && (
-                <>
-                  <TodayGreeting
-                    open={view.open}
-                    reminders={view.today?.reminders ?? []}
-                    progress={view.today?.progress}
+              <PlusIcon />
+            </button>
+          </div>
+          {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
+          {naming?.kind === 'newGroup' && (
+            <div className="naming-group" data-flip="naming:group">
+              {groupNameField('', 'new-group')}
+            </div>
+          )}
+          {sidebarItems.map((item) => {
+            if (item.kind === 'list') {
+              const list = listById.get(item.id);
+              if (list && !shownByFilter(list.id)) return null;
+              return list ? navList(list) : null;
+            }
+            if (syncFilter !== 'all' && isConnected(sync) && !item.lists.some(shownByFilter))
+              return null;
+            const collapsed = sidebarView?.collapsed.includes(item.id) ?? false;
+            return (
+              <NavGroup
+                key={item.id}
+                group={item}
+                collapsed={collapsed}
+                focused={sidebarFocus === item.id}
+                header={
+                  naming?.kind === 'renameGroup' && naming.id === item.id
+                    ? groupNameField(item.name, `rename-${item.id}`)
+                    : null
+                }
+                onToggle={() => toggleGroup(item.id)}
+                onMenu={(at) => groupMenu(item, at)}
+                onRename={() => {
+                  setNamingProblem(null);
+                  setNaming({ kind: 'renameGroup', id: item.id, name: item.name });
+                }}
+              >
+                {item.lists.map((id) => {
+                  const list = listById.get(id);
+                  return list ? navList(list) : null;
+                })}
+                {/* D-98: a new list or note named right where it will be, at the end of the group. */}
+                {naming?.kind === 'new' && naming.group === item.id && (
+                  <NameField
+                    flip="naming:list"
+                    key={`new-${naming.mode}-${item.id}`}
+                    initial=""
+                    placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+                    icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+                    problem={namingProblem}
+                    onSubmit={(name) => void submitName(name)}
+                    onLeave={(name) => void submitName(name, true)}
+                    onCancel={() => setNaming(null)}
                   />
-                  <RolloverCard
-                    tasks={view.today?.rollover ?? []}
-                    onAnswer={(clear) =>
-                      void window.flintMain.todayAnswer(clear).then((label) => {
+                )}
+              </NavGroup>
+            );
+          })}
+          {naming?.kind === 'new' && !naming.group && (
+            <NameField
+              flip="naming:list"
+              key={`new-${naming.mode}`}
+              initial=""
+              placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+              icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+              problem={namingProblem}
+              onSubmit={(name) => void submitName(name)}
+              onLeave={(name) => void submitName(name, true)}
+              onCancel={() => setNaming(null)}
+            />
+          )}
+          {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
+          {/* D-103: room for the fade above the foot, so the last list isn't dimmed at the end. */}
+          <div className="sidebar-foot-space" aria-hidden="true" />
+          <div className="sidebar-foot">
+            {/* APP-11, D-100, D-103: Settings and Trash, side by side. */}
+            <FootButton
+              id={SETTINGS_ID}
+              name="Settings"
+              active={listId === SETTINGS_ID}
+              icon={<SettingsIcon />}
+              onSelect={() => openList(SETTINGS_ID)}
+            />
+            <FootButton
+              id={TRASH_ID}
+              name="Trash"
+              active={listId === TRASH_ID}
+              icon={<TrashIcon />}
+              onSelect={() => openList(TRASH_ID)}
+            />
+          </div>
+          {/* Settings returns with the Settings screen (APP-11, M8, D-52). */}
+        </aside>
+
+        <main className="main">
+          <div className="titlebar">
+            {/* NAV-07, D-85: shows or hides the panel whenever the window can fit it. */}
+            {/* MINI-01, D-109: mini mode, beside the main window (left of the panel toggle). */}
+            <button
+              type="button"
+              className="mini-toggle"
+              aria-label="Mini mode"
+              title="Mini mode (Ctrl+Alt+Space)"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => window.flintMain.toggleMini()}
+            >
+              <MiniIcon />
+            </button>
+            {wide && view && (
+              <button
+                type="button"
+                className={panelHidden ? 'panel-toggle' : 'panel-toggle on'}
+                aria-label={panelHidden ? 'Show the panel' : 'Hide the panel'}
+                aria-pressed={!panelHidden}
+                title={panelHidden ? 'Show the panel (Ctrl+\\)' : 'Hide the panel (Ctrl+\\)'}
+                onClick={togglePanel}
+              >
+                <PanelIcon />
+              </button>
+            )}
+          </div>
+          <div
+            className="scroller"
+            ref={scroller}
+            onMouseDown={(event) => {
+              // NAV-07, D-85: a click on blank space (not on a row) clears the selection.
+              if (event.button !== 0 || view?.mode !== 'tasks' || pageTask) return;
+              if ((event.target as Element).closest(BLANK_EXCEPT)) return;
+              setSelected(null);
+              setMarked(NOTHING);
+            }}
+            onContextMenu={(event) => {
+              if (event.defaultPrevented || (event.target as Element).closest(BLANK_EXCEPT)) return;
+              const sorts = sortItems();
+              const panel = panelItem();
+              const items: MenuEntry[] = [
+                ...sorts,
+                ...(sorts.length > 0 && panel.length > 0 ? ['divider' as const] : []),
+                ...panel,
+              ];
+              if (items.length === 0) return;
+              event.preventDefault();
+              openMenu(items, { x: event.clientX, y: event.clientY });
+            }}
+          >
+            {/* NAV-07, D-83, D-85: the column and the context panel, centred together. */}
+            <div
+              className={
+                panelState || todayColumn || trashPanel || snapshotPanel || settingsPanel
+                  ? `pair ${pairSize ?? ''}`
+                  : 'pair single'
+              }
+              style={{ '--panel-top': `${panelTop}px` } as CSSProperties}
+            >
+              {/* D-65: a list or page fades in, rising a few pixels, when it opens. */}
+              <div
+                ref={content}
+                className={[
+                  'content',
+                  view?.mode === 'note' ? 'note-page' : '',
+                  pageTask ? 'task-page' : '',
+                  heading ?? '',
+                ].join(' ')}
+                // D-114: triage is a page of Inbox's: in and out of it slide as pages do.
+                key={`${view?.id ?? 'none'}/${pageTask?.key ?? ''}/${view && triage === view.id ? 'triage' : ''}`}
+              >
+                {view && pageTask && (
+                  <TaskPage
+                    key={pageTask.key}
+                    task={pageTask}
+                    readOnly={view.readOnly !== null}
+                    onBack={leavePage}
+                    onTitle={(text) => void change({ kind: 'edit', key: pageTask.key, text })}
+                    onBody={(body) => void change({ kind: 'body', key: pageTask.key, body })}
+                    onAddSubtask={() => addSubtask(pageTask)}
+                    onImage={showImage}
+                    onRemovePart={(body, kind) => removePart(pageTask.key, body, kind)}
+                  >
+                    {pageRows.length > 0 && (
+                      <section
+                        className="card tasks page-subtasks"
+                        aria-label="Subtasks"
+                        ref={pageCard}
+                        onMouseDown={(event) => startRowDrag(event, pageCard.current)}
+                      >
+                        <Glide
+                          card={pageCard}
+                          target={glideTarget}
+                          version={[pageTask, editing]}
+                          editing={editing !== null}
+                        />
+                        {pageRows}
+                      </section>
+                    )}
+                  </TaskPage>
+                )}
+
+                {/* NAV-06, D-88, D-89: the find bar, level with the title row, then 16 px below the
+              window's top as the list scrolls (where the context panel sticks). */}
+                {view?.mode === 'tasks' && !pageTask && finding > 0 && (
+                  <ListFind
+                    key={finding}
+                    rows={visibleRows(shownView, true)}
+                    root={scroller.current}
+                    version={[view, expanded, completedOpen, tempSort]}
+                    onJump={(match) => {
+                      // A match in a folded place opens it (Completed, a body under its row).
+                      if (
+                        view.completed.some(
+                          (task) =>
+                            task.key === match.row.key ||
+                            task.subtasks.some((sub) => sub.key === match.row.key),
+                        )
+                      )
+                        setCompletedOpen(true);
+                      if (match.where === 'body' && !panelShownRef.current)
+                        setExpanded((current) => new Set([...current, match.row.key]));
+                      followSelection.current = 'smooth';
+                      setMarked(NOTHING);
+                      setSelected(match.row.key);
+                      // D-89: the match's row lights up a moment as the jump lands.
+                      window.requestAnimationFrame(() => {
+                        const row = scroller.current?.querySelector(
+                          `.row[data-key="${CSS.escape(match.row.key)}"]`,
+                        );
+                        if (row) flash(row);
+                      });
+                    }}
+                    onClose={() => setFinding(0)}
+                  />
+                )}
+
+                {/* APP-11, D-100: Settings. */}
+                {listId === SETTINGS_ID && !pageTask && (
+                  <SettingsScreen
+                    find={settingsFind}
+                    onToast={(text) => showToast(text, false)}
+                    onSnapshots={() => openList(SNAPSHOTS_ID)}
+                    claudeLists={lists.filter((list) => list.mode === 'tasks')}
+                    onClaudeFolders={setClaudeFolders}
+                    onReplayTour={() => startTour(0)}
+                    onWhatsNew={() => setWhatsNew({ since: undefined })}
+                    updates={updates}
+                    onLinkPatterns={(patterns) => {
+                      setLinkPatterns(patterns);
+                      setPatternsLoaded((count) => count + 1);
+                    }}
+                    onBuiltInLinksOff={(off) => {
+                      setBuiltInLinksOff(off);
+                      setPatternsLoaded((count) => count + 1);
+                    }}
+                    zoom={zoomFactor}
+                    onZoom={(level) => void window.flintMain.zoom(level)}
+                    sync={sync}
+                    syncSummary={syncSummary(sync, lists, false)}
+                    syncChosen={chosenNames(sync, lists, sidebarView?.items ?? [])}
+                    syncProblem={sync.problem ? <ProblemRow problem={sync.problem} /> : null}
+                    onSyncChoose={() => setSyncDialog({ kind: 'choose' })}
+                    onSyncDisconnect={() => setSyncDialog({ kind: 'disconnect' })}
+                    onSyncMode={(mode) => {
+                      if (mode === 'everything' && sync.mode === 'chosen') {
+                        void window.flintMain
+                          .syncPreviewEverything()
+                          .then((preview) => setSyncDialog({ kind: 'everything', preview }));
+                      } else void syncAct({ kind: 'mode', mode });
+                    }}
+                  />
+                )}
+                {/* DATA-04, D-97: the Snapshots view. */}
+                {listId === SNAPSHOTS_ID && !pageTask && (
+                  <SnapshotsScreen
+                    version={lists}
+                    onRestored={(label) => showToast(label, true)}
+                    openFile={snapshotOpen}
+                    page={snapshotOpen && !snapshotWide ? snapshotDiffView(true) : null}
+                    onOpenFile={(id, path, when) =>
+                      void window.flintMain.snapshotDiff(id, path).then((diff) => {
+                        if (diff) setSnapshotOpen({ id, path, when, diff });
+                      })
+                    }
+                  />
+                )}
+                {/* DATA-02, TASK-06, D-97: the Trash view. */}
+                {listId === TRASH_ID && !pageTask && (
+                  <TrashScreen
+                    view={trash}
+                    open={trashOpen}
+                    asPage={!trashWide}
+                    onOpen={(id) =>
+                      void window.flintMain
+                        .trashPreview(id)
+                        .then((preview) => setTrashOpen(preview))
+                    }
+                    onClose={() => setTrashOpen(null)}
+                    onRestoreToEdit={restoreToEdit}
+                    onSnapshots={() => openList(SNAPSHOTS_ID)}
+                    onExport={() => void window.flintMain.exportFolder()}
+                    tabRequest={trashTab}
+                    onRestore={(id) =>
+                      void window.flintMain.restoreFromTrash(id).then((restored) => {
+                        // D-98: it stays in Trash; the toast offers the way to it.
+                        if (restored)
+                          showToast(restored.label, true, {
+                            label: `Go to ${restored.listName}`,
+                            run: () => goToRestored(restored),
+                          });
+                      })
+                    }
+                    onDelete={(id) =>
+                      void window.flintMain.deleteFromTrash(id).then((done) => {
+                        if (done) showToast('Deleted for good', false);
+                      })
+                    }
+                    onEmpty={() =>
+                      void window.flintMain.emptyTrash().then((count) => {
+                        if (count > 0) showToast('Trash emptied', false);
+                      })
+                    }
+                    onRestoreArchived={(id, key) =>
+                      void window.flintMain.restoreArchived(id, key).then((label) => {
                         if (label) showToast(label, true);
                       })
                     }
                   />
-                  <OverdueCard
-                    overdue={view.today?.overdue ?? []}
-                    reminders={view.today?.reminders ?? []}
-                    called={overdueCalled}
-                    onCalled={() => setOverdueCalled(false)}
-                    onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
-                    onDone={completeOverdue}
-                    onSnooze={snoozeOverdue}
+                )}
+                {/* TODAY-01, TODAY-02, TODAY-03 (M6, D-89, mockup 03): the greeting, the rollover
+                  prompt and today's reminders, above the composer and Focus. */}
+                {view && !pageTask && view.id === TODAY_ID && (
+                  <>
+                    <TodayGreeting
+                      open={view.open}
+                      reminders={view.today?.reminders ?? []}
+                      progress={view.today?.progress}
+                    />
+                    <RolloverCard
+                      tasks={view.today?.rollover ?? []}
+                      onAnswer={(clear) =>
+                        void window.flintMain.todayAnswer(clear).then((label) => {
+                          if (label) showToast(label, true);
+                        })
+                      }
+                    />
+                    <OverdueCard
+                      overdue={view.today?.overdue ?? []}
+                      reminders={view.today?.reminders ?? []}
+                      called={overdueCalled}
+                      onCalled={() => setOverdueCalled(false)}
+                      onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
+                      onDone={completeOverdue}
+                      onSnooze={snoozeOverdue}
+                    />
+                    <ReminderCards
+                      reminders={view.today?.reminders ?? []}
+                      onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
+                    />
+                  </>
+                )}
+                {view && triage === view.id && !pageTask && (
+                  <Triage
+                    key={view.id}
+                    view={view}
+                    lists={lists}
+                    change={change}
+                    undo={undo}
+                    onImage={showImage}
+                    onExit={() => setTriage(null)}
+                    memory={triageMemory}
+                    details={panelShown ? 'panel' : 'card'}
+                    onDetails={triageDetails}
                   />
-                  <ReminderCards
-                    reminders={view.today?.reminders ?? []}
-                    onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
-                  />
-                </>
-              )}
-              {view && triage === view.id && !pageTask && (
-                <Triage
-                  key={view.id}
-                  view={view}
-                  lists={lists}
-                  change={change}
-                  undo={undo}
-                  onImage={showImage}
-                  onExit={() => setTriage(null)}
-                  memory={triageMemory}
-                  details={panelShown ? 'panel' : 'card'}
-                  onDetails={triageDetails}
-                />
-              )}
-              {view &&
-                triage !== view.id &&
-                !pageTask &&
-                view.mode === 'tasks' &&
-                view.id !== TODAY_ID && (
-                  <header className="list-header">
-                    <h1>
-                      {view.name}
-                      {view.mode === 'tasks' && <span className="count"> · {view.open} open</span>}
-                    </h1>
-                    {lists.find((list) => list.id === view.id)?.inbox && (
-                      <span className="subtitle">
-                        {INBOX_SUBTITLE}
-                        {view.open > 0 && (
-                          <>
-                            {' · '}
-                            {/* TASK-14, D-113 (D-115: back from D-114's pill): one task at a
-                                time, by keyboard. */}
-                            <button
-                              type="button"
-                              className="subtitle-link"
-                              title="Sort Inbox one task at a time (T)"
-                              onClick={() => setTriage(view.id)}
-                            >
-                              Triage · {view.open}
-                            </button>
-                          </>
+                )}
+                {view &&
+                  triage !== view.id &&
+                  !pageTask &&
+                  view.mode === 'tasks' &&
+                  view.id !== TODAY_ID && (
+                    <header className="list-header">
+                      <h1>
+                        {view.name}
+                        {view.mode === 'tasks' && (
+                          <span className="count"> · {view.open} open</span>
                         )}
-                      </span>
-                    )}
-                    {view.readOnly && (
-                      <span className="subtitle">
-                        Read-only: Flint can&apos;t change this file ({view.readOnly}).
-                      </span>
-                    )}
-                  </header>
+                      </h1>
+                      {lists.find((list) => list.id === view.id)?.inbox && (
+                        <span className="subtitle">
+                          {INBOX_SUBTITLE}
+                          {view.open > 0 && (
+                            <>
+                              {' · '}
+                              {/* TASK-14, D-113 (D-115: back from D-114's pill): one task at a
+                                time, by keyboard. */}
+                              <button
+                                type="button"
+                                className="subtitle-link"
+                                title="Sort Inbox one task at a time (T)"
+                                onClick={() => setTriage(view.id)}
+                              >
+                                Triage · {view.open}
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      )}
+                      {view.readOnly && (
+                        <span className="subtitle">
+                          Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                        </span>
+                      )}
+                      {syncLine(view.id, 'list')}
+                    </header>
+                  )}
+
+                {view?.mode === 'note' && (
+                  // NOTE-01, D-85: the note's title and text on a card, so it is clear where to type.
+                  <div className="card note-card">
+                    <header className="list-header">
+                      {quickHere ? (
+                        <QuickTitle
+                          key={view.id}
+                          at={quickHere.at}
+                          title={quickHere.label === view.name ? view.name : ''}
+                          onTitle={(title) =>
+                            void window.flintMain
+                              .listAction({ kind: 'rename', id: view.id, name: title })
+                              .then((outcome) => {
+                                if (outcome?.ok && outcome.label) showToast(outcome.label, true);
+                                else if (outcome && !outcome.ok) showToast(outcome.problem, false);
+                              })
+                          }
+                        />
+                      ) : (
+                        <NoteTitle
+                          key={view.id}
+                          name={view.name}
+                          readOnly={view.readOnly !== null}
+                          onRename={async (name) => {
+                            const outcome = await window.flintMain.listAction({
+                              kind: 'rename',
+                              id: view.id,
+                              name,
+                            });
+                            if (outcome?.ok) {
+                              await refresh();
+                              if (outcome.label) showToast(outcome.label, true);
+                            }
+                            return outcome;
+                          }}
+                          onProblem={(problem) => showToast(problem, false)}
+                        />
+                      )}
+                      {view.readOnly && (
+                        <span className="subtitle">
+                          Read-only: Flint can&apos;t change this file ({view.readOnly}).
+                        </span>
+                      )}
+                      {syncLine(view.id, 'note')}
+                    </header>
+                    <NoteEditor
+                      key={noteEditorKey(view.id)}
+                      id={view.id}
+                      text={view.noteText ?? ''}
+                      readOnly={view.readOnly !== null}
+                      onId={(id, from) => {
+                        noteIdHandover.current = { from, to: id };
+                        setListId(id);
+                      }}
+                      onImage={showImage}
+                      mono={view.mono === true}
+                      source={view.source === true}
+                      focus={focusNote === view.id}
+                      onFocused={() => setFocusNote(null)}
+                    />
+                  </div>
                 )}
 
-              {view?.mode === 'note' && (
-                // NOTE-01, D-85: the note's title and text on a card, so it is clear where to type.
-                <div className="card note-card">
-                  <header className="list-header">
-                    {quickHere ? (
-                      <QuickTitle
+                {view?.mode === 'tasks' && !pageTask && triage !== view.id && (
+                  <>
+                    {!view.readOnly && (
+                      <Composer
                         key={view.id}
-                        at={quickHere.at}
-                        title={quickHere.label === view.name ? view.name : ''}
-                        onTitle={(title) =>
-                          void window.flintMain
-                            .listAction({ kind: 'rename', id: view.id, name: title })
-                            .then((outcome) => {
-                              if (outcome?.ok && outcome.label) showToast(outcome.label, true);
-                              else if (outcome && !outcome.ok) showToast(outcome.problem, false);
-                            })
-                        }
+                        listId={view.id}
+                        lists={lists}
+                        inputRef={composer}
+                        onAdd={addFromComposer}
+                        {...(view.id === TODAY_ID && { placeholder: 'Add a task to today…' })}
                       />
-                    ) : (
-                      <NoteTitle
-                        key={view.id}
-                        name={view.name}
-                        readOnly={view.readOnly !== null}
-                        onRename={async (name) => {
-                          const outcome = await window.flintMain.listAction({
-                            kind: 'rename',
-                            id: view.id,
-                            name,
-                          });
-                          if (outcome?.ok) {
-                            await refresh();
-                            if (outcome.label) showToast(outcome.label, true);
-                          }
-                          return outcome;
+                    )}
+
+                    {/* TASK-08, D-88: while sorted, what the order is and the way back. */}
+                    {sortLine && sortLine.list === view.id && (
+                      <div
+                        className={sortLine.leaving ? 'sort-indicator leaving' : 'sort-indicator'}
+                        role="status"
+                        onAnimationEnd={(event) => {
+                          if (sortLine.leaving && event.target === event.currentTarget)
+                            setSortLine(null);
                         }}
-                        onProblem={(problem) => showToast(problem, false)}
-                      />
-                    )}
-                    {view.readOnly && (
-                      <span className="subtitle">
-                        Read-only: Flint can&apos;t change this file ({view.readOnly}).
-                      </span>
-                    )}
-                  </header>
-                  <NoteEditor
-                    key={noteEditorKey(view.id)}
-                    id={view.id}
-                    text={view.noteText ?? ''}
-                    readOnly={view.readOnly !== null}
-                    onId={(id, from) => {
-                      noteIdHandover.current = { from, to: id };
-                      setListId(id);
-                    }}
-                    onImage={showImage}
-                    mono={view.mono === true}
-                    source={view.source === true}
-                    focus={focusNote === view.id}
-                    onFocused={() => setFocusNote(null)}
-                  />
-                </div>
-              )}
-
-              {view?.mode === 'tasks' && !pageTask && triage !== view.id && (
-                <>
-                  {!view.readOnly && (
-                    <Composer
-                      key={view.id}
-                      listId={view.id}
-                      lists={lists}
-                      inputRef={composer}
-                      onAdd={addFromComposer}
-                      {...(view.id === TODAY_ID && { placeholder: 'Add a task to today…' })}
-                    />
-                  )}
-
-                  {/* TASK-08, D-88: while sorted, what the order is and the way back. */}
-                  {sortLine && sortLine.list === view.id && (
-                    <div
-                      className={sortLine.leaving ? 'sort-indicator leaving' : 'sort-indicator'}
-                      role="status"
-                      onAnimationEnd={(event) => {
-                        if (sortLine.leaving && event.target === event.currentTarget)
-                          setSortLine(null);
-                      }}
-                    >
-                      <span>Sorted by {SORT_NAMES[sortLine.sort]}</span>
-                      <span aria-hidden="true">·</span>
-                      <button type="button" onClick={() => sortTo(null)}>
-                        Back to manual order
-                      </button>
-                    </div>
-                  )}
-                  <section
-                    className="card tasks"
-                    aria-label="Tasks"
-                    ref={tasksCard}
-                    onMouseDown={(event) => startRowDrag(event, tasksCard.current)}
-                  >
-                    <Glide
-                      card={tasksCard}
-                      target={glideTarget}
-                      version={glideVersion}
-                      editing={editing !== null}
-                    />
-                    {view.id === TODAY_ID && (
-                      <div className="focus-head">
-                        <span className="panel-label">Focus · pinned</span>
-                        {view.open > 1 && <span className="focus-hint">drag to reorder</span>}
+                      >
+                        <span>Sorted by {SORT_NAMES[sortLine.sort]}</span>
+                        <span aria-hidden="true">·</span>
+                        <button type="button" onClick={() => sortTo(null)}>
+                          Back to manual order
+                        </button>
                       </div>
                     )}
-                    {view.id === TODAY_ID &&
-                      view.items.length > 0 &&
-                      view.items.length === (view.today?.high.length ?? 0) && (
-                        <p className="empty focus-empty">
-                          Nothing pinned yet. Press P on a task to bring it here.
-                        </p>
-                      )}
-                    {view.items.length === 0 && (
-                      <p className="empty">
-                        {view.id === TODAY_ID
-                          ? 'Nothing pinned yet. Press P on a task in any list to bring it here, or add one above.'
-                          : 'Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your hotkey.'}
-                      </p>
-                    )}
-                    {cardRows}
-                  </section>
-                  {view.id === TODAY_ID && !panelShown && view.today && (
-                    <TodayColumn
-                      extras={view.today}
-                      stacked
-                      onOpen={openFromToday}
-                      onMoveReminder={moveReminder}
-                      onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
-                    />
-                  )}
-
-                  {(view.completed.length > 0 ||
-                    ghosts.some((ghost) => ghost.section === 'done')) && (
-                    <section className="card completed" aria-label="Completed" ref={completedCard}>
+                    <section
+                      className="card tasks"
+                      aria-label="Tasks"
+                      ref={tasksCard}
+                      onMouseDown={(event) => startRowDrag(event, tasksCard.current)}
+                    >
                       <Glide
-                        card={completedCard}
+                        card={tasksCard}
                         target={glideTarget}
                         version={glideVersion}
                         editing={editing !== null}
                       />
-                      <button
-                        type="button"
-                        className="completed-head"
-                        aria-expanded={completedOpen}
-                        onClick={() => setCompletedOpen(!completedOpen)}
-                      >
-                        <span className={completedOpen ? 'chev open' : 'chev'}>
-                          <ChevronIcon />
-                        </span>
-                        <span>Completed</span>
-                        <span className="chip">{view.completed.length}</span>
-                      </button>
-                      {/* TASK-06, Q-13, D-88: a large Completed section offers auto-archive. */}
-                      {archiveOffer && (
-                        <div className="archive-offer" role="note">
-                          <span>
-                            Archive tasks completed more than {ARCHIVE_DAYS} days ago,
-                            automatically?
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void window.flintMain.setAutoArchive(ARCHIVE_DAYS).then((count) => {
-                                setArchiveDays(ARCHIVE_DAYS);
-                                showToast(
-                                  count > 0
-                                    ? `Auto-archive on · archived ${tasksCount(count)}`
-                                    : 'Auto-archive on',
-                                  false,
-                                );
-                              })
-                            }
-                          >
-                            Turn on
-                          </button>
-                          <button type="button" onClick={() => dismissArchive(view.id)}>
-                            Not now
-                          </button>
+                      {view.id === TODAY_ID && (
+                        <div className="focus-head">
+                          <span className="panel-label">Focus · pinned</span>
+                          {view.open > 1 && <span className="focus-hint">drag to reorder</span>}
                         </div>
                       )}
-                      {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
-                      <div
-                        className={completedOpen ? 'completed-rows open' : 'completed-rows'}
-                        inert={!completedOpen}
-                      >
-                        <div className="completed-inner">
-                          {ghostRows(ghosts, 'done', null, rowProps)}
-                          {view.completed.flatMap((task) => [
-                            withBody(
-                              <Row
-                                key={task.key}
-                                task={task}
-                                fresh={freshKeys.get(task.key)}
-                                {...rowProps}
-                              />,
-                              task,
-                              false,
-                            ),
-                            ...ghostRows(ghosts, 'done', task.key, rowProps),
-                          ])}
-                        </div>
-                      </div>
+                      {view.id === TODAY_ID &&
+                        view.items.length > 0 &&
+                        view.items.length === (view.today?.high.length ?? 0) && (
+                          <p className="empty focus-empty">
+                            Nothing pinned yet. Press P on a task to bring it here.
+                          </p>
+                        )}
+                      {view.items.length === 0 && (
+                        <p className="empty">
+                          {view.id === TODAY_ID
+                            ? 'Nothing pinned yet. Press P on a task in any list to bring it here, or add one above.'
+                            : 'Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your hotkey.'}
+                        </p>
+                      )}
+                      {cardRows}
                     </section>
-                  )}
-                </>
+                    {view.id === TODAY_ID && !panelShown && view.today && (
+                      <TodayColumn
+                        extras={view.today}
+                        stacked
+                        onOpen={openFromToday}
+                        onMoveReminder={moveReminder}
+                        onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
+                      />
+                    )}
+
+                    {(view.completed.length > 0 ||
+                      ghosts.some((ghost) => ghost.section === 'done')) && (
+                      <section
+                        className="card completed"
+                        aria-label="Completed"
+                        ref={completedCard}
+                      >
+                        <Glide
+                          card={completedCard}
+                          target={glideTarget}
+                          version={glideVersion}
+                          editing={editing !== null}
+                        />
+                        <button
+                          type="button"
+                          className="completed-head"
+                          aria-expanded={completedOpen}
+                          onClick={() => setCompletedOpen(!completedOpen)}
+                        >
+                          <span className={completedOpen ? 'chev open' : 'chev'}>
+                            <ChevronIcon />
+                          </span>
+                          <span>Completed</span>
+                          <span className="chip">{view.completed.length}</span>
+                        </button>
+                        {/* TASK-06, Q-13, D-88: a large Completed section offers auto-archive. */}
+                        {archiveOffer && (
+                          <div className="archive-offer" role="note">
+                            <span>
+                              Archive tasks completed more than {ARCHIVE_DAYS} days ago,
+                              automatically?
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void window.flintMain.setAutoArchive(ARCHIVE_DAYS).then((count) => {
+                                  setArchiveDays(ARCHIVE_DAYS);
+                                  showToast(
+                                    count > 0
+                                      ? `Auto-archive on · archived ${tasksCount(count)}`
+                                      : 'Auto-archive on',
+                                    false,
+                                  );
+                                })
+                              }
+                            >
+                              Turn on
+                            </button>
+                            <button type="button" onClick={() => dismissArchive(view.id)}>
+                              Not now
+                            </button>
+                          </div>
+                        )}
+                        {/* D-77: Completed folds away (and opens) smoothly; its rows stay rendered. */}
+                        <div
+                          className={completedOpen ? 'completed-rows open' : 'completed-rows'}
+                          inert={!completedOpen}
+                        >
+                          <div className="completed-inner">
+                            {ghostRows(ghosts, 'done', null, rowProps)}
+                            {view.completed.flatMap((task) => [
+                              withBody(
+                                <Row
+                                  key={task.key}
+                                  task={task}
+                                  fresh={freshKeys.get(task.key)}
+                                  {...rowProps}
+                                />,
+                                task,
+                                false,
+                              ),
+                              ...ghostRows(ghosts, 'done', task.key, rowProps),
+                            ])}
+                          </div>
+                        </div>
+                      </section>
+                    )}
+                  </>
+                )}
+                {/* D-98: back to the top, at the bottom right of the column (never over the panel). */}
+                <div className="to-top-dock">
+                  <button
+                    type="button"
+                    className={toTop ? 'to-top shown' : 'to-top'}
+                    tabIndex={toTop ? 0 : -1}
+                    aria-hidden={!toTop}
+                    aria-label="Back to top"
+                    title="Back to top"
+                    onClick={() =>
+                      scroller.current?.scrollTo({
+                        top: 0,
+                        behavior: reducedMotion() ? 'instant' : 'smooth',
+                      })
+                    }
+                  >
+                    <ChevronIcon size={14} />
+                  </button>
+                </div>
+              </div>
+              {/* D-100: Settings' index, in the panel's place. */}
+              {settingsPanel && (
+                <PanelAside label="Settings sections">
+                  <SettingsIndex scroller={scroller} />
+                </PanelAside>
               )}
-              {/* D-98: back to the top, at the bottom right of the column (never over the panel). */}
-              <div className="to-top-dock">
+              {/* D-99: a snapshot's list or note against now, in the panel's place. */}
+              {snapshotPanel && <PanelAside label="Changes">{snapshotDiffView(false)}</PanelAside>}
+              {/* D-98: on wide screens a trash item opens read-only in the panel's place. */}
+              {trashPanel && trashOpen && (
+                <PanelAside label="Deleted item">
+                  <TrashPreviewView
+                    key={trashOpen.id}
+                    preview={trashOpen}
+                    onRestore={() => restoreToEdit(trashOpen.id)}
+                    onClose={() => setTrashOpen(null)}
+                  />
+                </PanelAside>
+              )}
+              {panelState && (
+                <ContextPanel
+                  state={panelState}
+                  upNext={upNextItems}
+                  current={outlineCurrent}
+                  back={panelBack}
+                  handlers={panelHandlers}
+                  foot={
+                    <ClipboardSection
+                      onInsert={(item) => insertClipboard(item, currentField())}
+                      onMenu={clipboardMenu}
+                      onSettings={() => void window.flintMain.clipboardSettings()}
+                      onShowContents={showClipboardContents}
+                      onClear={clearClipboard}
+                    />
+                  }
+                />
+              )}
+              {todayColumn && view?.today && (
+                <TodayColumn
+                  extras={view.today}
+                  stacked={false}
+                  onOpen={openFromToday}
+                  onMoveReminder={moveReminder}
+                  onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
+                />
+              )}
+            </div>
+          </div>
+        </main>
+
+        {marked.size > 1 && (
+          <div className="action-bar" role="toolbar" aria-label="Marked tasks">
+            <span className="action-count">{marked.size} selected</span>
+            <button type="button" onClick={selectAll}>
+              Select all
+            </button>
+            <button
+              type="button"
+              data-picker-trigger
+              onClick={(event) => bulkMove(event.currentTarget.getBoundingClientRect())}
+            >
+              Move
+            </button>
+            <button
+              type="button"
+              data-picker-trigger
+              onClick={(event) =>
+                openPriorityPicker(
+                  {
+                    anchor: event.currentTarget.getBoundingClientRect(),
+                    returnFocus: null,
+                    trigger: event.currentTarget,
+                  },
+                  null,
+                  bulkPriority,
+                )
+              }
+            >
+              Priority
+            </button>
+            {/* TODAY-01, D-85: pins them all, or unpins them when all are pinned. */}
+            <button
+              type="button"
+              onClick={() => void pin(markedRows, !markedRows.every((row) => row.pinned))}
+            >
+              {markedRows.every((row) => row.pinned) ? 'Unpin' : 'Pin'}
+            </button>
+            <button type="button" onClick={bulkDelete}>
+              Delete
+            </button>
+            <button
+              type="button"
+              className="action-clear"
+              aria-label="Clear the selection"
+              title="Clear the selection (Esc)"
+              onClick={() => setMarked(NOTHING)}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
+
+        {linkedNotices.length > 0 && (
+          <div className="linked-notices" role="status">
+            {linkedNotices.map((notice) => (
+              <div key={notice.id} className="linked-notice">
+                <div className="linked-notice-text">
+                  <span className="linked-notice-title">
+                    Large file, linked to its original location
+                  </span>
+                  <span className="linked-notice-name">{notice.name}</span>
+                </div>
+                <span className="linked-notice-why-holder">
+                  <button
+                    type="button"
+                    className="linked-notice-copy"
+                    onClick={() => void copyLinkedIn(notice)}
+                  >
+                    Copy into Flint instead
+                  </button>
+                  <span className="linked-notice-info" aria-hidden="true">
+                    i
+                  </span>
+                  <span className="linked-notice-why" role="tooltip">
+                    Large files are linked by default: copying them makes the Flint folder,
+                    snapshots, exports and future sync slow and big. Copying keeps the file safe if
+                    the original is moved or deleted.
+                  </span>
+                </span>
                 <button
                   type="button"
-                  className={toTop ? 'to-top shown' : 'to-top'}
-                  tabIndex={toTop ? 0 : -1}
-                  aria-hidden={!toTop}
-                  aria-label="Back to top"
-                  title="Back to top"
+                  className="linked-notice-close"
+                  aria-label="Dismiss"
                   onClick={() =>
-                    scroller.current?.scrollTo({
-                      top: 0,
-                      behavior: reducedMotion() ? 'instant' : 'smooth',
-                    })
+                    setLinkedNotices((current) => current.filter((other) => other.id !== notice.id))
                   }
                 >
-                  <ChevronIcon size={14} />
+                  <CloseIcon size={12} />
                 </button>
               </div>
-            </div>
-            {/* D-100: Settings' index, in the panel's place. */}
-            {settingsPanel && (
-              <PanelAside label="Settings sections">
-                <SettingsIndex scroller={scroller} />
-              </PanelAside>
-            )}
-            {/* D-99: a snapshot's list or note against now, in the panel's place. */}
-            {snapshotPanel && <PanelAside label="Changes">{snapshotDiffView(false)}</PanelAside>}
-            {/* D-98: on wide screens a trash item opens read-only in the panel's place. */}
-            {trashPanel && trashOpen && (
-              <PanelAside label="Deleted item">
-                <TrashPreviewView
-                  key={trashOpen.id}
-                  preview={trashOpen}
-                  onRestore={() => restoreToEdit(trashOpen.id)}
-                  onClose={() => setTrashOpen(null)}
-                />
-              </PanelAside>
-            )}
-            {panelState && (
-              <ContextPanel
-                state={panelState}
-                upNext={upNextItems}
-                current={outlineCurrent}
-                back={panelBack}
-                handlers={panelHandlers}
-                foot={
-                  <ClipboardSection
-                    onInsert={(item) => insertClipboard(item, currentField())}
-                    onMenu={clipboardMenu}
-                    onSettings={() => void window.flintMain.clipboardSettings()}
-                    onShowContents={showClipboardContents}
-                    onClear={clearClipboard}
-                  />
-                }
-              />
-            )}
-            {todayColumn && view?.today && (
-              <TodayColumn
-                extras={view.today}
-                stacked={false}
-                onOpen={openFromToday}
-                onMoveReminder={moveReminder}
-                onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
-              />
-            )}
+            ))}
           </div>
-        </div>
-      </main>
+        )}
 
-      {marked.size > 1 && (
-        <div className="action-bar" role="toolbar" aria-label="Marked tasks">
-          <span className="action-count">{marked.size} selected</span>
-          <button type="button" onClick={selectAll}>
-            Select all
-          </button>
-          <button
-            type="button"
-            data-picker-trigger
-            onClick={(event) => bulkMove(event.currentTarget.getBoundingClientRect())}
+        {/* NAV-04, D-79, D-88: the swipe's arrow at the window's edge, growing with the swipe. */}
+        {swipe && (
+          <div
+            className={swipe.back ? 'swipe-arrow back' : 'swipe-arrow forward'}
+            style={{ '--swipe': swipe.progress } as CSSProperties}
+            aria-hidden="true"
           >
-            Move
-          </button>
-          <button
-            type="button"
-            data-picker-trigger
-            onClick={(event) =>
-              openPriorityPicker(
-                {
-                  anchor: event.currentTarget.getBoundingClientRect(),
-                  returnFocus: null,
-                  trigger: event.currentTarget,
-                },
-                null,
-                bulkPriority,
-              )
-            }
-          >
-            Priority
-          </button>
-          {/* TODAY-01, D-85: pins them all, or unpins them when all are pinned. */}
-          <button
-            type="button"
-            onClick={() => void pin(markedRows, !markedRows.every((row) => row.pinned))}
-          >
-            {markedRows.every((row) => row.pinned) ? 'Unpin' : 'Pin'}
-          </button>
-          <button type="button" onClick={bulkDelete}>
-            Delete
-          </button>
-          <button
-            type="button"
-            className="action-clear"
-            aria-label="Clear the selection"
-            title="Clear the selection (Esc)"
-            onClick={() => setMarked(NOTHING)}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      )}
+            <ChevronIcon size={18} />
+          </div>
+        )}
 
-      {linkedNotices.length > 0 && (
-        <div className="linked-notices" role="status">
-          {linkedNotices.map((notice) => (
-            <div key={notice.id} className="linked-notice">
-              <div className="linked-notice-text">
-                <span className="linked-notice-title">
-                  Large file, linked to its original location
-                </span>
-                <span className="linked-notice-name">{notice.name}</span>
-              </div>
-              <span className="linked-notice-why-holder">
-                <button
-                  type="button"
-                  className="linked-notice-copy"
-                  onClick={() => void copyLinkedIn(notice)}
-                >
-                  Copy into Flint instead
-                </button>
-                <span className="linked-notice-info" aria-hidden="true">
-                  i
-                </span>
-                <span className="linked-notice-why" role="tooltip">
-                  Large files are linked by default: copying them makes the Flint folder, snapshots,
-                  exports and future sync slow and big. Copying keeps the file safe if the original
-                  is moved or deleted.
-                </span>
-              </span>
-              <button
-                type="button"
-                className="linked-notice-close"
-                aria-label="Dismiss"
-                onClick={() =>
-                  setLinkedNotices((current) => current.filter((other) => other.id !== notice.id))
-                }
-              >
-                <CloseIcon size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+        {zoomShown && (
+          <div className="zoom-pill" role="status" key={zoomShown.id}>
+            {zoomShown.text}
+          </div>
+        )}
 
-      {/* NAV-04, D-79, D-88: the swipe's arrow at the window's edge, growing with the swipe. */}
-      {swipe && (
-        <div
-          className={swipe.back ? 'swipe-arrow back' : 'swipe-arrow forward'}
-          style={{ '--swipe': swipe.progress } as CSSProperties}
-          aria-hidden="true"
-        >
-          <ChevronIcon size={18} />
-        </div>
-      )}
-
-      {zoomShown && (
-        <div className="zoom-pill" role="status" key={zoomShown.id}>
-          {zoomShown.text}
-        </div>
-      )}
-
-      {/* APP-10, APP-13, D-115 to D-120: the walkthrough's spotlight. */}
-      {tourRun && (
-        <Walkthrough
-          key={tourRun.run}
-          from={tourRun.from}
-          folder={tourFolder}
-          paletteOpen={palette}
-          onInbox={tourInbox}
-          onEnd={endTour}
+        {/* APP-10, APP-13, D-115 to D-120: the walkthrough's spotlight. */}
+        {tourRun && (
+          <Walkthrough
+            key={tourRun.run}
+            from={tourRun.from}
+            folder={tourFolder}
+            paletteOpen={palette}
+            onInbox={tourInbox}
+            onEnd={endTour}
+          />
+        )}
+        {/* APP-15, D-117: What's new. */}
+        {whatsNew && !tourRun && appVersion !== '' && (
+          <WhatsNew version={appVersion} since={whatsNew.since} onClose={() => setWhatsNew(null)} />
+        )}
+        {/* APP-14, D-118: a tip, bottom right, never during the walkthrough, triage or What's new. */}
+        <TipLayer
+          blocked={tourRun !== null || whatsNew !== null || triage !== null}
+          onOff={() => void window.flintMain.setSetting({ key: 'tipsOff', value: true })}
         />
-      )}
-      {/* APP-15, D-117: What's new. */}
-      {whatsNew && !tourRun && appVersion !== '' && (
-        <WhatsNew version={appVersion} since={whatsNew.since} onClose={() => setWhatsNew(null)} />
-      )}
-      {/* APP-14, D-118: a tip, bottom right, never during the walkthrough, triage or What's new. */}
-      <TipLayer
-        blocked={tourRun !== null || whatsNew !== null || triage !== null}
-        onOff={() => void window.flintMain.setSetting({ key: 'tipsOff', value: true })}
-      />
-      {/* NAV-01, D-106: the Ctrl+K palette. */}
-      {palette && (
-        <Palette
-          sources={paletteSources()}
-          search={paletteSearch}
-          hitItem={hitItem}
-          onClose={() => setPalette(false)}
-        />
-      )}
-      {/* TASK-18, D-151: Give to Claude's card. */}
-      {claudeTask &&
-        view &&
-        (() => {
-          const task = findRow(view, claudeTask);
-          if (!task) return null;
-          const parent = findParent(view, claudeTask);
-          const home = task.home ?? parent?.home;
-          const list = home
-            ? { id: home.listId, name: home.listName }
-            : view.id !== TODAY_ID
-              ? { id: view.id, name: view.name }
-              : null;
-          return (
-            <GiveToClaude
-              task={task}
-              parent={parent}
-              list={list}
-              onClose={() => {
-                setClaudeTask(null);
-                // Shift+Enter may have given the list its folder (the list's menu shows it).
-                refreshClaudeFolders();
-              }}
-              onGiven={(outcome, folder) => {
-                const name = folderName(folder);
-                if (outcome === 'opened') showToast(`Given to Claude · ${name}`, false);
-                else if (outcome === 'copied')
-                  showToast('Copied: paste it into Claude with Ctrl+V', false);
-                else if (outcome === 'no-folder') showToast(`${name} no longer exists`, false);
-                else
-                  showToast("Claude isn't installed, or Windows couldn't open it", false, {
-                    label: 'Download',
-                    run: () => window.flintMain.openLink(CLAUDE_DOWNLOAD_URL),
-                  });
-              }}
-            />
-          );
-        })()}
-      {/* NAV-02, D-106: the `?` cheat sheet. */}
-      {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
-      {lightbox && (
-        <Lightbox
-          images={lightbox.images}
-          start={lightbox.start}
-          onClose={() => setLightbox(null)}
-        />
-      )}
+        {/* NAV-01, D-106: the Ctrl+K palette. */}
+        {palette && (
+          <Palette
+            sources={paletteSources()}
+            search={paletteSearch}
+            hitItem={hitItem}
+            onClose={() => setPalette(false)}
+          />
+        )}
+        {/* TASK-18, D-151: Give to Claude's card. */}
+        {claudeTask &&
+          view &&
+          (() => {
+            const task = findRow(view, claudeTask);
+            if (!task) return null;
+            const parent = findParent(view, claudeTask);
+            const home = task.home ?? parent?.home;
+            const list = home
+              ? { id: home.listId, name: home.listName }
+              : view.id !== TODAY_ID
+                ? { id: view.id, name: view.name }
+                : null;
+            return (
+              <GiveToClaude
+                task={task}
+                parent={parent}
+                list={list}
+                onClose={() => {
+                  setClaudeTask(null);
+                  // Shift+Enter may have given the list its folder (the list's menu shows it).
+                  refreshClaudeFolders();
+                }}
+                onGiven={(outcome, folder) => {
+                  const name = folderName(folder);
+                  if (outcome === 'opened') showToast(`Given to Claude · ${name}`, false);
+                  else if (outcome === 'copied')
+                    showToast('Copied: paste it into Claude with Ctrl+V', false);
+                  else if (outcome === 'no-folder') showToast(`${name} no longer exists`, false);
+                  else
+                    showToast("Claude isn't installed, or Windows couldn't open it", false, {
+                      label: 'Download',
+                      run: () => window.flintMain.openLink(CLAUDE_DOWNLOAD_URL),
+                    });
+                }}
+              />
+            );
+          })()}
+        {/* NAV-02, D-106: the `?` cheat sheet. */}
+        {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
+        {lightbox && (
+          <Lightbox
+            images={lightbox.images}
+            start={lightbox.start}
+            onClose={() => setLightbox(null)}
+          />
+        )}
 
-      {toast && (
-        <ToastView
-          key={toast.id}
-          toast={toast}
-          className={marked.size > 1 ? 'above-bar' : ''}
-          onHide={hideToast}
-          onUndo={() => void undo().then(hideToast)}
-        />
-      )}
-    </div>
+        {toast && (
+          <ToastView
+            key={toast.id}
+            toast={toast}
+            className={marked.size > 1 ? 'above-bar' : ''}
+            onHide={hideToast}
+            onUndo={() => void undo().then(hideToast)}
+          />
+        )}
+        {/* SYNC-01, D-161: sync's dialogs. */}
+        {syncDialog?.kind === 'setup' && (
+          <SetupDialog status={sync} onClose={() => setSyncDialog(null)} />
+        )}
+        {syncDialog?.kind === 'choose' && (
+          <ChooseDialog
+            status={sync}
+            lists={lists}
+            items={sidebarView?.items ?? []}
+            onClose={() => setSyncDialog(null)}
+          />
+        )}
+        {syncDialog?.kind === 'stop' && (
+          <StopDialog
+            id={syncDialog.id}
+            name={syncDialog.name}
+            mode={syncDialog.mode}
+            lists={syncDialog.lists}
+            onClose={() => setSyncDialog(null)}
+          />
+        )}
+        {syncDialog?.kind === 'disconnect' && (
+          <SyncQuestion
+            title="Disconnect Google Drive?"
+            text="Everything stays on this PC, and your Drive keeps its copy."
+            confirm="Disconnect"
+            onConfirm={() => void syncAct({ kind: 'disconnect' })}
+            onClose={() => setSyncDialog(null)}
+          />
+        )}
+        {syncDialog?.kind === 'everything' && (
+          <SyncQuestion
+            title="Sync everything on this PC?"
+            text={everythingText(syncDialog.preview)}
+            confirm="Sync everything"
+            onConfirm={() => void syncAct({ kind: 'mode', mode: 'everything' })}
+            onClose={() => setSyncDialog(null)}
+          />
+        )}
+      </div>
+    </SyncContext.Provider>
   );
+}
+
+/** SYNC-01, D-161: which of sync's dialogs is open. */
+type SyncDialogState =
+  | { readonly kind: 'setup' }
+  | { readonly kind: 'choose' }
+  | { readonly kind: 'disconnect' }
+  | { readonly kind: 'everything'; readonly preview: SyncEverythingPreview }
+  | {
+      readonly kind: 'stop';
+      readonly id: string;
+      readonly name: string;
+      readonly mode: 'tasks' | 'note' | 'group';
+      readonly lists: number;
+    };
+
+/** SYNC-01, D-161: the sidebar's Show filter (the sort menu). */
+type SyncFilter = 'all' | 'synced' | 'local';
+
+/** SYNC-01: a cloud after a synced item's name in the sidebar. */
+function NavCloud(props: { readonly on: boolean }): ReactElement | null {
+  return props.on ? (
+    <span className="nav-cloud" title="Synced with Google Drive">
+      <CloudIcon size={13} />
+    </span>
+  ) : null;
 }
 
 /**
@@ -5802,6 +6115,7 @@ function NavGroup(props: {
   readonly children: ReactNode;
 }): ReactElement {
   const { group, collapsed, focused, header, onToggle, onMenu, onRename, children } = props;
+  const sync = useSyncStatus();
 
   return (
     <div
@@ -5834,6 +6148,7 @@ function NavGroup(props: {
           <span className="group-name">
             <MorphText text={group.name} />
           </span>
+          <NavCloud on={groupSyncs(sync, group.id)} />
           <span className="nav-count group-count">
             <MorphText text={String(group.lists.length)} />
           </span>
@@ -5861,6 +6176,7 @@ function NavItem(props: {
   readonly onRename?: () => void;
 }): ReactElement {
   const { list, active, marked = false, icon, onSelect, onMenu, onRename } = props;
+  const sync = useSyncStatus();
   const wasActive = useRef(false);
   const slow = useRef(0);
   useEffect(() => () => window.clearTimeout(slow.current), []);
@@ -5904,6 +6220,7 @@ function NavItem(props: {
     >
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
       <span className="nav-name">{list.name}</span>
+      <NavCloud on={listSyncs(sync, list.id) && list.id !== TODAY_ID} />
       {list.mode === 'tasks' && <span className="nav-count">{list.open}</span>}
     </button>
   );

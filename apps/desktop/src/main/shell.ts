@@ -132,6 +132,12 @@ export interface E2EHooks {
   claudeMissing?: boolean;
   /** D-93, D-151: text Flint would have put on the clipboard, recorded instead. */
   copied?: string[];
+  /**
+   * SYNC-01, D-161: Google Drive in test runs (a fake in this process, no network): a test reads
+   * it and changes it as another PC would; `syncNow` runs a sync and resolves when it is done.
+   */
+  syncDrive?: import('@flint/core/sync').FakeDrive;
+  syncNow?: () => Promise<void>;
 }
 
 export function e2eHooks(): E2EHooks | undefined {

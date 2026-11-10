@@ -339,6 +339,10 @@ export class SyncEngine {
       ...Object.keys(state.items),
     ]);
     for (const id of ids) {
+      if (local.busy?.(id)) {
+        setAgain(true);
+        continue;
+      }
       const previous = state.items[id];
       const mineItem = localById.get(id);
       const file = remote.get(id) ?? null;

@@ -22,6 +22,8 @@ import type {
 } from '../../shared/ipc.js';
 import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
+import { syncedAgo, type SyncMode, type SyncStatusView } from '../../shared/sync.js';
+import { CloudIcon } from './icons.js';
 import { clipboardChanged } from './ClipboardSection.js';
 import {
   compileLinkPatterns,
@@ -47,6 +49,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'reminders', name: 'Reminders' },
   { id: 'mini', name: 'Mini mode' },
   { id: 'today', name: 'Today & lists' },
+  { id: 'sync', name: 'Sync' },
   { id: 'links', name: 'Links' },
   { id: 'clipboard', name: 'Clipboard' },
   { id: 'claude', name: 'Claude' },
@@ -111,18 +114,31 @@ interface RowProps {
   /** More words the filter finds it by. */
   readonly words?: string;
   readonly children?: ReactNode;
+  /** SYNC-01: a tile before the name (the Google account, the cloud). */
+  readonly lead?: ReactNode;
+  readonly className?: string;
 }
 
 function Row(props: RowProps): ReactElement | null {
-  const { name, note, filter, words = '', children } = props;
+  const { name, note, filter, words = '', children, lead } = props;
   const haystack = `${name} ${typeof note === 'string' ? note : ''} ${words}`.toLowerCase();
   if (filter !== '' && !haystack.includes(filter)) return null;
+  const text = (
+    <div className="settings-text">
+      <span className="settings-name">{name}</span>
+      {note && <span className="settings-note">{note}</span>}
+    </div>
+  );
   return (
-    <div className="settings-row">
-      <div className="settings-text">
-        <span className="settings-name">{name}</span>
-        {note && <span className="settings-note">{note}</span>}
-      </div>
+    <div className={props.className ? `settings-row ${props.className}` : 'settings-row'}>
+      {lead ? (
+        <div className="settings-lead">
+          {lead}
+          {text}
+        </div>
+      ) : (
+        text
+      )}
       {children && <div className="settings-control">{children}</div>}
     </div>
   );
@@ -306,9 +322,193 @@ export function SettingsScreen(props: {
   readonly onWhatsNew: () => void;
   /** APP-06, D-136: what the updater is doing (About's status line and button). */
   readonly updates: UpdateView;
+  /** SYNC-01, D-161: Google Drive sync (Settings → Sync). */
+  readonly sync: SyncStatusView;
+  /** "3 lists, 1 note, 1 group" and the chosen items' names. */
+  readonly syncSummary: string;
+  readonly syncChosen: string;
+  /** Needs attention: the problem and its action. */
+  readonly syncProblem: ReactNode;
+  readonly onSyncChoose: () => void;
+  readonly onSyncDisconnect: () => void;
+  readonly onSyncMode: (mode: SyncMode) => void;
 }): ReactElement {
   const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
   const { onReplayTour, onWhatsNew, updates } = props;
+  const { sync } = props;
+  const [syncNow, setSyncNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setSyncNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const syncAct = (action: Parameters<typeof window.flintMain.syncAct>[0]): void =>
+    void window.flintMain.syncAct(action);
+  /** Settings → Sync's rows for the state sync is in (D-161, mockup 13). */
+  const syncRows = (): ReactNode => {
+    const words = 'sync google drive cloud account devices backup';
+    const cloudTile = (
+      <span className="tile sync-settings-tile">
+        <CloudIcon size={18} width={1.9} />
+      </span>
+    );
+    if (
+      sync.phase === 'unavailable' ||
+      sync.phase === 'disconnected' ||
+      sync.phase === 'signing-in'
+    ) {
+      const note =
+        sync.phase === 'unavailable'
+          ? 'Not set up in this build.'
+          : sync.phase === 'signing-in'
+            ? 'Waiting for Google… Finish signing in in your browser.'
+            : 'Keep chosen lists and notes in step across your devices, through your own Drive.';
+      return [
+        <Row
+          key="connect"
+          name="Sync with Google Drive"
+          note={note}
+          lead={cloudTile}
+          filter={filter}
+          words={words}
+        >
+          {sync.phase === 'disconnected' && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => syncAct({ kind: 'connect' })}
+            >
+              Connect Google Drive
+            </button>
+          )}
+          {sync.phase === 'signing-in' && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => syncAct({ kind: 'cancel-connect' })}
+            >
+              Cancel
+            </button>
+          )}
+        </Row>,
+        <Row
+          key="privacy"
+          name=""
+          className="sync-privacy"
+          note="Only what you choose to sync goes to your own Google Drive. Nothing else leaves this PC, and Flint has no server of its own."
+          filter={filter}
+          words={`${words} privacy`}
+        />,
+      ];
+    }
+    const letter = (sync.email ?? '?').slice(0, 1).toUpperCase();
+    const state =
+      sync.phase === 'syncing'
+        ? 'syncing…'
+        : sync.phase === 'offline'
+          ? "offline · changes sync when you're back"
+          : sync.phase === 'attention'
+            ? `needs attention · ${sync.problem?.message ?? ''}`
+            : `last synced ${syncedAgo(sync.lastSync, syncNow)}`;
+    return [
+      <Row
+        key="account"
+        name="Google Drive"
+        note={`Connected as ${sync.email ?? ''} · ${state}`}
+        lead={<span className="sync-account">{letter}</span>}
+        filter={filter}
+        words={words}
+      >
+        <span className="settings-buttons">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={sync.phase === 'syncing'}
+            onClick={() => syncAct({ kind: 'sync-now' })}
+          >
+            Sync now
+          </button>
+          <button type="button" className="quiet-button" onClick={props.onSyncDisconnect}>
+            Disconnect
+          </button>
+        </span>
+      </Row>,
+      ...(sync.problem
+        ? [
+            <Row
+              key="problem"
+              name="Needs attention"
+              note={props.syncProblem}
+              filter={filter}
+              words={words}
+            />,
+          ]
+        : []),
+      <Row
+        key="what"
+        name="What syncs"
+        note="Everything, or only the lists, notes and groups you choose. Turn sync on or off for one item from its right-click menu."
+        filter={filter}
+        words={`${words} everything chosen`}
+      >
+        <Choice
+          label="What syncs"
+          value={sync.mode ?? 'chosen'}
+          options={[
+            { value: 'everything', label: 'Everything' },
+            { value: 'chosen', label: 'Chosen items' },
+          ]}
+          onChange={(mode) => {
+            if (mode !== sync.mode) props.onSyncMode(mode);
+          }}
+        />
+      </Row>,
+      ...(sync.mode === 'chosen'
+        ? [
+            <Row
+              key="chosen"
+              name="Chosen items"
+              note={`${props.syncSummary}: ${props.syncChosen}`}
+              filter={filter}
+              words={`${words} chosen choose`}
+            >
+              <button type="button" className="secondary-button" onClick={props.onSyncChoose}>
+                Choose…
+              </button>
+            </Row>,
+          ]
+        : []),
+      <Row
+        key="folder"
+        name="Drive folder"
+        note={
+          <>
+            <span className="sync-folder-path">{sync.folderPath ?? 'My Drive › Flint'}</span>
+            <br />
+            Plain markdown files. Flint can only see files it created there.
+          </>
+        }
+        filter={filter}
+        words={`${words} folder my drive open`}
+      >
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={sync.folderId === null}
+          onClick={() => syncAct({ kind: 'open-drive' })}
+        >
+          Open in Drive
+        </button>
+      </Row>,
+      <Row
+        key="privacy"
+        name=""
+        className="sync-privacy"
+        note="Only what you choose to sync goes to your own Google Drive. Nothing else leaves this PC, and Flint has no server of its own."
+        filter={filter}
+        words={`${words} privacy`}
+      />,
+    ];
+  };
   // DATA-07, D-104: a folder chosen to become the Flint folder (asked in its row).
   const [folderChoice, setFolderChoice] = useState<(FolderChoice & { at: number }) | null>(null);
   // NOTE-07, D-104: the link-pattern editor open.
@@ -610,6 +810,11 @@ export function SettingsScreen(props: {
         </Row>
       </Section>
 
+      {/* SYNC-01, D-161 (mockup 13): Google Drive sync. */}
+      <Section id="sync" filter={filter}>
+        {syncRows()}
+      </Section>
+
       <Section id="links" filter={filter}>
         <Row
           name="Link patterns"
@@ -833,7 +1038,7 @@ export function SettingsScreen(props: {
         {/* APP-09, D-16, D-132, D-136: stated plainly, first in About. */}
         <Row
           name="Privacy"
-          note="Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude."
+          note="Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude."
           filter={filter}
           words="privacy telemetry network data account offline github updates claude"
         />

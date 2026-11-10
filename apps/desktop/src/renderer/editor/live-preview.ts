@@ -38,6 +38,7 @@ import {
   imageMenuItems,
   isLinkedFile,
   mediaElement,
+  onCopyIntoFlint,
 } from '../media/media.js';
 import { COPY_ICON, copyWithFeedback } from '../media/copy.js';
 import { activeLinkPatterns } from '../../shared/link-patterns.js';
@@ -841,3 +842,15 @@ export function replaceLink(view: EditorView, old: string, next: string): boolea
   view.dispatch({ changes, userEvent: 'input.relink' });
   return true;
 }
+
+// SYNC-01, D-161: "Copy into Flint to sync it" from a linked file's explanation: the editor that
+// shows the line copies the file and relinks it (as its right-click Copy into Flint does).
+onCopyIntoFlint((holder, link) => {
+  const view = EditorView.findFromDOM(holder);
+  if (!view) return false;
+  void window.flintMain.copyIntoFlint(link).then((outcome) => {
+    if (outcome?.ok) replaceLink(view, link, outcome.link);
+    else if (outcome) announce(outcome.problem);
+  });
+  return true;
+});

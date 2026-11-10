@@ -1,3 +1,4 @@
+import { conflictView } from './conflict-view.js';
 import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -130,6 +131,8 @@ export function MarkdownEditor(props: {
               latest.current.onBlur?.(out(update.view));
             if (update.focusChanged && update.view.hasFocus) latest.current.onFocus?.();
           }),
+          // SYNC-01, D-161 Q5: sync's conflict callouts as cards.
+          conflictView,
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
           lock.current.of(locked ? EditorState.readOnly.of(true) : []),
           // MEDIA-01, D-84: files dragged in (from Explorer) go where they are dropped.
