@@ -9,7 +9,7 @@ import { mergeText } from './text-merge.js';
 
 const RUNS = Number(process.env.FLINT_FUZZ_RUNS ?? 2000);
 const labels = { mine: 'WORK-PC', theirs: 'DAVIT-LAPTOP', when: '10 Nov 14:02' };
-const line = fc.constantFrom('a', 'b', 'c', 'd', '', '# Head', '- item', '```', 'x y');
+const line = fc.constantFrom<string>('a', 'b', 'c', 'd', '', '# Head', '- item', '```', 'x y');
 const lines = fc.array(line, { maxLength: 12 });
 
 /** An edit: replace a range of lines with new ones. */
