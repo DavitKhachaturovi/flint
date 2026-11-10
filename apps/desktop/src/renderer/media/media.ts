@@ -149,7 +149,8 @@ function markUnsynced(holder: HTMLElement, badge: HTMLElement, link: string): vo
     const card = document.querySelector<HTMLElement>('.fl-sync-explain');
     if (card) card.dataset['pinned'] = '1';
   });
-  badge.after(cloud);
+  badge.classList.add('with-cloud');
+  badge.append(cloud);
 }
 
 const icon = (path: string): string =>
@@ -170,7 +171,7 @@ function notFound(holder: HTMLElement, link: string): void {
     title.className = 'fl-media-missing-title';
     title.textContent = linkName(link);
     box.append(title);
-    const kept = [...holder.querySelectorAll('.fl-media-badge, .fl-media-cloud')];
+    const kept = [...holder.querySelectorAll('.fl-media-badge')];
     holder.replaceChildren(...kept, box);
     return;
   }
@@ -185,7 +186,7 @@ function notFound(holder: HTMLElement, link: string): void {
   path.textContent = displayPath(link);
   box.append(title, path);
   // A linked file keeps its badge (and, synced, its cloud).
-  const kept = [...holder.querySelectorAll('.fl-media-badge, .fl-media-cloud')];
+  const kept = [...holder.querySelectorAll('.fl-media-badge')];
   holder.replaceChildren(...kept, box);
 }
 
@@ -207,8 +208,8 @@ function cannotPlay(holder: HTMLElement, link: string): void {
     void openAttachment(holder, link);
   });
   box.append(name, open);
-  const badge = holder.querySelector('.fl-media-badge');
-  holder.replaceChildren(...(badge ? [badge] : []), box);
+  const kept = [...holder.querySelectorAll('.fl-media-badge')];
+  holder.replaceChildren(...kept, box);
 }
 
 /**

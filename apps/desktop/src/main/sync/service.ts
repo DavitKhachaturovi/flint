@@ -250,7 +250,8 @@ export class SyncService {
       email: this.account?.email ?? null,
       lastSync: this.state.lastSync,
       folderId: this.state.folderId,
-      folderPath: this.state.folderPath,
+      // Before the first sync made it: the folder it will be (D-161 Q7).
+      folderPath: this.state.folderPath ?? `My Drive › ${this.options.folderName}`,
       mode: this.state.mode,
       synced: Object.keys(this.state.items),
       syncedGroups: this.state.groups

@@ -9,7 +9,14 @@ import { rawOffset, titleHtml } from '../../shared/inline-markdown.js';
 import { isTextField } from '../menu/menu.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText } from '../main-window/inert-text.js';
-import { BodyIcon, CheckIcon, ImageIcon, PinIcon, ReminderBellIcon } from '../main-window/icons.js';
+import {
+  BodyIcon,
+  CheckIcon,
+  ConflictIcon,
+  ImageIcon,
+  PinIcon,
+  ReminderBellIcon,
+} from '../main-window/icons.js';
 import type { Ghost } from './ghosts.js';
 import { parseCapture, type ListInfo } from '@flint/core/shorthand';
 import { usePresence } from './presence.js';
@@ -20,6 +27,9 @@ export interface Point {
 }
 
 export const hasBody = (task: TaskRow): boolean => task.body.trim() !== '';
+
+/** SYNC-01: a conflict callout in a task's notes (sync kept both versions, D-161 Q5). */
+const CONFLICT = /^[ \t]*>[ \t]?\[!conflict\]/im;
 
 /**
  * Edit state (docs/03 §2): a task's title, or a new row below a task (Edit-state Enter). `level`:
@@ -411,6 +421,21 @@ export function Row(
             }}
           >
             <ImageIcon />
+          </button>
+        )}
+        {/* SYNC-01, D-161 Q5: the body holds both versions of a change made on two PCs. */}
+        {!compact && CONFLICT.test(task.body) && (
+          <button
+            type="button"
+            className="body-toggle row-conflict"
+            title="Changed on two PCs: open the notes to choose"
+            aria-label="Changed on two PCs"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!props.expanded.has(task.key)) props.onBody(task);
+            }}
+          >
+            <ConflictIcon size={13} />
           </button>
         )}
         {!compact && !task.code && hasText && (

@@ -467,7 +467,11 @@ export function SettingsScreen(props: {
             <Row
               key="chosen"
               name="Chosen items"
-              note={`${props.syncSummary}: ${props.syncChosen}`}
+              note={
+                props.syncSummary === 'Nothing'
+                  ? 'Nothing chosen yet. Turn sync on for a list, note or group from its right-click menu, or here.'
+                  : `${props.syncSummary}: ${props.syncChosen}`
+              }
               filter={filter}
               words={`${words} chosen choose`}
             >

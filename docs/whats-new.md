@@ -2,6 +2,13 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.5.0 (10 Nov 2026)
+
+- **Sync with Google Drive:** keep lists and notes in step across your PCs, through your own Google Drive. Open Settings → Sync and choose **Connect Google Drive**, sign in in your browser, then pick **Everything** or **Only what I choose**.
+- **Choose what syncs:** right-click a list, note or group and choose **Sync with Google Drive** (a group syncs everything in it). Synced items show a small cloud; the cloud button beside Lists shows how sync is doing and has **Sync now**.
+- **Nothing gets lost:** changes from two PCs are combined task by task. If the same lines of a note changed on both, both versions are kept and a card lets you pick one or keep both.
+- **Private by design:** only what you choose goes to a "Flint" folder in your own Drive, as plain markdown. Flint has no server, and everything still works offline.
+
 ## 1.4.0 (10 Nov 2026)
 
 - **Send selected text to mini mode's note:** select text in any app and press **Ctrl+Alt+X**. It lands at the end of the note in mini mode's Note tab; code comes in as a code block. If mini mode was hidden, it opens ready to type; if it was already on screen, you stay where you were. Change the keys in Settings → Capture & hotkeys.

@@ -121,7 +121,8 @@ test('Settings → About: the status line, Check for updates, the switch and the
   await main.locator('.nav', { hasText: 'Settings' }).click();
   const about = main.locator('#settings-about');
   await expect(about.locator('.settings-row').first()).toContainText(
-    'Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off.',
+    // D-161: with Google Drive sync, the row says what syncs and where.
+    'Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off.',
   );
   const version = about.locator('.settings-row', { hasText: /^Flint \d/ });
   const status = version.locator('.update-status');

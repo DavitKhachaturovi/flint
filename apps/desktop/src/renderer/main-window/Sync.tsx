@@ -21,6 +21,7 @@ import {
   type SyncStatusView,
 } from '../../shared/sync.js';
 import type { ListSummary, SidebarItem } from '../../shared/ipc.js';
+import { createPortal } from 'react-dom';
 import { CloudIcon, type CloudMark } from './icons.js';
 
 export const SYNC_OFF: SyncStatusView = {
@@ -216,22 +217,24 @@ export function SyncButton(props: {
         </span>
         {status.phase === 'attention' && <span className="sync-dot" />}
       </button>
-      {open && (
-        <SyncPopover
-          at={open}
-          status={status}
-          lists={lists}
-          onClose={() => setOpen(null)}
-          onSettings={() => {
-            setOpen(null);
-            onSettings();
-          }}
-          onOpen={(id) => {
-            setOpen(null);
-            onOpen(id);
-          }}
-        />
-      )}
+      {open &&
+        createPortal(
+          <SyncPopover
+            at={open}
+            status={status}
+            lists={lists}
+            onClose={() => setOpen(null)}
+            onSettings={() => {
+              setOpen(null);
+              onSettings();
+            }}
+            onOpen={(id) => {
+              setOpen(null);
+              onOpen(id);
+            }}
+          />,
+          document.body,
+        )}
     </>
   );
 }

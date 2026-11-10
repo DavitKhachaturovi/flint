@@ -339,7 +339,8 @@ test('an update shows What’s new once, in plain words; the palette and Setting
   // APP-09, D-132, D-136: stated plainly, first in About.
   await expect(about.locator('.settings-row').first()).toContainText('Privacy');
   await expect(about.locator('.settings-row').first()).toContainText(
-    'Your notes never leave your machine. Flint only contacts GitHub to check for updates, which you can turn off.',
+    // D-161: with Google Drive sync, the row says what syncs and where.
+    'Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off.',
   );
   await about
     .locator('.settings-row', { hasText: 'What changed in each version' })

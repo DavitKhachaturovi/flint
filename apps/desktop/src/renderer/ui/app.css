@@ -7932,12 +7932,27 @@ body[data-tour-step='5'] .main .row .pin-hover {
   margin-top: 4px;
 }
 
+/* A task row whose notes hold a conflict (D-161 Q5): its marker, in the primary tone. */
+.body-toggle.row-conflict {
+  color: var(--fl-text-primary);
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
 /* The crossed-out cloud on a linked file that doesn't sync, and its explanation. */
+.fl-media-badge.with-cloud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .fl-media-cloud {
   display: inline-flex;
-  margin-left: 6px;
   color: var(--fl-text-primary);
   cursor: default;
+}
+
+.fl-media-cloud svg {
+  display: block;
 }
 
 .fl-sync-explain {
