@@ -1247,3 +1247,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | No analytics, trackers, cookies or third-party requests; fonts self-hosted | WEB-01, APP-09 · Built (1.5.0) | 02, D-162 |
 | 4 | GitHub Pages from `site/` on pushes to main; custom domain, HTTPS, DNS and domain verifications | WEB-01 · Built (1.5.0); DNS and settings Davit's | 05 §6, 06 |
 | 5 | Consent screen Branding: support address, home page, privacy link, authorised domain; Publish app | SYNC-01, WEB-01 · Davit's, after the site is live | 06 §6 |
+| 6 | Terms of use at /terms/ (MIT, as is, your content, Drive under Google's terms), linked from the footers and the consent screen | WEB-01 · Built (after 1.5.0); the Branding link Davit's | 02, D-162, `site/terms/index.html` |
