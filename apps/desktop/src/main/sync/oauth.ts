@@ -55,12 +55,17 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
   let server: Server | null = null;
   let timer: NodeJS.Timeout | undefined;
   let cancel: () => void = () => undefined;
+  /** The redirect address, known once the listener has its port (it is needed after it closes). */
+  let redirect = '';
+  let answered = false;
 
+  /** No more connections; the ones open finish (the page just sent reaches the browser). */
   const close = (): void => {
     clearTimeout(timer);
-    server?.close();
-    server?.closeAllConnections();
+    const closing = server;
     server = null;
+    closing?.close();
+    setTimeout(() => closing?.closeAllConnections(), 2000).unref();
   };
 
   const result = new Promise<Tokens>((resolve, reject) => {
@@ -70,10 +75,12 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
     };
     const listener = createServer((request, response) => {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-      if (url.pathname !== '/') {
+      // Only the one answer counts (a browser may ask again, or for its icon).
+      if (url.pathname !== '/' || answered) {
         response.writeHead(404).end();
         return;
       }
+      answered = true;
       const code = url.searchParams.get('code');
       const returned = url.searchParams.get('state');
       const error = url.searchParams.get('error');
@@ -89,7 +96,6 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
         );
         return;
       }
-      const redirect = `http://127.0.0.1:${(listener.address() as AddressInfo).port}/`;
       exchange(clientId, code, verifier, redirect, fetch).then(resolve, reject);
     });
     server = listener;
@@ -99,9 +105,10 @@ export function signIn(clientId: string, open: (url: string) => void, fetch: Fet
     });
     listener.listen(0, '127.0.0.1', () => {
       const { port } = listener.address() as AddressInfo;
+      redirect = `http://127.0.0.1:${port}/`;
       const params = new URLSearchParams({
         client_id: clientId,
-        redirect_uri: `http://127.0.0.1:${port}/`,
+        redirect_uri: redirect,
         response_type: 'code',
         scope: DRIVE_SCOPE,
         code_challenge: challenge,

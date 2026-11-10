@@ -7889,9 +7889,17 @@ body[data-tour-step='5'] .main .row .pin-hover {
   gap: 8px;
 }
 
+/* The privacy note: the card's last band, edge to edge (mockup 13), a shade under the card. */
 .sync-privacy {
-  background: var(--fl-ground-well);
+  margin: 0 -18px -8px;
+  padding: 14px 18px 16px;
+  min-height: 0;
+  background: var(--fl-ground-sidebar);
   border-radius: 0 0 var(--fl-radius-card) var(--fl-radius-card);
+}
+
+.sync-privacy .settings-name:empty {
+  display: none;
 }
 
 .sync-folder-path {
