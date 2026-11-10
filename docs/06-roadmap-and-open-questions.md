@@ -185,4 +185,4 @@ Users only sign in with Google; the Cloud project and its client ID are set up o
 6. **Publish:** Audience → **Publish app** → In production. In Testing, refresh tokens expire after 7 days (everyone would have to sign in again weekly) and only listed test users can sign in.
 7. The client ID goes into `apps/desktop/src/main/sync/google.ts` (committed: desktop client IDs are public by design, D-161 Q7).
 
-Until step 7 the app says "Not set up in this build" in Settings → Sync. The first real sign-in (development build, `My Drive › Flint (development)`) is the check that the setup works.
+**Status (10 Nov 2026):** steps 1–5 done (the project, the Drive API, the consent screen with the support address, the scope, the Desktop client); its ID is in `google.ts`; the app is in Testing with Davit as a test user until the site is live and Branding's links are set (step 6). Without an ID the app would say "Not set up in this build" in Settings → Sync. The first real sign-in (development build, `My Drive › Flint (development)`) is the check that the setup works.
