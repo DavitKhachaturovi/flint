@@ -85,6 +85,8 @@ export function Composer(props: {
    * is focused and empty.
    */
   readonly compact?: boolean;
+  /** FOCUS-02 (D-170): a quiet chip at the field's end saying where new tasks go ("Inbox"). */
+  readonly badge?: string;
 }): ReactElement {
   const { listId, lists, inputRef, onAdd, placeholder = 'Add a task…', compact = false } = props;
   // D-111: what was typed here and not sent waits for this list, for the session (as the popup's
@@ -364,6 +366,13 @@ export function Composer(props: {
           >
             <SendIcon />
           </button>
+        </div>
+      ) : props.badge ? (
+        <div className="composer-line">
+          {field}
+          <span className="chip composer-badge" title={`New tasks are saved in ${props.badge}`}>
+            {props.badge}
+          </span>
         </div>
       ) : (
         field

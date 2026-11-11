@@ -53,6 +53,8 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Space', action: 'Complete or reopen' },
       { keys: '1 / 2 / 3 / 0', action: 'Priority low, medium, high, none' },
       { keys: 'P', action: 'Pin to Today, or unpin' },
+      // FOCUS-02 (D-170).
+      { keys: 'F', action: 'Send to Focus, or take out' },
       { keys: 'R', action: 'Set or change the reminder' },
       { keys: 'G', action: 'Give to Claude (Claude Code)' },
       { keys: 'Alt+↑ / Alt+↓', action: 'Move the task up or down' },
@@ -63,6 +65,16 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Shift+F10', action: 'The task’s menu' },
       { keys: 'Esc', action: 'Clear the selection' },
       { keys: 'T', action: 'Triage Inbox (in Inbox)' },
+    ],
+  },
+  {
+    // FOCUS-01 to FOCUS-03 (D-170): on the Focus page.
+    name: 'Focus',
+    shortcuts: [
+      { keys: 'Shift+Space', action: 'Start or pause the timer' },
+      { keys: 'Shift+F', action: 'Focus on this (the active task)' },
+      { keys: '− / +', action: 'One session fewer or more (the estimate)' },
+      { keys: 'F', action: 'Take the task out of Focus' },
     ],
   },
   {
@@ -120,6 +132,8 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: 'Enter', action: 'Open the task in the main window' },
       { keys: 'N', action: 'Add a task (the composer)' },
       { keys: 'D / S / O', action: 'A reminder card: Done / Snooze 10m / Open' },
+      // FOCUS-06 (D-170): Focus chosen in the list tab.
+      { keys: 'Shift+Space', action: 'Start or pause the Focus timer' },
       { keys: 'Esc', action: 'Clear the selection, or leave the field' },
     ],
   },

@@ -30,6 +30,8 @@ export function MiniList(props: {
   readonly onMute: (key: string, muted: boolean) => void;
   readonly onMenu: (task: TaskRow, at: Point) => void;
   readonly onOpen: (task: TaskRow) => void;
+  /** FOCUS-06 (D-170): what a row shows at its end (Focus's "1/4"). */
+  readonly trailing?: (task: TaskRow) => ReactElement | undefined;
   /** A drop: the task before or after another one. */
   readonly onPlace: (
     key: string,
@@ -37,6 +39,10 @@ export function MiniList(props: {
   ) => Promise<boolean>;
 }): ReactElement {
   const { rows, scope, selected, draggable, isDone, onPlace } = props;
+  const trailingOf = (task: TaskRow): { trailing?: ReactElement } => {
+    const element = props.trailing?.(task);
+    return element ? { trailing: element } : {};
+  };
   const card = useRef<HTMLDivElement>(null);
   const { ghosts, fresh } = useRowGhosts(rows, scope, isDone);
   const handlers: RowHandlers = {
@@ -99,6 +105,7 @@ export function MiniList(props: {
         fresh={fresh.get(task.key)}
         onActivate={props.onOpen}
         {...handlers}
+        {...trailingOf(task)}
       />,
       ...ghostRows(ghosts, 'open', task.key, handlers, 'compact'),
     );

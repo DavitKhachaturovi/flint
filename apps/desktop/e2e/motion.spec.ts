@@ -339,6 +339,39 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
     await main.keyboard.press('Escape');
     await expect(main.locator('.give-to-claude')).toHaveCount(0);
   });
+  // FOCUS-01 to FOCUS-05 (D-170): sending, the page, the card's inversion, the settings card.
+  // The selection cleared first: a second click on a selected row edits it (D-74).
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.main .row.sel')).toHaveCount(0);
+  await main.locator('.main .row[data-key]:not(.done)').first().click();
+  await step(main, 'Send a task to Focus (F)', 'motion', async () => {
+    await main.keyboard.press('f');
+    await expect(main.locator('.toast')).toContainText('Sent to Focus');
+  });
+  await step(main, 'Focus (the page)', 'motion', async () => {
+    await nav('Focus').click();
+    await expect(main.locator('.focus-timer')).toBeVisible();
+  });
+  await step(main, 'Start the Focus timer (the card inverts)', 'motion', async () => {
+    await main.locator('.focus-go').click();
+    await expect(main.locator('.focus-timer')).toHaveClass(/\binverted\b/);
+  });
+  // The Start button keeps the keyboard focus: Shift+Space pauses once, never twice.
+  await step(main, 'Pause it (Shift+Space)', 'motion', async () => {
+    await main.keyboard.press('Shift+Space');
+    await expect(main.locator('.focus-timer')).not.toHaveClass(/\binverted\b/);
+    await expect(main.locator('.focus-go')).toHaveText('Resume');
+  });
+  await step(main, 'Focus settings open (the gear)', 'motion', async () => {
+    await main.locator('.focus-tool[aria-label="Focus settings"]').click();
+    await expect(main.locator('.focus-settings-card')).toBeVisible();
+  });
+  await step(main, 'They close (Esc)', 'motion', async () => {
+    await main.keyboard.press('Escape');
+    await expect(main.locator('.focus-settings-scrim')).toHaveCount(0);
+  });
+  await nav('Inbox').click();
+  await expect(main.locator('.main .row[data-key]').first()).toBeVisible();
   await step(main, 'Find opens (Ctrl+F)', 'motion', () => main.keyboard.press('Control+f'));
   await step(main, 'It closes (Esc)', 'motion', () => main.keyboard.press('Escape'));
   await step(main, 'What’s new opens', 'motion', async () => {

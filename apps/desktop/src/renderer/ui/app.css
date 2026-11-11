@@ -8073,3 +8073,707 @@ body[data-tour-step='5'] .main .row .pin-hover {
     animation: none;
   }
 }
+
+/* FOCUS-01 to FOCUS-05 (D-170, mockup 15): the Focus page. The timer card is the dark card at rest,
+   in a break and paused; while a focus session runs it inverts to the strong pair (Q3), the page
+   and the sidebar staying dark. The change is a crossfade (none under reduce-motion, D-75). */
+.focus-header {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.focus-session {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.focus-timer {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 24px 30px;
+  transition:
+    background-color var(--fl-dur-page) ease,
+    box-shadow var(--fl-dur-page) ease;
+}
+
+.focus-modes {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
+  transition: background-color var(--fl-dur-page) ease;
+}
+
+.focus-modes button {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.focus-modes button:hover {
+  color: var(--fl-text-primary);
+}
+
+.focus-modes button.on {
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 6%, transparent);
+  color: var(--fl-text-highlight);
+  font-weight: 500;
+}
+
+.focus-digits {
+  margin: 6px 0 10px;
+  font-size: 118px;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fl-text-highlight);
+  transition: color var(--fl-dur-page) ease;
+}
+
+.focus-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.focus-skip-room {
+  width: 48px;
+}
+
+.focus-go {
+  min-width: 196px;
+  height: 48px;
+  padding: 0 28px;
+  border-radius: 12px;
+  background: var(--fl-strong-bg);
+  box-shadow: var(--fl-shadow-primary-button);
+  color: var(--fl-strong-fg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    background-color var(--fl-dur-page) ease,
+    color var(--fl-dur-page) ease;
+}
+
+.focus-go:hover {
+  background: var(--fl-text-highlight);
+}
+
+.focus-go:active,
+.focus-skip:active {
+  transform: scale(0.97);
+}
+
+.focus-skip {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-secondary);
+  animation: fade-in var(--fl-dur-state) ease;
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    color var(--fl-dur-fast) ease;
+}
+
+.focus-skip:hover {
+  color: var(--fl-text-highlight);
+}
+
+.focus-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--fl-ground-tile);
+}
+
+.focus-progress i {
+  display: block;
+  height: 100%;
+  background: var(--fl-text-highlight);
+  transition: width 250ms linear;
+}
+
+.focus-timer.inverted {
+  background: var(--fl-strong-bg);
+  box-shadow:
+    0 0 0 1px var(--fl-strong-bg),
+    var(--fl-shadow-card);
+}
+
+.focus-timer.inverted .focus-modes {
+  background: color-mix(in srgb, var(--fl-strong-fg) 7%, transparent);
+  box-shadow: none;
+}
+
+.focus-timer.inverted .focus-modes button {
+  color: var(--fl-pri-low-color);
+}
+
+.focus-timer.inverted .focus-modes button.on {
+  background: var(--fl-strong-fg);
+  box-shadow: none;
+  color: var(--fl-text-highlight);
+}
+
+.focus-timer.inverted .focus-digits {
+  color: var(--fl-strong-fg);
+}
+
+.focus-timer.inverted .focus-go {
+  background: var(--fl-strong-fg);
+  color: var(--fl-text-highlight);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fl-strong-fg) 25%, transparent);
+}
+
+.focus-timer.inverted .focus-skip {
+  background: color-mix(in srgb, var(--fl-strong-fg) 8%, transparent);
+  box-shadow: none;
+  color: var(--fl-strong-fg);
+}
+
+.focus-timer.inverted .focus-progress {
+  background: color-mix(in srgb, var(--fl-strong-fg) 10%, transparent);
+}
+
+.focus-timer.inverted .focus-progress i {
+  background: var(--fl-strong-fg);
+}
+
+.focus-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+
+.focus-hash {
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-faint);
+}
+
+.focus-active-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  color: var(--fl-text-primary);
+}
+
+.focus-tasks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 6px;
+}
+
+.focus-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.focus-tool {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  color: var(--fl-text-muted);
+  transition:
+    color var(--fl-dur-fast) ease,
+    background-color var(--fl-dur-fast) ease;
+}
+
+.focus-tool:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-highlight);
+}
+
+/* FOCUS-03: a row's "1/4"; on hover (or selected) a − and + around it change the estimate. */
+.focus-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.focus-count.active {
+  color: var(--fl-text-highlight);
+}
+
+.focus-count.done {
+  color: var(--fl-text-faint);
+}
+
+.focus-count-text {
+  min-width: 34px;
+  text-align: right;
+}
+
+.focus-step {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--fl-font-mono);
+  color: var(--fl-text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--fl-dur-fast) ease,
+    background-color var(--fl-dur-fast) ease,
+    color var(--fl-dur-fast) ease;
+}
+
+.row:hover .focus-step,
+.row.sel .focus-step {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.focus-step:hover:not(:disabled) {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-highlight);
+}
+
+.focus-step:disabled {
+  color: var(--fl-text-faint);
+}
+
+.chip.home-list.done {
+  color: var(--fl-text-faint);
+}
+
+.composer-badge {
+  flex: 0 0 auto;
+  height: 22px;
+  color: var(--fl-text-secondary);
+}
+
+.focus-plan {
+  margin: 0;
+  padding-top: 2px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--fl-text-muted);
+}
+
+.focus-plan .mono {
+  font-family: var(--fl-font-mono);
+}
+
+.focus-plan .strong {
+  color: var(--fl-text-primary);
+}
+
+/* FOCUS-05: the settings card over the Focus page, the palette's way (a light dim, rising in). */
+.focus-settings-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3vh 24px 24px;
+  background: color-mix(in srgb, var(--fl-ground-window) 45%, transparent);
+  animation: palette-dim var(--fl-dur-fast) ease;
+}
+
+.focus-settings-scrim.leaving {
+  animation: palette-dim-out var(--fl-dur-fast) ease forwards;
+}
+
+.focus-settings-card {
+  width: min(440px, 100%);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--fl-radius-card);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  animation: palette-in var(--fl-dur-base) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.focus-settings-scrim.leaving .focus-settings-card {
+  animation: palette-out var(--fl-dur-fast) ease forwards;
+}
+
+.focus-settings-head,
+.focus-settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px 22px;
+}
+
+.focus-settings-head {
+  border-bottom: 1px solid var(--fl-edge-float);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+
+.focus-settings-foot {
+  padding: 12px 14px 14px 22px;
+  border-top: 1px solid var(--fl-edge-float);
+  font-size: 12.5px;
+  color: var(--fl-text-muted);
+}
+
+.focus-settings-foot .primary-button {
+  min-width: 76px;
+}
+
+.focus-settings-close {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--fl-text-muted);
+}
+
+.focus-settings-close:hover {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-highlight);
+}
+
+.focus-settings-body {
+  overflow-y: auto;
+}
+
+.focus-settings-section {
+  padding: 14px 22px 8px;
+  border-top: 1px solid var(--fl-edge-float);
+}
+
+.focus-settings-section:first-child {
+  border-top: 0;
+}
+
+.focus-minutes {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0 6px;
+}
+
+.focus-minute {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--fl-text-muted);
+}
+
+.focus-well {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  outline: none;
+  background: var(--fl-ground-well);
+  box-shadow:
+    inset 0 0 0 1px var(--fl-edge-divider),
+    inset 0 2px 4px color-mix(in srgb, var(--fl-ground-window) 60%, transparent);
+  font-family: var(--fl-font-mono);
+  font-size: 13px;
+  color: var(--fl-text-primary);
+  transition: box-shadow var(--fl-dur-fast) ease;
+}
+
+.focus-well:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--fl-accent),
+    inset 0 2px 4px color-mix(in srgb, var(--fl-ground-window) 60%, transparent);
+}
+
+.focus-well.narrow {
+  width: 56px;
+  text-align: center;
+}
+
+.focus-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+}
+
+.focus-setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.focus-setting-name {
+  font-size: 13.5px;
+  color: var(--fl-text-primary);
+}
+
+.focus-setting-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fl-text-muted);
+}
+
+.focus-setting .switch {
+  flex: 0 0 auto;
+}
+
+.focus-setting-pair {
+  display: flex;
+  gap: 6px;
+}
+
+.focus-select {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  border-radius: 10px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-size: 13px;
+  color: var(--fl-text-primary);
+  transition: background-color var(--fl-dur-fast) ease;
+}
+
+.focus-select:hover {
+  background: var(--fl-ground-hover);
+}
+
+.focus-select-chev {
+  display: flex;
+  color: var(--fl-text-muted);
+  transform: rotate(90deg);
+}
+
+.focus-play {
+  height: 34px;
+}
+
+.focus-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--fl-font-mono);
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.focus-volume input[type='range'] {
+  width: 140px;
+  height: 4px;
+  appearance: none;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    var(--fl-strong-bg) var(--fill, 50%),
+    var(--fl-ground-tile) var(--fill, 50%)
+  );
+  outline: none;
+}
+
+.focus-volume input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  appearance: none;
+  border-radius: 50%;
+  background: var(--fl-strong-bg);
+  box-shadow: var(--fl-shadow-strong-tile);
+}
+
+/* FOCUS-05: in Settings → Focus, the same form inside the section's card. */
+.settings-section .focus-settings-section {
+  padding: 12px 0 6px;
+  border-top-color: var(--fl-edge-divider);
+}
+
+/* FOCUS-06 (mockup 15): mini's compact timer, never inverted (Q3): white digits and line while
+   focus runs, the accent in a break. */
+.mini-focus {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 6px;
+  padding: 10px 12px 14px;
+  border-radius: 16px;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+}
+
+.mini-focus-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mini-focus-modes {
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
+}
+
+.mini-focus-modes button {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--fl-text-muted);
+  transition: color var(--fl-dur-fast) ease;
+}
+
+.mini-focus-modes button:hover {
+  color: var(--fl-text-primary);
+}
+
+.mini-focus-modes button.on {
+  background: var(--fl-ground-tile);
+  color: var(--fl-text-highlight);
+  font-weight: 500;
+}
+
+.mini-focus-hash {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+
+.mini-focus-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mini-focus-digits {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fl-text-highlight);
+  transition: color var(--fl-dur-page) ease;
+}
+
+.mini-focus.break .mini-focus-digits {
+  color: var(--fl-accent);
+}
+
+.mini-focus-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.mini-focus-go,
+.mini-focus-skip {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fl-text-highlight) 6%, transparent);
+  color: var(--fl-text-primary);
+  transition:
+    transform var(--fl-dur-fast) var(--fl-ease-spring),
+    color var(--fl-dur-fast) ease;
+}
+
+.mini-focus-go {
+  min-width: 76px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+
+.mini-focus-skip {
+  width: 32px;
+  color: var(--fl-text-secondary);
+}
+
+.mini-focus-go:active,
+.mini-focus-skip:active {
+  transform: scale(0.97);
+}
+
+.mini-focus-go:hover,
+.mini-focus-skip:hover {
+  color: var(--fl-text-highlight);
+}
+
+.mini-focus-title {
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fl-text-muted);
+}
+
+.mini-focus-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--fl-ground-tile);
+}
+
+.mini-focus-progress i {
+  display: block;
+  height: 100%;
+  background: var(--fl-text-highlight);
+  transition:
+    width 250ms linear,
+    background-color var(--fl-dur-page) ease;
+}
+
+.mini-focus.break .mini-focus-progress i {
+  background: var(--fl-accent);
+}
+
+.mini-tab-time {
+  font-family: var(--fl-font-mono);
+  font-size: 12px;
+}

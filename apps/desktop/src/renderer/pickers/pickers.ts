@@ -420,6 +420,8 @@ export function openListPicker(
     readonly placeholder: string;
     /** D-158: no "New list" row (choosing a list to show, not a place to send to); on by default. */
     readonly newList?: boolean;
+    /** FOCUS-06 (D-170): these first, in this order, while nothing is typed (mini: Inbox, Focus). */
+    readonly first?: readonly string[];
   },
   onPick: (pick: ListPick) => void,
 ): void {
@@ -438,7 +440,14 @@ export function openListPicker(
   const highlight = rowList(box);
   const render = (): void => {
     const typed = search.value.trim();
-    const found = suggestLists(typed, lists).filter((list) => list.id !== options.exclude);
+    const matched = suggestLists(typed, lists).filter((list) => list.id !== options.exclude);
+    const first = typed === '' ? (options.first ?? []) : [];
+    const rank = (list: ListInfo): number => {
+      const at = first.indexOf(list.id);
+      return at < 0 ? first.length : at;
+    };
+    // Stable: the rest keep the picker's order (most recently used, then the sidebar's).
+    const found = [...matched].sort((a, b) => rank(a) - rank(b));
     const rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
     const taken = lists.some((list) => normalizeListName(list.name) === normalizeListName(typed));
     if (options.newList !== false && typed !== '' && !taken && isValidListName(typed))

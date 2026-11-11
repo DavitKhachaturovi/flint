@@ -24,6 +24,7 @@ import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accele
 import { SHORTCUTS } from '../../shared/shortcuts.js';
 import { syncedAgo, type SyncMode, type SyncStatusView } from '../../shared/sync.js';
 import { CloudIcon } from './icons.js';
+import { FocusSettingsForm, useFocusTimer } from './Focus.js';
 import { clipboardChanged } from './ClipboardSection.js';
 import {
   compileLinkPatterns,
@@ -49,6 +50,8 @@ export const SETTINGS_SECTIONS = [
   { id: 'reminders', name: 'Reminders' },
   { id: 'mini', name: 'Mini mode' },
   { id: 'today', name: 'Today & lists' },
+  // FOCUS-05 (D-170): the Focus settings card's rows, the same component.
+  { id: 'focus', name: 'Focus' },
   { id: 'sync', name: 'Sync' },
   { id: 'links', name: 'Links' },
   { id: 'clipboard', name: 'Clipboard' },
@@ -186,6 +189,16 @@ function withFilter(children: ReactNode, filter: string): ReactNode {
 }
 
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
+
+/** FOCUS-05: what Settings' filter finds the Focus section by (its rows aren't Settings rows). */
+const FOCUS_WORDS =
+  'focus pomodoro timer minutes short break long break auto start breaks auto start focus long break interval auto check tasks check to bottom alarm sound nudge drop mallet volume repeat notify when a session ends heads-up before the end';
+
+/** FOCUS-05: Settings → Focus: the form, once the timer's settings have come. */
+function FocusSection(): ReactElement | null {
+  const view = useFocusTimer();
+  return view ? <FocusSettingsForm settings={view.settings} /> : null;
+}
 
 const DOES: Record<HotkeyName, string> = {
   capture: 'opens the capture popup',
@@ -798,6 +811,11 @@ export function SettingsScreen(props: {
             onChange={(value) => set({ key: 'autoArchiveDays', value })}
           />
         </Row>
+      </Section>
+
+      {/* FOCUS-05 (D-170): the Focus settings, as the gear's card on the Focus page shows them. */}
+      <Section id="focus" filter={filter} matches={FOCUS_WORDS.includes(filter)}>
+        <FocusSection />
       </Section>
 
       {/* SYNC-01, D-161 (mockup 13): Google Drive sync. */}

@@ -151,6 +151,11 @@ export function Row(
      * a second click on a selected row then does nothing.
      */
     readonly onActivate?: (task: TaskRow) => void;
+    /**
+     * FOCUS-03 (D-170): what Focus shows at the row's end (its "1/4"); with it, the home list
+     * stays on a done row too (faded, mockup 15).
+     */
+    readonly trailing?: ReactElement;
   },
 ): ReactElement {
   const {
@@ -453,10 +458,10 @@ export function Row(
           </button>
         )}
         {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
-        {!compact && task.home && !task.done && (
+        {!compact && task.home && (!task.done || props.trailing) && (
           <button
             type="button"
-            className="chip home-list"
+            className={task.done ? 'chip home-list done' : 'chip home-list'}
             title={`Open ${task.home.listName}`}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -467,6 +472,7 @@ export function Row(
             {task.home.listName}
           </button>
         )}
+        {props.trailing}
       </span>
     </div>
   );

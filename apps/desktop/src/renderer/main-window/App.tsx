@@ -61,7 +61,7 @@ import {
   MiniIcon,
 } from './icons.js';
 import { OverdueCard, ReminderCards, RolloverCard, TodayColumn, TodayGreeting } from './Today.js';
-import { titleHtml } from '../../shared/inline-markdown.js';
+import { titleHtml, titlePlain } from '../../shared/inline-markdown.js';
 import { isTextField, openMenu, textFieldMenu, type MenuEntry } from '../menu/menu.js';
 
 import { NoteEditor } from './NoteEditor.js';
@@ -85,7 +85,18 @@ import {
   useSync,
   useSyncStatus,
 } from './Sync.js';
-import { CloudIcon } from './icons.js';
+import { CloudIcon, FocusIcon, MoreIcon, SettingsIcon as GearIcon } from './icons.js';
+import { FOCUS_ID, type FocusAction } from '../../shared/focus.js';
+import {
+  FocusActiveLine,
+  FocusCount,
+  FocusPlanLine,
+  FocusSettingsCard,
+  FocusTimerCard,
+  playAlarm,
+  sessionNumber,
+  useFocusTimer,
+} from './Focus.js';
 import { setConflictDevice } from '../editor/conflict-view.js';
 import { setLinkedSync } from '../media/media.js';
 import { syncedAgo, type SyncEverythingPreview, type SyncStatusView } from '../../shared/sync.js';
@@ -678,11 +689,13 @@ export function App(): ReactElement {
     async (then?: () => void): Promise<void> => {
       const seq = ++refreshSeq.current;
       if (then) refreshThens.current.push(then);
-      const [nextLists, nextView, nextSidebar, nextTrash] = await Promise.all([
+      const [nextLists, nextView, nextSidebar, nextTrash, nextSprint] = await Promise.all([
         window.flintMain.lists(),
         window.flintMain.view(listId),
         window.flintMain.sidebar(),
         window.flintMain.trash(),
+        // FOCUS-02: the sprint, for Send to / Remove from Focus and the sidebar's count.
+        listId === FOCUS_ID ? Promise.resolve(null) : window.flintMain.view(FOCUS_ID),
       ]);
       if (seq !== refreshSeq.current) return;
       const thens = refreshThens.current;
@@ -697,6 +710,7 @@ export function App(): ReactElement {
         motion.capture();
       setLists(nextLists);
       setView(nextView);
+      setSprint(listId === FOCUS_ID ? nextView : nextSprint);
       setSidebarView(nextSidebar);
       for (const each of thens) each();
     },
@@ -757,6 +771,13 @@ export function App(): ReactElement {
     window.flintMain.onShowOverdue(() => {
       goRef.current({ list: TODAY_ID, page: null });
       setOverdueCalled(true);
+    });
+    // FOCUS-04 (D-170): a session ended (or Play in the settings): the alarm, here.
+    window.flintMain.onFocusAlarm((alarm) => playAlarm(alarm.sound, alarm.volume, alarm.repeat));
+    // A Focus toast's body, mini's Focus settings…: the Focus page (and its settings card).
+    window.flintMain.onShowFocus((settings) => {
+      goRef.current({ list: FOCUS_ID, page: null });
+      if (settings) setFocusSettings('open');
     });
     // REM-06, D-94: Flint's own sound, when it is turned on (main decides).
     window.flintMain.onChime(() => {
@@ -901,6 +922,11 @@ export function App(): ReactElement {
   const [toTop, setToTop] = useState(false);
   /** D-94: "N reminders you missed" was opened: the Overdue card opens and comes into view. */
   const [overdueCalled, setOverdueCalled] = useState(false);
+  /** FOCUS-01 (D-170): the timer (main owns it); the sprint, for the menus, F and the sidebar. */
+  const focusTimer = useFocusTimer();
+  const [sprint, setSprint] = useState<ListView | null>(null);
+  /** FOCUS-05: the settings card over the Focus page (leaving: its fade out). */
+  const [focusSettings, setFocusSettings] = useState<'open' | 'leaving' | null>(null);
   /**
    * D-91: a reminder's Open, and Today's timeline: the task in its list, centred and flashed. D-93:
    * at once (never a long smooth scroll, which flashed the row before it was in view).
@@ -2019,6 +2045,89 @@ export function App(): ReactElement {
     [change, showToast],
   );
 
+  /** FOCUS-02 (D-170): the tasks in Focus's sprint (only the menu's label shows it elsewhere). */
+  const focusKeys = useMemo(
+    () =>
+      new Set(
+        (sprint?.items ?? []).flatMap((item) => (item.kind === 'task' ? [item.task.key] : [])),
+      ),
+    [sprint],
+  );
+  /**
+   * FOCUS-02: F, Send to Focus / Remove from Focus (all marked, or one task), one undo step; a
+   * toast with Go to Focus after sending (D-147's way to the place it went).
+   */
+  const sendToFocus = useCallback(
+    async (tasks: readonly TaskRow[], focus: boolean): Promise<void> => {
+      const targets = tasks.filter((task) => focusKeys.has(task.key) !== focus);
+      if (targets.length === 0) return;
+      const many = targets.length > 1 ? ` ${tasksCount(targets.length)}` : '';
+      const label = focus ? `Sent${many} to Focus` : `Removed${many} from Focus`;
+      const outcome = await change({
+        kind: 'many',
+        label,
+        changes: targets.map((task) => ({ kind: 'focus', key: task.key, focus })),
+      });
+      if (!outcome) return;
+      showToast(
+        outcome.label,
+        true,
+        focus && listId !== FOCUS_ID
+          ? { label: 'Go to Focus', run: () => openList(FOCUS_ID) }
+          : undefined,
+      );
+    },
+    [change, showToast, focusKeys, listId, openList],
+  );
+  /** FOCUS-02: Focus on this (Shift+F): first in the sprint, so it is the active task. */
+  const focusOnThis = useCallback(
+    async (key: string): Promise<void> => {
+      const outcome = await change({ kind: 'focusTop', key });
+      if (outcome) showToast(outcome.label, true);
+    },
+    [change, showToast],
+  );
+  /** FOCUS-03: a task's estimate (the stepper, − and +). */
+  const setEstimate = useCallback(
+    (key: string, estimate: number): void => {
+      if (estimate < 1) return;
+      void change({ kind: 'estimate', key, estimate });
+    },
+    [change],
+  );
+  /** FOCUS-02: the Focus page's ⋯ menu. */
+  const focusAction = useCallback(
+    (action: FocusAction): void => {
+      void window.flintMain.focusAction(action).then((label) => {
+        if (label) showToast(label, true);
+      });
+    },
+    [showToast],
+  );
+
+  /** FOCUS-05: the settings card closes with its fade (at once under reduce-motion). */
+  const closeFocusSettings = useCallback((): void => {
+    setFocusSettings((current) =>
+      current === null || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? null
+        : 'leaving',
+    );
+  }, []);
+  /** FOCUS-02, FOCUS-05: the Focus page's ⋯ menu and its sidebar row's menu. */
+  const focusMenu = (): MenuEntry[] => [
+    {
+      label: 'Focus settings…',
+      action: () => {
+        openList(FOCUS_ID);
+        setFocusSettings('open');
+      },
+    },
+    'divider',
+    { label: 'Clear finished', action: () => focusAction('clearFinished') },
+    { label: 'Reset counts', action: () => focusAction('resetCounts') },
+    { label: 'Remove all from Focus', action: () => focusAction('removeAll') },
+  ];
+
   /** TASK-07, D-59: the right-click menu of a marked row: the actions for all marked tasks. */
   const bulkMenu = useCallback(
     (at: Point): void => {
@@ -2052,13 +2161,25 @@ export function App(): ReactElement {
           markedRows.every((row) => row.pinned)
             ? { label: `Unpin ${count}`, hint: 'P', action: () => void pin(markedRows, false) }
             : { label: `Pin ${count}`, hint: 'P', action: () => void pin(markedRows, true) },
+          // FOCUS-02: sends all, or takes all out when all are in Focus.
+          markedRows.every((row) => focusKeys.has(row.key))
+            ? {
+                label: `Remove ${count} from Focus`,
+                hint: 'F',
+                action: () => void sendToFocus(markedRows, false),
+              }
+            : {
+                label: `Send ${count} to Focus`,
+                hint: 'F',
+                action: () => void sendToFocus(markedRows, true),
+              },
           'divider',
           { label: `Delete ${tasksCount(markedRows.length)}`, hint: 'Del', action: bulkDelete },
         ],
         at,
       );
     },
-    [markedRows, bulkComplete, bulkPriority, bulkMove, bulkDelete, pin],
+    [markedRows, bulkComplete, bulkPriority, bulkMove, bulkDelete, pin, focusKeys, sendToFocus],
   );
 
   /** REM-12, D-66: turns a reminder off (kept, never fired) or on, with Undo. */
@@ -2366,6 +2487,17 @@ export function App(): ReactElement {
           hint: 'P',
           action: () => void pin([row], !row.pinned),
         },
+        // FOCUS-02 (D-170): the only place outside Focus that says a task is in it.
+        focusKeys.has(row.key)
+          ? {
+              label: 'Remove from Focus',
+              hint: 'F',
+              action: () => void sendToFocus([row], false),
+            }
+          : { label: 'Send to Focus', hint: 'F', action: () => void sendToFocus([row], true) },
+        ...(listId === FOCUS_ID && open
+          ? [{ label: 'Focus on this', hint: 'Shift+F', action: () => void focusOnThis(row.key) }]
+          : []),
         ...(add.length > 0 ? ['divider' as const, { label: 'Add', submenu: add }] : []),
         'divider',
         {
@@ -2476,6 +2608,9 @@ export function App(): ReactElement {
       addSubtask,
       showToast,
       go,
+      focusKeys,
+      sendToFocus,
+      focusOnThis,
     ],
   );
   /** UI-08, D-55: a task's right-click menu (also Shift+F10 and the Menu key). */
@@ -3229,6 +3364,12 @@ export function App(): ReactElement {
         return;
       }
       if (event.altKey) return;
+      // FOCUS-01 (D-170): Shift+Space starts and pauses Focus's timer on its page.
+      if (event.key === ' ' && event.shiftKey && view.id === FOCUS_ID) {
+        event.preventDefault();
+        window.flintMain.focusCommand({ kind: 'toggle' });
+        return;
+      }
       if (event.key === 'ArrowRight' && row && hasBody(row)) {
         event.preventDefault();
         if (!expanded.has(row.key)) showBody(row);
@@ -3267,6 +3408,32 @@ export function App(): ReactElement {
         const targets = marked.size > 1 ? rows.filter((other) => marked.has(other.key)) : [row];
         const tasks = targets.filter((task): task is TaskRow => task !== undefined);
         void pin(tasks, !tasks.every((task) => task.pinned));
+      } else if (key === 'f' && !event.shiftKey && (marked.size > 1 || row)) {
+        // FOCUS-02 (D-170): F sends to Focus, or takes out (all marked, or the selected task).
+        event.preventDefault();
+        const targets = marked.size > 1 ? rows.filter((other) => marked.has(other.key)) : [row];
+        const tasks = targets.filter((task): task is TaskRow => task !== undefined);
+        void sendToFocus(tasks, !tasks.every((task) => focusKeys.has(task.key)));
+      } else if (
+        key === 'f' &&
+        event.shiftKey &&
+        view.id === FOCUS_ID &&
+        marked.size <= 1 &&
+        open
+      ) {
+        // FOCUS-02: Shift+F, Focus on this: the active task.
+        event.preventDefault();
+        void focusOnThis(open.key);
+      } else if (
+        (event.key === '+' || event.key === '=' || event.key === '-') &&
+        view.id === FOCUS_ID &&
+        marked.size <= 1 &&
+        open
+      ) {
+        // FOCUS-03: − and + change the selected task's estimate.
+        event.preventDefault();
+        const estimate = sprint?.focus?.entries[open.key]?.estimate ?? 1;
+        setEstimate(open.key, estimate + (event.key === '-' ? -1 : 1));
       } else if (key === 'g' && !event.shiftKey && !event.altKey && marked.size <= 1 && row) {
         // TASK-18, D-151: G gives the selected task to Claude (completed ones too).
         event.preventDefault();
@@ -3342,6 +3509,11 @@ export function App(): ReactElement {
     showBody,
     openPage,
     pin,
+    sendToFocus,
+    focusKeys,
+    focusOnThis,
+    setEstimate,
+    sprint,
   ]);
 
   /** The task shown as a page, if it is still in the list (else the list shows). */
@@ -3478,7 +3650,7 @@ export function App(): ReactElement {
             ? (element as HTMLElement).dataset['key']
             : undefined;
         // Inbox and Today stay where they are (M6).
-        return key && key !== inbox?.id && key !== TODAY_ID && key !== TRASH_ID
+        return key && key !== inbox?.id && key !== TODAY_ID && key !== FOCUS_ID && key !== TRASH_ID
           ? [{ key, elements: [element as HTMLElement] }]
           : [];
       });
@@ -3501,7 +3673,8 @@ export function App(): ReactElement {
       return;
     }
     const id = nav?.dataset['key'];
-    if (!nav || !id || id === inbox?.id || id === TODAY_ID || id === TRASH_ID) return;
+    if (!nav || !id || id === inbox?.id || id === TODAY_ID || id === FOCUS_ID || id === TRASH_ID)
+      return;
     // Every visible list and group header, in order, each moving on its own.
     interface Spot {
       readonly unit: DragUnit;
@@ -3513,7 +3686,7 @@ export function App(): ReactElement {
     for (const element of aside.children) {
       if (element.matches('.nav[data-key]')) {
         const key = (element as HTMLElement).dataset['key'] ?? '';
-        if (key !== inbox?.id && key !== TODAY_ID && key !== TRASH_ID)
+        if (key !== inbox?.id && key !== TODAY_ID && key !== FOCUS_ID && key !== TRASH_ID)
           spots.push({
             unit: { key, elements: [element as HTMLElement] },
             kind: 'list',
@@ -3831,6 +4004,7 @@ export function App(): ReactElement {
       );
     };
     cardRows.push(...ghostRows(ghosts, 'open', null, rowProps));
+    const focusEntries = view.focus?.entries;
     const highKeys = new Set(view.today?.high ?? []);
     let firstHigh: string | null = null;
     for (const item of (shownView ?? view).items)
@@ -3870,6 +4044,7 @@ export function App(): ReactElement {
             </div>,
           );
         }
+        const focusEntry = focusEntries?.[item.task.key];
         cardRows.push(
           withBody(
             <Row
@@ -3877,6 +4052,17 @@ export function App(): ReactElement {
               task={item.task}
               fresh={freshKeys.get(item.task.key)}
               {...rowProps}
+              {...(focusEntry && {
+                // FOCUS-03 (D-170): the task's "1/4", its estimate's stepper on hover.
+                trailing: (
+                  <FocusCount
+                    entry={focusEntry}
+                    active={view.focus?.active === item.task.key}
+                    done={item.task.done}
+                    onEstimate={(estimate) => setEstimate(item.task.key, estimate)}
+                  />
+                ),
+              })}
             />,
             item.task,
             false,
@@ -4246,13 +4432,15 @@ export function App(): ReactElement {
   const placeName = (id: string): string =>
     id === TODAY_ID
       ? 'Today'
-      : id === SETTINGS_ID
-        ? 'Settings'
-        : id === TRASH_ID
-          ? 'Trash'
-          : id === SNAPSHOTS_ID
-            ? 'Snapshots'
-            : (lists.find((list) => list.id === id)?.name ?? '');
+      : id === FOCUS_ID
+        ? 'Focus'
+        : id === SETTINGS_ID
+          ? 'Settings'
+          : id === TRASH_ID
+            ? 'Trash'
+            : id === SNAPSHOTS_ID
+              ? 'Snapshots'
+              : (lists.find((list) => list.id === id)?.name ?? '');
   /** D-106: Settings, at a section. */
   const openSettings = (section?: string): void => {
     openList(SETTINGS_ID);
@@ -4318,6 +4506,7 @@ export function App(): ReactElement {
     // D-107: "Go to" is the fixed places; lists, notes and groups come after the tasks.
     const places: PaletteItem[] = [
       { id: 'go:today', label: 'Today', hint: undefined, run: go(TODAY_ID) },
+      { id: 'go:focus', label: 'Focus', keywords: 'pomodoro timer', run: go(FOCUS_ID) },
       { id: 'go:settings', label: 'Settings', run: () => openSettings() },
       ...SETTINGS_SECTIONS.map((section) => ({
         id: `go:settings:${section.id}`,
@@ -4344,7 +4533,8 @@ export function App(): ReactElement {
         .querySelector(`.row[data-key="${CSS.escape(row.key)}"]`)
         ?.getBoundingClientRect();
       const at = box ? { x: box.left + 48, y: box.bottom } : { x: 240, y: 160 };
-      const home = view?.id === TODAY_ID ? (row.home?.listId ?? listId) : listId;
+      const home =
+        view?.id === TODAY_ID || view?.id === FOCUS_ID ? (row.home?.listId ?? listId) : listId;
       task = fromMenu(taskEntries(row, at), 'task').map((item) =>
         item.label === 'Move to…'
           ? {
@@ -4376,7 +4566,7 @@ export function App(): ReactElement {
       { id: 'new:group', label: 'New group', run: () => setNaming({ kind: 'newGroup' }) },
       { id: 'new:quick', label: 'Quick note', hint: 'Ctrl+Shift+J', run: () => newQuickNote() },
       // TASK-18, D-151: the list's folder for Give to Claude.
-      ...(view?.mode === 'tasks' && view.id !== TODAY_ID
+      ...(view?.mode === 'tasks' && view.id !== TODAY_ID && view.id !== FOCUS_ID
         ? [
             {
               id: 'claude:folder',
@@ -4396,7 +4586,7 @@ export function App(): ReactElement {
               : []),
           ]
         : []),
-      ...(view?.mode === 'tasks' && !pageTask && view.id !== TODAY_ID
+      ...(view?.mode === 'tasks' && !pageTask && view.id !== TODAY_ID && view.id !== FOCUS_ID
         ? [
             {
               id: 'list:find',
@@ -4428,7 +4618,10 @@ export function App(): ReactElement {
       ...tablePaletteCommands()
         .filter((command) => !command.disabled)
         .map((command) => ({ id: command.id, label: command.label, run: command.run })),
-      ...(view && !lists.find((list) => list.id === view.id)?.inbox && view.id !== TODAY_ID
+      ...(view &&
+      !lists.find((list) => list.id === view.id)?.inbox &&
+      view.id !== TODAY_ID &&
+      view.id !== FOCUS_ID
         ? [
             {
               id: 'list:rename',
@@ -4511,6 +4704,81 @@ export function App(): ReactElement {
         hint: 'T',
         run: () => startTriage(lists.find((list) => list.inbox)?.id ?? 'inbox'),
       },
+      // FOCUS-01, FOCUS-02, FOCUS-05 (D-170, D-106): the timer and the sprint from Ctrl+K.
+      ...(() => {
+        const state = focusTimer?.state;
+        const running = state?.endsAt !== null && state?.endsAt !== undefined;
+        const started = state !== undefined && (running || state.left !== state.length);
+        const timer = (kind: 'toggle' | 'skip'): void => window.flintMain.focusCommand({ kind });
+        const words = 'focus pomodoro timer';
+        return [
+          {
+            id: 'focus:toggle',
+            label: running
+              ? 'Pause focus timer'
+              : started
+                ? 'Resume focus timer'
+                : state?.mode === 'focus' || !state
+                  ? 'Start focus'
+                  : state.mode === 'short'
+                    ? 'Start short break'
+                    : 'Start long break',
+            keywords: words,
+            hint: 'Shift+Space',
+            run: () => timer('toggle'),
+          },
+          ...(started
+            ? [
+                {
+                  id: 'focus:skip',
+                  label: 'Skip',
+                  keywords: `${words} next break`,
+                  run: () => timer('skip'),
+                },
+              ]
+            : []),
+          ...(['focus', 'short', 'long'] as const)
+            .filter((mode) => mode !== state?.mode)
+            .map((mode) => ({
+              id: `focus:mode:${mode}`,
+              label:
+                mode === 'focus'
+                  ? 'Focus session'
+                  : mode === 'short'
+                    ? 'Short break'
+                    : 'Long break',
+              keywords: words,
+              run: () => window.flintMain.focusCommand({ kind: 'mode', mode }),
+            })),
+          {
+            id: 'focus:settings',
+            label: 'Focus settings',
+            keywords: `${words} settings alarm sound minutes`,
+            run: () => {
+              openList(FOCUS_ID);
+              setFocusSettings('open');
+            },
+          },
+          {
+            id: 'focus:clear',
+            label: 'Clear finished tasks from Focus',
+            keywords: words,
+            run: () => focusAction('clearFinished'),
+          },
+          {
+            id: 'focus:reset',
+            label: 'Reset Focus counts',
+            keywords: words,
+            run: () => focusAction('resetCounts'),
+          },
+          {
+            id: 'focus:remove-all',
+            label: 'Remove all from Focus',
+            keywords: words,
+            run: () => focusAction('removeAll'),
+          },
+        ];
+      })(),
       {
         id: 'app:mini',
         label: 'Mini mode',
@@ -5065,6 +5333,20 @@ export function App(): ReactElement {
               onMenu={(at) => listMenu(inbox, at)}
             />
           )}
+          {/* FOCUS-01 (D-170): Focus under Inbox, with its open tasks. */}
+          <NavItem
+            list={{
+              id: FOCUS_ID,
+              name: 'Focus',
+              mode: 'tasks',
+              open: sprint?.open ?? 0,
+              inbox: false,
+            }}
+            active={listId === FOCUS_ID}
+            icon={<FocusIcon />}
+            onSelect={() => openList(FOCUS_ID)}
+            onMenu={(at) => openMenu(focusMenu(), at)}
+          />
           {/* NOTE-08, D-99: a quick note in one click; the untitled ones listed below it. */}
           <button
             type="button"
@@ -5503,6 +5785,60 @@ export function App(): ReactElement {
                     />
                   </>
                 )}
+                {/* FOCUS-01, FOCUS-02 (D-170, mockup 15): the title, the timer card, "#3 · the
+                  active task", then the sprint's head with the settings and the ⋯ menu. */}
+                {view && !pageTask && view.id === FOCUS_ID && (
+                  <>
+                    <header className="list-header focus-header">
+                      <h1>
+                        Focus
+                        {view.open > 0 && <span className="count"> · {view.open} open</span>}
+                      </h1>
+                      {focusTimer && (
+                        <span className="focus-session">
+                          Session {sessionNumber(focusTimer.state, Date.now())} today
+                        </span>
+                      )}
+                    </header>
+                    {focusTimer && <FocusTimerCard view={focusTimer} />}
+                    {focusTimer && (
+                      <FocusActiveLine
+                        view={focusTimer}
+                        title={(() => {
+                          const active = view.focus?.active;
+                          const row = active ? findRow(view, active) : null;
+                          return row ? titlePlain(row.title.trim()) || row.label : null;
+                        })()}
+                      />
+                    )}
+                    <div className="focus-tasks-head">
+                      <span className="panel-label">Tasks</span>
+                      <span className="focus-tools">
+                        <button
+                          type="button"
+                          className="focus-tool"
+                          title="Focus settings"
+                          aria-label="Focus settings"
+                          onClick={() => setFocusSettings('open')}
+                        >
+                          <GearIcon size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="focus-tool"
+                          title="More"
+                          aria-label="More"
+                          onClick={(event) => {
+                            const box = event.currentTarget.getBoundingClientRect();
+                            openMenu(focusMenu(), { x: box.right - 200, y: box.bottom + 4 });
+                          }}
+                        >
+                          <MoreIcon />
+                        </button>
+                      </span>
+                    </div>
+                  </>
+                )}
                 {view && triage === view.id && !pageTask && (
                   <Triage
                     key={view.id}
@@ -5521,7 +5857,8 @@ export function App(): ReactElement {
                   triage !== view.id &&
                   !pageTask &&
                   view.mode === 'tasks' &&
-                  view.id !== TODAY_ID && (
+                  view.id !== TODAY_ID &&
+                  view.id !== FOCUS_ID && (
                     <header className="list-header">
                       <h1>
                         {view.name}
@@ -5623,7 +5960,7 @@ export function App(): ReactElement {
 
                 {view?.mode === 'tasks' && !pageTask && triage !== view.id && (
                   <>
-                    {!view.readOnly && (
+                    {!view.readOnly && view.id !== FOCUS_ID && (
                       <Composer
                         key={view.id}
                         listId={view.id}
@@ -5665,7 +6002,7 @@ export function App(): ReactElement {
                       />
                       {view.id === TODAY_ID && (
                         <div className="focus-head">
-                          <span className="panel-label">Focus · pinned</span>
+                          <span className="panel-label">Pinned</span>
                           {view.open > 1 && <span className="focus-hint">drag to reorder</span>}
                         </div>
                       )}
@@ -5680,11 +6017,29 @@ export function App(): ReactElement {
                         <p className="empty">
                           {view.id === TODAY_ID
                             ? 'Nothing pinned yet. Press P on a task in any list to bring it here, or add one above.'
-                            : 'Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your hotkey.'}
+                            : view.id === FOCUS_ID
+                              ? 'Send tasks here with F from any list, or add one below.'
+                              : 'Nothing here. Press Ctrl+N to add a task, or capture from anywhere with your hotkey.'}
                         </p>
                       )}
                       {cardRows}
                     </section>
+                    {/* FOCUS-02, FOCUS-03: the composer under the sprint (to Inbox and the
+                      sprint), then "2 of 7 sessions · finish at 15:40". */}
+                    {view.id === FOCUS_ID && (
+                      <>
+                        <Composer
+                          key={view.id}
+                          listId={view.id}
+                          lists={lists}
+                          inputRef={composer}
+                          onAdd={addFromComposer}
+                          placeholder="Add a task to Focus…"
+                          badge="Inbox"
+                        />
+                        {focusTimer && <FocusPlanLine view={focusTimer} list={view} />}
+                      </>
+                    )}
                     {view.id === TODAY_ID && !panelShown && view.today && (
                       <TodayColumn
                         extras={view.today}
@@ -5844,6 +6199,15 @@ export function App(): ReactElement {
           </div>
         </main>
 
+        {focusSettings && focusTimer && (
+          <FocusSettingsCard
+            view={focusTimer}
+            leaving={focusSettings === 'leaving'}
+            onClose={closeFocusSettings}
+            onGone={() => setFocusSettings(null)}
+          />
+        )}
+
         {marked.size > 1 && (
           <div className="action-bar" role="toolbar" aria-label="Marked tasks">
             <span className="action-count">{marked.size} selected</span>
@@ -5880,6 +6244,15 @@ export function App(): ReactElement {
               onClick={() => void pin(markedRows, !markedRows.every((row) => row.pinned))}
             >
               {markedRows.every((row) => row.pinned) ? 'Unpin' : 'Pin'}
+            </button>
+            {/* FOCUS-02 (D-170): sends them all to Focus, or takes them out when all are in. */}
+            <button
+              type="button"
+              onClick={() =>
+                void sendToFocus(markedRows, !markedRows.every((row) => focusKeys.has(row.key)))
+              }
+            >
+              {markedRows.every((row) => focusKeys.has(row.key)) ? 'Remove from Focus' : 'Focus'}
             </button>
             <button type="button" onClick={bulkDelete}>
               Delete
@@ -5994,7 +6367,7 @@ export function App(): ReactElement {
             const home = task.home ?? parent?.home;
             const list = home
               ? { id: home.listId, name: home.listName }
-              : view.id !== TODAY_ID
+              : view.id !== TODAY_ID && view.id !== FOCUS_ID
                 ? { id: view.id, name: view.name }
                 : null;
             return (

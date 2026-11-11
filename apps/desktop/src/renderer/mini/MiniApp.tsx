@@ -18,7 +18,17 @@ import {
 } from '../../shared/ipc.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
-import { ChevronIcon, CloseIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
+import { ChevronIcon, CloseIcon, MoreIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
+import { FOCUS_ID } from '../../shared/focus.js';
+import { timeLeft, timerRunning } from '@flint/core/focus';
+import { titlePlain } from '../../shared/inline-markdown.js';
+import {
+  clockText,
+  FocusCount,
+  MiniFocusCard,
+  useClock,
+  useFocusTimer,
+} from '../main-window/Focus.js';
 import { openListPicker } from '../pickers/pickers.js';
 import { Composer, listInfos } from '../ui/Composer.js';
 import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
@@ -118,6 +128,16 @@ function listRows(
   const routes = new Map<string, Route>();
   const rows = openTasks(view).map((task) => {
     routes.set(task.key, { listId, homeId: listId });
+    return todayTime(task);
+  });
+  return { rows, routes };
+}
+
+/** FOCUS-06 (D-170): Focus's open tasks; Open goes to each task's own list. */
+function focusRows(view: ListView | null): { rows: TaskRow[]; routes: Map<string, Route> } {
+  const routes = new Map<string, Route>();
+  const rows = openTasks(view).map((task) => {
+    routes.set(task.key, { listId: FOCUS_ID, homeId: task.home?.listId ?? INBOX_ID });
     return todayTime(task);
   });
   return { rows, routes };
@@ -336,9 +356,21 @@ export function MiniApp(): ReactElement {
 
   // MINI-03, D-158: the list the second tab shows; one that is gone falls back to Inbox.
   const shownList = listChoice ?? INBOX_ID;
-  const shownListName = lists.find((list) => list.id === shownList)?.name ?? 'Inbox';
+  // FOCUS-06 (D-170): Focus, chosen like a list, is never gone.
+  const focusShown = shownList === FOCUS_ID;
+  const shownListName = focusShown
+    ? 'Focus'
+    : (lists.find((list) => list.id === shownList)?.name ?? 'Inbox');
+  const focusTimer = useFocusTimer();
+  const focusClock = useClock(focusTimer !== null && timerRunning(focusTimer.state));
   useEffect(() => {
-    if (!listChoice || lists.length === 0 || lists.some((list) => list.id === listChoice)) return;
+    if (
+      !listChoice ||
+      listChoice === FOCUS_ID ||
+      lists.length === 0 ||
+      lists.some((list) => list.id === listChoice)
+    )
+      return;
     listRef.current = null;
     setListChoice(null);
     window.flintMini.setState({ listId: null });
@@ -359,8 +391,17 @@ export function MiniApp(): ReactElement {
   const pickList = (button: HTMLElement): void => {
     openListPicker(
       { anchor: button.getBoundingClientRect(), returnFocus: null, trigger: button },
-      listInfos(lists.filter((list) => list.mode === 'tasks')),
-      { exclude: shownList, placeholder: 'Show a list…', newList: false },
+      // FOCUS-06: Inbox, then Focus, always first; then the lists by recent use.
+      [
+        ...listInfos(lists.filter((list) => list.mode === 'tasks')),
+        { id: FOCUS_ID, name: 'Focus', mode: 'tasks' as const },
+      ],
+      {
+        exclude: shownList,
+        placeholder: 'Show a list…',
+        newList: false,
+        first: [INBOX_ID, FOCUS_ID],
+      },
       (pick) => {
         if ('list' in pick) chooseList(pick.list.id);
       },
@@ -371,7 +412,9 @@ export function MiniApp(): ReactElement {
     tab === 'today'
       ? todayRows(today, now)
       : tab === 'inbox'
-        ? listRows(inbox, shownList)
+        ? focusShown
+          ? focusRows(inbox)
+          : listRows(inbox, shownList)
         : { rows: [], routes: new Map<string, Route>() };
   const safeSelected = rows.some((row) => row.key === selected) ? selected : null;
   const routeOf = (key: string): Route =>
@@ -435,6 +478,17 @@ export function MiniApp(): ReactElement {
   /** Today's pinned rows and Inbox's rows reorder; Today's reminders keep their time order. */
   const movable = (key: string): boolean =>
     tab === 'inbox' || (tab === 'today' && routeOf(key).listId === TODAY_ID);
+  /** FOCUS-06: the active task's title, under the compact timer. */
+  const focusActive = focusShown ? (inbox?.focus?.active ?? null) : null;
+  const focusActiveRow = focusActive ? rows.find((row) => row.key === focusActive) : undefined;
+  const focusTitle = focusActiveRow
+    ? titlePlain(focusActiveRow.title.trim()) || focusActiveRow.label
+    : null;
+  /** FOCUS-06: "Focus 12:34" on the list tab while a session runs and another tab is in view. */
+  const focusLabel =
+    focusShown && tab !== 'inbox' && focusTimer && timerRunning(focusTimer.state)
+      ? clockText(timeLeft(focusTimer.state, focusClock))
+      : null;
   const place = async (
     key: string,
     where: { readonly at: 'before' | 'after'; readonly key: string },
@@ -513,6 +567,10 @@ export function MiniApp(): ReactElement {
               : rows.length - 1
             : Math.max(0, Math.min(rows.length - 1, at + step));
         setSelected(rows[next]?.key ?? null);
+      } else if (event.key === ' ' && event.shiftKey && tab === 'inbox' && focusShown) {
+        // FOCUS-06: Shift+Space starts and pauses the timer.
+        event.preventDefault();
+        window.flintMain.focusCommand({ kind: 'toggle' });
       } else if (event.key === ' ' && row) {
         event.preventDefault();
         void complete(row.key);
@@ -611,6 +669,7 @@ export function MiniApp(): ReactElement {
                       <span key={name} className="mini-tab-name">
                         {name}
                       </span>
+                      {isList && focusLabel && <span className="mini-tab-time">{focusLabel}</span>}
                       <span className="mini-tab-pick" aria-hidden="true">
                         <ChevronIcon size={11} />
                       </span>
@@ -623,6 +682,23 @@ export function MiniApp(): ReactElement {
             })}
           </div>
           <span className="mini-head-space" />
+          {/* FOCUS-06 (D-170): Focus settings…, opened in the main window. */}
+          <button
+            type="button"
+            className="tool"
+            aria-label="More"
+            title="More"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect();
+              openMenu(
+                [{ label: 'Focus settings…', action: () => window.flintMain.showFocusSettings() }],
+                { x: box.left, y: box.bottom + 4 },
+              );
+            }}
+          >
+            <MoreIcon size={14} />
+          </button>
           {/* D-111: back to the default size, while the size differs from it. */}
           <button
             type="button"
@@ -675,6 +751,9 @@ export function MiniApp(): ReactElement {
             className={tab === 'note' ? 'mini-view note' : 'mini-view'}
             key={tab === 'inbox' ? `inbox:${shownList}` : tab}
           >
+            {tab === 'inbox' && focusShown && focusTimer && (
+              <MiniFocusCard view={focusTimer} title={focusTitle} />
+            )}
             {tab !== 'note' && rows.length === 0 && (
               <p className="empty">
                 {tab === 'today' ? 'Nothing pinned for today.' : `${shownListName} is empty.`}
@@ -694,6 +773,26 @@ export function MiniApp(): ReactElement {
                 onMenu={rowMenu}
                 onOpen={(task) => open(task.key)}
                 onPlace={place}
+                {...(tab === 'inbox' &&
+                  focusShown && {
+                    trailing: (task: TaskRow) => {
+                      const entry = inbox?.focus?.entries[task.key];
+                      return entry ? (
+                        <FocusCount
+                          entry={entry}
+                          active={task.key === focusActive}
+                          done={false}
+                          onEstimate={(estimate) =>
+                            void window.flintMain.change(FOCUS_ID, {
+                              kind: 'estimate',
+                              key: task.key,
+                              estimate,
+                            })
+                          }
+                        />
+                      ) : undefined;
+                    },
+                  })}
               />
             )}
             {tab === 'note' && noteId !== null && (

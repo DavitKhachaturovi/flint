@@ -233,3 +233,26 @@ export const CloudIcon = ({
 /** SYNC-01, D-161 Q5: two versions side by side (the conflict card's header). */
 export const ConflictIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M7 4v13M7 17l-3-3M7 17l3-3M17 20V7M17 7l-3 3M17 7l3 3" />);
+
+/** FOCUS-01 (D-170, mockup 15): Focus's stopwatch in the sidebar. */
+export const FocusIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <circle key="a" cx="12" cy="13" r="8" />,
+    <path key="b" d="M12 9v4l2.5 2.5M9.5 2h5" />,
+  ]);
+
+/** FOCUS-01: Skip (a filled triangle against a bar). */
+export const SkipIcon = ({ size = 18 }: IconProps): ReactElement => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M5 5.5v13l9.5-6.5zM16.5 5h2.5v14h-2.5z" />
+  </svg>
+);
+
+/** A menu of more actions (three dots). */
+export const MoreIcon = ({ size = 15 }: IconProps): ReactElement => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <circle cx="5" cy="12" r="1.8" />
+    <circle cx="12" cy="12" r="1.8" />
+    <circle cx="19" cy="12" r="1.8" />
+  </svg>
+);
