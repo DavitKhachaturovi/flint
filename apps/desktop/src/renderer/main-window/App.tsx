@@ -88,7 +88,7 @@ import {
 import { CloudIcon } from './icons.js';
 import { setConflictDevice } from '../editor/conflict-view.js';
 import { setLinkedSync } from '../media/media.js';
-import { syncedAgo, type SyncEverythingPreview } from '../../shared/sync.js';
+import { syncedAgo, type SyncEverythingPreview, type SyncStatusView } from '../../shared/sync.js';
 import { Triage, type TriageMemory } from './Triage.js';
 import {
   ContextPanel,
@@ -6102,11 +6102,26 @@ type SyncDialogState =
 /** SYNC-01, D-161: the sidebar's Show filter (the sort menu). */
 type SyncFilter = 'all' | 'synced' | 'local';
 
-/** SYNC-01: a cloud after a synced item's name in the sidebar. */
-function NavCloud(props: { readonly on: boolean }): ReactElement | null {
-  return props.on ? (
-    <span className="nav-cloud" title="Synced with Google Drive">
-      <CloudIcon size={13} />
+/** SYNC-01, D-163: unresolved sync conflicts in these lists or notes. */
+function conflictsIn(sync: SyncStatusView, ids: readonly string[]): number {
+  return sync.conflicts
+    .filter((entry) => ids.includes(entry.listId))
+    .reduce((sum, entry) => sum + entry.count, 0);
+}
+
+/**
+ * SYNC-01, D-163: a cloud with "!" after an item's name in the sidebar while it (or, on a group's
+ * header, one of its lists) has an unresolved sync conflict. Synced items carry no mark otherwise:
+ * the list's header says it syncs, and the Show filter picks synced items out.
+ */
+function NavCloud(props: { readonly conflicts: number }): ReactElement | null {
+  const { conflicts } = props;
+  return conflicts > 0 ? (
+    <span
+      className="nav-cloud"
+      title={conflicts === 1 ? '1 sync conflict' : `${conflicts} sync conflicts`}
+    >
+      <CloudIcon size={13} mark="alert" />
     </span>
   ) : null;
 }
@@ -6167,7 +6182,7 @@ function NavGroup(props: {
           <span className="group-name">
             <MorphText text={group.name} />
           </span>
-          <NavCloud on={groupSyncs(sync, group.id)} />
+          <NavCloud conflicts={conflictsIn(sync, group.lists)} />
           <span className="nav-count group-count">
             <MorphText text={String(group.lists.length)} />
           </span>
@@ -6239,7 +6254,7 @@ function NavItem(props: {
     >
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
       <span className="nav-name">{list.name}</span>
-      <NavCloud on={listSyncs(sync, list.id) && list.id !== TODAY_ID} />
+      <NavCloud conflicts={conflictsIn(sync, [list.id])} />
       {list.mode === 'tasks' && <span className="nav-count">{list.open}</span>}
     </button>
   );

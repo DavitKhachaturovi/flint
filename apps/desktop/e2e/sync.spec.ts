@@ -228,12 +228,12 @@ test('connecting asks What should sync?, Only what I choose preselected', async 
   expect(await drive()).toEqual({});
 });
 
-test('right-click → Sync with Google Drive: the list goes up, with its cloud and header line', async () => {
+test('right-click → Sync with Google Drive: the list goes up, with its header line (no sidebar cloud, D-163)', async () => {
   await syncMenu('Groceries');
   await syncNow();
   expect(await drive()).toEqual({ Groceries: GROCERIES });
-  await expect(nav('Groceries').locator('.nav-cloud')).toBeVisible();
-  await expect(nav('Reading').locator('.nav-cloud')).toHaveCount(0);
+  // D-163: a synced row carries no cloud; only a conflict marks it.
+  await expect(nav('Groceries').locator('.nav-cloud')).toHaveCount(0);
   await nav('Groceries').click();
   await expect(main.locator('.list-header .sync-line')).toHaveText(/Synced with Google Drive · /);
   // The menu shows it checked.
@@ -284,6 +284,8 @@ test('the same note line changed on two PCs: both kept, the conflict card resolv
   await expect(card).toContainText('Also changed on DAVIT-LAPTOP');
   await expect(card).toContainText('Leave Saturday morning.');
   await expect(main.locator('.note-card .sync-line')).toContainText('1 conflict');
+  // D-163: the sidebar row shows the cloud with "!" while the conflict lasts.
+  await expect(nav('Trip ideas').locator('.nav-cloud')).toHaveAttribute('title', '1 sync conflict');
   // The popover lists it.
   await statusButton().click();
   await expect(main.locator('.sync-popover')).toContainText('1 conflict in Trip ideas');
@@ -308,6 +310,8 @@ test('the same note line changed on two PCs: both kept, the conflict card resolv
       { timeout: 15_000, intervals: [1000] },
     )
     .toBe(TRIP.replace('Leave Friday after work.', 'Leave Saturday morning.'));
+  // Resolved: the next run clears the sidebar's mark.
+  await expect(nav('Trip ideas').locator('.nav-cloud')).toHaveCount(0);
 });
 
 test('stop syncing on this PC: unticked by default; ticked reads Stop syncing everywhere', async () => {
