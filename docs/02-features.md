@@ -868,6 +868,14 @@ Opt-in sync of chosen lists, notes and groups between your PCs through **your ow
 
 **Privacy (APP-09):** notes go only to the user's own Google Drive, only for what they choose to sync; Flint has no server. The network guard allows Google's sign-in and API hosts only from sync's own session and only while Drive is connected or a sign-in is under way (05 §5).
 
+### SYNC-02 — Sync checks what each device can read (next desktop release, D-166)
+Future-proofing for devices on different versions (separate desktop and phone versions, D-165). The check compares **what each app can read**, never app version numbers.
+- **Sync version:** `.flint-sync/compat.json` in Drive (04 §7) holds the sync version, **1** today, and each app knows the highest it supports. It stays 1 until a change really needs a raise; new optional fields don't raise it, and every app keeps fields it doesn't know when it rewrites a bookkeeping file.
+- **Drive newer than this app:** sync pauses before anything is read, merged or written; local files stay as they are. The status and Settings → Sync: "**Needs attention · Update Flint to keep syncing.** The Flint folder in Drive was updated by Flint for Android 1.4.0 on PIXEL-9." with **Update Flint** (the PC checks for updates, APP-06; the phone opens the release page). The popover's row says the same.
+- **One synced file newer than this app** (its `flint:` higher than this app reads, 04 §3): never merged and never overwritten by this app; it downloads as it is and opens read-only with "Needs a newer Flint" (the existing notice); only that item pauses, everything else keeps syncing. The item's row shows the needs-attention cloud.
+- **Devices:** each app records itself in `compat.json` (device name, app and version, the highest sync version it supports, its last sync). Settings → Sync lists them under the account: "DAVIT-LAPTOP · Flint 1.6.0 · 2 min ago", "PIXEL-9 · Flint for Android 1.0.0 · just now" (this device first, marked "this PC" or "this phone"). Before an app ever raises the sync version, it asks: "ALEX-LAPTOP runs Flint 1.6.2, which can't sync with this. Sync will pause there until it's updated." with **Update Drive's folder** and **Not now** (Proposed).
+- **Shipped before the phone (D-166):** desktop 1.5.0–1.5.1 have no check; the sync version stays 1 while they are in use.
+
 ### WEB-01 — The website, flintnotes.app (1.5.0, D-162)
 - A small static site at **https://flintnotes.app** (Davit's domain), in the repository's `site/` folder, published by GitHub Pages. Three pages:
   - **Home (`/`):** a hero with the app icon, the headline and **Download for Windows** (the latest installer on GitHub Releases); real screenshots of Flint on neutral sample data (never Davit's notes); the features worth showing (capture from anywhere, task lists and notes, Today, mini mode, Google Drive sync); the privacy promise; a footer with GitHub, release notes and the MIT license.
@@ -971,3 +979,74 @@ Cross-cutting visual and input behaviour from daily use (31 Oct 2026, D-52 to D-
 ### UI-11 — Flint's own text selection colour (v1, D-69)
 - Selected text uses Flint's colour instead of Windows blue: a **soft translucent gray based on the accent** with **white text**, in text fields and selectable app text alike (`--fl-selection`, `--fl-selection-text`, 09 §8).
 - Milestones: M4; the note editor (CodeMirror) in M5.
+
+---
+
+## 13. Flint for Android (D-165)
+
+A **companion** app: capture, Today, lists and notes, reminders and sync on the phone. Without sync it is a small Flint of its own. Look and wording: `design/mockups/14-android.html` (twelve screens). Android first; iPhone later from the same code. Its own version line from **1.0.0** (D-165). Details here are Proposed unless D-165 records them as Davit's.
+
+**Not on the phone:** mini mode, Give to Claude (TASK-18), global hotkeys and capture-selection, the context panel, the right-click and slash menus, the Ctrl+K palette (MOB-11 finds, it doesn't run commands: the phone's exception to D-106), a home-screen widget.
+
+### MOB-01 — Navigation: Today · Inbox · Lists (D-165 Q7)
+- A bottom bar with **Today**, **Inbox** (its open count) and **Lists**; the selected tab's icon sits in a light pill. The app opens on the last tab used.
+- **Lists** is the PC's sidebar as a screen: a search field at the top (MOB-11), groups (collapsible), lists and notes with their counts, quick notes, then **Settings** and **Trash** (with its count) at the bottom; + in the header makes a new list or note (LIST-01, NOTE-08); the sort button holds Synced only / Local only while connected (SYNC-01).
+- A list or note opens as its own screen; Android's back gesture returns.
+- A synced item carries no mark; an item with a conflict carries the cloud with "!" (D-163). An item only on this phone says "on this phone" in its row while connected.
+
+### MOB-02 — Capture (D-165 Q1)
+- A round-cornered **+** button (60 px, the strong surface) at the bottom right of Today, Inbox and every list opens **capture**: a sheet over the keyboard, keyboard up, the cursor in the title. From a list it captures into that list; elsewhere into Inbox (CAP-02).
+- **Shorthand while typing** (CAP-03, CAP-04): `!h`, `##list`, `@15:00` turn into chips above the text as on the PC; the `##` list autocomplete (CAP-05). The sheet's tools: priority, list, reminder, photo or file (MOB-09), notes; "to Unicorn" and the save button at the right. The save button (or Enter on the keyboard) saves and closes; the sheet slides away.
+- **Draft kept** (CAP-08): leaving the sheet keeps what was typed for the next open.
+- **The app shortcut:** long-pressing Flint's icon offers **New task**, which opens capture straight away.
+
+### MOB-03 — Sharing to Flint (D-165 Q1, Q6)
+- Flint is a target in Android's share sheet for text, links, images and files. **Save to Flint** opens as a sheet over the other app: **New task** or **Add to a note**, the shared text as the title (editable, with shorthand), a link or file shown below it (a link goes into the task's notes, TASK-10's link titles), the target (Inbox by default) and **Save**. The other app stays where it was.
+- **Add to a note** appends to the chosen note (the last one used preselected) under a dated line (Proposed).
+
+### MOB-04 — Today (TODAY-01, TODAY-03)
+- The greeting, the date and reminders left, the progress bar, the **next reminder** card, the **Focus · pinned** card with its rows, then "High priority · not pinned" (Show N). The rollover question on a new day (TODAY-02) as a card at the top. Reordering pinned tasks: long-press and drag. A search icon in the header (MOB-11); the sync status in the header line ("Synced 2 min ago").
+
+### MOB-05 — Task lists and rows (TASK-*)
+- Rows as on the PC: the priority stripe, the checkbox (tap to complete, TASK-06's motion), the title, and one line under it for what the task has (pinned, a reminder's time, notes, subtasks "1 of 2", images). The list's header: back, the sync cloud while synced, sort (TASK-08), more (rename, convert, delete, sync with Google Drive…).
+- **Swipes:** right completes; left reveals **Move** and **Delete**. Long-press starts dragging (TASK-01, one level of subtasks kept); a long-press menu on a row has the rest (pin, priority, duplicate, convert to a note).
+- **Completed** collapses at the bottom with its count (TASK-06).
+- **Non-task content** in a list shows read-only as on the PC (TASK-15).
+
+### MOB-06 — Task details (Davit's correction to the mockup)
+- Tapping a task opens its details as a screen: the checkbox and the title (editable), then **small chips** for priority, list and reminder (an empty one outlined: "Reminder"), each opening its picker (CAP-11's choices; the time with wheels, D-70).
+- **The notes are the main part:** a large card with the body rendered (TASK-05), "Tap to edit" with a pencil in its corner; tapping opens the full note editor (MOB-07) for the body as its own screen.
+- **Subtasks** below (TASK-04), with Add a subtask. Pin to Today and More in the header.
+
+### MOB-07 — The note editor (D-165 Q3)
+- Notes and task bodies are edited in **CodeMirror 6 with the desktop's live preview** (NOTE-01, shared in `packages/editor`): headings, bold, code, lists, real checkboxes, tables (NOTE-10), images, code blocks (NOTE-04, NOTE-05), link patterns (NOTE-07), the conflict card (SYNC-01). The text stays byte for byte; only what the user changes changes.
+- **The keyboard bar** sits on the keyboard while editing: checklist, bulleted list, numbered list, indent, outdent, heading, bold, photo or file (MOB-09), undo (redo on long-press, Proposed). It scrolls sideways if the screen is narrow; the active formatting is highlighted.
+- No right-click or slash menus. Android's own selection handles, spell check and keyboard suggestions work as in any app.
+- **Opening is instant:** the editor's web view is kept warm, so a note opens in the same frame as its screen (R-A2's check, 06 §7).
+- The header: back, the sync cloud, more (rename, convert, monospace NOTE-06, delete, Open in Google Drive).
+
+### MOB-08 — Reminders as notifications (REM-*, D-165)
+- A reminder is a **local notification** at its minute, also with Flint closed and the phone idle (Android's exact alarms; Flint asks once for the "Alarms and reminders" permission and explains why). Its text: the task, the time and priority, the list; actions **Done**, **Snooze 15 min** (Settings → Reminders) and **Later…** (opens the presets, REM-04). Tapping opens the task.
+- **Both devices ring** (D-165); Done or Snooze on one cancels the other's once synced. A reminder missed while the phone was off shows on the next start (REM-07). Hide task text (REM-10) follows its setting.
+- Notifications need Android's permission, asked on first use (MOB-12) and again only from Settings.
+
+### MOB-09 — Attachments (D-165 Q6)
+- Images inline and full screen with pinch to zoom; videos with their first frame, played in Android's player; other files as a chip opening with Android's Open with. Added from the camera, the gallery or sharing to Flint (MOB-03), into `attachments/` as on the PC (MEDIA-02), originals unchanged. Synced with their items (SYNC-01). A PC's linked large file (MEDIA-03) shows as a placeholder: "kazbegi-flight.mp4 · only on DAVIT-LAPTOP".
+
+### MOB-10 — Undo and Trash (D-165 Q5)
+- Every task and list action shows the **undo bar** at the bottom for about 5 seconds: "Task completed · **Undo**", "Task deleted · **Undo**", "Moved to Groceries · **Undo**" (one step). Deleting a list or note asks first ("Delete Groceries? It goes to Trash for 30 days.").
+- **Trash** (DATA-02, the same files): a screen from Lists, by day, newest first, each item with its kind and where it was, **Restore**, **Delete now** on long-press, **Empty Trash** in the header (it asks). Items deleted on a PC show there once synced. No Archived tab.
+
+### MOB-11 — Search (D-165 Q8)
+- One search screen, opened from the field at the top of Lists and the icon on Today: list and note names, task titles and bodies, and note text, grouped **Lists and notes · Tasks · In notes**, the matching words highlighted. A task opens its details, a list or note opens itself, a match in a note opens it at that line. Recent searches are not kept (Proposed).
+
+### MOB-12 — Settings, first use and storage (D-165 Q4)
+- **First use:** "Write it down before it's gone.", three lines (notes kept inside Flint on this phone and what uninstalling means; Drive sync and no Flint server; reminders as notifications), **Connect Google Drive** and **Start without sync**.
+- **Settings:** Sync (the account, What syncs, the devices of SYNC-02, Synced N min ago with Sync now, Disconnect); On this phone (the storage line, **Export…**); Reminders (notifications, snooze length); Writing (link patterns, NOTE-07); About (version, Privacy, What's new, the update line).
+- **Storage:** Flint's private app storage, the same layout as a Flint folder (04 §8); **Export…** copies it as plain markdown into a folder the user picks (DATA-05's content, not zipped, Proposed). Android's automatic backup off.
+- **Updates:** an APK from GitHub Releases at first; About checks GitHub's release listing (only that host, APP-09) and says "Flint for Android 1.1.0 is available" with **Download**, which opens the release page (Proposed). The Play Store later.
+
+### MOB-13 — Sync on the phone (SYNC-01, SYNC-02)
+- The same engine and rules as the PC (04 §7): What should sync? on connecting, chosen items, conflicts as cards, deletes to Trash everywhere, stop syncing per device. Device name: the phone's name from Android's settings (upper case, as on the PC).
+- **When:** on opening the app, 5 s after a change while open, and in the background every 15 minutes or more as Android allows (WorkManager), on the network returning.
+- **Sign-in:** Google's Android authorization (Flint's own Android client in the same Cloud project, `drive.file` only); no browser round trip, no refresh token or secret on the phone (05 §8).

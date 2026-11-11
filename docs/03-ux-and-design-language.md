@@ -273,3 +273,24 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Short, plain, friendly. No jargon in user-facing text.
 - Tell the truth about limitations (e.g. admin-window capture, Focus Assist, "Flint must be running for reminders").
 - The privacy promise is stated plainly: "Your notes never leave your machine." **D-161:** with sync: what you choose to sync goes only to your own Google Drive, and Flint has no server; the rest stays on this PC.
+
+---
+
+## 8. Flint for Android (D-165, Proposed unless D-165 records it)
+
+The phone follows the same philosophy with touch in place of the keyboard map: one obvious way to do each thing, no hidden gestures that are the only way to something.
+
+- **Touch, not Navigate/Edit:** no selected row or keyboard states. Tap a checkbox to complete, tap a row for its details, tap a note to read, tap its text to edit.
+- **Targets:** at least 48 px tall for rows and buttons (44 px minimum for icon buttons); text 16 px for tasks and note bodies.
+- **Gestures, each with a visible alternative:**
+  - On a task, swiping right completes it; swiping left reveals Move and Delete.
+  - A long-press on a row opens its menu.
+  - Dragging after a long-press reorders.
+  - Android's back gesture leaves a screen.
+  - Pull to refresh runs Sync now while connected.
+- **Sheets:** capture, sharing to Flint, pickers and confirmations rise from the bottom with a grab handle; a swipe down or back closes them (capture keeps its draft).
+- **The undo bar** replaces the PC's toasts: bottom, above the bar and the + button (which moves up out of its way), about 5 s, one action.
+- **Keyboard:** capture and the editor open with the keyboard up; the editor's formatting bar rides on the keyboard; the screen resizes so the cursor line is never covered.
+- **Haptics:** a light tick on completing a task, on a swipe passing its threshold and on a drag lifting; nothing else vibrates.
+- **Motion (D-75, D-89 apply as on the PC):** screens slide in from the right and back out (~320 ms); sheets rise and settle with the spring (~280 ms); the completion sequence as on the PC; swiped rows follow the finger and spring back or away; the bottom bar's pill glides between tabs (~200 ms); the undo bar rises and falls. Never delaying input; off with Android's "Remove animations" (APP-12's rule).
+- **Copy:** the same voice as on the PC (§7); "this phone" where the PC says "this PC".

@@ -188,3 +188,29 @@ Users only sign in with Google; the Cloud project and its client ID are set up o
 7. The client ID goes into `apps/desktop/src/main/sync/google.ts` (committed: desktop client IDs are public by design, D-161 Q7).
 
 **Status (10 Nov 2026):** steps 1–5 done (the project, the Drive API, the consent screen with the support address, the scope, the Desktop client); its ID is in `google.ts`; the app is in Testing with Davit as a test user until the site is live and Branding's links are set (step 6). Without an ID the app would say "Not set up in this build" in Settings → Sync. The first real sign-in (development build, `My Drive › Flint (development)`) is the check that the setup works.
+
+## 7. Flint for Android (D-165) and the sync check (D-166)
+
+**First, on the desktop:** SYNC-02 (D-166) ships in the next desktop release, before any phone build syncs: `compat.json`, the pause with "Update Flint to keep syncing", read-only newer files, the device list in Settings → Sync, the round-trip test for unknown bookkeeping fields. Unit tests on the fake Drive (a newer Drive, a newer file, two devices); an end-to-end check of the message.
+
+**Then the phone, risk first (D-18: production code, no throwaway).** Each risk has a check on Davit's phone; a failed one stops the plan for a decision.
+
+| Risk | What is built | Passes when |
+|---|---|---|
+| **R-A1** Drive across the two apps | `apps/android` started (Expo, the bottom bar, empty screens); Google sign-in with the Android client; the Drive client listing `My Drive › Flint (development)` | The phone lists the files the desktop's development build created. Fails if `drive.file` treats the Android client as another app (then: decide between a one-time grant of the folder through Google's picker, a broader scope with Google's verification, or changing the plan) |
+| **R-A2** The editor on real keyboards | `packages/editor` split out of the desktop renderer (the desktop's own tests still pass); the editor web view with the keyboard bar; a note opened, edited, saved | On Davit's phone, with Samsung's keyboard and with Gboard, in English and Georgian: typing, autocorrect, deleting across formatting, Enter continuing lists and checklists, the bar's buttons, selection handles; no lost or doubled characters; a warm note opens in the frame its screen arrives. Fails: the live-styling native field (D-165 Q3's fallback) |
+| **R-A3** Reminders on time | Storage, a task with a reminder, the exact alarm, the notification with Done / Snooze / Later… | With Flint swiped away and the phone idle 30 minutes (Doze), a reminder fires within its minute; Done and Snooze work from the notification; reminders survive a reboot |
+
+**Milestones (after A0):**
+- **A1, the app:** storage and the core workspace adapter; Today, Inbox, Lists, a list, task details (notes first), capture with shorthand and chips, swipes, the undo bar, Trash, creating, renaming and deleting lists and notes; motion (03 §8). End-to-end flows in Maestro.
+- **A2, notes:** the full editor for notes and task bodies; link patterns into core; attachments (camera, gallery, inline, full screen, Open with).
+- **A3, sync:** the engine on the phone, Connect, What should sync?, Settings → Sync with devices (SYNC-02), background runs, reminders cancelled across devices, conflict cards.
+- **A4, the rest:** sharing to Flint, the app shortcut, search, Export, first use, Settings, the update line.
+- **A5, release 1.0.0:** the release workflow (`android-v*`), the signed APK on GitHub Releases, release notes and What's new for the phone, the site and the privacy policy mention Android (WEB-01). The Play Store later (a personal account's closed test: 12 testers for 14 days).
+
+**Davit's one-time setup (walked through when A0 needs it):**
+1. **Android Studio** (the SDK, platform tools and an emulator) and a JDK on the PC, for local builds.
+2. **USB debugging** on the phone (Developer options), so builds install straight from the PC; or install the APK file by hand.
+3. **Android OAuth clients** in the Flint Cloud project (Clients → Create client → Android): package `app.flintnotes`, the SHA-1 of the debug certificate (one client) and of the release key (another). No secret is involved.
+4. **The release key:** generated once, kept in the repository secrets (`ANDROID_KEYSTORE`, its passwords) and in Davit's own backup, never in the repository.
+5. Later, for the Play Store: a developer account ($25 once), identity verification, the closed test.

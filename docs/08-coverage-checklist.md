@@ -1258,3 +1258,40 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | Long list names: one line with an ellipsis in a reminder card's chip, Overdue and Captured today | TODAY-03 · Built (1.5.1) | 02, 09, D-163 |
 | 4 | The timeline: a passed reminder on an open task is overdue (not struck through, the overdue dot); only done tasks' reminders are struck | TODAY-03, REM-11 · Built (1.5.1) | 02, 09, D-164 |
 | 5 | Tests and motion: `e2e/today.spec.ts` (the grouped row, the 16:00 row on its line, the menu, the chip); `sync.spec.ts` (no cloud on a synced row, the conflict cloud until resolved); the badge fades in | TODAY-03, SYNC-01, UI-10 · Built (1.5.1) | 03 §5, D-89 |
+
+## CD. Sync checks what each device can read (11 Nov 2026, D-166)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | `.flint-sync/compat.json`: the sync version (1) and the device list; created when missing | SYNC-02 · Planned (next desktop release) | 02, 04 §7, D-166 |
+| 2 | A Drive newer than the app: the run stops before reading or writing; "Needs attention · Update Flint to keep syncing" naming the device and app; Update Flint | SYNC-02 · Planned | 02, D-166 |
+| 3 | A synced file newer than the app: never merged or overwritten; downloaded as is, read-only, only that item paused | SYNC-02 · Planned | 02, 04 §3 and §7 |
+| 4 | Unknown fields in the bookkeeping files kept on rewrite (round-trip test); new optional fields don't raise the version | SYNC-02 · Planned | 04 §7, D-166 |
+| 5 | Settings → Sync lists the devices; a warning before an app raises the sync version | SYNC-02 · Planned | 02, D-166 |
+| 6 | Compares what devices can read, never app version numbers; the version stays 1 while 1.5.x is in use | SYNC-02 · Decided | D-166 |
+
+## CE. Flint for Android (11 Nov 2026, D-165, grill Q1–Q8, mockup 14)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A companion that also works alone; not on the phone: mini mode, Give to Claude, hotkeys, capture-selection, the context panel, a widget | MOB-* · Decided | 02 §13, D-165 Q1 |
+| 2 | React Native with Expo; `packages/core` shared unchanged | MOB-* · Decided | 05 §8, D-165 Q2 |
+| 3 | The note editor: CodeMirror in a warm web view, the desktop's live preview in `packages/editor`; the native keyboard bar (checklist, bullets, numbers, indent, outdent, heading, bold, photo, undo) | MOB-07 · Planned (A2; R-A2 in A0) | 02, 05 §8, D-165 Q3 |
+| 4 | Private storage with the same layout and atomic writes; Export to a picked folder; Android's backup off; the uninstall line; principle 7's phone exception | MOB-12 · Planned (A1, A4) | 01, 04 §8, D-165 Q4 |
+| 5 | The undo bar; editor undo and redo; the 30-day Trash with a phone screen; deleting a list or note asks | MOB-10 · Planned (A1) | 02, D-165 Q5 |
+| 6 | Attachments shown, added (camera, gallery, share) and synced; originals unchanged; a PC's linked file as a placeholder | MOB-09 · Planned (A2) | 02, D-165 Q6 |
+| 7 | The bottom bar Today · Inbox · Lists; the + button for capture; Lists as the sidebar screen | MOB-01, MOB-02 · Planned (A1) | 02, 03 §8, 09 §12, D-165 Q7 |
+| 8 | Capture with shorthand and chips; the draft kept; the "New task" app shortcut | MOB-02 · Planned (A1, A4) | 02, D-165 Q1 |
+| 9 | Sharing to Flint: New task or Add to a note, Inbox by default | MOB-03 · Planned (A4) | 02, D-165 Q1 |
+| 10 | Task details lead with the notes: chips for priority, list and reminder; "Tap to edit" opens the full editor | MOB-06 · Planned (A1) | 02, 09 §12, D-165 (Davit's correction) |
+| 11 | Swipes (right completes, left Move and Delete), long-press menu and drag | MOB-05 · Planned (A1) | 02, 03 §8 |
+| 12 | Reminders as local notifications with exact alarms, Done / Snooze / Later…; both devices ring, the other cancelled once synced | MOB-08 · Planned (A1; R-A3 in A0) | 02, 05 §8, D-165 |
+| 13 | Search: names, task titles and bodies, note text, grouped; no commands (D-106's phone exception) | MOB-11 · Planned (A4) | 02, D-165 Q8 |
+| 14 | Sync on the phone: the same engine, Android sign-in with its own client in the same project, background runs; the phone chooses what syncs | MOB-13 · Planned (A3; R-A1 in A0) | 02, 05 §8, D-165 |
+| 15 | First use, Settings (sync and devices, storage and Export, reminders, link patterns, About with the update line) | MOB-12 · Planned (A4) | 02, mockup 14 |
+| 16 | Separate versions from 1.0.0, tags `android-v*`, `versionCode` per build; APK on GitHub Releases; Play Store later | MOB-* · Decided (A5) | 05 §8, 06 §7, D-165 |
+| 17 | App ID `app.flintnotes`, Android 12 or newer | MOB-* · Proposed | D-165 |
+| 18 | Risks first: R-A1 Drive across the two apps, R-A2 the editor on Davit's keyboards, R-A3 reminders on time | MOB-* · Planned (A0) | 06 §7 |
+| 19 | Tests: core as today, Jest for the app, Maestro on an emulator in CI with the fake Drive and the test clock; real-device checks | MOB-* · Planned | 05 §8, D-107 |
+| 20 | Motion on the phone: screens, sheets, swipes, the bar's pill, the undo bar; off with Remove animations | MOB-*, UI-10 · Planned | 03 §8, D-89 |
+| 21 | Davit's setup: Android Studio and a JDK, USB debugging, the Android OAuth clients, the release key | MOB-* · Davit's (A0) | 06 §7 |

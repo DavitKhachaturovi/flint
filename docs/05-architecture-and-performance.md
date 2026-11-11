@@ -54,7 +54,10 @@ flint/
       model/                 ← lists, tasks, operations (move, reorder, complete, convert…)
       undo/                  ← operation history (DATA-03)
       sync/                  ← Google Drive sync without Google or Electron: the three-way merges, the conflict callout, the sync engine against a `Drive` interface, a fake Drive for tests (SYNC-01, D-161)
+      links/                 ← link patterns (NOTE-07), moved from the desktop app so the phone shares them (D-165)
+    editor/                  ← D-165: the CodeMirror note editor and its live preview, moved out of the desktop renderer; DOM only, no Electron or React Native (used by the desktop renderer and the phone's editor web view)
   apps/
+    android/                 ← D-165: Flint for Android, React Native with Expo (§8)
     desktop/
       main/                  ← Electron main process: storage, watcher, scheduler, hotkeys, tray, notifications, updater
       preload/               ← the typed Platform bridge (contextBridge)
@@ -205,3 +208,20 @@ flint/
 - **Other apps:** integrate through the CLI, APIs and the shared `packages/core` TypeScript packages, not by coupling runtimes.
 - **Switching shells (e.g. to Tauri)** stays possible: only `apps/desktop/main` + `preload` would be rewritten; the React UI, CodeMirror editor, and core packages carry over.
 - **CLI** (Later): a small Node-based `flint` (name: Q-07, Proposed) reusing `packages/core`; packaged as a single executable so users don't need Node installed (Proposed).
+- **Phones:** Android first (§8, D-165); iPhone later from the same React Native app (its own sign-in, notifications and storage parts).
+
+---
+
+## 8. Flint for Android (D-165, Proposed unless D-165 records it)
+
+- **Stack:** React Native (New Architecture) with Expo, TypeScript strict, in `apps/android`; Expo's prebuild generates the native project (not committed, Proposed), so native settings live in `app.json` and config plugins. Dependencies follow D-30 (exact pins, 7-day release age, audit in CI).
+- **Shared code:** `packages/core` unchanged (the format, shorthand, time, model, undo, sync engine and merges; it already has no Node APIs, so it runs on Hermes); `packages/editor` (the CodeMirror live preview) runs in the editor's web view.
+- **The editor:** an Expo DOM component holding CodeMirror 6 in Android's WebView, kept warm (one instance, reused across notes) so opening a note costs no web-view start; the text goes in and out over the component's message bridge (whole text on open, changes as CodeMirror transactions' summaries, Proposed); the formatting bar is native and calls the editor's commands. The web view loads only the bundled editor (no remote content, a strict CSP) and has no access to files or network.
+- **Storage:** the app's private files directory through Expo's file system, atomic writes (04 §8). The workspace logic that the desktop's main process does today (read, parse, write, Trash, `.flint/` bookkeeping) moves into core where it is platform-neutral, with a small file-system adapter per app (05 §2's rule).
+- **Reminders:** each reminder an exact alarm (`AlarmManager.setExactAndAllowWhileIdle` through a native module; `SCHEDULE_EXACT_ALARM`, asked once with an explanation; denied, reminders fall back to inexact delivery and Settings says so); rescheduled on boot, on time-zone change and after a sync changes reminders; notifications with actions on a "Reminders" channel (high importance). Which module (Expo Notifications or a small Kotlin module) is settled by R-A3.
+- **Sync:** the same `SyncEngine` with an Android `LocalSide` over the private folder and a `Drive` client over `fetch`. **Sign-in:** Google's Android authorization API (Identity Services `AuthorizationClient`) for the `drive.file` scope, with Flint's **Android OAuth client** in the same Cloud project (app ID and the signing certificate's SHA-1; one for debug builds, one for release): access tokens come from Google Play services, silently after the first consent; no refresh token, client secret or browser round trip on the phone. Whether `drive.file` lets this client see files the desktop client created is R-A1. Background runs: WorkManager (Expo's background task), at least 15 minutes apart, network required.
+- **Network (APP-09):** only Google's token and Drive hosts while connected, and GitHub's release listing for the update check. No analytics, crash reporting or ads; the network test's equivalent on Android is an end-to-end check that a session makes no other request (Proposed: through a fetch wrapper that refuses other hosts, like the desktop's guard).
+- **Sharing to Flint and the app shortcut:** an intent filter for `ACTION_SEND` / `ACTION_SEND_MULTIPLE` (text, URLs, images, any file) opening the Save to Flint sheet; a static app shortcut "New task".
+- **Builds and signing:** debug builds locally; release APKs signed with Flint's upload key (kept only in the repository secret and Davit's own backup, never in the repository; losing it means the app can't be updated in place). `versionName` from `apps/android/package.json`, `versionCode` increasing with every build (Proposed: major × 10000 + minor × 100 + patch). Tags `android-v<version>` run an Android release workflow that builds the APK and attaches it to its GitHub release, after CI passed on the commit (D-145's gate).
+- **Tests:** core's tests as today; the app's logic with Jest; end to end with Maestro on an Android emulator in CI (Linux runners with KVM), on the fake Drive (an in-app fake as on the desktop, test builds only) and the fixed test clock (D-107); real devices for what an emulator can't judge (keyboards, alarms in Doze).
+- **Budgets:** + to a focused capture field one frame after the sheet starts rising (the keyboard's own animation aside); save and close < 100 ms; a note opens in the frame its screen arrives (the warm editor); a list of 500 tasks scrolls at the display's rate (Proposed).

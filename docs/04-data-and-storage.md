@@ -250,7 +250,9 @@ My Drive/Flint/                 ← found by its Drive ID, so renaming or moving
     groups.json                 ← synced groups: { "flint": 1, "groups": [ { "id": "g-k3f9", "name": "Personal", "lists": ["l7c2", "n4d8"] } ] }
     items.json                  ← per synced list or note (by list ID): its file's Drive ID; per task ID `created` and `lastTouched`; the linked files of its lines: { "<file:/// target>": { "device": "DAVIT-LAPTOP", "size": 1932735283 } }
     removed.json                ← what left Drive and why: { "<list ID>": { "how": "deleted" | "unsynced", "at": "<ISO time>", "device": "DAVIT-LAPTOP" } }, kept 90 days (Proposed)
+    compat.json                 ← SYNC-02 (D-166): { "flint": 1, "sync": 1, "raisedBy": null | { "device", "app", "version" }, "devices": { "<device name>": { "app": "Flint" | "Flint for Android", "version": "1.6.0", "sync": 1, "seen": "<ISO time>" } } }
 ```
+- **Sync version (SYNC-02, D-166):** every run reads `compat.json` first. A `sync` higher than this app supports stops the run before anything else is read or written. Missing, it is created with `sync: 1` (Drive folders from 1.5.x). Each run updates its own `devices` entry. Unknown keys anywhere in the `.flint-sync` files are kept when a file is rewritten (a round-trip test), so a field added later never breaks an older app. A synced file whose frontmatter `flint:` is higher than this app reads (§3) is never merged or written by this app; it downloads as it is and stays read-only.
 - Only files Flint created are visible to it (`drive.file`); a file added to the folder by hand in Drive is not seen. Each file's Drive `appProperties` carry `flintId` (the list ID, or the attachment's file name), so Flint never matches by name alone.
 - **Deletes** move files to Drive's own trash (Google keeps them 30 days), never deleted for good, and are recorded in `removed.json`: `deleted` means "to Trash on every PC", `unsynced` means "each PC keeps its copy and stops syncing it". A file that disappears from Drive without a record (removed in Drive itself) counts as `unsynced`.
 - `.flint-sync/*.json` files are written whole with Drive's `If-Match`-style revision check (the file's `headRevisionId` read before; a changed one means read, merge, write again), so two PCs never overwrite each other's bookkeeping (Proposed).
@@ -282,3 +284,13 @@ My Drive/Flint/                 ← found by its Drive ID, so renaming or moving
 
 ### Lessons kept from the folder-sync idea
 - Folder-sync services (OneDrive) can't merge concurrent edits and create unnoticed conflict copies (`Inbox-DESKTOP-7QK2M1B.md`); that is why Flint syncs through Drive's API itself and never writes conflict copies. Keeping all app and UI state outside the synced data (already the v1 design) still applies.
+
+## 8. Flint for Android (D-165, Proposed)
+
+- **The Flint folder** is in the app's private storage (`<files dir>/Flint/`), with the layout of §2: the same list and note files, `attachments/`, `.flint/` (meta, today, sidebar, trash). The same core writes them, so the format, IDs, Trash (30 days) and quick notes are identical.
+- **Atomic writes (DATA-01):** a temp file in the same folder, flushed, then renamed over the old one, as on the PC; a file the parser doesn't understand is never rewritten.
+- **App state** (the last tab, drafts, sync's `state.json`, `base/` and the account) lives beside it in the app's private storage, never in the Flint folder; the account in Android's encrypted storage (Keystore).
+- **Android's automatic backup is off** (`allowBackup="false"`, no backup rules): nothing reaches Google unless the user syncs it.
+- **Uninstalling deletes all of it** (Android's rule for private storage). First use and Settings say so; Export and sync are the ways to keep a copy.
+- **Export (MOB-12):** copies the Flint folder (without temp files) into a folder the user picks with Android's picker, as plain files; a one-off copy, so Android's slower document access doesn't matter.
+- **No snapshots** on the phone in the first version (DATA-04 stays a PC feature; Proposed). Synced items have their PCs' snapshots and Drive's history.
