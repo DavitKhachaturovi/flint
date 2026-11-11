@@ -52,7 +52,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 - **Tags in addition to lists**: two organizing systems double the cognitive load. Lists are the only organizing system.
 - **Backlinks / graph view**: that is Obsidian's job.
 - **Voice capture**: you can't speak while you're on the call that triggered the capture.
-- **Time features beyond lightweight reminders/snooze**: reminders are the ceiling (see REM-*).
+- **Time features beyond lightweight reminders/snooze**: reminders are the ceiling (see REM-*). **One exception (D-170):** Focus (FOCUS-*), a Pomodoro timer with an alarm sound, and nothing more: no reports, no time logged against tasks, no history kept per task.
 
 **Not in v1 (may be revisited later):**
 - ~~**Syncing of any kind** (OneDrive, cloud, server).~~ **D-161 (1.5.0):** opt-in **Google Drive sync** of chosen lists and notes (SYNC-01), through the user's own Drive with no Flint server; still not: a Flint server or account, folder-sync services for the Flint folder (OneDrive, Dropbox), sharing with other people, iCloud. OneDrive through Microsoft Graph stays Later.

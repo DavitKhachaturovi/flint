@@ -29,6 +29,13 @@ const SCREENS = {
   },
   // D-92: Davit's Today redesign, wide screen.
   12: { file: '12-today-redesign', width: 1920, height: 1140 },
+  // D-170: Focus, one screenshot per state of the mockup's switch.
+  15: {
+    file: '15-focus',
+    width: 1440,
+    height: 960,
+    states: ['ready', 'running', 'paused', 'break', 'settings', 'empty', 'mrun', 'mbreak', 'mlabel'],
+  },
 };
 
 const args = process.argv.slice(2);

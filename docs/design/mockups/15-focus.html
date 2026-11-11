@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.fx *{box-sizing:border-box}
+:where(.fx button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.card{background:#151619;border-radius:18px;box-shadow:0 0 0 1px #232529,inset 0 1px 0 rgba(255,255,255,.045),0 1px 2px rgba(0,0,0,.45),0 14px 34px -12px rgba(0,0,0,.6)}
+.float{background:#1B1D20;border-radius:18px;box-shadow:0 0 0 1px #2A2C30,inset 0 1px 0 rgba(255,255,255,.07),0 2px 4px rgba(0,0,0,.4),0 26px 60px -16px rgba(0,0,0,.85)}
+.tile{width:26px;height:26px;border-radius:8px;background:#1F2124;box-shadow:inset 0 0 0 1px #2A2C30;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#B9BDC4}
+.tile.strong{background:#ECEDEE;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#0E0F11}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px 7px 7px;border-radius:12px;color:#C9CCCF;font-size:14px}
+.nav.on{background:#1A1B1E;box-shadow:0 0 0 1px #26282C,inset 0 1px 0 rgba(255,255,255,.05);color:#FFFFFF;font-weight:500}
+.cnt{font-family:'Geist Mono',monospace;font-size:12px;color:#7C7F84;margin-left:auto}
+.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#75787D}
+.mono{font-family:'Geist Mono',monospace}
+.row{position:relative;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:12px;font-size:14px;color:#E3E4E6}
+.row.sel{background:#1B1D20;box-shadow:0 0 0 1px #2A2C30}
+.stripe{position:absolute;left:3px;top:10px;bottom:10px;border-radius:3px}
+.check{width:20px;height:20px;border-radius:7px;border:1.5px solid #4A4D52;flex:0 0 auto}
+.chip{height:22px;padding:0 8px;border-radius:7px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;color:#A4A7AB;font-size:12px;display:inline-flex;align-items:center;flex:0 0 auto}
+.est{font-family:'Geist Mono',monospace;font-size:12px;color:#8E9196;width:34px;text-align:right;flex:0 0 auto}
+.est.now{color:#FFFFFF}
+.btn{height:34px;padding:0 14px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;color:#D9DADC;background:#222428;box-shadow:inset 0 0 0 1px #2C2E33}
+.btn.primary{background:#ECEDEE;color:#0E0F11;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.ibtn{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8E9196}
+.ibtn.ring{background:#1B1D20;box-shadow:inset 0 0 0 1px #2A2C30}
+.tabs{display:flex;padding:3px;border-radius:12px;background:#151619;box-shadow:inset 0 0 0 1px #232529;flex-wrap:wrap;justify-content:center}
+.tabs button{height:32px;padding:0 13px;border-radius:9px;color:#8E9196;font-size:13px;cursor:pointer}
+.tabs button.on{background:#ECEDEE;color:#0E0F11;font-weight:500}
+.fbtn{flex:1;height:38px;border-radius:11px;background:#18191C;box-shadow:0 0 0 1px #24262A;display:flex;align-items:center;gap:8px;padding:0 10px;font-size:13px;color:#C9CCCF}
+
+/* The timer card: dark at rest, in a break and paused; inverted while a focus session runs (D-170 Q3). */
+.timer{position:relative;overflow:hidden;border-radius:18px;padding:22px 24px 30px;display:flex;flex-direction:column;align-items:center;gap:6px;background:#151619;box-shadow:0 0 0 1px #232529,inset 0 1px 0 rgba(255,255,255,.045),0 1px 2px rgba(0,0,0,.45),0 14px 34px -12px rgba(0,0,0,.6);transition:background-color 300ms ease,box-shadow 300ms ease}
+.modes{display:flex;padding:3px;border-radius:11px;background:#0E0F11;box-shadow:inset 0 0 0 1px #212327}
+.modes span{height:30px;padding:0 14px;border-radius:8px;display:flex;align-items:center;font-size:13px;color:#8E9196}
+.modes span.on{background:#26282C;color:#FFFFFF;font-weight:500;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.digits{font-family:'Onest',system-ui,sans-serif;font-weight:700;font-size:118px;line-height:1.08;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:#FFFFFF;margin:6px 0 10px}
+.go{height:48px;min-width:196px;padding:0 28px;border-radius:12px;font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;display:inline-flex;align-items:center;justify-content:center;background:#ECEDEE;color:#0E0F11;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.skip{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#A4A7AB;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33}
+.prog{position:absolute;left:0;right:0;bottom:0;height:3px;background:#1F2124}
+.prog i{display:block;height:100%;background:#FFFFFF}
+.timer.inv{background:#ECEDEE;box-shadow:0 0 0 1px #ECEDEE,0 1px 2px rgba(0,0,0,.45),0 14px 34px -12px rgba(0,0,0,.6)}
+.timer.inv .modes{background:rgba(14,15,17,.07);box-shadow:none}
+.timer.inv .modes span{color:#55585D}
+.timer.inv .modes span.on{background:#0E0F11;color:#FFFFFF;box-shadow:none}
+.timer.inv .digits{color:#0E0F11}
+.timer.inv .go{background:#0E0F11;color:#FFFFFF;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.timer.inv .skip{background:rgba(14,15,17,.08);box-shadow:none;color:#0E0F11}
+.timer.inv .prog{background:rgba(14,15,17,.1)}
+.timer.inv .prog i{background:#0E0F11}
+
+.sw{position:relative;width:36px;height:20px;border-radius:999px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#8E9196}
+.sw.on{background:#ECEDEE;box-shadow:none}
+.sw.on::after{transform:translateX(16px);background:#0E0F11}
+.well{height:34px;border-radius:10px;background:#0E0F11;box-shadow:inset 0 0 0 1px #212327,inset 0 2px 4px rgba(0,0,0,.35);display:flex;align-items:center;padding:0 10px;font-family:'Geist Mono',monospace;font-size:13px;color:#ECEDEE}
+.sel-box{height:34px;border-radius:10px;background:#222428;box-shadow:inset 0 0 0 1px #2C2E33;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;font-size:13px;color:#ECEDEE}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:7px 0}
+.sname{font-size:13.5px;color:#ECEDEE}
+.sdesc{font-size:12px;color:#8E9196;line-height:1.45;margin-top:2px}
+.sec{padding:14px 22px 8px;border-top:1px solid #26282C}
+.sec:first-child{border-top:0}
+.note{font-size:12.5px;color:#8E9196;line-height:1.55}
+
+/* Mini (mockup 05's card, compact components, D-110). */
+.mtab{height:28px;padding:0 12px;border-radius:9px;color:#8E9196;display:flex;align-items:center;gap:6px;font-size:13px}
+.mtab.on{background:#222428;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 2px 6px rgba(0,0,0,.4);color:#FFFFFF;font-weight:500}
+.mtool{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8E9196}
+.mrow{position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:11px;font-size:13px;color:#E3E4E6}
+.mcheck{width:17px;height:17px;border-radius:6px;border:1.5px solid #4A4D52;flex:0 0 auto}
+.mtimer{position:relative;overflow:hidden;padding:10px 12px 14px;border-radius:16px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30,inset 0 1px 0 rgba(255,255,255,.07),0 12px 28px -12px rgba(0,0,0,.8);margin-bottom:6px}
+.mmodes{display:flex;padding:2px;border-radius:9px;background:#0E0F11;box-shadow:inset 0 0 0 1px #212327;align-self:flex-start}
+.mmodes span{height:24px;padding:0 9px;border-radius:7px;display:flex;align-items:center;font-size:12px;color:#8E9196}
+.mmodes span.on{background:#26282C;color:#FFFFFF;font-weight:500}
+.mdig{font-family:'Onest',system-ui,sans-serif;font-weight:700;font-size:40px;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.mprog{position:absolute;left:0;right:0;bottom:0;height:2px;background:#26282C}
+.mprog i{display:block;height:100%}
+</style>
+</head>
+<body>
+<div class="fx" style="box-sizing: border-box; width: 1440px; height: 960px; background: #070708; font-family: 'Onest', system-ui, sans-serif; color: #E8E9EB; display: flex; flex-direction: column">
+
+<div style="height: 60px; display: flex; align-items: center; justify-content: center; gap: 14px; flex: 0 0 auto">
+<span style="font-size: 13px; color: #8E9196">Mockup state</span>
+<div class="tabs"><button data-mode="ready">Ready</button><button data-mode="running">Focus running</button><button data-mode="paused">Paused</button><button data-mode="break">Short break</button><button data-mode="settings">Focus settings</button><button data-mode="empty">Empty sprint</button><button data-mode="mrun">Mini · running</button><button data-mode="mbreak">Mini · break</button><button data-mode="mlabel">Mini · another tab</button></div>
+</div>
+
+<!-- ============ The main window ============ -->
+<div data-if="isMain" style="display: contents">
+<div style="flex: 1; display: flex; background: #0D0E10; position: relative; overflow: hidden">
+
+<aside style="width: 248px; flex: 0 0 auto; background: #111214; border-right: 1px solid #1C1E21; padding: 14px 12px; display: flex; flex-direction: column; gap: 3px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 6px 4px 16px 8px"><img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo" style="width: 30px; height: 30px; display: block"><span style="font-weight: 600; font-size: 16px; color: #ECEDEE; flex: 1">Flint</span><span style="color: #8E9196; display: flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2"></path></svg></span>Today<span class="cnt">6</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"></path></svg></span>Inbox<span class="cnt">12</span></div>
+<div class="nav on"><span class="tile strong"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2.5M9.5 2h5"></path></svg></span>Focus<span class="cnt" data-text="navCount"></span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>Quick note</div>
+<div style="padding: 16px 6px 6px 10px"><span class="lbl">Lists</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span>Backend<span class="cnt">9</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span>Infra<span class="cnt">4</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"></path><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"></path></svg></span>Website<span class="cnt">7</span></div>
+<div class="nav"><span class="tile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg></span>Meeting notes</div>
+<div style="margin-top: auto; display: flex; gap: 8px; padding-top: 10px">
+<div class="fbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>Settings</div>
+<div class="fbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Trash</div>
+</div>
+</aside>
+
+<div style="position: absolute; right: 6px; top: 0; height: 40px; display: flex; align-items: center; color: #7C7F84">
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"></path></svg></span>
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect></svg></span>
+<span style="width: 44px; display: flex; justify-content: center"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"></path></svg></span>
+</div>
+
+<div style="flex: 1; min-width: 0; display: flex; justify-content: center; padding: 40px 40px 24px; position: relative">
+<div style="width: 820px; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px">
+<span style="font-size: 30px; font-weight: 700; letter-spacing: -0.025em; color: #B9BDC4">Focus<span style="color: #FFFFFF" data-text="titleCount"></span></span>
+<span class="mono" style="font-size: 12px; color: #8E9196" data-text="sessionNo"></span>
+</div>
+
+<!-- The timer card -->
+<div data-cls="timerCls">
+<div class="modes"><span data-cls="mFocus">Focus</span><span data-cls="mShort">Short break</span><span>Long break</span></div>
+<div class="digits" data-text="digits"></div>
+<div style="display: flex; align-items: center; gap: 10px">
+<span data-if="showSkipSpacer" style="display: contents"><span style="width: 48px"></span></span>
+<span class="go" data-text="goLabel"></span>
+<span data-if="showSkip" style="display: contents"><span class="skip" title="Skip (doesn't count)"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5.5v13l9.5-6.5zM16.5 5h2.5v14h-2.5z"></path></svg></span></span>
+</div>
+<div class="prog"><i data-style="progW"></i></div>
+</div>
+
+<div style="text-align: center; padding: 2px 0 6px">
+<div class="mono" style="font-size: 12px; color: #75787D" data-text="hash"></div>
+<div style="font-size: 15px; color: #ECEDEE; margin-top: 4px" data-text="activeLine"></div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 6px">
+<span class="lbl">Tasks</span>
+<span style="display: flex; gap: 4px">
+<span class="ibtn ring" title="Focus settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>
+<span class="ibtn ring" title="Clear finished · Reset counts · Remove all from Focus"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></span>
+</span>
+</div>
+
+<div class="card" style="padding: 6px">
+<div data-if="hasTasks" style="display: contents">
+<div class="row"><span class="stripe" style="width: 4px; background: #FFFFFF"></span><span class="check"></span><span style="flex: 1; min-width: 0" data-cls="firstTitle">Fix the login redirect loop</span><span class="chip">Backend</span><span data-cls="firstEst">2/3</span></div>
+<div class="row sel"><span class="stripe" style="width: 3px; background: #9AA0AB"></span><span class="check"></span><span style="flex: 1">Write the migration for user settings</span><span class="chip">Backend</span><span class="est">0/2</span></div>
+<div class="row"><span class="check"></span><span style="flex: 1">Review Alex's PR on response caching</span><span class="chip">Inbox</span><span class="est">0/1</span></div>
+<div class="row"><span class="stripe" style="width: 2px; background: #55585D"></span><span class="check"></span><span style="flex: 1">Update the deploy section of the API docs</span><span class="chip">Website</span><span class="est">0/1</span></div>
+<div class="row" style="color: #75787D"><span style="width: 20px; height: 20px; border-radius: 7px; background: #9AA0AB; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0E0F11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span style="flex: 1; text-decoration: line-through; text-decoration-color: #55585D">Answer the Contoso security questionnaire</span><span class="chip" style="color: #75787D">Inbox</span><span class="est" style="color: #75787D">1/1</span></div>
+</div>
+<div data-if="isEmpty" style="display: contents">
+<div style="padding: 26px 16px; text-align: center; color: #8E9196; font-size: 13.5px">Send tasks here with <span class="mono" style="color: #ECEDEE; padding: 1px 6px; border-radius: 6px; background: #1F2124; box-shadow: inset 0 0 0 1px #2C2E33">F</span> from any list, or add one below.</div>
+</div>
+</div>
+
+<label style="display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 8px 0 16px; border-radius: 14px; background: #0F1012; box-shadow: inset 0 0 0 1px #212327, inset 0 2px 4px rgba(0,0,0,.35)">
+<span style="flex: 1; color: #6E7176; font-size: 14px">Add a task to Focus…</span>
+<span class="chip" title="New tasks are saved in Inbox">Inbox</span>
+</label>
+
+<div data-if="hasTasks" style="display: contents">
+<div style="text-align: center; font-size: 13px; color: #8E9196; padding-top: 2px"><span class="mono" style="color: #ECEDEE" data-text="sessions"></span> sessions · finish at <span class="mono" style="color: #ECEDEE" data-text="finish"></span></div>
+</div>
+
+</div>
+</div>
+
+<!-- Focus settings: over the page, as the palette's card -->
+<div data-if="isSettings" style="display: contents">
+<div style="position: absolute; inset: 0; background: rgba(5,5,6,.45)"></div>
+<div class="float" style="position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: 440px; overflow: hidden">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px 22px; border-bottom: 1px solid #26282C"><span style="font-size: 15px; font-weight: 600; color: #ECEDEE">Focus settings</span><span class="ibtn"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></span></div>
+
+<div class="sec">
+<span class="lbl">Timer · minutes</span>
+<div style="display: flex; gap: 10px; padding: 10px 0 6px">
+<div style="flex: 1"><div style="font-size: 12px; color: #8E9196; margin-bottom: 5px">Focus</div><div class="well">25</div></div>
+<div style="flex: 1"><div style="font-size: 12px; color: #8E9196; margin-bottom: 5px">Short break</div><div class="well">5</div></div>
+<div style="flex: 1"><div style="font-size: 12px; color: #8E9196; margin-bottom: 5px">Long break</div><div class="well">15</div></div>
+</div>
+<div class="srow"><span class="sname">Auto start breaks</span><span class="sw"></span></div>
+<div class="srow"><span class="sname">Auto start focus</span><span class="sw"></span></div>
+<div class="srow"><div><div class="sname">Long break interval</div><div class="sdesc">A long break after this many focus sessions.</div></div><div class="well" style="width: 56px; justify-content: center">4</div></div>
+</div>
+
+<div class="sec">
+<span class="lbl">Tasks</span>
+<div class="srow"><div><div class="sname">Auto check tasks</div><div class="sdesc">Complete the active task when its sessions reach the estimate.</div></div><span class="sw"></span></div>
+<div class="srow"><div><div class="sname">Check to bottom</div><div class="sdesc">Done tasks move below the open ones.</div></div><span class="sw on"></span></div>
+</div>
+
+<div class="sec">
+<span class="lbl">Sound</span>
+<div class="srow"><span class="sname">Alarm sound</span><span style="display: flex; gap: 6px"><span class="sel-box">Nudge<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span><span class="btn">Play</span></span></div>
+<div class="srow"><span class="sname">Volume</span><span style="display: flex; align-items: center; gap: 10px"><span class="mono" style="font-size: 12px; color: #8E9196">50</span><span style="position: relative; width: 140px; height: 4px; border-radius: 4px; background: #26282C"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 50%; border-radius: 4px; background: #ECEDEE"></span><span style="position: absolute; left: calc(50% - 8px); top: -6px; width: 16px; height: 16px; border-radius: 50%; background: #ECEDEE; box-shadow: 0 2px 6px rgba(0,0,0,.5)"></span></span></span></div>
+<div class="srow"><span class="sname">Repeat</span><div class="well" style="width: 56px; justify-content: center">1</div></div>
+</div>
+
+<div class="sec">
+<span class="lbl">Notification</span>
+<div class="srow"><span class="sname">Notify when a session ends</span><span class="sw on"></span></div>
+<div class="srow"><div><div class="sname">Heads-up before the end</div><div class="sdesc">A quiet notification this long before a focus session ends.</div></div><span class="sel-box">Off<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 14px 22px; border-top: 1px solid #26282C"><span class="note">Also in Settings → Focus</span><span class="btn primary" style="min-width: 76px">OK</span></div>
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- ============ Mini mode ============ -->
+<div data-if="isMini" style="display: contents">
+<div style="flex: 1; background: #0A0B0C; display: flex; align-items: center; justify-content: center; font-size: 13px">
+<div style="width: 364px; border-radius: 22px; background: #141517; box-shadow: 0 0 0 1px #25272B, inset 0 1px 0 rgba(255,255,255,.07), 0 2px 4px rgba(0,0,0,.4), 0 34px 80px -18px rgba(0,0,0,.85); padding: 10px">
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 10px">
+<div style="display: flex; padding: 3px; border-radius: 12px; background: #0E0F11; box-shadow: inset 0 0 0 1px #212327">
+<span data-cls="mtToday">Today</span>
+<span data-cls="mtFocus"><span>Focus</span><span class="mono" style="font-size: 12px" data-text="mtFocusTime"></span><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+<span class="mtab">Note</span>
+</div>
+<div style="display: flex; align-items: center">
+<span class="mtool" title="More (Focus settings…)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></span>
+<span class="mtool"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg></span>
+<span class="mtool"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></span>
+</div>
+</div>
+
+<div data-if="miniFocus" style="display: contents">
+<div class="mtimer">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+<div class="mmodes"><span data-cls="mmFocus">Focus</span><span data-cls="mmShort">Short break</span><span>Long break</span></div>
+<span class="mono" style="font-size: 11.5px; color: #75787D">#3</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span class="mdig" data-text="mDigits" data-style="mDigColor"></span>
+<span style="display: flex; gap: 6px">
+<span style="height: 32px; min-width: 76px; padding: 0 14px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #ECEDEE; font-weight: 500; display: flex; align-items: center; justify-content: center">Pause</span>
+<span style="width: 32px; height: 32px; border-radius: 10px; background: #26282C; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); color: #A4A7AB; display: flex; align-items: center; justify-content: center" title="Skip"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5.5v13l9.5-6.5zM16.5 5h2.5v14h-2.5z"></path></svg></span>
+</span>
+</div>
+<div style="font-size: 12px; color: #8E9196; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis" data-text="mActive"></div>
+<div class="mprog"><i data-style="mProg"></i></div>
+</div>
+<div style="display: flex; flex-direction: column; padding: 2px 0 8px">
+<div class="mrow"><span style="position: absolute; left: 3px; top: 8px; bottom: 8px; width: 4px; border-radius: 3px; background: #FFFFFF"></span><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #FFFFFF">Fix the login redirect loop</span><span class="mono" style="font-size: 11.5px; color: #FFFFFF">2/3</span></div>
+<div class="mrow"><span style="position: absolute; left: 3px; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: #9AA0AB"></span><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Write the migration for user settings</span><span class="mono" style="font-size: 11.5px; color: #8E9196">0/2</span></div>
+<div class="mrow"><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Review Alex's PR on response caching</span><span class="mono" style="font-size: 11.5px; color: #8E9196">0/1</span></div>
+</div>
+<div style="display: flex; align-items: center; height: 42px; padding: 0 6px 0 12px; border-radius: 13px; background: #0F1012; box-shadow: inset 0 0 0 1px #212327, inset 0 2px 4px rgba(0,0,0,.35); color: #6E7176">Add to Focus…</div>
+</div>
+
+<div data-if="miniToday" style="display: contents">
+<div style="display: flex; flex-direction: column; padding: 2px 0 8px">
+<div class="mrow"><span style="position: absolute; left: 3px; top: 8px; bottom: 8px; width: 4px; border-radius: 3px; background: #FFFFFF"></span><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Fix the login redirect loop</span></div>
+<div class="mrow"><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Book the venue for the team offsite</span></div>
+<div class="mrow"><span style="position: absolute; left: 3px; top: 8px; bottom: 8px; width: 2px; border-radius: 3px; background: #55585D"></span><span class="mcheck"></span><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Renew the acme.example certificate</span><span class="mono" style="font-size: 11.5px; color: #8E9196">15:00</span></div>
+</div>
+<div style="display: flex; align-items: center; height: 42px; padding: 0 6px 0 12px; border-radius: 13px; background: #0F1012; box-shadow: inset 0 0 0 1px #212327, inset 0 2px 4px rgba(0,0,0,.35); color: #6E7176">Add to Today…</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div style="height: 44px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0 40px; font-size: 12.5px; color: #8E9196; text-align: center" data-text="caption"></div>
+</div>
+
+<script>
+function vals(mode){
+  var mini = mode === 'mrun' || mode === 'mbreak' || mode === 'mlabel';
+  var running = mode === 'running';
+  var brk = mode === 'break' || mode === 'mbreak';
+  var empty = mode === 'empty';
+  var digits = {ready: '25:00', running: '18:42', paused: '18:42', 'break': '04:12', settings: '25:00', empty: '25:00'}[mode] || '25:00';
+  var prog = {running: '25%', paused: '25%', 'break': '16%'}[mode] || '0%';
+  var captions = {
+    ready: 'Ready: the dark card; Start (Shift+Space). The active task is the top open one; "2/3" is its count against its estimate. Selected row: the second one.',
+    running: 'A focus session runs: only the timer card inverts (the strong pair: --fl-strong-bg, --fl-strong-fg); the page and the sidebar stay dark. Pause, and Skip (doesn\'t count).',
+    paused: 'Paused: back to the dark card, white digits; Resume.',
+    'break': 'A short break runs: the dark card, white digits. Skip starts the next focus session\'s countdown ready.',
+    settings: 'The gear opens Focus settings over the page; the same rows are Settings → Focus. No themes, focus sound, reports or integrations.',
+    empty: 'An empty sprint: the timer still works; the line says how to send tasks.',
+    mrun: 'Mini, Focus chosen in the list tab (second in the picker after Inbox): a compact timer, never inverted; white digits and line while focus runs.',
+    mbreak: 'Mini in a break: the digits and the line in the accent gray (--fl-accent).',
+    mlabel: 'Mini on another tab while a session runs: the list tab reads "Focus 12:34" (mono, by the minute; seconds in the last minute).'
+  };
+  return {
+    isMain: !mini,
+    isMini: mini,
+    isSettings: mode === 'settings',
+    hasTasks: !empty,
+    isEmpty: empty,
+    navCount: empty ? '' : '4',
+    titleCount: empty ? '' : ' · 4 open',
+    sessionNo: 'Session 3 today',
+    timerCls: 'timer' + (running ? ' inv' : ''),
+    mFocus: brk ? '' : 'on',
+    mShort: brk ? 'on' : '',
+    digits: digits,
+    goLabel: running || mode === 'break' ? 'Pause' : mode === 'paused' ? 'Resume' : 'Start',
+    showSkip: running || mode === 'paused' || mode === 'break',
+    showSkipSpacer: running || mode === 'paused' || mode === 'break',
+    progW: 'width:' + prog,
+    hash: empty ? '#3' : '#3',
+    activeLine: empty ? 'Time to focus!' : mode === 'break' ? 'Time for a break!' : 'Fix the login redirect loop',
+    firstTitle: '',
+    firstEst: 'est now',
+    sessions: '2 of 7',
+    finish: '12:40',
+    caption: captions[mode] || '',
+    miniFocus: mode === 'mrun' || mode === 'mbreak',
+    miniToday: mode === 'mlabel',
+    mtToday: 'mtab' + (mode === 'mlabel' ? ' on' : ''),
+    mtFocus: 'mtab' + (mode === 'mlabel' ? '' : ' on'),
+    mtFocusTime: mode === 'mlabel' ? '12:34' : '',
+    mmFocus: mode === 'mbreak' ? '' : 'on',
+    mmShort: mode === 'mbreak' ? 'on' : '',
+    mDigits: mode === 'mbreak' ? '04:12' : '18:42',
+    mDigColor: 'color:' + (mode === 'mbreak' ? '#9AA0AB' : '#FFFFFF'),
+    mActive: mode === 'mbreak' ? 'Time for a break!' : 'Fix the login redirect loop',
+    mProg: 'width:' + (mode === 'mbreak' ? '16%' : '25%') + ';background:' + (mode === 'mbreak' ? '#9AA0AB' : '#FFFFFF')
+  };
+}
+function setMode(mode){
+  var v = vals(mode);
+  document.querySelectorAll('[data-mode]').forEach(function(b){ b.className = b.dataset.mode === mode ? 'on' : ''; });
+  document.querySelectorAll('[data-if]').forEach(function(el){ el.style.display = v[el.dataset.if] ? 'contents' : 'none'; });
+  document.querySelectorAll('[data-cls]').forEach(function(el){ el.className = v[el.dataset.cls] || ''; });
+  document.querySelectorAll('[data-text]').forEach(function(el){ el.textContent = v[el.dataset.text] || ''; });
+  document.querySelectorAll('[data-style]').forEach(function(el){ el.style.cssText = v[el.dataset.style] || ''; });
+}
+document.querySelectorAll('[data-mode]').forEach(function(b){ b.addEventListener('click', function(){ setMode(b.dataset.mode); }); });
+setMode('ready');
+</script>
+</body>
+</html>

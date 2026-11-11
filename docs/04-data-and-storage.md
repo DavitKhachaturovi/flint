@@ -26,6 +26,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
   .flint/
     meta.json                   ← per-task bookkeeping (created, last touched), keyed by task ID
     today.json                  ← Today's manual order (task IDs), pin days, the rollover prompt's last answer (D-90)
+    focus.json                  ← Focus's sprint: task IDs in order, each with its estimate and count (FOCUS-02, FOCUS-03, D-170)
     sidebar.json                ← sidebar groups and the manual order of lists, notes and groups (LIST-05, LIST-06, D-73)
     archive/                    ← auto-archived completed tasks, one task list per list: `<list ID>.md` (TASK-06, D-88)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
@@ -41,6 +42,7 @@ App data (not in the Flint folder):
   (the window's local storage)  ← how often each palette command is used, for "most used" (D-106; a convenience, safe to lose)
   tips.json                     ← how often each first-few-times tip was shown (D-107, D-109: shared by both windows; safe to lose: a tip shows again)
   mini-state.json               ← mini mode's tab, the quick note it shows, and per monitor setup the corner it is anchored to (D-109)
+  focus-state.json              ← Focus's timer: the mode, when the session ends (or the time left while paused), the day's session number (FOCUS-01, D-170; machine state, never synced)
   drafts.json                   ← capture popup draft (CAP-08)
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
@@ -145,6 +147,7 @@ The app never shows fields as text; it renders them as the stripe, bell, pin, an
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
 - `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion), and **D-85** `captured` (when it came from the capture popup, for Recently captured); per note ID its `created` (first sighting). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
 - `today.json`: the manual order of Today. Today membership itself is the `pinned` field in the line (D-85), so losing this file only loses the order. **D-90 (Proposed format):** `{ "flint": 1, "order": [task IDs], "pinnedOn": { task ID: "YYYY-MM-DD" }, "answered": "YYYY-MM-DD" | null }`: the order, the day each task was pinned (for the rollover prompt; a pin first seen counts as pinned that day) and the day the prompt was last answered; unknown keys are kept.
+- `focus.json` (D-170): Focus's sprint, the one place a task's membership is kept (never in its line, so the format doesn't change). **Proposed format:** `{ "flint": 1, "tasks": [{ "id": task ID, "estimate": 1, "count": 0 }] }` in the sprint's order; an ID no longer found (the task deleted) is dropped when the file is next written; unknown keys are kept. Losing it empties the sprint and its counts, never a task. Per PC: not synced (like `today.json`).
 
 ### Sidebar groups in `.flint/sidebar.json` (LIST-05, LIST-06, D-73, Proposed format)
 - One file for the sidebar's groups and its manual order, kept in the Flint folder so it travels with the lists. Groups are not folders: the list files stay flat (D-23).

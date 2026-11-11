@@ -131,6 +131,12 @@ flint/
 
 ## 5. Feature implementation notes
 
+### The Focus timer (FOCUS-01, FOCUS-04, D-170)
+- The **main process** owns the timer, as reminders' schedule: the mode, the moment the session ends (or the time left while paused) and the day's session number, saved in `focus-state.json` (app data) on every change. The windows (main, mini) only show it, from one broadcast; they compute the digits from the end time each frame they draw, so they never drift and never disagree.
+- One main-process timeout per session end (and per heads-up), set again after resume from sleep (`powerMonitor`) and on start. A session whose end passed while Flint was closed or asleep is closed quietly: the next mode is shown ready, no sound, no toast.
+- The alarm sound plays in the main window's renderer (hidden windows still play audio), from the bundled sound files; the toast is an ordinary Windows toast (no reminder scenario).
+- The sprint (`.flint/focus.json`) is read and written by `packages/core` (a pure module with its tests) through the workspace, as `today.json`. The timer reads the clock the end-to-end tests fix (`FLINT_E2E_CLOCK_OFFSET`, `fixClockForTests`, D-107), so its tests run on the test clock and wait for the state they check (D-156), never for 25 real minutes (a test sets short durations).
+
 ### Global hotkeys (CAP-01, CAP-07, APP-08)
 - Register with Electron's global shortcut API. Registration fails if another app owns the combination → show "already in use, choose another" (conflict detection).
 - Must work over full-screen apps such as a full-screen Teams call (verify in spike).

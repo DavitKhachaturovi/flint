@@ -330,6 +330,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ## 4. Today
 
 ### TODAY-01 — Pinned tasks and the Today view (v1, D-85)
+- **D-170 (1.6.0):** Today's "Focus · pinned" section is renamed **Pinned**; **Focus** is now the timer page (FOCUS-01), a different thing from pinning.
 - **D-122 (0.8.17):** an open task's row shows a faint pin on hover where a pinned task's pin is; a click pins it (the pin settles in with a pop). Main-window rows; mini keeps P and the menu.
 - **D-86:** a click on a pin (on a row, in Up next, the panel's Pin chip) unpins the task.
 - **D-85: pinning replaces "star to Today"**, one concept instead of two. A task is **pinned** from any list: right-click **Pin** / **Unpin**, or **P** in Navigate state (and the multi-select bar's Pin). A pinned row shows a small pin indicator. Pinned tasks show in the context panel's **Pinned** section (NAV-07) whichever list is open (built with D-85), and in M6 they are the **Today** view.
@@ -560,6 +561,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 
 ### NAV-03 — Main window layout (v1, Proposed)
 - A minimal, collapsible sidebar: Today and Inbox pinned at the top, then the user's lists. The content area shows the selected list.
+- **D-170 (1.6.0):** **Focus** (FOCUS-01) under Inbox: Today, Inbox, Focus, then the lists.
 
 ### NAV-04 — Back and forward (v1, D-53)
 - The main window keeps a history of the views shown this session (lists, Today, task pages). **Back / forward** with the **mouse's side buttons** and **Alt+← / Alt+→**.
@@ -652,6 +654,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Mini mode's second tab reads the name of the task list it shows, **Inbox** by default, with a small chevron. A click on the tab while another tab is active switches to it; a click while it is the active tab, or on the chevron at any time, opens the **list picker** (CAP-11's: a search field, every task list most recently used first, D-25), with Inbox in it to come back, the list shown left out, no "New list" row (a list to show, not a place to send to), notes left out (the Note tab has them). Ctrl+2 only switches.
 - The choice is kept in mini's state file (`mini-state.json`, beside its tab and note); a list that is gone falls back to Inbox. Choosing a list here doesn't count as a recent use for `##list` and Move (only moves and captures do, D-25).
 - The composer adds to the chosen list ("Add to <list>…"), the keys, drag, Alt+↑/↓, the right-click menu and Open behave as on Inbox; its open top-level tasks are shown; "<list> is empty." when there are none. A new name fades in (D-89); the rows arrive as a page does.
+- **D-170 (1.6.0):** the picker starts with **Inbox**, then **Focus**, then the lists by recent use; Focus shows the timer and the sprint (FOCUS-06).
 
 ---
 
@@ -1050,3 +1053,49 @@ A **companion** app: capture, Today, lists and notes, reminders and sync on the 
 - The same engine and rules as the PC (04 §7): What should sync? on connecting, chosen items, conflicts as cards, deletes to Trash everywhere, stop syncing per device. Device name: the phone's name from Android's settings (upper case, as on the PC).
 - **When:** on opening the app, 5 s after a change while open, and in the background every 15 minutes or more as Android allows (WorkManager), on the network returning.
 - **Sign-in:** Google's Android authorization (Flint's own Android client in the same Cloud project, `drive.file` only); no browser round trip, no refresh token or secret on the phone (05 §8).
+
+---
+
+## 14. Focus (1.6.0, D-170)
+
+A Pomodoro timer with its own small list of tasks, the **sprint**: a separate little app inside Flint for what you do *now*, familiar to Pomofocus users. Not pinning (TODAY-01: what to work on today) and not a list: tasks are sent to it from any list and stay in their home lists. Limit (01): a timer and an alarm sound; no reports, no time logged against tasks.
+
+### FOCUS-01 — The Focus page and the timer (1.6.0, D-170)
+- **Focus** in the sidebar under Inbox (Today, Inbox, Focus, then the lists; NAV-03). The page, top to bottom (mockup 15, approved): the timer card with the mode tabs **Focus · Short break · Long break**, the time in large digits, **Start** (the primary button; **Pause** while running) and **Skip** while running; under the card "#3 · <the active task>" (or "Time to focus!" / "Time for a break!" with no task); then **Tasks** with the gear (FOCUS-05) and the ⋯ menu (FOCUS-02), the composer, the rows and the finish line (FOCUS-03).
+- **Modes:** Focus, then Short break; after every Nth focus session (Long break interval, 4) a Long break. A click on a mode tab switches to it (stopping what runs). The "#N" session number starts at 1 each day (**Proposed**).
+- **Colour (Q3):** while a focus session runs, the timer card inverts: `--fl-strong-bg` with `--fl-strong-fg` digits; a break or a pause is the dark card with white digits. Page and sidebar stay dark. A crossfade of about 300 ms (none under reduce-motion, D-75).
+- **The timer** lives in the main process as the moment the session ends (or the time left while paused), saved in `focus-state.json` (04 §2, 05 §5); it survives hidden windows, sleep, restarts, updates and crashes. A session that ended while Flint was closed or the PC slept shows the next mode ready, with no late alarm.
+- **Keys:** **Shift+Space** starts and pauses (Navigate state, the Focus page and mini's Focus tab). Palette: Go to Focus, Start focus, Pause / Resume, Skip, Short break, Long break, Focus settings. No global hotkey.
+
+### FOCUS-02 — The sprint: sending tasks, the active task (1.6.0, D-170)
+- **Sending:** **F** in Navigate state sends the selected tasks or takes them out; right-click **Send to Focus** / **Remove from Focus** (the only place outside Focus that shows membership); the multi-select bar; the palette. A toast "Sent to Focus" with **Go to Focus** (D-147).
+- The page's composer adds a task to **Inbox** and to the sprint.
+- **Rows** as in Today: ordinary task rows with the home list as a chip; completing, priority, editing and the rest change the task in its home list; "1/4" on the right (FOCUS-03). Done tasks stay, struck; with **Check to bottom** on they sink below the open ones.
+- **The active task** is the top open one; Alt+↑/↓, drag, or **Focus on this** (right-click, **Shift+F**, the palette: moves it to the top) change it; when it is done the next one takes over.
+- **⋯ menu:** **Clear finished**, **Reset counts**, **Remove all from Focus**: each changes only the sprint (never deletes a task), one undo step.
+- A deleted task leaves the sprint; a moved task stays (its ID is the same). A subtask can be sent on its own, shown flat with its home list (**Proposed**). The sprint is kept in `.flint/focus.json` (04), per PC, until cleared (**Proposed**: across days and restarts).
+- Empty: a quiet line, "Send tasks here with F, or add one below." (**Proposed**).
+
+### FOCUS-03 — Estimates and session counts (1.6.0, D-170)
+- Each task in the sprint has an **estimate** (focus sessions it should take; default 1; a small stepper on the row, or + / − on the selected row) and a **count** (focus sessions that ran to their end with it active). The row shows "1/4" in mono.
+- Under the rows: "2 of 7 sessions · finish at 15:40" (the open tasks' remaining sessions with the breaks between them, from now; **Proposed**).
+- **Auto check tasks** (off): the active task is completed when its count reaches its estimate.
+- Kept only in `focus.json`, gone when the task leaves the sprint: a plan, not time tracking.
+
+### FOCUS-04 — A session's end (1.6.0, D-170)
+- The timer moves to the next mode and waits; with **Auto start breaks** / **Auto start focus** (both off) it starts it. A focus session that runs to its end counts one for the active task; **Skip** moves on without counting.
+- **Flint's alarm sound** (FOCUS-05; played by Flint, so also under Do Not Disturb) and, with **Notify when a session ends** (on), an ordinary toast that leaves by itself: "Focus session done" with **Start break** (after a break "Break over" with **Start focus**); a click on the body opens Focus. Not the reminder-scenario toast (REM-06).
+- **Heads-up before the end** (off, or N minutes): a quiet toast N minutes before a focus session ends.
+
+### FOCUS-05 — Focus settings (1.6.0, D-170)
+- The gear on the Focus page opens the **Focus settings** card; the same rows are Settings' **Focus** section after Today & lists (APP-11), one component, found by Settings' Ctrl+F. Mini's ⋯ menu has **Focus settings…** (opens them in the main window).
+- **Timer:** Focus / Short break / Long break in minutes (25 / 5 / 15); Auto start breaks (off); Auto start focus (off); Long break interval (4).
+- **Tasks:** Auto check tasks (off); Check to bottom (on).
+- **Sound:** Alarm sound: **Nudge** (the reminder chime), **Drop**, **Mallet** (D-95's runners-up, made the same way and bundled as Davit's files, D-96), **None**; volume; repeat (1); Play.
+- **Notification:** Notify when a session ends (on); Heads-up before the end (off / N minutes).
+- Not in Flint: colour themes, dark mode when running, hour format, small window, mobile alarm, Todoist, webhook, reports, focus sound (D-170 Q8).
+
+### FOCUS-06 — Focus in mini mode (1.6.0, D-170)
+- Mini's list picker (MINI-03) starts with **Inbox**, then **Focus**, then the lists by recent use (only there; `##list` and Move to keep their order, without Focus).
+- Focus chosen: the tab reads **Focus**; a compact timer card (the mode, a click switches it; the digits, white while focus runs, `--fl-accent` in a break, never inverted; Start / Pause and Skip; a thin progress line), the sprint's rows with "1/4", the composer "Add to Focus…" (Inbox and the sprint); Space, Alt+↑/↓, drag and the right-click menu as on Inbox; Shift+Space starts and pauses.
+- While a session runs and another tab is in view, the tab reads **"Focus 12:34"** (mono; by the minute, seconds in the last minute; no task name). The choice is kept in `mini-state.json` as any list's.

@@ -92,6 +92,9 @@ Task lists are keyboard-driven, and single keys like **Space** and **1/2/3/0** a
 | Pin / unpin (TODAY-01, D-85) | P; D-122: the faint pin on a row's hover pins, a pinned task's pin unpins | Proposed |
 | Set reminder | R (the date and time picker for the selected task; D-94, built 0.4.28) | Proposed |
 | Give to Claude (TASK-18) | G (the selected task, completed too; also on the task's page), the task's menu, Ctrl+K, the side panel | Decided (D-151) |
+| Send to Focus / take out of it (FOCUS-02) | F (the selected tasks; also the task's menu, the multi-select bar, Ctrl+K) | Decided (D-170) |
+| Focus on this: make it the active task (FOCUS-02) | Shift+F (the Focus page and mini's Focus tab; also the task's menu there, Ctrl+K) | Decided (D-170) |
+| Start / pause the Focus timer (FOCUS-01) | Shift+Space (the Focus page and mini's Focus tab) | Decided (D-170) |
 | Move to list | via Ctrl+K / context menu; single key undecided | Q-06 |
 | Delete (to Trash, undo toast) | Delete | Proposed |
 | Open the selected task's menu (UI-08) | Shift+F10 or the Menu key | Proposed (D-55) |

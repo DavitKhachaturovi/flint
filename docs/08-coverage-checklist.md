@@ -1295,3 +1295,25 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 19 | Tests: core as today, Jest for the app, Maestro on an emulator in CI with the fake Drive and the test clock; real-device checks | MOB-* · Planned | 05 §8, D-107 |
 | 20 | Motion on the phone: screens, sheets, swipes, the bar's pill, the undo bar; off with Remove animations | MOB-*, UI-10 · Planned | 03 §8, D-89 |
 | 21 | Davit's setup: Android Studio and a JDK, USB debugging, the Android OAuth clients, the release key | MOB-* · Davit's (A0) | 06 §7 |
+
+## CF. Focus: a Pomodoro timer with its own sprint (11 Nov 2026, D-170, grill Q1–Q13, mockup 15)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The one exception to "reminders are the ceiling": a timer and an alarm sound; no reports, no time logged, no per-task history | FOCUS-* · Decided | 01, D-170 |
+| 2 | Focus in the sidebar under Inbox; Today's "Focus · pinned" renamed Pinned | FOCUS-01, TODAY-01, NAV-03 · Planned (1.6.0) | 02, D-170 Q2 |
+| 3 | The page: mode tabs Focus · Short break · Long break, digits, Start / Pause, Skip, "#N · task", Tasks with gear and ⋯ | FOCUS-01 · Planned (1.6.0) | 02, mockup 15, D-170 Q11 |
+| 4 | The timer card inverted while focus runs (strong pair), dark in breaks and pauses; page and sidebar dark | FOCUS-01 · Planned (1.6.0) | 02, 09 §10, D-170 Q3 |
+| 5 | The timer in the main process, by its end time; `focus-state.json`; sleep, restart, update, crash; no late alarm | FOCUS-01 · Planned (1.6.0) | 04 §2, 05 §5, D-170 Q6 |
+| 6 | The sprint in `.flint/focus.json` (IDs, estimates, counts), per PC; no change to the file format | FOCUS-02 · Planned (1.6.0) | 04, D-170 Q1 |
+| 7 | Sending: F, Send to Focus / Remove from Focus, the multi-select bar, the palette, the toast with Go to Focus; the composer to Inbox and the sprint | FOCUS-02 · Planned (1.6.0) | 02, 03 §3, D-170 Q5 |
+| 8 | The active task: the top open one; Shift+F Focus on this; Alt+↑/↓ and drag | FOCUS-02 · Planned (1.6.0) | 02, D-170 Q5 |
+| 9 | Done tasks struck, Check to bottom; ⋯ Clear finished, Reset counts, Remove all from Focus (never deleting, one undo) | FOCUS-02 · Planned (1.6.0) | 02, D-170 Q5 |
+| 10 | Estimates and counts "1/4"; "2 of 7 sessions · finish at 15:40"; Auto check tasks | FOCUS-03 · Planned (1.6.0) | 02, D-170 Q4 |
+| 11 | A session's end: next mode, auto start (off), Skip doesn't count; the alarm sound and an ordinary toast; heads-up | FOCUS-04 · Planned (1.6.0) | 02, 05 §5, D-170 Q7 |
+| 12 | Focus settings: the card and Settings' Focus section; Nudge, Drop, Mallet, None; no focus sound | FOCUS-05, APP-11 · Planned (1.6.0) | 02, D-170 Q8 |
+| 13 | Mini: Inbox then Focus first in the picker; the compact timer, never inverted; "Focus 12:34" on the tab | FOCUS-06, MINI-03 · Planned (1.6.0) | 02, D-170 Q9 |
+| 14 | Keys and palette: Shift+Space, F, Shift+F; Go to Focus, Start focus, Pause / Resume, Skip, the modes, the sprint's actions, Focus settings | FOCUS-* · Planned (1.6.0) | 03 §3, D-170 Q10, D-106 |
+| 15 | Motion: the card's inversion, the digits, rows sent and sinking, the tab label, the settings card; in the motion census | FOCUS-* · Planned (1.6.0) | D-89, D-75 |
+| 16 | Tests: the sprint file in core (round trip, unknown keys, missing IDs); the timer on the test clock with short durations; end to end for the page, sending, mini | FOCUS-* · Planned (1.6.0) | 05 §5, D-107, D-156 |
+| 17 | Version 1.6.0 (D-139); small fixes held for it | FOCUS-* · Decided | D-170 Q13 |
