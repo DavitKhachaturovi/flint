@@ -1073,17 +1073,17 @@ A Pomodoro timer with its own small list of tasks, the **sprint**: a separate li
 - **Rows** as in Today: ordinary task rows with the home list as a chip; completing, priority, editing and the rest change the task in its home list; "1/4" on the right (FOCUS-03). Done tasks stay, struck; with **Check to bottom** on they sink below the open ones.
 - **The active task** is the top open one; Alt+↑/↓, drag, or **Focus on this** (right-click, **Shift+F**, the palette: moves it to the top) change it; when it is done the next one takes over.
 - **⋯ menu:** **Clear finished**, **Reset counts**, **Remove all from Focus**: each changes only the sprint (never deletes a task), one undo step.
-- A deleted task leaves the sprint; a moved task stays (its ID is the same). A subtask can be sent on its own, shown flat with its home list (**Proposed**). The sprint is kept in `.flint/focus.json` (04), per PC, until cleared (**Proposed**: across days and restarts).
+- A deleted task leaves the sprint (D-171: it stays in the file, hidden, so undoing the delete brings it back; Clear finished drops it); a moved task stays (its ID is the same). A subtask can be sent on its own, shown flat with its home list (**Proposed**). The sprint is kept in `.flint/focus.json` (04), per PC, until cleared (**Proposed**: across days and restarts).
 - Empty: a quiet line, "Send tasks here with F, or add one below." (**Proposed**).
 
 ### FOCUS-03 — Estimates and session counts (1.6.0, D-170)
-- Each task in the sprint has an **estimate** (focus sessions it should take; default 1; a small stepper on the row, or + / − on the selected row) and a **count** (focus sessions that ran to their end with it active). The row shows "1/4" in mono.
+- Each task in the sprint has an **estimate** (focus sessions it should take; default 1; D-171: a − and + appear around the row's "1/4" on hover and on the selected row, and the keys − and + change it) and a **count** (focus sessions that ran to their end with it active). The row shows "1/4" in mono.
 - Under the rows: "2 of 7 sessions · finish at 15:40" (the open tasks' remaining sessions with the breaks between them, from now; **Proposed**).
 - **Auto check tasks** (off): the active task is completed when its count reaches its estimate.
 - Kept only in `focus.json`, gone when the task leaves the sprint: a plan, not time tracking.
 
 ### FOCUS-04 — A session's end (1.6.0, D-170)
-- The timer moves to the next mode and waits; with **Auto start breaks** / **Auto start focus** (both off) it starts it. A focus session that runs to its end counts one for the active task; **Skip** moves on without counting.
+- The timer moves to the next mode and waits; with **Auto start breaks** / **Auto start focus** (both off) it starts it. A focus session that runs to its end counts one for the active task; **Skip** moves on without counting (D-171: Skip during focus goes to a short break: a skipped session never earns the long one). A session whose end is handled more than a minute late (Flint closed, the PC asleep) is closed quietly: no sound, no toast, no count (D-171).
 - **Flint's alarm sound** (FOCUS-05; played by Flint, so also under Do Not Disturb) and, with **Notify when a session ends** (on), an ordinary toast that leaves by itself: "Focus session done" with **Start break** (after a break "Break over" with **Start focus**); a click on the body opens Focus. Not the reminder-scenario toast (REM-06).
 - **Heads-up before the end** (off, or N minutes): a quiet toast N minutes before a focus session ends.
 
@@ -1098,4 +1098,5 @@ A Pomodoro timer with its own small list of tasks, the **sprint**: a separate li
 ### FOCUS-06 — Focus in mini mode (1.6.0, D-170)
 - Mini's list picker (MINI-03) starts with **Inbox**, then **Focus**, then the lists by recent use (only there; `##list` and Move to keep their order, without Focus).
 - Focus chosen: the tab reads **Focus**; a compact timer card (the mode, a click switches it; the digits, white while focus runs, `--fl-accent` in a break, never inverted; Start / Pause and Skip; a thin progress line), the sprint's rows with "1/4", the composer "Add to Focus…" (Inbox and the sprint); Space, Alt+↑/↓, drag and the right-click menu as on Inbox; Shift+Space starts and pauses.
-- While a session runs and another tab is in view, the tab reads **"Focus 12:34"** (mono; by the minute, seconds in the last minute; no task name). The choice is kept in `mini-state.json` as any list's.
+- While a session runs and another tab is in view, the tab reads **"Focus 12:34"** (mono; no task name). **D-171:** built as mockup 15 shows it, minutes and seconds, ticking each second; D-170's "by the minute" is raised with Davit (open). The choice is kept in `mini-state.json` as any list's.
+- **D-171:** mini's header has a **⋯** with **Focus settings…** (opens them in the main window), as in mockup 15.
