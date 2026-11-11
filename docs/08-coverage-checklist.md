@@ -1221,7 +1221,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 3 | First-time setup: What should sync? Everything / Only what I choose (preselected); new items follow it | SYNC-01 · Built (1.5.0) | 02, D-161 |
 | 4 | Choose what syncs: On this PC and In Drive, not on this PC, grouped as the sidebar; both directions | SYNC-01 · Built (1.5.0) | 02, D-161 Q1, mockup 13 |
 | 5 | The status button (synced / syncing / offline / needs attention; plain before connecting → Settings → Sync) and its popover (state, what syncs, conflicts, problem and action, Sync settings…, Sync now) | SYNC-01 · Built (1.5.0) | 02, 09, mockup 13 |
-| 6 | Clouds on synced lists, notes and groups; the list and note header's sync line; Show: All / Synced only / Local only in the sort menu; Today unfiltered | SYNC-01, LIST-06, TODAY-01 · Built (1.5.0) | 02, D-161 |
+| 6 | ~~Clouds on synced lists, notes and groups~~ the conflict cloud only (D-163, 1.5.1); the list and note header's sync line; Show: All / Synced only / Local only in the sort menu; Today unfiltered | SYNC-01, LIST-06, TODAY-01 · Built (1.5.0) | 02, D-161 |
 | 7 | Right-click Sync with Google Drive on lists, notes and groups (a group syncs its lists); Open in Google Drive for a synced list or note; palette commands | SYNC-01, UI-08, NAV-01 · Built (1.5.0) | 02, 03, D-106 |
 | 8 | Drive layout: My Drive › Flint (development: Flint (development)) mirroring the files, attachments/, .flint-sync/ (groups, items, removed); found by Drive ID | SYNC-01 · Built (1.5.0) | 04 §7, D-161 Q3 |
 | 9 | Per-PC sync state in app data: account.bin, state.json, base/ merge bases; .flint/ never uploaded; sidebar order, Today's order and snapshots per PC | SYNC-01, DATA-04 · Built (1.5.0) | 04 §7 |
@@ -1248,3 +1248,12 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | GitHub Pages from `site/` on pushes to main; custom domain, HTTPS, DNS and domain verifications | WEB-01 · Built (1.5.0); DNS and settings Davit's | 05 §6, 06 |
 | 5 | Consent screen Branding: support address, home page, privacy link, authorised domain; Publish app | SYNC-01, WEB-01 · Davit's, after the site is live | 06 §6 |
 | 6 | Terms of use at /terms/ (MIT, as is, your content, Drive under Google's terms), linked from the footers and the consent screen | WEB-01 · Built (after 1.5.0); the Branding link Davit's | 02, D-162, `site/terms/index.html` |
+
+## CC. 1.5.1: Davit's feedback on 1.5.0 (11 Nov 2026, D-163)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The sidebar: no cloud on synced items; the cloud with "!" on an item (or a group's header) with an unresolved conflict | SYNC-01 · Built (1.5.1) | 02, 09, D-163 Q1 |
+| 2 | The timeline: reminders too close to show apart share a row at the earliest's time with "+N"; its menu lists them all; no row drifts from its hour | TODAY-03 · Built (1.5.1) | 02, 09, D-163 Q2 |
+| 3 | Long list names: one line with an ellipsis in a reminder card's chip, Overdue and Captured today | TODAY-03 · Built (1.5.1) | 02, 09, D-163 |
+| 4 | Tests and motion: `e2e/today.spec.ts` (the grouped row, the 16:00 row on its line, the menu, the chip); `sync.spec.ts` (no cloud on a synced row, the conflict cloud until resolved); the badge fades in | TODAY-03, SYNC-01, UI-10 · Built (1.5.1) | 03 §5, D-89 |

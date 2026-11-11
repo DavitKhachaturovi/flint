@@ -2,6 +2,13 @@
 
 Detailed notes for every build handed out (D-64). Newest first. The app's What's new card shows the shorter, plain-language [`whats-new.md`](whats-new.md) instead (D-117).
 
+## 1.5.1 (11 Nov 2026)
+
+- **The sidebar's clouds (SYNC-01, D-163):** synced lists, notes and groups no longer carry a cloud after their name (with everything synced, every row had one). Only an item with an unresolved sync conflict shows the cloud with "!", titled "1 sync conflict" (a group's header too, while one of its lists has one); it fades in when the conflict appears and goes after the run that sees it resolved. Which items sync stays in the header line, the sort menu's Show filter and the status popover.
+- **The timeline (TODAY-03, D-163):** reminders too close to show apart at the rail's scale (the same time, or minutes apart) share one row at the earliest's time instead of pushing each other down the rail, where two at 14:00 ended up on 13:00 and 15:00. The row shows the next reminder if it is among them, else the earliest, with a "+N" badge; its menu lists every reminder of the row with its time and list, and choosing one opens it. Dragging a row's reminder still changes its time; the others regroup around it.
+- **Long list names (TODAY-03, D-163):** a reminder card's list chip keeps the name on one line with an ellipsis and the full name on hover (it wrapped and spilled out of the chip); Overdue's and Captured today's list names shorten the same way, leaving the title room.
+- **Tests:** `e2e/today.spec.ts` (new: the grouped row, the 16:00 row on its hour line, the +N menu, the chip on one line); `e2e/sync.spec.ts` checks that a synced row has no cloud and that a conflict marks its row until resolved.
+
 ## 1.5.0 (10 Nov 2026)
 
 - **Google Drive sync (SYNC-01, D-161):** opt-in sync of chosen lists, notes and groups between PCs through the user's own Drive, as in mockup 13 (eight states). The local Flint folder stays the source of truth; Drive holds a visible `My Drive › Flint` folder of plain markdown (development builds `Flint (development)`), with sync's bookkeeping in `.flint-sync/` (groups, per-task created and last-touched times, linked files' PC and size, deletion records). No Flint server; Google access only to files Flint created (`drive.file`).
