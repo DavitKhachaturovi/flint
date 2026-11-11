@@ -44,6 +44,10 @@ type Hooks = {
   toasts: string[];
   closedToasts?: string[];
   miniSurface?: { rects: Box[] };
+  // MINI-04, D-177.
+  miniEdge?: () => unknown;
+  miniStartCollapsed?: () => void;
+  miniToggle?: () => void;
 };
 /** A test hook: called when it is a function, else its value. */
 const hook = (name: keyof Hooks): Promise<unknown> =>
@@ -1149,7 +1153,12 @@ test('the header never overflows: a long list name shortens first, the buttons s
   expect(await head.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
     true,
   );
-  for (const label of ['Hide mini mode', 'Always on top (on)', 'Reset size']) {
+  for (const label of [
+    'Hide mini mode',
+    'Always on top (on)',
+    'Collapse to the edge',
+    'Reset size',
+  ]) {
     const button = mini.locator(`.mini-head [aria-label="${label}"]`);
     await expect(button).toBeVisible();
     const box = await button.boundingBox();
@@ -1202,4 +1211,209 @@ test('× hides mini mode (fading out first); the palette and the cheat sheet kno
   await main.keyboard.press('Shift+Slash');
   await expect(main.locator('.cheat-sheet .cheat-group[aria-label="Mini mode"]')).toHaveCount(1);
   await main.keyboard.press('Escape');
+});
+
+/** MINI-04, D-177: mini at the screen's edge, as main has it. */
+type Edge = {
+  mode: 'card' | 'tab';
+  view: string;
+  tab: { side: 'left' | 'right'; x: number; y: number } | null;
+};
+const edgeNow = (): Promise<Edge> => hook('miniEdge') as Promise<Edge>;
+const view = async (): Promise<string> => {
+  const now = await edgeNow();
+  return now.mode === 'tab' ? now.view : 'card';
+};
+/** Where the cursor is for main (the test windows are off-screen); null: the real cursor. */
+const pointer = (where: 'tab' | 'zone' | 'away' | null): Promise<void> =>
+  app.evaluate((_electron, value) => {
+    const found = (globalThis as { __flintE2E?: Record<string, unknown> }).__flintE2E;
+    if (!found) return;
+    if (value) found['miniPointer'] = value;
+    else delete found['miniPointer'];
+  }, where);
+const edgeTab = (): ReturnType<Page['locator']> => mini.locator('.mini-edge-tab');
+const miniCard = (): ReturnType<Page['locator']> => mini.locator('.mini-card');
+/** A point on the tab's half on screen (the window ends at the edge, through the tab's middle). */
+const onTab = async (): Promise<{ x: number; y: number }> => {
+  const box = await edgeTab().boundingBox();
+  if (!box) throw new Error('no tab');
+  const width = await mini.evaluate(() => window.innerWidth);
+  return {
+    x: box.x + box.width / 2 >= width - 1 ? box.x + 12 : box.x + box.width - 12,
+    y: box.y + 24,
+  };
+};
+
+test('Collapse to the edge: the card slides into its nearer edge, the tab comes out at the corner spot; only the tab takes clicks, on top (MINI-04, D-177)', async () => {
+  await expect.poll(() => hook('miniVisible')).toBe(true);
+  expect(await view()).toBe('card');
+  await resetMotion();
+  await mini.locator('.mini-head .mini-collapse').click();
+  await expect.poll(view).toBe('collapsed');
+  await expect(miniCard()).toHaveClass(/\btucked\b/);
+  await expect(edgeTab()).toBeVisible();
+  await expect(edgeTab()).toHaveClass(/\bright\b/);
+  await expect(edgeTab()).not.toHaveClass(/\btucked\b/);
+  // Snapped into the top-right corner, the card collapses to that corner's spot (Q3), and the
+  // window is the strip along that edge: it ends in the tab's middle.
+  await expect(edgeTab()).toHaveCSS('top', '120px');
+  // Once it has slid out of the edge (D-89: its slide-in plays first).
+  const width = await mini.evaluate(() => window.innerWidth);
+  await expect
+    .poll(async () => {
+      const box = await edgeTab().boundingBox();
+      return box && Math.round(box.x + box.width / 2);
+    })
+    .toBe(width);
+  // D-89: the card slid away.
+  await expect.poll(motion).toContain('transitionend mini-card translate');
+  // Only the tab's half on screen takes clicks: the card is out of the surface.
+  await expect
+    .poll(async () => {
+      const surface = (await hook('miniSurface')) as { rects: Box[]; tab: Box | null };
+      return surface.tab && surface.rects.length === 0 ? surface.tab.width : null;
+    })
+    .toBe(24);
+  expect(await miniWindow('onTop')).toBe(true);
+});
+
+test('resting on the tab peeks without the keyboard; away from it, it slides back; a click opens it, Ctrl+M collapses it (D-177 Q1, Q7)', async () => {
+  await pointer('tab');
+  await expect.poll(view).toBe('peek');
+  await expect(miniCard()).not.toHaveClass(/\btucked\b/);
+  await expect(edgeTab()).toHaveClass(/\btucked\b/);
+  // The card comes out level with the tab, 24 px from the edge.
+  await expect
+    .poll(async () => {
+      const card = await miniCard().boundingBox();
+      const width = await mini.evaluate(() => window.innerWidth);
+      return card ? [Math.round(card.y), Math.round(width - card.x - card.width)] : null;
+    })
+    .toEqual([120, 24]);
+  // In the card's place (or the strip to the edge) it stays; away, it slides back.
+  await pointer('zone');
+  expect(await view()).toBe('peek');
+  await pointer('away');
+  await expect.poll(view).toBe('collapsed');
+  await expect(miniCard()).toHaveClass(/\btucked\b/);
+  // A click on the tab opens it; it stays, whatever the cursor does.
+  await pointer(null);
+  const at = await onTab();
+  await mini.mouse.click(at.x, at.y);
+  await expect.poll(view).toBe('open');
+  await expect(miniCard()).not.toHaveClass(/\btucked\b/);
+  await pointer('away');
+  // Ctrl+M collapses, also with the caret in the composer.
+  await mini.locator('.mini-card .composer input').focus();
+  await mini.keyboard.press('Control+m');
+  await expect.poll(view).toBe('collapsed');
+  await pointer(null);
+});
+
+test('the hotkey goes back where it came from: from the tab it opens and collapses; from hidden it opens and hides (D-177 Q4)', async () => {
+  await hook('miniToggle');
+  await expect.poll(view).toBe('open');
+  await hook('miniToggle');
+  await expect.poll(view).toBe('collapsed');
+  expect(await hook('miniVisible')).toBe(true);
+  await hook('hideMini');
+  await expect.poll(() => hook('miniVisible')).toBe(false);
+  await hook('miniToggle');
+  await expect.poll(() => hook('miniVisible')).toBe(true);
+  // From hidden: an ordinary card, at the tab's level (one position).
+  expect(await view()).toBe('card');
+  await expect(miniCard()).not.toHaveClass(/\btucked\b/);
+  await expect(edgeTab()).toHaveCount(0);
+  await hook('miniToggle');
+  await expect.poll(() => hook('miniVisible')).toBe(false);
+});
+
+test('Flint starting shows the tab; dragged, the corner spots show; let go it stays, near a spot it snaps; past the middle it moves to the other edge (D-177 Q2, Q8)', async () => {
+  await hook('miniStartCollapsed');
+  await expect.poll(() => hook('miniVisible')).toBe(true);
+  await expect.poll(view).toBe('collapsed');
+  await expect(edgeTab()).toBeVisible();
+  const dragBy = async (dx: number, dy: number, check?: () => Promise<void>): Promise<void> => {
+    const start = await onTab();
+    await mini.mouse.move(start.x, start.y);
+    await mini.mouse.down();
+    await mini.mouse.move(start.x + dx / 2, start.y + dy / 2, { steps: 4 });
+    await mini.mouse.move(start.x + dx, start.y + dy, { steps: 4 });
+    if (check) await check();
+    await mini.mouse.up();
+  };
+  const top = (): Promise<string> => edgeTab().evaluate((tab) => getComputedStyle(tab).top);
+  await expect.poll(top).toBe('120px');
+  await dragBy(0, 200, async () => {
+    await expect(mini.locator('.mini-edge-spot')).toHaveCount(2);
+  });
+  await expect(mini.locator('.mini-edge-spot')).toHaveCount(0);
+  await expect.poll(top).toBe('320px');
+  // A drag never peeks or opens.
+  expect(await view()).toBe('collapsed');
+  // Let go 30 px from the top spot: it snaps there.
+  await dragBy(0, -170, async () => {
+    await expect(mini.locator('.mini-edge-spot.near')).toHaveCount(1);
+  });
+  await expect.poll(top).toBe('120px');
+  // Past the screen's middle: the other edge.
+  await dragBy(-6000, 100);
+  await expect.poll(async () => (await edgeNow()).tab?.side).toBe('left');
+  await expect(edgeTab()).toHaveClass(/\bleft\b/);
+  await expect.poll(top).toBe('220px');
+  // The card comes out of it on the left now.
+  await pointer('tab');
+  await expect.poll(view).toBe('peek');
+  await expect(miniCard()).toHaveAttribute('data-corner', 'top-left');
+  await pointer('away');
+  await expect.poll(view).toBe('collapsed');
+  await pointer(null);
+});
+
+test('a reminder while collapsed: the white dot and one pulse on the tab; a peek shows its card; dealt with, the dot goes (D-177 Q5)', async () => {
+  const at = stamp(appNow());
+  await writeFile(
+    join(flint, 'Errands.md'),
+    `---\nflint: 1\nid: errands\nmode: tasks\n---\n- [ ] Ring the garage [reminder:: ${at}] [id:: rg1]\n`,
+  );
+  await expect(mini.locator('.mini-edge-tab .mini-edge-dot')).toBeVisible({ timeout: 40_000 });
+  await expect(mini.locator('.mini-edge-tab .mini-edge-pulse')).toHaveCount(1);
+  // The card never comes out by itself (Show reminders in Flint: when it is open, the default).
+  expect(await view()).toBe('collapsed');
+  await pointer('tab');
+  await expect.poll(view).toBe('peek');
+  const card = mini.locator('.mini-reminder.alert');
+  await expect(card).toContainText('Ring the garage');
+  await card.locator('button', { hasText: 'Done' }).click();
+  await expect(mini.locator('.mini-edge-dot')).toHaveCount(0);
+  await expect.poll(() => readFile(join(flint, 'Errands.md'), 'utf8')).toContain('- [x] Ring');
+  await pointer('away');
+  await expect.poll(view).toBe('collapsed');
+  await pointer(null);
+});
+
+test('Settings, Mini mode: Open on hover off, the tab shows the cursor but only a click opens; Start collapsed with Flint; both on by default (D-177)', async () => {
+  const settings = await main.evaluate(() => window.flintMain.settings());
+  expect(settings?.miniHoverOpens).toBe(true);
+  expect(settings?.miniStartCollapsed).toBe(true);
+  await main.evaluate(() => window.flintMain.setSetting({ key: 'miniHoverOpens', value: false }));
+  await pointer('tab');
+  await expect(edgeTab()).toHaveClass(/\bhover\b/);
+  // Resting there: the tab nudged out, the card still in the edge. A click opens it.
+  expect(await view()).toBe('collapsed');
+  await pointer(null);
+  const at = await onTab();
+  await mini.mouse.click(at.x, at.y);
+  await expect.poll(view).toBe('open');
+  await mini.keyboard.press('Control+m');
+  await expect.poll(view).toBe('collapsed');
+  await main.evaluate(() => window.flintMain.setSetting({ key: 'miniHoverOpens', value: true }));
+  await main.evaluate(() =>
+    window.flintMain.setSetting({ key: 'miniStartCollapsed', value: false }),
+  );
+  expect((await main.evaluate(() => window.flintMain.settings()))?.miniStartCollapsed).toBe(false);
+  await main.evaluate(() =>
+    window.flintMain.setSetting({ key: 'miniStartCollapsed', value: true }),
+  );
 });

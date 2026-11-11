@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import type { MiniLayout } from '../../shared/ipc.js';
+import type { MiniLayout, MiniTabLayout } from '../../shared/ipc.js';
 import { MINI_LIMIT, MINI_SHADOW, MINI_SNAP, MINI_WIDTH } from '../../shared/mini-size.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
 
@@ -47,6 +47,10 @@ export interface Stage {
   /** D-111: the size differs from the default: the reset button shows. */
   readonly resized: boolean;
   readonly reset: () => void;
+  /** MINI-04, D-177: at the screen's edge, the tab's place (null: an ordinary card). */
+  readonly tab: MiniTabLayout | null;
+  /** The window is moving to another stage: what the page shows waits, hidden. */
+  readonly moving: boolean;
 }
 
 const DEFAULT = { width: MINI_WIDTH.initial, limit: MINI_LIMIT.initial };
@@ -57,8 +61,12 @@ export function useStage(refs: {
   readonly version: unknown;
   /** The Note tab: the card always takes its full height. */
   readonly full: boolean;
+  /** MINI-04, D-177: the card tucked into the edge (only the tab shows). */
+  readonly tucked: boolean;
 }): Stage {
-  const { card, version, full } = refs;
+  const { card, version, full, tucked } = refs;
+  const tuckedRef = useRef(tucked);
+  tuckedRef.current = tucked;
   const [layout, setLayout] = useState<MiniLayout | null>(null);
   const [size, setSize] = useState<{ width: number; limit: number }>(DEFAULT);
   // Where the hang-side edge is (`MiniLayout.horizontal`); a resize from that side moves it.
@@ -95,7 +103,8 @@ export function useStage(refs: {
     window.flintMini.onSettled(() => {
       setHidden(false);
       const element = card.current;
-      if (!element || reducedMotion()) return;
+      // D-177: a card tucked into the edge stays out of sight (the tab comes in by itself).
+      if (!element || reducedMotion() || tuckedRef.current) return;
       element.animate(
         [
           { opacity: 0, transform: 'scale(0.97)' },
@@ -186,22 +195,47 @@ export function useStage(refs: {
     const tick = (): void => {
       const element = card.current;
       if (!element) return;
-      const box = element.getBoundingClientRect();
+      const edgeTab = layoutRef.current?.tab ?? null;
+      // D-177: at the edge the card slides in and out: its place is its layout box, not where the
+      // slide has it now.
+      const box = edgeTab
+        ? {
+            x: element.offsetLeft,
+            y: element.offsetTop,
+            width: element.offsetWidth,
+            height: element.offsetHeight,
+          }
+        : element.getBoundingClientRect();
+      const out = !tuckedRef.current;
       const topCorner = (layoutRef.current?.corner ?? 'top-right').startsWith('top');
       const root = document.getElementById('root');
       const overlays = [
         ...[...document.body.children].filter((each) => each !== root),
         ...document.querySelectorAll('.cm-tooltip'),
       ];
+      // The tab's half on screen, where the layout has it (not where its slide-in has it now).
+      const tabBox =
+        edgeTab && tuckedRef.current
+          ? {
+              x: edgeTab.side === 'right' ? window.innerWidth - edgeTab.size / 2 : 0,
+              y: edgeTab.top,
+              width: edgeTab.size / 2,
+              height: edgeTab.size,
+            }
+          : null;
       const rects = [
-        {
-          // The side handles and the one away from the corner; above a card in a top corner,
-          // nothing (D-111).
-          x: box.x - HANDLE,
-          y: topCorner ? box.y : box.y - TOP_HANDLE,
-          width: box.width + 2 * HANDLE,
-          height: box.height + (topCorner ? HANDLE : TOP_HANDLE),
-        },
+        ...(out
+          ? [
+              {
+                // The side handles and the one away from the corner; above a card in a top
+                // corner, nothing (D-111).
+                x: box.x - HANDLE,
+                y: topCorner ? box.y : box.y - TOP_HANDLE,
+                width: box.width + 2 * HANDLE,
+                height: box.height + (topCorner ? HANDLE : TOP_HANDLE),
+              },
+            ]
+          : []),
         ...overlays
           .map((overlay) => {
             const rect = overlay.getBoundingClientRect();
@@ -213,6 +247,15 @@ export function useStage(refs: {
         card: { width: box.width, height: box.height },
         rects,
         held: held.current,
+        // MINI-04: the tab (only its half on screen takes the pointer), and the card's place out
+        // to the edge (a peek stays while the cursor is in it, D-177 Q1).
+        tab: tabBox,
+        zone:
+          edgeTab && out
+            ? edgeTab.side === 'right'
+              ? { x: box.x, y: box.y, width: window.innerWidth - box.x, height: box.height }
+              : { x: 0, y: box.y, width: box.x + box.width, height: box.height }
+            : null,
       };
       const key = JSON.stringify(surface);
       if (key !== sent.current) {
@@ -251,7 +294,7 @@ export function useStage(refs: {
       window.removeEventListener('blur', up);
     };
   }, [card, report]);
-  useEffect(report, [report, layout, width, limit, horizontal, full]);
+  useEffect(report, [report, layout, width, limit, horizontal, full, tucked]);
 
   const startResize = (handle: Handle, event: ReactPointerEvent<HTMLElement>): void => {
     if (event.button !== 0) return;
@@ -358,6 +401,8 @@ export function useStage(refs: {
     // D-160: by what is visible: the width, and the height only where the limit shows.
     resized: size.width !== DEFAULT.width || heightDiffers,
     reset,
+    tab: layout?.tab ?? null,
+    moving: hidden,
   };
 }
 
@@ -366,7 +411,11 @@ export function useStage(refs: {
  * fade before hiding the window, the focus already given back). Between the two it waits, unseen,
  * ready to rise in. Off with reduce-motion.
  */
-export function useShowMotion(card: RefObject<HTMLElement | null>): void {
+export function useShowMotion(
+  card: RefObject<HTMLElement | null>,
+  /** D-177: the card tucked into the edge: shown as the tab, the card doesn't rise in. */
+  tucked: RefObject<boolean>,
+): void {
   useEffect(() => {
     const curve = 'cubic-bezier(0.2, 0.9, 0.3, 1)';
     let out: Animation | null = null;
@@ -376,7 +425,7 @@ export function useShowMotion(card: RefObject<HTMLElement | null>): void {
       out = null;
       if (!element) return;
       element.style.removeProperty('opacity');
-      if (reducedMotion()) return;
+      if (reducedMotion() || tucked.current) return;
       element.animate(
         [
           { opacity: 0, transform: 'translateY(6px) scale(0.97)' },
@@ -403,5 +452,5 @@ export function useShowMotion(card: RefObject<HTMLElement | null>): void {
       // Unseen until it rises in again.
       element?.style.setProperty('opacity', '0');
     });
-  }, [card]);
+  }, [card, tucked]);
 }

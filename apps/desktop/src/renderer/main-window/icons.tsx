@@ -165,6 +165,14 @@ export const SendIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [<path key="a" d="M12 19V5" />, <path key="b" d="m5 12 7-7 7 7" />], 2.2);
 
 /** D-111: mini mode's "Reset size": two corners drawn in toward each other. */
+/** MINI-04, D-177: mini's Collapse to the edge: an arrow into a bar (mirrored for a left edge). */
+export const CollapseIcon = ({ size = 14 }: IconProps): ReactElement =>
+  svg(size, [
+    <path key="a" d="M4 12h11" />,
+    <path key="b" d="m11 8 4 4-4 4" />,
+    <path key="c" d="M19 5v14" />,
+  ]);
+
 export const ResetSizeIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, [
     <path key="a" d="M4 14h6v6" />,

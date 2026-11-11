@@ -92,6 +92,15 @@ export interface E2EHooks {
   /** D-159: what mini's page last said it takes clicks over (the card, open menus and pickers). */
   miniSurface?: MiniSurface;
   /**
+   * MINI-04, D-177: where the cursor is for mini at the edge (the test windows are off-screen):
+   * on the tab, in the card's place, or away; unset: the real cursor.
+   */
+  miniPointer?: 'tab' | 'zone' | 'away';
+  /** D-177: mini at the edge now; Flint's start as the tab; the hotkey. */
+  miniEdge?: () => { mode: 'card' | 'tab'; view: string; tab: unknown };
+  miniStartCollapsed?: () => void;
+  miniToggle?: () => void;
+  /**
    * MINI-02, D-157: the capture-into-note hotkey after its copy step (tests never send keys to
    * another app): what the selection was, as the hotkey would have read it.
    */

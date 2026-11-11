@@ -492,3 +492,207 @@ body {
 .mini-tab-list.on .mini-tab-pick {
   color: var(--fl-text-muted);
 }
+
+/* MINI-04, D-177 (mockup 16): at the screen's edge the window is a strip ending at the edge. The
+   card slides out of the tab and back into the edge (interruptible: a transition); the tab is the
+   app icon, cut in half by the edge. Off under reduce-motion (app.css). */
+.mini-card.at-edge,
+.mini-card.tucked {
+  transition:
+    translate calc(var(--fl-dur-base) * 1.1) cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity calc(var(--fl-dur-base) * 0.8) ease;
+}
+
+.mini-card.tucked {
+  /* Past the window's edge: the card's 24 px from it and its shadow. */
+  translate: calc(100% + 64px) 0;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate calc(var(--fl-dur-base) * 0.9) cubic-bezier(0.5, 0, 0.75, 0),
+    opacity calc(var(--fl-dur-base) * 0.9) ease;
+}
+
+.mini-card.tucked.side-left {
+  translate: calc(-100% - 64px) 0;
+}
+
+.mini-collapse.left svg {
+  transform: scaleX(-1);
+}
+
+/* The tab: 48 px, centred on the edge (the window cuts off its outer half). */
+.mini-edge-tab {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: none;
+  transition:
+    translate var(--fl-dur-fast) var(--fl-ease-spring),
+    opacity var(--fl-dur-fast) ease;
+}
+
+.mini-edge-tab.right {
+  right: -24px;
+}
+
+.mini-edge-tab.left {
+  left: -24px;
+}
+
+.mini-edge-tab.hover.right {
+  translate: -4px 0;
+}
+
+.mini-edge-tab.hover.left {
+  translate: 4px 0;
+}
+
+.mini-edge-tab.tucked {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate var(--fl-dur-base) cubic-bezier(0.5, 0, 0.75, 0),
+    opacity var(--fl-dur-base) ease;
+}
+
+.mini-edge-tab.tucked.right {
+  translate: 26px 0;
+}
+
+.mini-edge-tab.tucked.left {
+  translate: -26px 0;
+}
+
+.mini-edge-tab.moving {
+  opacity: 0;
+  transition: none;
+}
+
+.mini-edge-tab.dragging {
+  cursor: grabbing;
+}
+
+.mini-edge-icon {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(var(--fl-shadow-primary-button));
+  transition: filter var(--fl-dur-fast) ease;
+  -webkit-user-drag: none;
+}
+
+.mini-edge-tab.hover .mini-edge-icon,
+.mini-edge-tab.dragging .mini-edge-icon {
+  filter: drop-shadow(var(--fl-shadow-primary-button)) brightness(1.18);
+}
+
+/* D-177 Q6: Focus's line round the icon's visible half (mirrored on a left edge). */
+.mini-edge-line {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 56px;
+  height: 56px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mini-edge-tab.left .mini-edge-line {
+  transform: scaleX(-1);
+}
+
+.mini-edge-line path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--fl-dur-state) ease;
+}
+
+.mini-edge-line .track {
+  stroke: var(--fl-edge-chip);
+}
+
+.mini-edge-line .fill.focus {
+  stroke: var(--fl-strong-bg);
+}
+
+.mini-edge-line .fill.break {
+  stroke: var(--fl-accent);
+}
+
+/* D-177 Q5: a reminder waiting: the bell's white dot (D-68), one pulse when one comes. */
+.mini-edge-dot,
+.mini-edge-pulse {
+  position: absolute;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.mini-edge-tab.right .mini-edge-dot,
+.mini-edge-tab.right .mini-edge-pulse {
+  left: 6px;
+}
+
+.mini-edge-tab.left .mini-edge-dot,
+.mini-edge-tab.left .mini-edge-pulse {
+  left: 33px;
+}
+
+.mini-edge-dot {
+  background: var(--fl-strong-bg);
+  box-shadow: 0 0 0 2px var(--fl-ground-float);
+}
+
+.mini-edge-pulse {
+  border: 2px solid var(--fl-strong-bg);
+  opacity: 0;
+  animation: mini-edge-pulse calc(var(--fl-dur-complete) * 2.5) cubic-bezier(0.2, 0.7, 0.3, 1) 1;
+}
+
+@keyframes mini-edge-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* D-177 Q2: the corner spots while the tab is dragged: the icon's rounded square, half past the
+   edge as the tab is. */
+.mini-edge-spot {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mini-edge-spot.right {
+  right: -24px;
+}
+
+.mini-edge-spot.left {
+  left: -24px;
+}
+
+.mini-edge-spot::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 9px;
+  border: 1.5px dashed var(--fl-checkbox-border);
+  transition:
+    border-color var(--fl-dur-fast) ease,
+    background-color var(--fl-dur-fast) ease;
+}
+
+.mini-edge-spot.near::before {
+  border-style: solid;
+  border-color: var(--fl-strong-bg);
+  background: color-mix(in srgb, var(--fl-strong-bg) 6%, transparent);
+}

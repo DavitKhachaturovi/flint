@@ -4,10 +4,12 @@ import {
   type MiniAlert,
   type MiniAlertAction,
   type MiniCapture,
+  type MiniEdgeState,
   type MiniLayout,
   type MiniResize,
   type MiniState,
   type MiniSurface,
+  type MiniTabMove,
 } from '../shared/ipc.js';
 import { invoke, main, send } from './main-bridge.js';
 import { applyTestClock } from './test-clock.js';
@@ -143,6 +145,21 @@ const mini = {
   /** A resize let go: its width and height limit, remembered. */
   resized(size: MiniResize): void {
     send(Channels.miniResized, size);
+  },
+  /** MINI-04, D-177: at the screen's edge now (the page asks when it starts), and what changes. */
+  edge(): Promise<MiniEdgeState | null> {
+    return invoke(Channels.miniGetEdge) as Promise<MiniEdgeState | null>;
+  },
+  onEdge(listener: (state: MiniEdgeState) => void): void {
+    ipcRenderer.on(Channels.miniEdge, (_event, state: MiniEdgeState) => listener(state));
+  },
+  /** The tab clicked (open), the header's Collapse or Ctrl+M (collapse). */
+  edgeAction(action: 'open' | 'collapse'): void {
+    send(Channels.miniEdgeAction, action);
+  },
+  /** The tab dragged across to the other edge, or let go. */
+  tabMoved(move: MiniTabMove): void {
+    send(Channels.miniTabMoved, move);
   },
 };
 

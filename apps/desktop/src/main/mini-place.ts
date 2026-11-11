@@ -157,6 +157,130 @@ export function settle(
   };
 }
 
+/**
+ * MINI-04, D-177: the edge tab. Mini collapses to the app icon cut in half by a side edge of the
+ * screen; the card comes out of it, level with it, 24 px from the edge. The tab is dragged along
+ * its edge (snapping to the corner spots) or across to the other one. Sizes here are DIP: the tab's
+ * 48 page pixels times the page's zoom.
+ */
+export type Side = 'left' | 'right';
+
+/** The tab's place: its side, the work area's edge there (x) and its top (y). */
+export interface TabPlace {
+  readonly side: Side;
+  readonly x: number;
+  readonly y: number;
+}
+
+/** The tab: 48 page pixels square, centred on the edge (only its inner half shows). */
+export const TAB_SIZE = 48;
+/** The corner spots (Proposed): the tab's top 120 px below the work area's top, its bottom 48 px above its bottom. */
+export const TAB_SPOT_TOP = 120;
+export const TAB_SPOT_BOTTOM = 48;
+/** Let go this near a corner spot, the tab snaps to it (mini's snap distance). */
+export const TAB_SNAP = SNAP_DISTANCE;
+
+const edgeOf = (side: Side, area: Rect): number => (side === 'left' ? area.x : area.x + area.width);
+
+/** The tab's highest and lowest tops on a work area. */
+function tabRange(area: Rect, size: number): { readonly min: number; readonly max: number } {
+  return { min: area.y, max: Math.max(area.y, area.y + area.height - size) };
+}
+
+/** The corner spots' tops (on both edges). */
+export function tabSpots(
+  area: Rect,
+  size = TAB_SIZE,
+): { readonly top: number; readonly bottom: number } {
+  const range = tabRange(area, size);
+  const clamp = (y: number): number => Math.max(range.min, Math.min(range.max, Math.round(y)));
+  return {
+    top: clamp(area.y + TAB_SPOT_TOP),
+    bottom: clamp(area.y + area.height - TAB_SPOT_BOTTOM - size),
+  };
+}
+
+/** A tab's top let go at `y`: on the work area, and at a corner spot when within 48 px of one. */
+export function snapTabY(y: number, area: Rect, size = TAB_SIZE): number {
+  const range = tabRange(area, size);
+  const spots = tabSpots(area, size);
+  const near = [spots.top, spots.bottom]
+    .map((spot) => ({ spot, gap: Math.abs(y - spot) }))
+    .filter((each) => each.gap <= TAB_SNAP)
+    .sort((a, b) => a.gap - b.gap)[0];
+  if (near) return near.spot;
+  return Math.max(range.min, Math.min(range.max, Math.round(y)));
+}
+
+/** The tab on `side` of a work area, its top at `y` (kept on the area, not snapped). */
+export function tabAt(side: Side, y: number, area: Rect, size = TAB_SIZE): TabPlace {
+  const range = tabRange(area, size);
+  return {
+    side,
+    x: edgeOf(side, area),
+    y: Math.max(range.min, Math.min(range.max, Math.round(y))),
+  };
+}
+
+/** The first place: the top-right corner spot. */
+export function firstTab(area: Rect, size = TAB_SIZE): TabPlace {
+  return tabAt('right', tabSpots(area, size).top, area, size);
+}
+
+/**
+ * D-177 Q3: the card comes out of the tab, 24 px from the edge: in the upper half of the screen its
+ * top is level with the tab's (it grows down), in the lower half its bottom (it grows up).
+ */
+export function hangForTab(tab: TabPlace, area: Rect, size = TAB_SIZE): Hang {
+  const upper = tab.y + size / 2 < area.y + area.height / 2;
+  return {
+    corner: `${upper ? 'top' : 'bottom'}-${tab.side}`,
+    x: tab.side === 'left' ? area.x + MINI_MARGIN : area.x + area.width - MINI_MARGIN,
+    y: upper ? tab.y : tab.y + size,
+  };
+}
+
+/**
+ * Collapsing a card at `box`: the tab goes to its nearer side edge, level with its top (upper half)
+ * or bottom (lower half), snapping as a drag does; a card snapped into a corner goes to that
+ * corner's spot (level with it would put the tab beside other apps' caption buttons).
+ */
+export function tabForCard(
+  box: Rect,
+  snapped: Corner | null,
+  area: Rect,
+  size = TAB_SIZE,
+): TabPlace {
+  if (snapped) {
+    const spots = tabSpots(area, size);
+    return tabAt(
+      isLeft(snapped) ? 'left' : 'right',
+      isTop(snapped) ? spots.top : spots.bottom,
+      area,
+      size,
+    );
+  }
+  const side: Side = box.x + box.width / 2 < area.x + area.width / 2 ? 'left' : 'right';
+  const upper = box.y + box.height / 2 < area.y + area.height / 2;
+  return tabAt(side, snapTabY(upper ? box.y : box.y + box.height - size, area, size), area, size);
+}
+
+/**
+ * The window while mini is at the edge: a strip along the tab's edge, the work area's full height,
+ * as wide as the largest card with its margin and shadow. It ends exactly at the edge, so the tab's
+ * outer half is cut off there (never shown on a monitor beside). The tab moves up and down and the
+ * card comes out inside it, so the window only moves to change sides.
+ */
+export function tabStage(tab: TabPlace, area: Rect, zoom = 1): Rect {
+  const width = Math.round(MINI_MARGIN + CARD_WIDTH.max * zoom + SHADOW.side);
+  return {
+    x: tab.side === 'left' ? area.x : area.x + area.width - width,
+    y: area.y,
+    width,
+    height: area.height,
+  };
+}
+
 /** A remembered size, kept in its ranges. */
 export function clampSize(size: { width?: unknown; limit?: unknown }): {
   width: number;

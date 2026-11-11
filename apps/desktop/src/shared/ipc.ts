@@ -84,6 +84,15 @@ export const Channels = {
   miniSettled: 'mini:settled',
   miniSurface: 'mini:surface',
   miniResized: 'mini:resized',
+  /**
+   * MINI-04, D-177: mini at the screen's edge. Main → mini: the view (collapsed, peek, open; null:
+   * not at the edge) and whether the cursor rests on the tab; mini → main: open or collapse (the
+   * tab clicked, the header's button, Ctrl+M), and the tab dragged (along its edge, or across).
+   */
+  miniEdge: 'mini:edge',
+  miniGetEdge: 'mini:get-edge',
+  miniEdgeAction: 'mini:edge-action',
+  miniTabMoved: 'mini:tab-moved',
   /** D-109: one window edits a note at a time (claim, hand over, the owner's live text). */
   noteClaim: 'note:claim',
   noteRelease: 'note:release',
@@ -579,6 +588,9 @@ export interface SettingsView {
   readonly miniHideFromSharing: boolean;
   readonly popupHideFromSharing: boolean;
   readonly miniReminders: 'when-open' | 'always';
+  /** MINI-04, D-177: the edge tab peeks on hover; mini starts as the tab with Flint. */
+  readonly miniHoverOpens: boolean;
+  readonly miniStartCollapsed: boolean;
   readonly version: string;
   /** APP-14, D-118: Don't show tips. */
   readonly tipsOff: boolean;
@@ -612,7 +624,8 @@ export type SettingChange =
     }
   | { readonly key: 'animationSpeed'; readonly value: 'relaxed' | 'normal' | 'quick' }
   | {
-      readonly key: 'miniHideFromSharing' | 'popupHideFromSharing';
+      readonly key:
+        'miniHideFromSharing' | 'popupHideFromSharing' | 'miniHoverOpens' | 'miniStartCollapsed';
       readonly value: boolean;
     }
   | { readonly key: 'miniReminders'; readonly value: 'when-open' | 'always' };
@@ -1026,6 +1039,39 @@ export interface MiniLayout {
   readonly limit: number;
   /** Snapping into another corner: hide the card, say `miniLayoutReady` with this, then settle in. */
   readonly moving?: number;
+  /** MINI-04, D-177: at the screen's edge, the tab (the window is a strip along that edge). */
+  readonly tab?: MiniTabLayout;
+}
+
+/** MINI-04, D-177: the edge tab in mini's window (page pixels, from the window's top left). */
+export interface MiniTabLayout {
+  /** The screen edge it is on (the window's edge on that side). */
+  readonly side: 'left' | 'right';
+  /** Its top. */
+  readonly top: number;
+  /** Its size (square; only the inner half shows). */
+  readonly size: number;
+  /** The corner spots' tops on this edge (a drag snaps to them, D-177 Q2). */
+  readonly spots: readonly number[];
+  /** Within this far of a spot, the tab snaps to it. */
+  readonly snap: number;
+  /** The work area's middle (x): dragged past it, the tab changes sides. */
+  readonly middle: number;
+}
+
+/** MINI-04, D-177: mini at the edge (null: not, it is an ordinary card). */
+export type MiniEdgeView = 'collapsed' | 'peek' | 'open';
+export interface MiniEdgeState {
+  readonly view: MiniEdgeView | null;
+  /** The cursor rests on the tab: it nudges out. */
+  readonly hover: boolean;
+}
+
+/** D-177 Q2: the tab dragged: its side and top (page pixels); `done` when let go. */
+export interface MiniTabMove {
+  readonly side: 'left' | 'right';
+  readonly top: number;
+  readonly done: boolean;
 }
 
 /** D-111: a resize let go: the size (every tab's), and where the hang-side edge now is. */
@@ -1048,6 +1094,9 @@ export interface MiniSurface {
   }[];
   /** A button is held in the page (a drag, a resize): it keeps the pointer wherever it goes. */
   readonly held: boolean;
+  /** MINI-04: the edge tab while it shows, and the card's place while it is out (to the edge). */
+  readonly tab?: MiniSurface['rects'][number] | null;
+  readonly zone?: MiniSurface['rects'][number] | null;
 }
 
 /** D-109: which window edits a note now (null: neither), and what it last had. */

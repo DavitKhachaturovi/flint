@@ -12,15 +12,23 @@ import {
   type ListView,
   type MiniAlert,
   type MiniAlertAction,
+  type MiniEdgeState,
   type MiniTab,
   type TaskRow,
   type TodayReminder,
 } from '../../shared/ipc.js';
 import { setBuiltInLinksOff, setLinkPatterns } from '../../shared/link-patterns.js';
 import { isTextField, openMenu, type MenuEntry } from '../menu/menu.js';
-import { ChevronIcon, CloseIcon, MoreIcon, PinIcon, ResetSizeIcon } from '../main-window/icons.js';
+import {
+  ChevronIcon,
+  CloseIcon,
+  CollapseIcon,
+  MoreIcon,
+  PinIcon,
+  ResetSizeIcon,
+} from '../main-window/icons.js';
 import { FOCUS_ID } from '../../shared/focus.js';
-import { timeLeft, timerRunning } from '@flint/core/focus';
+import { timeLeft, timerPaused, timerProgress, timerRunning } from '@flint/core/focus';
 import { titlePlain } from '../../shared/inline-markdown.js';
 import {
   clockText,
@@ -36,6 +44,7 @@ import { applySpeed, durationMs, nudge, reducedMotion } from '../ui/motion.js';
 import { parseAt } from '../ui/presence.js';
 import { showQuestion, showUndoNotice, ToastView, useToast } from '../ui/Toast.js';
 import type { ConfirmNotice, UndoNotice } from '../media/media.js';
+import { EdgeTab } from './EdgeTab.js';
 import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
 import { NoteTab } from './NoteTab.js';
@@ -618,17 +627,82 @@ export function MiniApp(): ReactElement {
   };
 
   const quick = lists.find((list) => list.id === noteId) ?? null;
+  // MINI-04, D-177: at the screen's edge (null: an ordinary card); collapsed, the card is tucked
+  // into the edge and only the tab shows.
+  const [edge, setEdge] = useState<MiniEdgeState>({ view: null, hover: false });
+  useEffect(() => {
+    void window.flintMini.edge().then((state) => {
+      if (state) setEdge(state);
+    });
+    window.flintMini.onEdge(setEdge);
+  }, []);
+  const tucked = edge.view === 'collapsed';
+  const tuckedRef = useRef(tucked);
+  tuckedRef.current = tucked;
+  // Out of the tab: up to date; opened, the Note tab's editor takes the caret (as when shown).
+  useEffect(() => {
+    if (edge.view !== 'peek' && edge.view !== 'open') return;
+    void refreshRef.current();
+    if (edge.view === 'open' && tabRef.current === 'note')
+      window.setTimeout(() => body.current?.querySelector<HTMLElement>('.cm-content')?.focus());
+  }, [edge.view]);
+  const collapse = (): void => window.flintMini.edgeAction('collapse');
+  // D-177 Q7: Ctrl+M collapses, also in a field; before the Note editor's own Ctrl+M (CodeMirror's
+  // Tab focus mode), which only the main window keeps.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;
+      if (event.key.toLowerCase() !== 'm') return;
+      event.preventDefault();
+      event.stopPropagation();
+      window.flintMini.edgeAction('collapse');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const stage = useStage({
     card: cardRef,
     version: `${tab}:${shownList}:${noteId ?? ''}`,
     full: tab === 'note',
+    tucked,
   });
-  useShowMotion(cardRef);
+  useShowMotion(cardRef, tuckedRef);
+  /** D-177 Q6: a running (or paused) Focus session on the tab: how far it is, focus or break. */
+  const edgeFocus =
+    focusTimer && (timerRunning(focusTimer.state) || timerPaused(focusTimer.state))
+      ? {
+          progress: timerProgress(focusTimer.state, focusClock),
+          tone: focusTimer.state.mode === 'focus' ? ('focus' as const) : ('break' as const),
+        }
+      : null;
   const selectReminder = (reminder: TodayReminder): void => setSelected(reminder.key);
 
   return (
     <div className="mini-stage">
-      <div className={stage.className} ref={cardRef} style={stage.style} data-corner={stage.corner}>
+      {stage.tab && edge.view && (
+        <EdgeTab
+          tab={stage.tab}
+          view={edge.view}
+          hover={edge.hover}
+          moving={stage.moving}
+          alerts={alerts.length}
+          focus={edgeFocus}
+        />
+      )}
+      <div
+        className={[
+          stage.className,
+          stage.tab ? 'at-edge' : '',
+          tucked ? 'tucked' : '',
+          stage.corner.endsWith('left') ? 'side-left' : 'side-right',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        ref={cardRef}
+        style={stage.style}
+        data-corner={stage.corner}
+        aria-hidden={tucked || undefined}
+      >
         <span className="mini-grip" aria-hidden="true" />
         <header className="mini-head">
           <div className="trash-tabs mini-tabs" role="tablist" aria-label="Mini mode">
@@ -715,6 +789,19 @@ export function MiniApp(): ReactElement {
             onClick={stage.reset}
           >
             <ResetSizeIcon size={13} />
+          </button>
+          {/* MINI-04, D-177: back to the tab at the screen's edge. */}
+          <button
+            type="button"
+            className={
+              stage.corner.endsWith('left') ? 'tool mini-collapse left' : 'tool mini-collapse'
+            }
+            aria-label="Collapse to the edge"
+            title="Collapse to the edge (Ctrl+M)"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={collapse}
+          >
+            <CollapseIcon size={14} />
           </button>
           <button
             type="button"

@@ -514,6 +514,8 @@ async function start(): Promise<void> {
     url: pageUrl('mini', MINI_HOST),
     onTop: () => settingsFile.current.miniOnTop,
     hideFromSharing: () => settingsFile.current.miniHideFromSharing,
+    hoverOpens: () => settingsFile.current.miniHoverOpens,
+    alertWaiting: () => alerts.length > 0,
     onShown: () => tourEvent('mini-open'),
     onHidden: () => noteEditors.leaveAll('mini'),
     log,
@@ -1300,6 +1302,8 @@ async function start(): Promise<void> {
       miniHideFromSharing: current.miniHideFromSharing,
       popupHideFromSharing: current.popupHideFromSharing,
       miniReminders: current.miniReminders,
+      miniHoverOpens: current.miniHoverOpens,
+      miniStartCollapsed: current.miniStartCollapsed,
       version: app.getVersion(),
       tipsOff: current.tipsOff,
       clipboardHistory: current.clipboardHistory,
@@ -2238,7 +2242,8 @@ async function start(): Promise<void> {
         ...plan.separate.map((toast) => ({ id: toast.id, title: toast.title, label: toast.label })),
       ];
       mini.send(Channels.miniAlerts, alerts);
-      if (settingsFile.current.miniReminders === 'always' && !mini.visible()) mini.show(false);
+      // D-177 Q5: "Always" opens a hidden mini as before, and brings the card out of the tab.
+      if (settingsFile.current.miniReminders === 'always') mini.show(false);
     }
     if (plan.summary) {
       if (hooks) hooks.toasts.push(`${plan.summary.count} reminders you missed`);
@@ -2431,6 +2436,10 @@ async function start(): Promise<void> {
     // D-157: the hotkey into mini's note after its copy step (tests never send keys to other apps).
     hooks.captureIntoMini = (selection) => captureIntoMini(selection);
     hooks.miniVisible = () => mini.visible();
+    // MINI-04, D-177: mini at the edge, Flint's start as the tab, the hotkey.
+    hooks.miniEdge = () => mini.edge();
+    hooks.miniStartCollapsed = () => mini.startCollapsed();
+    hooks.miniToggle = () => mini.toggle();
     hooks.closedToasts = [];
   }
   /** REM-07, D-94: "N reminders you missed": Today, its Overdue card open, in view. */
@@ -2552,6 +2561,19 @@ async function start(): Promise<void> {
     // APP-01, D-68: a manual start (Start menu, shortcut, the installer's finish) shows the main
     // window; only the start-with-Windows launch (`--hidden`) stays in the tray.
     showMain();
+  }
+  // MINI-04, D-177 Q8: every start shows mini as the edge tab (the one exception to D-68's tray
+  // start), made after the capture popup is ready so the popup never waits for it. Test runs show
+  // it only when a test asks (`miniStartCollapsed`), so the other tests see Flint as before.
+  if (
+    settingsFile.current.miniStartCollapsed &&
+    !hooks &&
+    !__FLINT_BENCH_BUILD__ &&
+    benchIterations === 0
+  ) {
+    if (popup.window.webContents.isLoading())
+      popup.window.webContents.once('did-finish-load', () => mini.startCollapsed());
+    else mini.startCollapsed();
   }
 
   const testToast = devEnv('FLINT_TEST_TOAST') as ToastKind | undefined;

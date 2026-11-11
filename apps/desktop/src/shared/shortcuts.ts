@@ -135,6 +135,9 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       // FOCUS-06 (D-170): Focus chosen in the list tab.
       { keys: 'Shift+Space', action: 'Start or pause the Focus timer' },
       { keys: 'Esc', action: 'Clear the selection, or leave the field' },
+      // MINI-04, D-177: the tab at the screen's edge.
+      { keys: 'Ctrl+M', action: 'Collapse to the edge' },
+      { keys: 'Hover the edge tab', action: 'Peek at mini mode (a click opens it)' },
     ],
   },
 ];

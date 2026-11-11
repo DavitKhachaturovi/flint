@@ -694,6 +694,31 @@ export function SettingsScreen(props: {
             onChange={(value) => set({ key: 'miniReminders', value })}
           />
         </Row>
+        {/* MINI-04, D-177: the edge tab. */}
+        <Row
+          name="Open on hover"
+          note="Rest the mouse on the tab at the edge of the screen to look at mini mode without leaving what you're typing in; it slides back when you move away. Off: a click on the tab opens it."
+          filter={filter}
+          words="mini mode edge tab hover peek collapse"
+        >
+          <Switch
+            on={view.miniHoverOpens}
+            label="Open mini mode on hover"
+            onChange={(on) => set({ key: 'miniHoverOpens', value: on })}
+          />
+        </Row>
+        <Row
+          name="Start collapsed with Flint"
+          note="Whenever Flint starts, mini mode waits as a tab at the edge of the screen. Off: it shows only when you open it."
+          filter={filter}
+          words="mini mode edge tab start startup collapsed login"
+        >
+          <Switch
+            on={view.miniStartCollapsed}
+            label="Start mini mode collapsed with Flint"
+            onChange={(on) => set({ key: 'miniStartCollapsed', value: on })}
+          />
+        </Row>
       </Section>
 
       <Section id="reminders" filter={filter}>

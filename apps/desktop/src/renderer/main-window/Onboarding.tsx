@@ -170,7 +170,8 @@ const STEPS: readonly Step[] = [
     text: (
       <>
         A small Flint that stays on top, for calls and meetings, and is hidden when you share your
-        screen: this button or <Key>Ctrl+Alt+Space</Key>.
+        screen: this button or <Key>Ctrl+Alt+Space</Key>. It also waits as a small tab at the edge
+        of your screen: rest the mouse on it to peek, click it to open.
       </>
     ),
     targets: ['.mini-toggle'],

@@ -3,12 +3,19 @@ import {
   cardBox,
   clampSize,
   firstHang,
+  firstTab,
+  hangForTab,
   hangInCorner,
   insetIn,
   roomFor,
   settle,
   snapCorner,
+  snapTabY,
   stageFor,
+  tabAt,
+  tabForCard,
+  tabSpots,
+  tabStage,
 } from './mini-place.js';
 
 const area = { x: 0, y: 0, width: 1920, height: 1040 };
@@ -103,5 +110,80 @@ describe('mini mode placement (MINI-01, D-109, D-110)', () => {
     expect(clampSize({})).toEqual({ width: 364, limit: 460 });
     expect(clampSize({ width: 9999, limit: 10 })).toEqual({ width: 520, limit: 180 });
     expect(clampSize({ width: 'wide', limit: 500.4 })).toEqual({ width: 364, limit: 500 });
+  });
+});
+
+describe('the edge tab (MINI-04, D-177)', () => {
+  it('starts at the top-right spot: 120 px below the top of the work area', () => {
+    expect(firstTab(area)).toEqual({ side: 'right', x: 1920, y: 120 });
+    expect(firstTab({ x: -1280, y: 200, width: 1280, height: 984 })).toEqual({
+      side: 'right',
+      x: 0,
+      y: 320,
+    });
+  });
+
+  it('the corner spots: 120 px from the top, the bottom 48 px above the work area bottom', () => {
+    expect(tabSpots(area)).toEqual({ top: 120, bottom: 1040 - 48 - 48 });
+    // At a larger zoom the tab is taller; the bottom spot keeps its gap.
+    expect(tabSpots(area, 72).bottom).toBe(1040 - 48 - 72);
+  });
+
+  it('snaps within 48 px of a spot, and not farther; it stays on the work area', () => {
+    expect(snapTabY(150, area)).toBe(120);
+    expect(snapTabY(168, area)).toBe(120);
+    expect(snapTabY(169, area)).toBe(169);
+    expect(snapTabY(930, area)).toBe(944);
+    expect(snapTabY(500.4, area)).toBe(500);
+    expect(snapTabY(-200, area)).toBe(0);
+    expect(snapTabY(5000, area)).toBe(1040 - 48);
+  });
+
+  it('the card comes out of the tab: level with its top in the upper half, its bottom in the lower', () => {
+    expect(hangForTab(tabAt('right', 120, area), area)).toEqual({
+      corner: 'top-right',
+      x: 1896,
+      y: 120,
+    });
+    expect(hangForTab(tabAt('left', 944, area), area)).toEqual({
+      corner: 'bottom-left',
+      x: 24,
+      y: 992,
+    });
+    // The middle: the tab's centre decides.
+    expect(hangForTab(tabAt('right', 495, area), area).corner).toBe('top-right');
+    expect(hangForTab(tabAt('right', 497, area), area).corner).toBe('bottom-right');
+  });
+
+  it('collapsing: the nearer edge, level with the card; a corner-snapped card to its spot', () => {
+    const box = { x: 1300, y: 300, width: 364, height: 400 };
+    // Its centre (500) is in the upper half: level with its top.
+    expect(tabForCard(box, null, area)).toEqual({ side: 'right', x: 1920, y: 300 });
+    // In the lower half: level with its bottom (less the tab).
+    expect(tabForCard({ ...box, x: 200, y: 500 }, null, area)).toEqual({
+      side: 'left',
+      x: 0,
+      y: 500 + 400 - 48,
+    });
+    // Near a spot: it snaps.
+    expect(tabForCard({ ...box, y: 150 }, null, area).y).toBe(120);
+    // Snapped into the top-right corner (24 px from the top): the top spot, not beside the buttons.
+    expect(tabForCard({ ...box, x: 1532, y: 24 }, 'top-right', area)).toEqual({
+      side: 'right',
+      x: 1920,
+      y: 120,
+    });
+    expect(tabForCard(box, 'bottom-left', area)).toEqual({ side: 'left', x: 0, y: 944 });
+  });
+
+  it('the strip: the work area height along the edge, ending exactly at it', () => {
+    const right = tabStage(tabAt('right', 300, area), area);
+    expect(right).toEqual({ x: 1920 - (24 + 520 + 32), y: 0, width: 24 + 520 + 32, height: 1040 });
+    expect(right.x + right.width).toBe(1920);
+    const left = tabStage(tabAt('left', 300, area), area, 1.25);
+    expect(left).toEqual({ x: 0, y: 0, width: 24 + 650 + 32, height: 1040 });
+    // The card hanging from the tab is inside it.
+    const hang = hangForTab(tabAt('right', 300, area), area);
+    expect(insetIn(hang, right)).toEqual({ corner: 'top-right', horizontal: 24, vertical: 300 });
   });
 });

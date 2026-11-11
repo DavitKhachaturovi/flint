@@ -66,6 +66,10 @@ export interface Settings {
   readonly miniReminders: MiniReminders;
   /** D-109: mini mode always on top (its header's pin). */
   readonly miniOnTop: boolean;
+  /** MINI-04, D-177: resting on the edge tab peeks at mini (on by default; off: a click opens). */
+  readonly miniHoverOpens: boolean;
+  /** D-177 Q8: every start of Flint shows mini as the edge tab (on by default). */
+  readonly miniStartCollapsed: boolean;
   /** APP-15, D-117: the version whose What's new was last shown; null before What's new existed. */
   readonly lastSeenVersion: string | null;
   /** APP-14, D-118: Don't show tips (off by default: tips show). */
@@ -120,6 +124,8 @@ export function defaultSettings(development = false): Settings {
     popupHideFromSharing: true,
     miniReminders: 'when-open',
     miniOnTop: true,
+    miniHoverOpens: true,
+    miniStartCollapsed: true,
     lastSeenVersion: null,
     tipsOff: false,
     clipboardHistory: true,
@@ -252,6 +258,8 @@ export function readSettings(stored: Stored, development = false): Settings {
       defaults.miniReminders,
     ),
     miniOnTop: pick(stored, 'miniOnTop', isBoolean, defaults.miniOnTop),
+    miniHoverOpens: pick(stored, 'miniHoverOpens', isBoolean, defaults.miniHoverOpens),
+    miniStartCollapsed: pick(stored, 'miniStartCollapsed', isBoolean, defaults.miniStartCollapsed),
     lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
     tipsOff: pick(stored, 'tipsOff', isBoolean, defaults.tipsOff),
     clipboardHistory: pick(stored, 'clipboardHistory', isBoolean, defaults.clipboardHistory),
