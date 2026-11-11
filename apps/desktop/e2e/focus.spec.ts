@@ -267,3 +267,29 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   await mini.locator('.mini-focus-go').click();
   await expect(main.locator('.focus-go')).toHaveText('Resume');
 });
+
+test('on a wide window the side panel is off on Focus until shown there, level with the timer card; other pages keep their own choice (D-172)', async () => {
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((each) => each.getTitle() === 'Flint');
+    window?.setBounds({ x: -6000, y: 0, width: 1920, height: 1040 });
+  });
+  const panel = main.locator('.context-panel:not(.panel-leaving)');
+  await nav('Inbox').click();
+  await expect(panel).toBeVisible();
+  await nav('Focus').click();
+  await expect(main.locator('.focus-timer')).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  await main.keyboard.press('Control+\\');
+  await expect(panel).toBeVisible();
+  await expect
+    .poll(async () => {
+      const card = await main.locator('.focus-timer').boundingBox();
+      const side = await panel.boundingBox();
+      return card && side ? Math.abs(card.y - side.y) : Infinity;
+    })
+    .toBeLessThan(2);
+  await main.keyboard.press('Control+\\');
+  await expect(panel).toHaveCount(0);
+  await nav('Inbox').click();
+  await expect(panel).toBeVisible();
+});

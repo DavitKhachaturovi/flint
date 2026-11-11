@@ -219,6 +219,8 @@ const tasksCount = (count: number): string => (count === 1 ? '1 task' : `${count
 const ARCHIVE_DAYS = 14;
 const ARCHIVE_OFFER_AT = 50;
 const ARCHIVE_DISMISSED = 'flint.archive.dismissed';
+/** D-172: whether the context panel is shown on Focus (off by default). */
+const FOCUS_PANEL = 'flint.focus.panel';
 /** D-92: Focus shows the first five high-priority tasks that aren't pinned, then "Show all N". */
 const HIGH_SHOWN = 5;
 
@@ -1018,7 +1020,19 @@ export function App(): ReactElement {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const panelShown = wide && !panelHidden && view !== null;
+  /**
+   * FOCUS-01 (D-172): on Focus the panel is off unless shown there (Ctrl+\, the panel button),
+   * remembered on this machine apart from the other pages' per-monitor choice.
+   */
+  const [focusPanel, setFocusPanel] = useState(() => {
+    try {
+      return window.localStorage.getItem(FOCUS_PANEL) === 'shown';
+    } catch {
+      return false;
+    }
+  });
+  const panelOff = listId === FOCUS_ID ? !focusPanel : panelHidden;
+  const panelShown = wide && !panelOff && view !== null;
   /** D-98: the Trash view on a wide screen: an opened item shows in the panel's place. */
   const trashWide = wide && !panelHidden && listId === TRASH_ID;
   const trashPanel = trashWide && trashOpen !== null;
@@ -1069,6 +1083,18 @@ export function App(): ReactElement {
       columnFrom.current = content.current?.getBoundingClientRect().left ?? null;
       const shown = document.querySelector<HTMLElement>('.context-panel:not(.panel-leaving)');
       leavingCopy.current = shown ? leavingPanel(shown) : null;
+    }
+    // D-172: on Focus only Focus's own choice changes.
+    if (listIdRef.current === FOCUS_ID) {
+      setFocusPanel((shown) => {
+        try {
+          window.localStorage.setItem(FOCUS_PANEL, shown ? 'hidden' : 'shown');
+        } catch {
+          // Not remembered; it holds for the session.
+        }
+        return !shown;
+      });
+      return;
     }
     setPanelHidden((hidden) => {
       window.flintMain.setPanel(!hidden);
@@ -4402,7 +4428,7 @@ export function App(): ReactElement {
     wide && view
       ? [
           {
-            label: panelHidden ? 'Show panel' : 'Hide panel',
+            label: panelOff ? 'Show panel' : 'Hide panel',
             hint: 'Ctrl+\\',
             action: togglePanel,
           },
@@ -5125,8 +5151,9 @@ export function App(): ReactElement {
     if (!element || !(panelShown || trashPanel || settingsPanel)) return;
     const measure = (): void => {
       // M6: in Today, its first card (the rollover prompt, the reminders or the composer).
+      // D-172: in Focus, the timer card (its composer is at the bottom).
       const anchor = element.querySelector<HTMLElement>(
-        '.content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card, .content > .trash-bar, .content > .settings > .card',
+        '.content > .focus-timer, .content > .rollover, .content > .overdue, .content > .today-reminders-wrap, .content > .composer, .content > .note-card, .content > .trash-bar, .content > .settings > .card',
       );
       const pair = element.querySelector<HTMLElement>('.pair');
       if (!anchor || !pair) {
@@ -5539,10 +5566,10 @@ export function App(): ReactElement {
             {wide && view && (
               <button
                 type="button"
-                className={panelHidden ? 'panel-toggle' : 'panel-toggle on'}
-                aria-label={panelHidden ? 'Show the panel' : 'Hide the panel'}
-                aria-pressed={!panelHidden}
-                title={panelHidden ? 'Show the panel (Ctrl+\\)' : 'Hide the panel (Ctrl+\\)'}
+                className={panelOff ? 'panel-toggle' : 'panel-toggle on'}
+                aria-label={panelOff ? 'Show the panel' : 'Hide the panel'}
+                aria-pressed={!panelOff}
+                title={panelOff ? 'Show the panel (Ctrl+\\)' : 'Hide the panel (Ctrl+\\)'}
                 onClick={togglePanel}
               >
                 <PanelIcon />

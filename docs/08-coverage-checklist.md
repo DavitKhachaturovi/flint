@@ -1318,3 +1318,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 16 | Tests: the sprint file in core (round trip, unknown keys, missing IDs); the timer on the test clock with short durations; end to end for the page, sending, mini | FOCUS-* · Built (1.6.0, D-171) | 05 §5, D-107, D-156 |
 | 17 | Version 1.6.0 (D-139); small fixes held for it | FOCUS-* · Decided | D-170 Q13 |
 | 18 | Built details: hidden deleted tasks kept until Clear finished; Skip to a short break; a late end quiet and uncounted; − / + and the hover stepper; mini's ⋯; Drop and Mallet remade (to judge by ear); the tab time ticking each second (raised) | FOCUS-* · Built (1.6.0), Proposed | D-171 |
+| 19 | The side panel off on Focus by default, shown with Ctrl+\ or its button (remembered for Focus), level with the timer card | FOCUS-01, NAV-07 · Built (1.6.0) | 02, D-172 |
