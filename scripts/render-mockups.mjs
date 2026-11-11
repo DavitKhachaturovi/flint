@@ -34,7 +34,17 @@ const SCREENS = {
     file: '15-focus',
     width: 1440,
     height: 960,
-    states: ['ready', 'running', 'paused', 'break', 'settings', 'empty', 'mrun', 'mbreak', 'mlabel'],
+    states: [
+      'ready',
+      'running',
+      'paused',
+      'break',
+      'settings',
+      'empty',
+      'mrun',
+      'mbreak',
+      'mlabel',
+    ],
   },
 };
 

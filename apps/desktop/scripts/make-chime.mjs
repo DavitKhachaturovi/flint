@@ -3,15 +3,22 @@
 // second quieter, with a short room tail; about half a second, stereo 44.1 kHz 16-bit, deterministic.
 // The bundled sound, src/renderer/main-window/sounds/chime.wav, is Davit's file and the source of
 // truth (D-96): this tool writes only to the path it is given and refuses to write over that file.
-// Run: node scripts/make-chime.mjs <out.wav>
+// Run: node scripts/make-chime.mjs <out.wav> [nudge|drop|mallet]
+// FOCUS-05, D-170: Drop (two rising droplets) and Mallet (two soft wooden notes), D-95's runners-up,
+// remade here for Focus's alarm choice (the originals were kept outside the repo); Nudge by default.
 import { Buffer } from 'node:buffer';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 const bundled = resolve(import.meta.dirname, '../src/renderer/main-window/sounds/chime.wav');
 const target = process.argv[2] ? resolve(process.argv[2]) : null;
+const sound = process.argv[3] ?? 'nudge';
+if (!['nudge', 'drop', 'mallet'].includes(sound)) {
+  console.error(`unknown sound ${sound}: nudge, drop or mallet`);
+  process.exit(1);
+}
 if (!target) {
-  console.error('usage: node scripts/make-chime.mjs <out.wav>');
+  console.error('usage: node scripts/make-chime.mjs <out.wav> [nudge|drop|mallet]');
   process.exit(1);
 }
 if (target.toLowerCase() === bundled.toLowerCase()) {
@@ -58,6 +65,32 @@ function tap(buf, start, f, { gain = 1, decay }) {
     const env = rise(t, 0.002) * Math.exp(-t / decay);
     buf[from + i] +=
       gain * env * (Math.sin(phase) + harmonic * Math.sin(2 * phase) * Math.exp(-t / (decay / 2)));
+  }
+}
+
+/** Drop: a droplet, a sine gliding quickly up onto its pitch, with a soft round body. */
+function droplet(buf, start, f, { gain = 1, decay }) {
+  const from = Math.round(start * RATE);
+  const len = Math.min(buf.length - from, Math.round(decay * 9 * RATE));
+  let phase = 0;
+  for (let i = 0; i < len; i++) {
+    const t = i / RATE;
+    // From about a fifth below up onto the note in ~45 ms.
+    phase += (TAU * f * (0.66 + 0.34 * (1 - Math.exp(-t / 0.015)))) / RATE;
+    const env = rise(t, 0.003) * Math.exp(-t / decay);
+    buf[from + i] += gain * env * Math.sin(phase);
+  }
+}
+
+/** Mallet: a soft wooden note, a sine with a quickly fading inharmonic partial (a struck bar). */
+function mallet(buf, start, f, { gain = 1, decay }) {
+  const from = Math.round(start * RATE);
+  const len = Math.min(buf.length - from, Math.round(decay * 9 * RATE));
+  for (let i = 0; i < len; i++) {
+    const t = i / RATE;
+    const env = rise(t, 0.0025) * Math.exp(-t / decay);
+    const knock = 0.35 * Math.exp(-t / (decay / 4)) * Math.sin(TAU * f * 3.93 * t);
+    buf[from + i] += gain * env * (Math.sin(TAU * f * t) + knock);
   }
 }
 
@@ -160,8 +193,16 @@ function loudest(channels) {
 // ---- the sound ----
 const n = Math.round(SECONDS * RATE);
 const dry = new Float64Array(n);
-tap(dry, 0, midi(79), { decay: 0.055 });
-tap(dry, 0.125, midi(79), { decay: 0.06, gain: 0.8 });
+if (sound === 'drop') {
+  droplet(dry, 0, midi(76), { decay: 0.06 });
+  droplet(dry, 0.14, midi(81), { decay: 0.07, gain: 0.85 });
+} else if (sound === 'mallet') {
+  mallet(dry, 0, midi(72), { decay: 0.07 });
+  mallet(dry, 0.15, midi(76), { decay: 0.08, gain: 0.8 });
+} else {
+  tap(dry, 0, midi(79), { decay: 0.055 });
+  tap(dry, 0.125, midi(79), { decay: 0.06, gain: 0.8 });
+}
 const wetLeft = convolve(dry, impulse(11));
 const wetRight = convolve(dry, impulse(23));
 const left = new Float64Array(n);

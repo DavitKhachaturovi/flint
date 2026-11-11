@@ -20,3 +20,20 @@ describe('the bundled reminder chime (REM-06, D-96)', () => {
     expect(createHash('sha256').update(file).digest('hex')).toBe(CHIME_SHA256);
   });
 });
+
+/** FOCUS-05, D-170: Focus's other alarm sounds, made the same way and kept the same way. */
+const ALARMS: Readonly<Record<string, string>> = {
+  'drop.wav': 'a5927172b97b3c7ed4a9770271635fd0d3d78ba3c37c6159a1b9a8dd1b3a9e5f',
+  'mallet.wav': 'e81ef2744bed9cf77819af19ce95923cfdb41e332c899f6f87ae0033b6112fe2',
+};
+
+describe('the bundled Focus alarm sounds (FOCUS-05, D-170)', () => {
+  for (const [name, hash] of Object.entries(ALARMS))
+    it(`${name} is the file made for Focus, unchanged`, async () => {
+      const file = await readFile(
+        join(import.meta.dirname, '../renderer/main-window/sounds', name),
+      );
+      expect(file.subarray(8, 12).toString('ascii')).toBe('WAVE');
+      expect(createHash('sha256').update(file).digest('hex')).toBe(hash);
+    });
+});
