@@ -6,6 +6,7 @@ What the app shows in its **What's new** card after an update (APP-15, D-117). N
 
 - **A calmer sidebar:** synced lists and notes no longer each show a cloud. A cloud with "!" appears only on one that has a sync conflict to sort out. To see whether a list syncs, open it: its header says "Synced · just now".
 - **Reminders at the same time stay on their hour:** on Today's timeline, reminders at the same time (or a few minutes apart) share one row with a "+1" (or more). Click it to see them all and open one.
+- **Overdue reminders look overdue:** on the timeline, a reminder whose time has passed but whose task isn't done is no longer crossed out as if it were done. It shows a white dot instead; only finished tasks are crossed out.
 - **Long list names fit:** a reminder card shows a long list name on one line, shortened with "…"; hover it to see the full name.
 
 ## 1.5.0 (10 Nov 2026)

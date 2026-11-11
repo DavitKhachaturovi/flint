@@ -1256,4 +1256,5 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 1 | The sidebar: no cloud on synced items; the cloud with "!" on an item (or a group's header) with an unresolved conflict | SYNC-01 · Built (1.5.1) | 02, 09, D-163 Q1 |
 | 2 | The timeline: reminders too close to show apart share a row at the earliest's time with "+N"; its menu lists them all; no row drifts from its hour | TODAY-03 · Built (1.5.1) | 02, 09, D-163 Q2 |
 | 3 | Long list names: one line with an ellipsis in a reminder card's chip, Overdue and Captured today | TODAY-03 · Built (1.5.1) | 02, 09, D-163 |
-| 4 | Tests and motion: `e2e/today.spec.ts` (the grouped row, the 16:00 row on its line, the menu, the chip); `sync.spec.ts` (no cloud on a synced row, the conflict cloud until resolved); the badge fades in | TODAY-03, SYNC-01, UI-10 · Built (1.5.1) | 03 §5, D-89 |
+| 4 | The timeline: a passed reminder on an open task is overdue (not struck through, the overdue dot); only done tasks' reminders are struck | TODAY-03, REM-11 · Built (1.5.1) | 02, 09, D-164 |
+| 5 | Tests and motion: `e2e/today.spec.ts` (the grouped row, the 16:00 row on its line, the menu, the chip); `sync.spec.ts` (no cloud on a synced row, the conflict cloud until resolved); the badge fades in | TODAY-03, SYNC-01, UI-10 · Built (1.5.1) | 03 §5, D-89 |
