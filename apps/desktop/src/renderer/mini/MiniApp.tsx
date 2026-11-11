@@ -24,6 +24,7 @@ import { timeLeft, timerRunning } from '@flint/core/focus';
 import { titlePlain } from '../../shared/inline-markdown.js';
 import {
   clockText,
+  Digits,
   FocusCount,
   MiniFocusCard,
   useClock,
@@ -669,7 +670,10 @@ export function MiniApp(): ReactElement {
                       <span key={name} className="mini-tab-name">
                         {name}
                       </span>
-                      {isList && focusLabel && <span className="mini-tab-time">{focusLabel}</span>}
+                      {isList && focusLabel && (
+                        // D-173: it fades in; its digits slide as they change.
+                        <Digits text={focusLabel} className="mini-tab-time" />
+                      )}
                       <span className="mini-tab-pick" aria-hidden="true">
                         <ChevronIcon size={11} />
                       </span>

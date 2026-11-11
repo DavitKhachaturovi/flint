@@ -4,7 +4,7 @@
  * a focus session runs, Q3), the "1/4" count with its estimate stepper, the settings (the card
  * and Settings → Focus, one component), and the alarm.
  */
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import {
   focusPlan,
   timeLeft,
@@ -28,6 +28,7 @@ import {
 } from '../../shared/focus.js';
 import type { ListView } from '../../shared/ipc.js';
 import { openMenu } from '../menu/menu.js';
+import { MorphText } from '../ui/Row.js';
 import { ChevronIcon, CloseIcon, SkipIcon } from './icons.js';
 
 const SOUND_URLS: Readonly<Record<Exclude<AlarmSound, 'none'>, string>> = {
@@ -120,6 +121,79 @@ const noShiftSpace = (event: {
   if (event.key === ' ' && event.shiftKey) event.preventDefault();
 };
 
+const reducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * FOCUS-01 (D-173): the mode tabs, their highlight gliding to the chosen one (D-89); at once on the
+ * first draw and under reduce-motion (D-75). The page's and mini's, by `className`.
+ */
+function ModeTabs(props: { readonly mode: FocusMode; readonly className: string }): ReactElement {
+  const box = useRef<HTMLDivElement>(null);
+  const glide = useRef<HTMLSpanElement>(null);
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    const place = (): void => {
+      const on = box.current?.querySelector<HTMLElement>('button.on');
+      const pill = glide.current;
+      if (!on || !pill) return;
+      // The first placing, a resize or reduce-motion: no glide.
+      pill.style.transition = placed.current && !reducedMotion() ? '' : 'none';
+      pill.style.transform = `translateX(${on.offsetLeft}px)`;
+      pill.style.width = `${on.offsetWidth}px`;
+      if (!placed.current) {
+        void pill.offsetWidth;
+        pill.style.transition = '';
+      }
+      placed.current = true;
+    };
+    place();
+    const observer = new ResizeObserver(() => {
+      placed.current = false;
+      place();
+    });
+    if (box.current) observer.observe(box.current);
+    return () => observer.disconnect();
+  }, [props.mode]);
+  return (
+    <div className={props.className} role="tablist" aria-label="Mode" ref={box}>
+      <span className="mode-glide" ref={glide} aria-hidden="true" />
+      {MODES.map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          role="tab"
+          aria-selected={props.mode === mode}
+          className={props.mode === mode ? 'on' : undefined}
+          onKeyUp={noShiftSpace}
+          onClick={() => {
+            if (props.mode !== mode) send({ kind: 'mode', mode });
+          }}
+        >
+          {MODE_NAMES[mode]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * FOCUS-01 (D-173): the time, each digit that changes sliding softly into place (the seconds once
+ * a second, every digit when the mode changes); nothing moves on the first draw.
+ */
+export function Digits(props: { readonly text: string; readonly className: string }): ReactElement {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+  return (
+    <span className={props.className} role="timer" aria-live="off" aria-label={props.text}>
+      {[...props.text].map((char, index) => (
+        <span key={`${index}:${char}`} className={ready ? 'digit in' : 'digit'} aria-hidden="true">
+          {char}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** FOCUS-01 (mockup 15): the timer card: the mode tabs, the digits, Start / Pause and Skip. */
 export function FocusTimerCard(props: { readonly view: FocusTimerView }): ReactElement {
   const { state } = props.view;
@@ -133,26 +207,8 @@ export function FocusTimerCard(props: { readonly view: FocusTimerView }): ReactE
       className={focusRunning(state) ? 'card focus-timer inverted' : 'card focus-timer'}
       aria-label="Timer"
     >
-      <div className="focus-modes" role="tablist" aria-label="Mode">
-        {MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            role="tab"
-            aria-selected={state.mode === mode}
-            className={state.mode === mode ? 'on' : undefined}
-            onKeyUp={noShiftSpace}
-            onClick={() => {
-              if (state.mode !== mode) send({ kind: 'mode', mode });
-            }}
-          >
-            {MODE_NAMES[mode]}
-          </button>
-        ))}
-      </div>
-      <div className="focus-digits" role="timer" aria-live="off">
-        {clockText(left)}
-      </div>
+      <ModeTabs mode={state.mode} className="focus-modes" />
+      <Digits text={clockText(left)} className="focus-digits" />
       <div className="focus-controls">
         {moving && <span className="focus-skip-room" aria-hidden="true" />}
         <button
@@ -162,7 +218,7 @@ export function FocusTimerCard(props: { readonly view: FocusTimerView }): ReactE
           onKeyUp={noShiftSpace}
           onClick={() => send({ kind: 'toggle' })}
         >
-          {go}
+          <MorphText text={go} />
         </button>
         {moving && (
           <button
@@ -199,8 +255,12 @@ export function FocusActiveLine(props: {
         : 'Time to focus!';
   return (
     <div className="focus-active">
-      <span className="focus-hash">#{sessionNumber(state, now)}</span>
-      <span className="focus-active-title">{text}</span>
+      <span className="focus-hash">
+        <MorphText text={`#${sessionNumber(state, now)}`} />
+      </span>
+      <span className="focus-active-title">
+        <MorphText text={text} />
+      </span>
     </div>
   );
 }
@@ -224,14 +284,14 @@ export function FocusPlanLine(props: {
   return (
     <p className="focus-plan">
       <span className="mono strong">
-        {plan.done} of {plan.total}
+        <MorphText text={`${plan.done} of ${plan.total}`} />
       </span>{' '}
       sessions
       {at && (
         <>
           {' · finish at '}
           <span className="mono strong">
-            {two(at.getHours())}:{two(at.getMinutes())}
+            <MorphText text={`${two(at.getHours())}:${two(at.getMinutes())}`} />
           </span>
         </>
       )}
@@ -269,7 +329,7 @@ export function FocusCount(props: {
         </button>
       )}
       <span className="focus-count-text" title="Sessions done of the estimate">
-        {entry.count}/{entry.estimate}
+        <MorphText text={`${entry.count}/${entry.estimate}`} />
       </span>
       {!props.done && (
         <button
@@ -628,29 +688,13 @@ export function MiniFocusCard(props: {
   return (
     <section className={`mini-focus ${tone}`} aria-label="Timer">
       <div className="mini-focus-top">
-        <div className="mini-focus-modes" role="tablist" aria-label="Mode">
-          {MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={state.mode === mode}
-              className={state.mode === mode ? 'on' : undefined}
-              onKeyUp={noShiftSpace}
-              onClick={() => {
-                if (state.mode !== mode) send({ kind: 'mode', mode });
-              }}
-            >
-              {MODE_NAMES[mode]}
-            </button>
-          ))}
-        </div>
-        <span className="mini-focus-hash">#{sessionNumber(state, now)}</span>
+        <ModeTabs mode={state.mode} className="mini-focus-modes" />
+        <span className="mini-focus-hash">
+          <MorphText text={`#${sessionNumber(state, now)}`} />
+        </span>
       </div>
       <div className="mini-focus-main">
-        <span className="mini-focus-digits" role="timer">
-          {clockText(timeLeft(state, now))}
-        </span>
+        <Digits text={clockText(timeLeft(state, now))} className="mini-focus-digits" />
         <span className="mini-focus-buttons">
           <button
             type="button"
@@ -659,7 +703,7 @@ export function MiniFocusCard(props: {
             title={`${go} (Shift+Space)`}
             onClick={() => send({ kind: 'toggle' })}
           >
-            {go}
+            <MorphText text={go} />
           </button>
           {moving && (
             <button
@@ -676,11 +720,15 @@ export function MiniFocusCard(props: {
         </span>
       </div>
       <div className="mini-focus-title">
-        {state.mode !== 'focus'
-          ? 'Time for a break!'
-          : props.title !== null && props.title !== ''
-            ? props.title
-            : 'Time to focus!'}
+        <MorphText
+          text={
+            state.mode !== 'focus'
+              ? 'Time for a break!'
+              : props.title !== null && props.title !== ''
+                ? props.title
+                : 'Time to focus!'
+          }
+        />
       </div>
       <div className="mini-focus-progress" aria-hidden="true">
         <i style={{ width: `${(timerProgress(state, now) * 100).toFixed(2)}%` }} />

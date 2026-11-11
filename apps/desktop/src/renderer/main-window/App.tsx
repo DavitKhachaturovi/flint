@@ -5819,11 +5819,18 @@ export function App(): ReactElement {
                     <header className="list-header focus-header">
                       <h1>
                         Focus
-                        {view.open > 0 && <span className="count"> · {view.open} open</span>}
+                        {view.open > 0 && (
+                          <span className="count">
+                            {' · '}
+                            <MorphText text={`${view.open} open`} />
+                          </span>
+                        )}
                       </h1>
                       {focusTimer && (
                         <span className="focus-session">
-                          Session {sessionNumber(focusTimer.state, Date.now())} today
+                          <MorphText
+                            text={`Session ${sessionNumber(focusTimer.state, Date.now())} today`}
+                          />
                         </span>
                       )}
                     </header>

@@ -362,6 +362,18 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
     await expect(main.locator('.focus-timer')).not.toHaveClass(/\binverted\b/);
     await expect(main.locator('.focus-go')).toHaveText('Resume');
   });
+  // D-173: the mode's highlight glides, the digits change, the line under the card crossfades.
+  await step(main, 'A mode tab (Short break)', 'motion', async () => {
+    await main.locator('.focus-modes button', { hasText: 'Short break' }).click();
+    await expect(main.locator('.focus-modes button.on')).toHaveText('Short break');
+  });
+  await step(main, 'The timer ticks (a digit slides in)', 'motion', async () => {
+    await main.locator('.focus-go').click();
+    const start = await main.locator('.focus-digits').getAttribute('aria-label');
+    await expect(main.locator('.focus-digits')).not.toHaveAttribute('aria-label', start ?? '');
+  });
+  await main.locator('.focus-go').click();
+  await expect(main.locator('.focus-go')).toHaveText('Resume');
   await step(main, 'Focus settings open (the gear)', 'motion', async () => {
     await main.locator('.focus-tool[aria-label="Focus settings"]').click();
     await expect(main.locator('.focus-settings-card')).toBeVisible();

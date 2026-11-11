@@ -1319,3 +1319,4 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 17 | Version 1.6.0 (D-139); small fixes held for it | FOCUS-* · Decided | D-170 Q13 |
 | 18 | Built details: hidden deleted tasks kept until Clear finished; Skip to a short break; a late end quiet and uncounted; − / + and the hover stepper; mini's ⋯; Drop and Mallet remade (to judge by ear); the tab time ticking each second (raised) | FOCUS-* · Built (1.6.0), Proposed | D-171 |
 | 19 | The side panel off on Focus by default, shown with Ctrl+\ or its button (remembered for Focus), level with the timer card | FOCUS-01, NAV-07 · Built (1.6.0) | 02, D-172 |
+| 20 | Motion for Focus's numbers and text: the tabs' gliding highlight, digits sliding in, crossfading labels and counts; in the motion census | FOCUS-*, UI-10 · Built (1.6.0) | 02, D-173, D-89 |
