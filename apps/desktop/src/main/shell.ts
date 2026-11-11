@@ -60,6 +60,10 @@ export interface E2EHooks {
   readonly toasts: string[];
   /** REM-06, D-94: Flint's own sound, how often it was asked for (it plays in the window). */
   chimes?: number;
+  /** FOCUS-04, D-170: Focus's alarm, how often it was asked for (it plays in the window). */
+  focusAlarms?: number;
+  /** FOCUS-04: the running Focus session ends now (tests never wait 25 minutes). */
+  focusEndNow?: () => void;
   /** D-94: tests turn Flint's own sound on (it is off by default). */
   reminderSound?: boolean;
   /** Links and files a click would open in the browser or their app, recorded instead. */

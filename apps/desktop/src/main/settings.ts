@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { writeFileAtomic } from './storage/atomic.js';
 import { readLinkPatterns, type LinkPattern } from '../shared/link-patterns.js';
+import { DEFAULT_FOCUS_SETTINGS, readFocusSettings, type FocusSettings } from '../shared/focus.js';
 
 /**
  * Settings (APP-11) in app data, never in the Flint folder (D-14, docs/04 §2). Reads are tolerant:
@@ -82,6 +83,8 @@ export interface Settings {
   readonly claudeFolders: Readonly<Record<string, string>>;
   /** D-151: the folders given to most recently, newest first (five at most). */
   readonly claudeRecentFolders: readonly string[];
+  /** FOCUS-05 (D-170): Focus's timer, tasks, sound and notifications. */
+  readonly focus: FocusSettings;
 }
 
 export type MiniReminders = 'when-open' | 'always';
@@ -124,6 +127,7 @@ export function defaultSettings(development = false): Settings {
     checkForUpdates: true,
     claudeFolders: {},
     claudeRecentFolders: [],
+    focus: DEFAULT_FOCUS_SETTINGS,
   };
 }
 
@@ -260,6 +264,7 @@ export function readSettings(stored: Stored, development = false): Settings {
     ),
     claudeFolders: readClaudeFolders(stored['claudeFolders']),
     claudeRecentFolders: readRecentFolders(stored['claudeRecentFolders']),
+    focus: readFocusSettings(stored['focus']),
   };
 }
 

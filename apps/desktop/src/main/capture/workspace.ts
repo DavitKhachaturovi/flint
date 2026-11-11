@@ -69,6 +69,19 @@ import type {
   TrashView,
 } from '../../shared/ipc.js';
 import { TODAY_ID } from '../../shared/ipc.js';
+import { FOCUS_ID, type FocusAction } from '../../shared/focus.js';
+import {
+  addToSprint,
+  countSession,
+  inSprint,
+  moveToTop,
+  orderSprint,
+  removeFromSprint,
+  resetCounts,
+  setEstimate,
+  type Sprint,
+} from '@flint/core/focus';
+import { FocusFile } from '../focus-file.js';
 import { dayStamp, TodayFile } from '../today-file.js';
 import { writeFileAtomic } from '../storage/atomic.js';
 import type { SnapshotStore } from '../storage/snapshots.js';
@@ -287,6 +300,10 @@ export class Workspace {
   readonly meta: TaskMetaFile;
   /** TODAY-01, TODAY-02 (M6): Today's order and the rollover prompt's memory (`.flint/today.json`). */
   readonly today: TodayFile;
+  /** FOCUS-02, FOCUS-03 (D-170): Focus's sprint (`.flint/focus.json`). */
+  readonly focus: FocusFile;
+  /** FOCUS-02: done tasks below the open ones in Focus (Check to bottom, from the settings). */
+  focusCheckToBottom = true;
 
   private constructor(
     folder: string,
@@ -302,6 +319,7 @@ export class Workspace {
     this.trashed = trashed;
     this.meta = new TaskMetaFile(folder);
     this.today = new TodayFile(folder);
+    this.focus = new FocusFile(folder);
   }
 
   /** Every task ID of the lists, for the bookkeeping's first sight. */
@@ -331,6 +349,7 @@ export class Workspace {
     );
     await workspace.meta.load();
     await workspace.today.load();
+    await workspace.focus.load();
     workspace.meta.seen(workspace.taskIds(), new Date());
     return workspace;
   }
@@ -555,7 +574,7 @@ export class Workspace {
    */
   async settled(): Promise<void> {
     await this.queue.catch(() => undefined);
-    await Promise.allSettled([this.meta.settled(), this.today.settled()]);
+    await Promise.allSettled([this.meta.settled(), this.today.settled(), this.focus.settled()]);
   }
 
   /** Changes run one at a time: watcher refreshes, captures and undos never interleave. */
@@ -811,6 +830,7 @@ export class Workspace {
   /** One list as the main window shows it (M4). */
   view(id: string, now: Date): ListView | null {
     if (id === TODAY_ID) return this.todayView(now);
+    if (id === FOCUS_ID) return this.focusView(now);
     const loaded = this.find(id);
     if (!loaded) return null;
     const info = this.listInfos().find((list) => list.id === id);
@@ -942,7 +962,11 @@ export class Workspace {
     change: ListChange,
     now: Date,
   ): Promise<ChangeOutcome | null> {
+    // FOCUS-02: sending to Focus, Focus on this and estimates change the sprint, from any list.
+    if (change.kind === 'focus' || change.kind === 'focusTop' || change.kind === 'estimate')
+      return this.sprintChange(change);
     if (id === TODAY_ID) return this.todayChange(change, now);
+    if (id === FOCUS_ID) return this.focusChange(change, now);
     const list = this.find(id);
     if (!list || list.entry.mode === 'note') return null;
     const document = list.file.document;
@@ -1682,6 +1706,255 @@ export class Workspace {
     }
   }
 
+  /**
+   * FOCUS-02: every task the sprint names that is still in a task list, by ID, with its home
+   * list. A task that isn't found (deleted, its list gone or a note) isn't shown; it stays in the
+   * file, so undoing a delete brings it back into Focus, until Clear finished drops it.
+   */
+  private sprintFound(): Map<
+    string,
+    { readonly task: TaskNode; readonly listId: string; readonly listName: string }
+  > {
+    const wanted = new Set(this.focus.sprint.tasks.map((task) => task.id));
+    const found = new Map<
+      string,
+      { readonly task: TaskNode; readonly listId: string; readonly listName: string }
+    >();
+    if (wanted.size === 0) return found;
+    const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
+    for (const { entry, file } of this.lists) {
+      if (entry.mode === 'note') continue;
+      const listId = this.listId(entry);
+      for (const { task } of allTasks(file.document))
+        if (wanted.has(task.key))
+          found.set(task.key, { task, listId, listName: names.get(listId) ?? entry.name });
+    }
+    return found;
+  }
+
+  /** FOCUS-02: the sprint's task IDs as Focus shows them, open and done. */
+  private focusOrder(): { readonly open: string[]; readonly done: string[] } {
+    const found = this.sprintFound();
+    const open: string[] = [];
+    const done: string[] = [];
+    for (const { id } of this.focus.sprint.tasks) {
+      const here = found.get(id);
+      if (!here) continue;
+      (here.task.line.status !== ' ' ? done : open).push(id);
+    }
+    return { open, done };
+  }
+
+  /** FOCUS-02: the active task: the top open one of the sprint. */
+  focusActive(): string | null {
+    return this.focusOrder().open[0] ?? null;
+  }
+
+  /**
+   * FOCUS-01, FOCUS-02, FOCUS-03 (D-170): Focus: the sprint's tasks as rows, in its order (the
+   * done ones below the open ones with Check to bottom, struck), each with its home list, and
+   * their estimates and counts; the active task is the top open one.
+   */
+  private focusView(now: Date): ListView {
+    const found = this.sprintFound();
+    const rows: TaskRow[] = [];
+    const doneRows: TaskRow[] = [];
+    const entries: Record<string, { estimate: number; count: number }> = {};
+    let active: string | null = null;
+    for (const { id, estimate, count } of this.focus.sprint.tasks) {
+      const here = found.get(id);
+      if (!here) continue;
+      const row: TaskRow = {
+        ...taskRow(here.task, now, (key) => this.meta.get(key)),
+        home: { listId: here.listId, listName: here.listName },
+      };
+      entries[id] = { estimate, count };
+      if (row.done && this.focusCheckToBottom) doneRows.push(row);
+      else rows.push(row);
+      if (!row.done && active === null) active = id;
+    }
+    const all = [...rows, ...doneRows];
+    return {
+      id: FOCUS_ID,
+      name: 'Focus',
+      mode: 'tasks',
+      open: all.filter((row) => !row.done).length,
+      items: all.map((row) => ({ kind: 'task', task: row })),
+      completed: [],
+      readOnly: null,
+      noteText: null,
+      focus: { entries, active },
+    };
+  }
+
+  /** FOCUS-02: the sprint becomes `after`, one undo step back to `before` (and redo again). */
+  private sprintStep(before: Sprint, after: Sprint, label: string): boolean {
+    if (!this.focus.set(after)) return false;
+    const step = (from: Sprint, to: Sprint): UndoEntry => ({
+      label,
+      run: () => {
+        this.focus.set(from);
+        this.notify();
+        return Promise.resolve(step(to, from));
+      },
+    });
+    this.remember(step(before, after));
+    return true;
+  }
+
+  /** FOCUS-02, FOCUS-03: Send to Focus or Remove from Focus, Focus on this, an estimate. */
+  private sprintChange(
+    change: Extract<ListChange, { kind: 'focus' | 'focusTop' | 'estimate' }>,
+  ): ChangeOutcome | null {
+    const home = this.locate(change.key);
+    if (!home) return null;
+    const listName = this.listInfos().find((info) => info.id === home.listId)?.name ?? '';
+    const before = this.focus.sprint;
+    let after: Sprint;
+    let label: string;
+    if (change.kind === 'focus') {
+      if (inSprint(before, change.key) === change.focus) return null;
+      after = change.focus
+        ? addToSprint(before, [change.key])
+        : removeFromSprint(before, [change.key]);
+      label = change.focus ? 'Sent to Focus' : 'Removed from Focus';
+    } else if (change.kind === 'focusTop') {
+      after = moveToTop(before, change.key);
+      label = 'Focusing on this';
+    } else {
+      after = setEstimate(before, change.key, change.estimate);
+      const estimate = after.tasks.find((task) => task.id === change.key)?.estimate ?? 1;
+      label = estimate === 1 ? 'Estimate 1 session' : `Estimate ${estimate} sessions`;
+    }
+    if (!this.sprintStep(before, after, label)) return null;
+    return { label, key: change.key, listId: home.listId, listName };
+  }
+
+  /**
+   * FOCUS-02: a change made in Focus goes to the task's home list; Focus itself keeps the sprint's
+   * order (Alt+↑/↓, drag), undoable. A task added in Focus goes to Inbox (or its `##list`) and to
+   * the end of the sprint, or below the task it was typed under. Indenting is the home list's
+   * business (null: the row nudges).
+   */
+  private async focusChange(change: ListChange, now: Date): Promise<ChangeOutcome | null> {
+    const here = (outcome: ChangeOutcome | null): ChangeOutcome | null =>
+      outcome && { ...outcome, listId: FOCUS_ID, listName: 'Focus' };
+    switch (change.kind) {
+      case 'add': {
+        const after = change.where === 'top' ? null : this.locate(change.where.after);
+        const list = this.find(after?.listId ?? INBOX_ID);
+        if (!list) return null;
+        const start = this.undoStack.length;
+        const added = await this.add(list, after ? change : { ...change, where: 'top' }, now);
+        if (!added?.key) return here(added);
+        const before = this.focus.sprint;
+        let next = addToSprint(before, [added.key]);
+        if (after) {
+          const ids = next.tasks.map((task) => task.id).filter((id) => id !== added.key);
+          ids.splice(ids.indexOf(after.key) + 1, 0, added.key);
+          next = orderSprint(next, ids);
+        }
+        this.sprintStep(before, next, added.label);
+        this.mergeSince(start, added.label);
+        return here(added);
+      }
+      case 'many': {
+        const start = this.undoStack.length;
+        let last: ChangeOutcome | null = null;
+        for (const each of change.changes)
+          if (each.kind !== 'many') last = (await this.focusChange(each, now)) ?? last;
+        if (!this.mergeSince(start, change.label)) return null;
+        return last && { ...last, label: change.label };
+      }
+      case 'move':
+      case 'place': {
+        // Only the open tasks have an order of their own; a done row nudges.
+        const { open: keys } = this.focusOrder();
+        const from = keys.indexOf(change.key);
+        if (from < 0) return null;
+        const next = keys.filter((key) => key !== change.key);
+        let to: number;
+        if (change.kind === 'move') to = from + (change.direction === 'up' ? -1 : 1);
+        else {
+          const at = next.indexOf(change.where.key);
+          if (at < 0) return null;
+          to = change.where.at === 'before' ? at : at + 1;
+        }
+        if (to < 0 || to > next.length || (change.kind === 'move' && to === from)) return null;
+        next.splice(to, 0, change.key);
+        if (next.every((key, index) => key === keys[index])) return null;
+        const before = this.focus.sprint;
+        if (!this.sprintStep(before, orderSprint(before, next), 'Moved')) return null;
+        this.notify();
+        return { label: 'Moved', key: change.key, listId: FOCUS_ID, listName: 'Focus' };
+      }
+      case 'indent':
+      case 'outdent':
+        return null;
+      default: {
+        const home = this.locate(change.key);
+        return home ? this.changeNow(home.listId, change, now) : null;
+      }
+    }
+  }
+
+  /**
+   * FOCUS-02: the Focus page's ⋯ menu: Clear finished (the done tasks, and any no longer found),
+   * Reset counts, Remove all from Focus. Only the sprint changes, never a task; one undo step.
+   */
+  focusAction(action: FocusAction): Promise<string | null> {
+    return this.serial(() => {
+      const before = this.focus.sprint;
+      const { open } = this.focusOrder();
+      const all = before.tasks.map((task) => task.id);
+      const after =
+        action === 'clearFinished'
+          ? removeFromSprint(
+              before,
+              all.filter((id) => !open.includes(id)),
+            )
+          : action === 'resetCounts'
+            ? resetCounts(before)
+            : removeFromSprint(before, all);
+      const label =
+        action === 'clearFinished'
+          ? 'Cleared finished tasks'
+          : action === 'resetCounts'
+            ? 'Counts reset'
+            : 'Removed all from Focus';
+      return Promise.resolve(this.sprintStep(before, after, label) ? label : null);
+    });
+  }
+
+  /**
+   * FOCUS-03, FOCUS-04: a focus session ran to its end: one more for the active task; with Auto
+   * check tasks, the task is completed once its count reaches its estimate (an ordinary, undoable
+   * completion). Resolves to the task's ID, or null when no task was active.
+   */
+  focusCounted(autoCheck: boolean, now: Date): Promise<string | null> {
+    return this.serial(async () => {
+      const active = this.focusActive();
+      if (active === null) return null;
+      const next = countSession(this.focus.sprint, active);
+      this.focus.set(next);
+      const entry = next.tasks.find((task) => task.id === active);
+      if (autoCheck && entry && entry.count >= entry.estimate) {
+        const home = this.locate(active);
+        if (home) await this.toggleNow(home.listId, active, now);
+      }
+      return active;
+    });
+  }
+
+  /** FOCUS-01: a task's title as the timer card shows it ("#3 · <title>"). */
+  taskTitle(id: string): string | null {
+    for (const { file } of this.lists) {
+      const found = findTask(file.document, id);
+      if (found) return taskLabel(titlePlain(found.task.line.title.trim()), getBody(found.task));
+    }
+    return null;
+  }
+
   /** M6: Today's order changes to `next`, one undo step back to `before` (and redo again). */
   private todayOrderStep(before: readonly string[], next: readonly string[]): void {
     this.today.setOrder(next);
@@ -2046,6 +2319,7 @@ export class Workspace {
     this.sidebarFile = readSidebar(await readFile(this.sidebarPath, 'utf8').catch(() => null));
     await this.meta.load();
     await this.today.load();
+    await this.focus.load();
     this.trashed.clear();
     for (const id of await trashedIds(this.folder)) this.trashed.add(id);
   }
@@ -2441,8 +2715,8 @@ export class Workspace {
   }
 
   private async toggleNow(id: string, key: string, now: Date): Promise<string | null> {
-    // M6: in Today, the task's home list.
-    if (id === TODAY_ID) {
+    // M6: in Today (and Focus, FOCUS-02), the task's home list.
+    if (id === TODAY_ID || id === FOCUS_ID) {
       const home = this.locate(key);
       return home ? this.toggleNow(home.listId, key, now) : null;
     }

@@ -1,7 +1,9 @@
 import { Notification } from 'electron';
 import {
+  focusToastXml,
   missedSummaryXml,
   reminderToastXml,
+  type FocusToast,
   type ReminderToast,
   type ToastOptions,
 } from './toast.js';
@@ -54,4 +56,16 @@ export function showMissedSummary(
   log: (message: string) => void = () => {},
 ): void {
   show(missedSummaryXml(summary, options), `${summary.count} missed reminders`, log);
+}
+
+/** FOCUS-04 (D-170): the last Focus toast, replaced by the next one (one at a time). */
+let focusToast: Notification | null = null;
+
+export function showFocusToast(
+  toast: FocusToast,
+  options: ToastOptions,
+  log: (message: string) => void = () => {},
+): void {
+  focusToast?.close();
+  focusToast = show(focusToastXml(toast, options), `focus: ${toast.title}`, log);
 }

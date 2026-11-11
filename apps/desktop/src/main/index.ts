@@ -44,7 +44,19 @@ import {
 import { isOpenableLink } from '../shared/inline-markdown.js';
 import { runBench } from './bench.js';
 import { IDENTITIES, type BuildKind } from './identity.js';
-import { closeReminderToast, showMissedSummary, showReminderToast } from './notifications.js';
+import {
+  closeReminderToast,
+  showFocusToast,
+  showMissedSummary,
+  showReminderToast,
+} from './notifications.js';
+import { FocusTimer } from './focus-timer.js';
+import {
+  ALARM_SOUNDS,
+  readFocusSettings,
+  type AlarmSound,
+  type FocusTimerView,
+} from '../shared/focus.js';
 import { createMini } from './mini.js';
 import { NoteEditors, type EditorWindow } from './note-editors.js';
 import { TipsFile } from './tips.js';
@@ -131,7 +143,9 @@ import {
 } from './shell.js';
 import {
   findActivation,
+  findFocusActivation,
   MISSED_SUMMARY_ID,
+  type FocusToast,
   type ReminderActivation,
   type ToastOptions,
 } from './toast.js';
@@ -1665,13 +1679,20 @@ async function start(): Promise<void> {
   // D-138: a quit waits (at most 3 s) for what is still being written: a capture handed over a
   // moment ago, the draft Esc just sent, a list change, the pins and Today's order.
   const capturesInFlight = new Set<Promise<void>>();
+  /** FOCUS-01: the Focus timer's last change written (set once the timer has started). */
+  let focusSaved = (): Promise<void> => Promise.resolve();
   let savedForQuit = false;
   app.on('before-quit', (event) => {
     if (savedForQuit) return;
     savedForQuit = true;
     event.preventDefault();
     log('quitting: saving what is still being written');
-    const saved = Promise.allSettled([drafts.settled(), workspace.settled(), ...capturesInFlight]);
+    const saved = Promise.allSettled([
+      drafts.settled(),
+      workspace.settled(),
+      focusSaved(),
+      ...capturesInFlight,
+    ]);
     const cap = new Promise((resolve) => setTimeout(resolve, 3000));
     void Promise.race([saved, cap]).then(() => app.quit());
   });
@@ -2239,6 +2260,122 @@ async function start(): Promise<void> {
     });
   }
 
+  // FOCUS-01, FOCUS-04, FOCUS-05 (D-170, docs/05 §5): Focus's one timer, owned here; the windows
+  // only show it. A session's end: the alarm (Flint's own, in the main window, so also under Do
+  // Not Disturb), an ordinary toast, the count for the active task.
+  workspace.focusCheckToBottom = settingsFile.current.focus.checkToBottom;
+  const focusView = (): FocusTimerView => ({
+    state: focusTimer.state,
+    settings: settingsFile.current.focus,
+  });
+  const playAlarm = (sound: AlarmSound, volume: number, repeat: number): void => {
+    if (sound === 'none') return;
+    if (hooks) hooks.focusAlarms = (hooks.focusAlarms ?? 0) + 1;
+    if (!mainWindow.isDestroyed())
+      mainWindow.webContents.send(Channels.focusAlarm, { sound, volume, repeat });
+  };
+  const focusToast = (toast: FocusToast): void => {
+    if (hooks) hooks.toasts.push(`Focus | ${toast.title}${toast.body ? ` | ${toast.body}` : ''}`);
+    else if (protocol)
+      showFocusToast(toast, { protocol, hideText: settingsFile.current.hideNotificationText }, log);
+  };
+  const focusTimer = await FocusTimer.start({
+    path: join(app.getPath('userData'), 'focus-state.json'),
+    settings: () => settingsFile.current.focus,
+    now: () => new Date(),
+    log,
+    changed: () => toWindows(Channels.focusTimerChanged, focusView()),
+    headsUp: (minutes) => {
+      if (!settingsFile.current.notifications && !hooks) return;
+      const active = workspace.focusActive();
+      focusToast({
+        title: minutes === 1 ? '1 minute left' : `${minutes} minutes left`,
+        body: (active && workspace.taskTitle(active)) ?? '',
+        button: null,
+      });
+    },
+    finished: (result) => {
+      if (result.quiet) return;
+      const focus = settingsFile.current.focus;
+      const announce = (): void => {
+        playAlarm(focus.sound, focus.volume, focus.repeat);
+        if (!focus.notifyEnd || (!settingsFile.current.notifications && !hooks)) return;
+        const next = result.state.mode;
+        const started = result.state.endsAt !== null;
+        focusToast(
+          result.ended === 'focus'
+            ? {
+                title: 'Focus session done',
+                body: next === 'long' ? 'Time for a long break' : 'Time for a break',
+                button: started ? null : next === 'long' ? 'Start long break' : 'Start break',
+              }
+            : {
+                title: 'Break over',
+                body: 'Time to focus',
+                button: started ? null : 'Start focus',
+              },
+        );
+      };
+      if (!result.counted) return announce();
+      void workspace
+        .focusCounted(focus.autoCheck, new Date())
+        .then((id) => log(`focus: session counted for ${id ?? 'no task'}`))
+        .catch((error: unknown) => log(`focus: count failed: ${String(error)}`))
+        .finally(announce);
+    },
+  });
+  focusSaved = () => focusTimer.settled();
+  powerMonitor.on('resume', () => focusTimer.check());
+  app.on('before-quit', () => focusTimer.stop());
+  if (hooks) hooks.focusEndNow = () => focusTimer.endNow();
+  /** The main window on Focus (a Focus toast's body, mini's Focus settings…). */
+  const showFocus = (settings = false): void => {
+    showMain();
+    const send = (): void => mainWindow.webContents.send(Channels.focusShow, settings);
+    if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send);
+    else send();
+  };
+  ipcMain.handle(Channels.focusTimer, (event) => (owns(event.sender) ? focusView() : null));
+  ipcMain.on(Channels.focusCommand, (event, command: unknown) => {
+    if (!owns(event.sender) || typeof command !== 'object' || command === null) return;
+    const { kind, mode } = command as { kind?: unknown; mode?: unknown };
+    if (kind === 'toggle' || kind === 'skip') focusTimer.command({ kind });
+    else if (kind === 'mode' && (mode === 'focus' || mode === 'short' || mode === 'long'))
+      focusTimer.command({ kind, mode });
+    else if (kind === 'settings') showFocus(true);
+  });
+  ipcMain.handle(Channels.focusAction, (event, action: unknown) =>
+    owns(event.sender) &&
+    (action === 'clearFinished' || action === 'resetCounts' || action === 'removeAll')
+      ? workspace.focusAction(action)
+      : null,
+  );
+  ipcMain.handle(Channels.focusSetSettings, async (event, changes: unknown) => {
+    if (!owns(event.sender) || typeof changes !== 'object' || changes === null) return focusView();
+    const focus = readFocusSettings({ ...settingsFile.current.focus, ...changes });
+    await settingsFile.update({ focus });
+    workspace.focusCheckToBottom = focus.checkToBottom;
+    focusTimer.settingsChanged();
+    toWindows(Channels.focusTimerChanged, focusView());
+    toWindows(Channels.mainChanged);
+    log(`focus settings: ${JSON.stringify(focus)}`);
+    return focusView();
+  });
+  // Play in the settings: the chosen sound, once, at the chosen volume.
+  ipcMain.on(Channels.focusAlarm, (event, sound: unknown, volume: unknown) => {
+    if (!owns(event.sender) || !ALARM_SOUNDS.some((each) => each === sound)) return;
+    if (typeof volume !== 'number') return;
+    playAlarm(sound as AlarmSound, Math.max(0, Math.min(100, volume)), 1);
+  });
+  const handleFocusActivation = (argv: readonly string[]): boolean => {
+    const action = protocol ? findFocusActivation(argv, protocol) : null;
+    if (!action) return false;
+    log(`focus toast: ${action}`);
+    if (action === 'start') focusTimer.startWaiting();
+    else showFocus();
+    return true;
+  };
+
   /** Open on a reminder toast: the main window, with the task's list open and the task selected. */
   const reveal = (taskId: string): void => {
     const found = workspace.locate(taskId);
@@ -2366,12 +2503,14 @@ async function start(): Promise<void> {
     log(`second launch: ${argv.slice(1).join(' ')}`);
     const activation = activationOf(argv);
     handleActivation(activation);
+    const focusLaunch = handleFocusActivation(argv);
     handleDevCommand(argv);
     // APP-01, D-68: starting Flint again by hand (Start menu, shortcut) shows its window.
     const devCommand = argv.some((argument) => argument.startsWith(`${protocol}://dev/`));
-    if (!activation && !devCommand && !argv.includes('--hidden')) showMain();
+    if (!activation && !focusLaunch && !devCommand && !argv.includes('--hidden')) showMain();
   });
   handleActivation(activationOf(process.argv));
+  handleFocusActivation(process.argv);
   handleDevCommand(process.argv);
 
   // Test hooks are development-only: an installed Flint ignores these variables.

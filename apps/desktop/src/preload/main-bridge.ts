@@ -2,6 +2,13 @@ import type { SyncAction, SyncEverythingPreview, SyncStatusView } from '../share
 import { ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
 import type { TipId } from '../shared/tips.js';
+import type {
+  AlarmSound,
+  FocusAction,
+  FocusCommand,
+  FocusSettings,
+  FocusTimerView,
+} from '../shared/focus.js';
 import type { UpdateView } from '../shared/updates.js';
 import {
   Channels,
@@ -513,6 +520,47 @@ export const main = {
   /** D-107, D-109: whether a first-few-times tip is still due (and counts this showing). */
   tipDue(name: string, times: number): Promise<boolean> {
     return invoke(Channels.tipDue, name, times) as Promise<boolean>;
+  },
+  /** FOCUS-01 (D-170): the timer and the settings it runs by. */
+  focusTimer(): Promise<FocusTimerView | null> {
+    return invoke(Channels.focusTimer) as Promise<FocusTimerView | null>;
+  },
+  /** The timer changed (a command from either window, a session's end, the settings). */
+  onFocusTimer(listener: (view: FocusTimerView) => void): void {
+    ipcRenderer.on(Channels.focusTimerChanged, (_event, view: FocusTimerView) => listener(view));
+  },
+  /** Start / Pause, Skip, a mode tab. */
+  focusCommand(command: FocusCommand): void {
+    send(Channels.focusCommand, command);
+  },
+  /** Mini's Focus settings…: the main window opens them. */
+  showFocusSettings(): void {
+    send(Channels.focusCommand, { kind: 'settings' });
+  },
+  /** FOCUS-02: the Focus page's ⋯ menu; the undo label, or null when nothing changed. */
+  focusAction(action: FocusAction): Promise<string | null> {
+    return invoke(Channels.focusAction, action) as Promise<string | null>;
+  },
+  /** FOCUS-05: some of the settings changed; the timer as it is then. */
+  setFocusSettings(changes: Partial<FocusSettings>): Promise<FocusTimerView | null> {
+    return invoke(Channels.focusSetSettings, changes) as Promise<FocusTimerView | null>;
+  },
+  /** FOCUS-05: Play in the settings: the sound once, at this volume. */
+  playAlarm(sound: AlarmSound, volume: number): void {
+    send(Channels.focusAlarm, sound, volume);
+  },
+  /** FOCUS-04: a session ended (or Play): the alarm, in this window. */
+  onFocusAlarm(
+    listener: (alarm: { sound: AlarmSound; volume: number; repeat: number }) => void,
+  ): void {
+    ipcRenderer.on(
+      Channels.focusAlarm,
+      (_event, alarm: { sound: AlarmSound; volume: number; repeat: number }) => listener(alarm),
+    );
+  },
+  /** A Focus toast's body, mini's Focus settings…: show Focus (`settings`: its settings card). */
+  onShowFocus(listener: (settings: boolean) => void): void {
+    ipcRenderer.on(Channels.focusShow, (_event, settings: boolean) => listener(settings === true));
   },
 };
 

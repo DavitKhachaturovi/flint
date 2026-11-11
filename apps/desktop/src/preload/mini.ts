@@ -56,6 +56,11 @@ const MINI_PLATFORM = [
   'tipDue',
   'settings',
   'onAppearance',
+  // FOCUS-06 (D-170): Focus's timer in mini's Focus tab.
+  'focusTimer',
+  'onFocusTimer',
+  'focusCommand',
+  'showFocusSettings',
 ] as const satisfies readonly (keyof typeof main)[];
 
 export type MiniPlatform = Pick<typeof main, (typeof MINI_PLATFORM)[number]>;

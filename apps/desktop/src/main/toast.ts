@@ -120,3 +120,57 @@ export function findActivation(
   }
   return null;
 }
+
+/** FOCUS-04 (D-170): what a Focus toast's buttons and body do: start the waiting mode, or open Focus. */
+export type FocusActivation = 'start' | 'open';
+
+export interface FocusToast {
+  /** "Focus session done", "Break over", "5 minutes left". */
+  readonly title: string;
+  /** A second line ("Time for a break", the active task); none when empty. */
+  readonly body: string;
+  /** The one button ("Start break", "Start focus"); none for the heads-up. */
+  readonly button: string | null;
+}
+
+/**
+ * FOCUS-04: an ordinary toast (no reminder scenario: it leaves by itself, and Do Not Disturb may
+ * hide it; Flint's own alarm has already sounded), silent: the alarm is Flint's.
+ */
+export function focusToastXml(toast: FocusToast, { protocol, hideText }: ToastOptions): string {
+  const url = (action: FocusActivation): string => escapeXml(`${protocol}://focus/${action}`);
+  return [
+    `<toast launch="${url('open')}" activationType="protocol">`,
+    '<visual><binding template="ToastGeneric">',
+    `<text>${escapeXml(toast.title)}</text>`,
+    ...(toast.body && !hideText ? [`<text>${escapeXml(toast.body)}</text>`] : []),
+    '</binding></visual>',
+    ...(toast.button
+      ? [
+          '<actions>',
+          `<action content="${escapeXml(toast.button)}" arguments="${url('start')}" activationType="protocol"/>`,
+          '</actions>',
+        ]
+      : []),
+    '<audio silent="true"/>',
+    '</toast>',
+  ].join('');
+}
+
+/** Finds `<protocol>://focus/<start|open>` in a command line or protocol launch. */
+export function findFocusActivation(
+  argv: readonly string[],
+  protocol: string,
+): FocusActivation | null {
+  for (const argument of argv) {
+    if (!argument.startsWith(`${protocol}://`)) continue;
+    try {
+      const url = new URL(argument);
+      const action = url.pathname.replace(/^\/+/, '');
+      if (url.hostname === 'focus' && (action === 'start' || action === 'open')) return action;
+    } catch {
+      // Not a URL: not ours.
+    }
+  }
+  return null;
+}

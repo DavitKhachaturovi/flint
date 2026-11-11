@@ -1,3 +1,4 @@
+import type { FocusExtras } from './focus.js';
 import type { LinkPattern } from './link-patterns.js';
 import type { CaptureBlock, ListInfo, TextRange } from '@flint/core/shorthand';
 
@@ -252,6 +253,19 @@ export const Channels = {
   mainZoomLevel: 'main:zoom-level',
   /** Main window → main: a note's text, edited as plain text until M5 (D-64). */
   mainSaveNote: 'main:save-note',
+  /** FOCUS-01, D-170: main ↔ windows: the timer (asked, and broadcast on every change). */
+  focusTimer: 'focus:timer',
+  focusTimerChanged: 'focus:timer-changed',
+  /** Main window or mini → main: Start / Pause, Skip, a mode tab. */
+  focusCommand: 'focus:command',
+  /** Main window or mini → main: the Focus page's ⋯ menu (FOCUS-02). */
+  focusAction: 'focus:action',
+  /** Main window → main: the Focus settings changed (FOCUS-05). */
+  focusSetSettings: 'focus:set-settings',
+  /** Main → main window: a session ended: play the alarm (FOCUS-04); or Play in its settings. */
+  focusAlarm: 'focus:alarm',
+  /** Main → main window: open Focus (the toast's body, mini's Focus settings…). */
+  focusShow: 'focus:show',
 } as const;
 
 /**
@@ -732,6 +746,8 @@ export interface ListView {
   readonly created?: string;
   /** TODAY-01 (M6): the Today view's reminders and rollover prompt. */
   readonly today?: TodayExtras;
+  /** FOCUS-02, FOCUS-03 (D-170): the Focus view's estimates, counts and active task. */
+  readonly focus?: FocusExtras;
 }
 
 /**
@@ -788,6 +804,12 @@ export type ListChange =
   | { readonly kind: 'mute'; readonly key: string; readonly muted: boolean }
   /** TODAY-01, D-85. */
   | { readonly kind: 'pin'; readonly key: string; readonly pinned: boolean }
+  /** FOCUS-02, D-170: sent to Focus's sprint, or taken out of it (from any list). */
+  | { readonly kind: 'focus'; readonly key: string; readonly focus: boolean }
+  /** FOCUS-02: Focus on this: first in the sprint, so it is the active task. */
+  | { readonly kind: 'focusTop'; readonly key: string }
+  /** FOCUS-03: the focus sessions a task in the sprint should take. */
+  | { readonly kind: 'estimate'; readonly key: string; readonly estimate: number }
   /** TASK-17, D-85: the task becomes a note; the outcome's list is the note. */
   | { readonly kind: 'toNote'; readonly key: string }
   /** TASK-12, D-50: to Trash storage, undoable. */
