@@ -235,8 +235,9 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   const mini = app.windows().find((page) => page.url().includes('/mini/')) as Page;
   const tab = mini.locator('.mini-tabs .mini-tab-list');
   await expect(tab).toHaveText('Inbox');
-  // The list tab active first (D-156: wait for it), so the next click opens its picker.
-  await mini.keyboard.press('Control+2');
+  // The list tab active first (a click on it while another tab is active switches to it; D-156:
+  // wait for it), so the next click opens its picker.
+  await tab.click();
   await expect(tab).toHaveClass(/\bon\b/);
   await tab.click();
   const picker = mini.locator('.fl-picker');
@@ -258,9 +259,10 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   await mini.locator('.mini-focus-go').click();
   await expect(main.locator('.focus-timer')).toHaveClass(/\binverted\b/);
   await expect(mini.locator('.mini-focus')).toHaveClass(/\bfocus\b/);
-  await mini.keyboard.press('Control+1');
+  await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
   await expect(tab.locator('.mini-tab-time')).toHaveText(/^\d\d:\d\d$/);
-  await mini.keyboard.press('Control+2');
+  await tab.click();
+  await expect(tab).toHaveClass(/\bon\b/);
   await expect(tab.locator('.mini-tab-time')).toHaveCount(0);
   await mini.locator('.mini-focus-go').click();
   await expect(main.locator('.focus-go')).toHaveText('Resume');
