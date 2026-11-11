@@ -637,7 +637,16 @@ function Timeline(props: {
           const moving = drag?.key === reminder.key && drag.moved ? drag : null;
           const shownAt = placed?.key === reminder.key ? placed.minutes : null;
           const past = moving ? isPast(moving.minutes) : !isComing(reminder, now);
-          const state = !moving && reminder.key === next ? 'next' : past ? 'past' : 'later';
+          // D-164: a passed reminder whose task isn't done is overdue, not struck through as done
+          // (while dragged over the past it reads as past: dropped there, it slides back).
+          const state =
+            !moving && reminder.key === next
+              ? 'next'
+              : !moving && past && !reminder.done
+                ? 'overdue'
+                : past
+                  ? 'past'
+                  : 'later';
           return (
             <button
               key={reminder.key}

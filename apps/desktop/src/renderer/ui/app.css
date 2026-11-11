@@ -4433,6 +4433,17 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-edge-chip);
 }
 
+/* D-164: a passed reminder whose task isn't done: behind the now line like a passed one, not
+   struck through, its title in the Overdue card's tone and the overdue dot (REM-11: no red). */
+.timeline-event.overdue {
+  background: var(--fl-ground-well);
+  color: var(--fl-text-secondary);
+}
+
+.timeline-event.overdue .timeline-dot {
+  background: var(--fl-overdue-dot);
+}
+
 .timeline-event.next {
   background: var(--fl-ground-float);
   box-shadow: inset 0 0 0 1px var(--fl-edge-float);

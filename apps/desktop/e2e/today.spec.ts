@@ -40,6 +40,8 @@ test.beforeAll(async () => {
     join(flint, `${LIST}.md`),
     [
       '---\nflint: 1\nid: metrics\nmode: tasks\n---',
+      '- [x] Stand-up [reminder:: 2026-03-10T08:00] [completion:: 2026-03-10T08:10] [id:: r0]',
+      '- [ ] Send the invoice [reminder:: 2026-03-10T09:30] [id:: r5]',
       '- [ ] Review the dashboards [reminder:: 2026-03-10T14:00] [id:: r1]',
       '- [ ] Sign the pipeline [reminder:: 2026-03-10T14:00] [id:: r2]',
       '- [ ] Call Alex [reminder:: 2026-03-10T14:05] [id:: r3]',
@@ -86,9 +88,9 @@ test('the timeline: reminders too close to show apart share a row with +N; none 
   await main.locator('.sidebar > .nav').first().click();
   const timeline = main.locator('.today-timeline');
   const events = timeline.locator('.timeline-event');
-  // 14:00, 14:00 and 14:05 share one row; 16:00 has its own.
-  await expect(events).toHaveCount(2);
-  const first = events.first();
+  // 14:00, 14:00 and 14:05 share one row; 08:00, 09:30 and 16:00 have their own.
+  await expect(events).toHaveCount(4);
+  const first = events.filter({ hasText: '14:00' });
   await expect(first.locator('.timeline-text')).toHaveText('14:00 · Review the dashboards');
   await expect(first).toHaveClass(/grouped/);
   const more = timeline.locator('.timeline-more');
@@ -99,9 +101,10 @@ test('the timeline: reminders too close to show apart share a row with +N; none 
   // The 16:00 row sits on its hour's line (it used to be pushed down by the rows above).
   const line = timeline.locator('.timeline-hour', { hasText: '16:00' });
   const lineBox = await line.boundingBox();
-  const lastBox = await events.last().boundingBox();
+  const last = events.filter({ hasText: '16:00' });
+  await expect(last.locator('.timeline-text')).toHaveText('16:00 · Ship the notes');
+  const lastBox = await last.boundingBox();
   if (!lineBox || !lastBox) throw new Error('no timeline layout');
-  await expect(events.last().locator('.timeline-text')).toHaveText('16:00 · Ship the notes');
   expect(Math.abs(lastBox.y + lastBox.height / 2 - (lineBox.y + lineBox.height / 2))).toBeLessThan(
     2,
   );
@@ -117,6 +120,22 @@ test('the timeline: reminders too close to show apart share a row with +N; none 
   await items.nth(2).click();
   await expect(main.locator('.fl-menu')).toHaveCount(0);
   await expect(main.locator('.row.sel')).toContainText('Call Alex');
+});
+
+test('the timeline: a passed reminder not done is overdue, not struck through as done (TODAY-03, D-164)', async () => {
+  await main.locator('.sidebar > .nav').first().click();
+  const events = main.locator('.today-timeline .timeline-event');
+  const overdue = events.filter({ hasText: 'Send the invoice' });
+  await expect(overdue).toHaveClass(/\boverdue\b/);
+  await expect(overdue).not.toHaveClass(/\bpast\b/);
+  const done = events.filter({ hasText: 'Stand-up' });
+  await expect(done).toHaveClass(/\bpast\b/);
+  const strike = (row: typeof done): Promise<string> =>
+    row
+      .locator('.timeline-text')
+      .evaluate((element) => getComputedStyle(element).textDecorationLine);
+  expect(await strike(overdue)).toBe('none');
+  expect(await strike(done)).toBe('line-through');
 });
 
 test('a reminder card keeps a long list name on one line, ending in an ellipsis (TODAY-03, D-163)', async () => {
