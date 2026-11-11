@@ -1535,3 +1535,6 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **The now line under the rows:** it crossed a row's text and read as a strike-through; it is now drawn under the rows, its time pill over everything. A "+N" badge the pill would cover moves to the pill's left.
 - **Overdue (D-164, revised):** faded as a passed reminder is (`--fl-ground-well`, `--fl-text-faint`), not struck through, with the white overdue dot.
 - **Kept:** a shared row still shows the next reminder when it is among its reminders (else the earliest); the earlier ones are in its "+N" menu (Davit: "the current behaviour is fine").
+
+### D-168 — 1.5.1: the now line along a row's edge
+- **Date:** 11 Nov 2026 · **Status:** Decided (Davit, second preview: under the rows the line was hidden by the row it fell in). Short entry. Where the now line would cross a row it runs along the row's edge instead: above a row still to come, below a passed one (by the reminder the row shows), in the 3 px gap between rows, so it is always seen and never reads as a strike-through; the pill still says the exact time. Replaces D-167's "under the rows".
