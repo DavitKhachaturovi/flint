@@ -34,6 +34,10 @@
       "types": "./dist/sync/index.d.ts",
       "default": "./dist/sync/index.js"
     },
+    "./focus": {
+      "types": "./dist/focus/index.d.ts",
+      "default": "./dist/focus/index.js"
+    },
     "./bench": {
       "types": "./dist/bench/index.d.ts",
       "default": "./dist/bench/index.js"
