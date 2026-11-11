@@ -40,12 +40,15 @@ test.beforeAll(async () => {
     join(flint, `${LIST}.md`),
     [
       '---\nflint: 1\nid: metrics\nmode: tasks\n---',
-      '- [x] Stand-up [reminder:: 2026-03-10T08:00] [completion:: 2026-03-10T08:10] [id:: r0]',
-      '- [ ] Send the invoice [reminder:: 2026-03-10T09:30] [id:: r5]',
+      '- [x] Stand-up [reminder:: 2026-03-10T07:00] [completion:: 2026-03-10T07:10] [id:: r0]',
+      '- [ ] Send the invoice [reminder:: 2026-03-10T08:00] [id:: r5]',
+      '- [ ] Pay the rent [reminder:: 2026-03-10T09:50] [id:: r6]',
+      '- [ ] Water the plants [reminder:: 2026-03-10T10:20] [id:: r7]',
       '- [ ] Review the dashboards [reminder:: 2026-03-10T14:00] [id:: r1]',
       '- [ ] Sign the pipeline [reminder:: 2026-03-10T14:00] [id:: r2]',
       '- [ ] Call Alex [reminder:: 2026-03-10T14:05] [id:: r3]',
       '- [ ] Ship the notes [reminder:: 2026-03-10T16:00] [id:: r4]',
+      '- [ ] Book the room [reminder:: 2026-03-10T17:00] [id:: r8]',
       '',
     ].join('\n'),
   );
@@ -84,18 +87,24 @@ test.afterAll(async () => {
   await rm(dataDirectory, { recursive: true, force: true });
 });
 
-test('the timeline: reminders too close to show apart share a row with +N; none drifts from its hour (TODAY-03, D-163)', async () => {
+test('the timeline: reminders under an hour apart share a row with +N, an hour apart each has its own; none drifts from its hour (TODAY-03, D-163, D-167)', async () => {
   await main.locator('.sidebar > .nav').first().click();
   const timeline = main.locator('.today-timeline');
   const events = timeline.locator('.timeline-event');
-  // 14:00, 14:00 and 14:05 share one row; 08:00, 09:30 and 16:00 have their own.
-  await expect(events).toHaveCount(4);
+  // 09:50 and 10:20 share a row (10:20, the next, in front); 14:00, 14:00 and 14:05 share one;
+  // 07:00, 08:00, 16:00 and 17:00, each an hour from its neighbour, have their own (D-167).
+  await expect(events).toHaveCount(6);
+  for (const time of ['07:00', '08:00', '16:00', '17:00'])
+    await expect(events.filter({ hasText: `${time} ·` })).toHaveCount(1);
+  const soon = events.filter({ hasText: 'Water the plants' });
+  await expect(soon).toHaveClass(/\bnext\b/);
+  await expect(soon).toHaveClass(/grouped/);
   const first = events.filter({ hasText: '14:00' });
   await expect(first.locator('.timeline-text')).toHaveText('14:00 · Review the dashboards');
   await expect(first).toHaveClass(/grouped/);
-  const more = timeline.locator('.timeline-more');
-  await expect(more).toHaveCount(1);
-  await expect(more).toHaveText('+2');
+  const badges = timeline.locator('.timeline-more');
+  await expect(badges).toHaveText(['+1', '+2']);
+  const more = badges.filter({ hasText: '+2' });
   // D-89: it fades in as rows do.
   expect(await more.evaluate((element) => getComputedStyle(element).animationName)).toBe('fade-in');
   // The 16:00 row sits on its hour's line (it used to be pushed down by the rows above).
@@ -108,6 +117,29 @@ test('the timeline: reminders too close to show apart share a row with +N; none 
   expect(Math.abs(lastBox.y + lastBox.height / 2 - (lineBox.y + lineBox.height / 2))).toBeLessThan(
     2,
   );
+
+  // D-167: the now line (10:00) crosses the 09:50 row: its "+1" moves beside the time pill, and
+  // the line passes under the row instead of through it.
+  const near = badges.filter({ hasText: '+1' });
+  await expect(near).toHaveClass(/beside-now/);
+  const apart = await main.evaluate(() => {
+    const badge = [...document.querySelectorAll('.timeline-more')]
+      .find((each) => each.textContent === '+1')
+      ?.getBoundingClientRect();
+    const pill = document.querySelector('.timeline-now-time')?.getBoundingClientRect();
+    const nowLine = document.querySelector('.timeline-now-line')?.getBoundingClientRect();
+    const row = [...document.querySelectorAll('.timeline-event')]
+      .find((each) => each.textContent?.includes('Water the plants'))
+      ?.getBoundingClientRect();
+    if (!badge || !pill || !nowLine || !row) return null;
+    const onTop = document.elementFromPoint(row.left + row.width / 2, nowLine.top + 0.5);
+    return {
+      clear: badge.right <= pill.left || badge.left >= pill.right,
+      crosses: nowLine.top > row.top && nowLine.top < row.bottom,
+      under: !!onTop?.closest('.timeline-event'),
+    };
+  });
+  expect(apart).toEqual({ clear: true, crosses: true, under: true });
 
   // +N opens a menu of all of them, each with its own time and list; one opens that reminder.
   await more.click();
@@ -122,7 +154,7 @@ test('the timeline: reminders too close to show apart share a row with +N; none 
   await expect(main.locator('.row.sel')).toContainText('Call Alex');
 });
 
-test('the timeline: a passed reminder not done is overdue, not struck through as done (TODAY-03, D-164)', async () => {
+test('the timeline: a passed reminder not done is overdue, faded but not struck through (TODAY-03, D-164, D-167)', async () => {
   await main.locator('.sidebar > .nav').first().click();
   const events = main.locator('.today-timeline .timeline-event');
   const overdue = events.filter({ hasText: 'Send the invoice' });
@@ -130,12 +162,17 @@ test('the timeline: a passed reminder not done is overdue, not struck through as
   await expect(overdue).not.toHaveClass(/\bpast\b/);
   const done = events.filter({ hasText: 'Stand-up' });
   await expect(done).toHaveClass(/\bpast\b/);
-  const strike = (row: typeof done): Promise<string> =>
-    row
-      .locator('.timeline-text')
-      .evaluate((element) => getComputedStyle(element).textDecorationLine);
-  expect(await strike(overdue)).toBe('none');
-  expect(await strike(done)).toBe('line-through');
+  const look = (row: typeof done): Promise<{ strike: string; color: string }> =>
+    row.locator('.timeline-text').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { strike: style.textDecorationLine, color: style.color };
+    });
+  const overdueLook = await look(overdue);
+  const doneLook = await look(done);
+  expect(overdueLook.strike).toBe('none');
+  expect(doneLook.strike).toBe('line-through');
+  // Faded as a passed one is.
+  expect(overdueLook.color).toBe(doneLook.color);
 });
 
 test('a reminder card keeps a long list name on one line, ending in an ellipsis (TODAY-03, D-163)', async () => {

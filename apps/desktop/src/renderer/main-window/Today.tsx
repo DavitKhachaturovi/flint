@@ -445,11 +445,20 @@ const MORE = 18;
 /** The least room between two hour labels, and the most the rail may take. */
 const LABEL_GAP = 28;
 const RAIL_MAX = 300;
+/**
+ * D-167: the least scale, pixels a minute: reminders an hour apart always get rows of their own
+ * (a long day grows past `RAIL_MAX` for it), so only reminders under an hour apart share one.
+ */
+const HOUR_SCALE = (EVENT + EVENT_GAP) / 60;
+/** D-167: the now line's time pill: its width and half its height, for the "+N" beside it. */
+const NOW_PILL = 44;
+const NOW_PILL_HALF = 8;
 
 /**
  * The hours the timeline covers (today's reminders and now, padded, on whole hours) and its scale:
- * close reminders get room enough not to overlap, a long day is kept within `RAIL_MAX`, and the
- * hour labels are every 1, 2 or 3 hours, whichever leaves them room.
+ * close reminders get room enough not to overlap, a long day is kept within `RAIL_MAX` unless that
+ * would put reminders an hour apart in one row (D-167), and the hour labels are every 1, 2 or 3
+ * hours, whichever leaves them room.
  */
 function railOf(times: readonly number[]): {
   start: number;
@@ -468,7 +477,7 @@ function railOf(times: readonly number[]): {
     if (gap >= 10) closest = Math.min(closest, gap);
   }
   const roomy = Number.isFinite(closest) ? (EVENT + EVENT_GAP) / closest : 0;
-  const scale = Math.min(Math.max(roomy, 0.25), RAIL_MAX / Math.max(60, to - from));
+  const scale = Math.max(Math.min(roomy, RAIL_MAX / Math.max(60, to - from)), HOUR_SCALE);
   const step = [60, 120, 180].find((each) => each * scale >= LABEL_GAP) ?? 180;
   return {
     start: Math.floor(from / step) * step,
@@ -554,9 +563,9 @@ function Timeline(props: {
   const y = (minutes: number): number => (minutes - start) * scale;
   const next = reminders.find((reminder) => isComing(reminder, now))?.key;
   // Centred on their time, in order of time, the dragged one aside (it follows the pointer, above
-  // the others). D-163: reminders too close to show apart share one row at the earliest's time,
-  // so no row drifts from its hour: the next one shows if it is among them (else the earliest),
-  // with "+N" opening the others.
+  // the others). D-163: reminders too close to show apart (under an hour, D-167) share one row at
+  // the earliest's time, so no row drifts from its hour: the next one shows if it is among them
+  // (else the earliest), with "+N" opening the others.
   const order = reminders
     .map((reminder, index) => ({ reminder, index, minutes: times[index] ?? nowAt }))
     .filter(({ reminder }) => reminder.key !== drag?.key || !drag.moved)
@@ -564,7 +573,8 @@ function Timeline(props: {
   const rows: { top: number; members: (typeof order)[number][] }[] = [];
   for (const entry of order) {
     const last = rows.at(-1);
-    if (last && y(entry.minutes) - EVENT / 2 - last.top < EVENT + EVENT_GAP)
+    // Half a pixel's grace: an hour at the least scale is exactly a row and its gap.
+    if (last && y(entry.minutes) - EVENT / 2 - last.top < EVENT + EVENT_GAP - 0.5)
       last.members.push(entry);
     else rows.push({ top: y(entry.minutes) - EVENT / 2, members: [entry] });
   }
@@ -577,6 +587,7 @@ function Timeline(props: {
     tops.set(lead.reminder.key, row.top);
     if (row.members.length > 1) groups.set(lead.reminder.key, row.members);
   }
+  const nowY = y(nowAt + now.getSeconds() / 60);
   const below = (rows.at(-1)?.top ?? -Infinity) + EVENT;
   if (drag?.moved) tops.set(drag.key, drag.top);
   const labels: number[] = [];
@@ -727,24 +738,31 @@ function Timeline(props: {
             </button>
           );
         })}
-        {[...groups].map(([key, members]) =>
-          drag?.moved && drag.key === key ? null : (
+        {[...groups].map(([key, members]) => {
+          if (drag?.moved && drag.key === key) return null;
+          const top = (tops.get(key) ?? 0) + (EVENT - MORE) / 2;
+          // D-167: beside the now line's time pill, never under it.
+          const besideNow = nowY + NOW_PILL_HALF > top && nowY - NOW_PILL_HALF < top + MORE;
+          return (
             <button
               key={`more:${key}`}
               type="button"
-              className="timeline-more"
-              style={{ top: `${(tops.get(key) ?? 0) + (EVENT - MORE) / 2}px` }}
+              className={besideNow ? 'timeline-more beside-now' : 'timeline-more'}
+              style={{
+                top: `${top}px`,
+                ...(besideNow && { right: `${NOW_PILL + 6}px` }),
+              }}
               aria-label={`${members.length} reminders at this time`}
               title={`${members.length - 1} more at this time`}
               onClick={(event) => showGroup(members, event.currentTarget)}
             >
               +{members.length - 1}
             </button>
-          ),
-        )}
+          );
+        })}
         <div
           className="timeline-now"
-          style={{ top: `${y(nowAt + now.getSeconds() / 60)}px` }}
+          style={{ top: `${nowY}px` }}
           aria-label={`Now, ${two(now.getHours())}:${two(now.getMinutes())}`}
         >
           <span className="timeline-now-line" />

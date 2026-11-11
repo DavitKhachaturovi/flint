@@ -4298,6 +4298,8 @@ body[data-tour-step='5'] .main .row .pin-hover {
 /* The timeline: hour labels on hairlines, the reminders on them, the now line across. */
 .timeline {
   position: relative;
+  /* D-167: its own layers: the now line under the rows, its time pill over everything. */
+  isolation: isolate;
   margin: 14px 0 2px;
   transition: height var(--fl-dur-state) ease;
   /* D-114: the rail fades in where "No reminders today." was. */
@@ -4328,6 +4330,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 
 .timeline-event {
   position: absolute;
+  z-index: 1;
   left: 52px;
   right: 0;
   height: 26px;
@@ -4355,7 +4358,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 /* D-93: a reminder being dragged to a new time: lifted, above the others, following the pointer
    (no easing while it moves; it eases into place when let go). */
 .timeline-event.dragging {
-  z-index: 2;
+  z-index: 3;
   background: var(--fl-ground-float);
   box-shadow:
     0 0 0 1px var(--fl-edge-float),
@@ -4381,7 +4384,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 .timeline-more {
   position: absolute;
   right: 4px;
-  z-index: 1;
+  z-index: 2;
   height: 18px;
   padding: 0 6px;
   border-radius: 6px;
@@ -4392,6 +4395,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-secondary);
   transition:
     top var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    right var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
     background-color var(--fl-dur-state) ease,
     color var(--fl-dur-state) ease;
   animation: fade-in var(--fl-dur-state) ease-out;
@@ -4433,11 +4437,11 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-edge-chip);
 }
 
-/* D-164: a passed reminder whose task isn't done: behind the now line like a passed one, not
-   struck through, its title in the Overdue card's tone and the overdue dot (REM-11: no red). */
+/* D-164, D-167: a passed reminder whose task isn't done: faded as a passed one, but not struck
+   through, with the overdue dot (REM-11: no red). */
 .timeline-event.overdue {
   background: var(--fl-ground-well);
-  color: var(--fl-text-secondary);
+  color: var(--fl-text-faint);
 }
 
 .timeline-event.overdue .timeline-dot {
@@ -4465,6 +4469,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 
 .timeline-now-line {
   position: absolute;
+  z-index: 0;
   left: 0;
   right: 52px;
   top: 0;
@@ -4473,6 +4478,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 
 .timeline-now-time {
   position: absolute;
+  z-index: 4;
   right: 0;
   top: -8px;
   height: 16px;
