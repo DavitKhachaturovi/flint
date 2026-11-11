@@ -118,8 +118,9 @@ test('the timeline: reminders under an hour apart share a row with +N, an hour a
     2,
   );
 
-  // D-167: the now line (10:00) crosses the 09:50 row: its "+1" moves beside the time pill, and
-  // the line passes under the row instead of through it.
+  // D-167, D-168: now (10:00) falls inside the row of 09:50 and 10:20 (the next, in front): the
+  // line runs along the row's top edge, never through it and never hidden, and the "+1" moves
+  // beside the time pill.
   const near = badges.filter({ hasText: '+1' });
   await expect(near).toHaveClass(/beside-now/);
   const apart = await main.evaluate(() => {
@@ -132,14 +133,15 @@ test('the timeline: reminders under an hour apart share a row with +N, an hour a
       .find((each) => each.textContent?.includes('Water the plants'))
       ?.getBoundingClientRect();
     if (!badge || !pill || !nowLine || !row) return null;
-    const onTop = document.elementFromPoint(row.left + row.width / 2, nowLine.top + 0.5);
+    const middle = nowLine.top + nowLine.height / 2;
+    const onTop = document.elementFromPoint(nowLine.left + nowLine.width / 2, middle);
     return {
       clear: badge.right <= pill.left || badge.left >= pill.right,
-      crosses: nowLine.top > row.top && nowLine.top < row.bottom,
-      under: !!onTop?.closest('.timeline-event'),
+      above: nowLine.bottom <= row.top + 0.5 && row.top - nowLine.bottom < 3,
+      seen: !onTop?.closest('.timeline-event'),
     };
   });
-  expect(apart).toEqual({ clear: true, crosses: true, under: true });
+  expect(apart).toEqual({ clear: true, above: true, seen: true });
 
   // +N opens a menu of all of them, each with its own time and list; one opens that reminder.
   await more.click();

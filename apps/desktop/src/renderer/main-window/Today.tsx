@@ -581,19 +581,25 @@ function Timeline(props: {
   const tops = new Map<string, number>();
   /** The row each shown reminder leads, by key, when it has others behind it. */
   const groups = new Map<string, (typeof order)[number][]>();
+  const isPast = (minutes: number): boolean => minutes * 60 <= nowAt * 60 + now.getSeconds();
+  // D-168: the now line never crosses a row (through the text it read as a strike-through, and
+  // under the row it was hidden): where it would, it runs along the row's edge instead, above a
+  // row still to come and below a passed one, so now stays in order with the reminders. Its pill
+  // still says the time.
+  let nowY = y(nowAt + now.getSeconds() / 60);
   for (const row of rows) {
     const lead = row.members.find(({ reminder }) => reminder.key === next) ?? row.members[0];
     if (!lead) continue;
     tops.set(lead.reminder.key, row.top);
     if (row.members.length > 1) groups.set(lead.reminder.key, row.members);
+    if (nowY > row.top && nowY < row.top + EVENT)
+      nowY = isPast(lead.minutes) ? row.top + EVENT + EVENT_GAP / 2 : row.top - EVENT_GAP / 2;
   }
-  const nowY = y(nowAt + now.getSeconds() / 60);
   const below = (rows.at(-1)?.top ?? -Infinity) + EVENT;
   if (drag?.moved) tops.set(drag.key, drag.top);
   const labels: number[] = [];
   for (let at = start; at <= end; at += step) labels.push(at);
   const height = Math.max(y(end), below, drag?.moved ? drag.top + EVENT : 0) + EVENT / 2;
-  const isPast = (minutes: number): boolean => minutes * 60 <= nowAt * 60 + now.getSeconds();
   const clock = (minutes: number): string =>
     `${two(Math.floor(minutes / 60))}:${two(minutes % 60)}`;
   /** D-163: the reminders sharing a row, each with its own time; one opens it as a click would. */
