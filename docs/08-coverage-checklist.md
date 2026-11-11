@@ -1311,7 +1311,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 9 | Done tasks struck, Check to bottom; ⋯ Clear finished, Reset counts, Remove all from Focus (never deleting, one undo) | FOCUS-02 · Built (1.6.0, D-171) | 02, D-170 Q5 |
 | 10 | Estimates and counts "1/4"; "2 of 7 sessions · finish at 15:40"; Auto check tasks | FOCUS-03 · Built (1.6.0, D-171) | 02, D-170 Q4 |
 | 11 | A session's end: next mode, auto start (off), Skip doesn't count; the alarm sound and an ordinary toast; heads-up | FOCUS-04 · Built (1.6.0, D-171) | 02, 05 §5, D-170 Q7 |
-| 12 | Focus settings: the card and Settings' Focus section; Nudge, Drop, Mallet, None; no focus sound | FOCUS-05, APP-11 · Built (1.6.0, D-171) | 02, D-170 Q8 |
+| 12 | Focus settings: the card on the Focus page, their one place (D-176: no Settings section); Nudge, Drop, Mallet, None; no focus sound | FOCUS-05 · Built (1.6.0, D-171, D-176) | 02, D-170 Q8, D-176 |
 | 13 | Mini: Inbox then Focus first in the picker; the compact timer, never inverted; "Focus 12:34" on the tab | FOCUS-06, MINI-03 · Built (1.6.0, D-171) | 02, D-170 Q9 |
 | 14 | Keys and palette: Shift+Space, F, Shift+F; Go to Focus, Start focus, Pause / Resume, Skip, the modes, the sprint's actions, Focus settings | FOCUS-* · Built (1.6.0, D-171) | 03 §3, D-170 Q10, D-106 |
 | 15 | Motion: the card's inversion, the digits, rows sent and sinking, the tab label, the settings card; in the motion census | FOCUS-* · Built (1.6.0, D-171) | D-89, D-75 |

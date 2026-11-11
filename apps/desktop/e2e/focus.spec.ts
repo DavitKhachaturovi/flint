@@ -210,7 +210,7 @@ test('the composer adds to Inbox and the end of the sprint; ⋯ Remove all only 
   await expect(main.locator('.card.tasks .row')).toHaveCount(3);
 });
 
-test('the gear opens Focus settings; a ready mode takes the new length; Settings has the same section (FOCUS-05)', async () => {
+test('the gear opens Focus settings; a ready mode takes the new length; Settings has no Focus section (FOCUS-05, D-176)', async () => {
   await main.locator('.focus-go').click();
   await main.locator('.focus-skip').click();
   await main.locator('.focus-modes button', { hasText: 'Focus' }).click();
@@ -224,8 +224,10 @@ test('the gear opens Focus settings; a ready mode takes the new length; Settings
   await expect(main.locator('.focus-digits')).toHaveText('50:00');
   await card.locator('button', { hasText: 'OK' }).click();
   await expect(card).toHaveCount(0);
+  // D-176: the card is their one place; Settings has no Focus section.
   await nav('Settings').click();
-  await expect(main.locator('#settings-focus input[aria-label="Focus minutes"]')).toHaveValue('50');
+  await expect(main.locator('.settings-index-item', { hasText: 'Focus' })).toHaveCount(0);
+  await expect(main.locator('#settings-focus')).toHaveCount(0);
   await nav('Focus').click();
 });
 

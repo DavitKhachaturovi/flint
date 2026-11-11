@@ -1,8 +1,8 @@
 /**
  * FOCUS-01 to FOCUS-06 (D-170, mockup 15): Focus's pieces, shared by the main window and mini
  * mode: the timer as main broadcasts it, the clock that redraws it, the timer card (inverted while
- * a focus session runs, Q3), the "1/4" count with its estimate stepper, the settings (the card
- * and Settings → Focus, one component), and the alarm.
+ * a focus session runs, Q3), the "1/4" count with its estimate stepper, the settings card (its one
+ * place, D-176), and the alarm.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import {
@@ -661,7 +661,6 @@ export function FocusSettingsCard(props: {
           <FocusSettingsForm settings={props.view.settings} />
         </div>
         <footer className="focus-settings-foot">
-          <span>Also in Settings → Focus</span>
           <button type="button" className="primary-button" onClick={props.onClose}>
             OK
           </button>

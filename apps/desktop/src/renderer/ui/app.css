@@ -8466,6 +8466,7 @@ body[data-tour-step='5'] .main .row .pin-hover {
 }
 
 .focus-settings-foot {
+  justify-content: flex-end;
   padding: 12px 14px 14px 22px;
   border-top: 1px solid var(--fl-edge-float);
   font-size: 12.5px;
@@ -8639,12 +8640,6 @@ body[data-tour-step='5'] .main .row .pin-hover {
   border-radius: 50%;
   background: var(--fl-strong-bg);
   box-shadow: var(--fl-shadow-strong-tile);
-}
-
-/* FOCUS-05: in Settings → Focus, the same form inside the section's card. */
-.settings-section .focus-settings-section {
-  padding: 12px 0 6px;
-  border-top-color: var(--fl-edge-divider);
 }
 
 /* FOCUS-06 (mockup 15): mini's compact timer, never inverted (Q3): white digits and line while

@@ -7,7 +7,7 @@ What the app shows in its **What's new** card after an update (APP-15, D-117). N
 - **Focus, a Pomodoro timer:** open **Focus** under Inbox. Press **Start** (or **Shift+Space**) for a 25-minute focus session, then take a short break; a long break comes after every fourth. The timer card turns white while you focus, and a sound and a notification tell you when a session ends.
 - **Send tasks to Focus:** select a task in any list and press **F** (or right-click → Send to Focus). Your Focus list is only for what you're doing now; the tasks stay in their own lists. The top task is the one you're working on; **Shift+F** puts another one on top.
 - **Plan your sessions:** each task shows "1/4", sessions done out of the ones you expect it to take. Hover it and use − and + to change that, and see when you'll finish under the list.
-- **Your own timings:** the gear on the Focus page (or Settings → Focus) changes the lengths, the alarm sound, auto start and more.
+- **Your own timings:** the gear on the Focus page changes the lengths, the alarm sound, auto start and more.
 - **Focus in mini mode:** click mini mode's list tab and choose **Focus** for a small timer next to your call; the tab shows the time left while you look at another tab. Today's pinned tasks are now under **Pinned**.
 
 ## 1.5.1 (11 Nov 2026)

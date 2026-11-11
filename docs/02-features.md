@@ -1090,7 +1090,7 @@ A Pomodoro timer with its own small list of tasks, the **sprint**: a separate li
 - **Heads-up before the end** (off, or N minutes): a quiet toast N minutes before a focus session ends.
 
 ### FOCUS-05 — Focus settings (1.6.0, D-170)
-- The gear on the Focus page opens the **Focus settings** card; the same rows are Settings' **Focus** section after Today & lists (APP-11), one component, found by Settings' Ctrl+F. Mini's ⋯ menu has **Focus settings…** (opens them in the main window).
+- The gear on the Focus page opens the **Focus settings** card, their one place (**D-176**, Davit: Settings' Focus section was a duplicate and is gone; Ctrl+K's Focus settings and mini's ⋯ open the card). Mini's ⋯ menu has **Focus settings…** (opens them in the main window).
 - **Timer:** Focus / Short break / Long break in minutes (25 / 5 / 15); Auto start breaks (off); Auto start focus (off); Long break interval (4).
 - **Tasks:** Auto check tasks (off); Check to bottom (on).
 - **Sound:** Alarm sound: **Nudge** (the reminder chime), **Drop**, **Mallet** (D-95's runners-up, made the same way and bundled as Davit's files, D-96), **None**; volume; repeat (1); Play.
