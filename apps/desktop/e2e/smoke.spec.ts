@@ -2703,7 +2703,16 @@ test('fixes after 0.4.26: a reminder opens and flashes at once, the column follo
     await expect(main.locator('.toast')).toContainText('Reminder set');
     // The task row's time follows at once.
     await expect(row.locator('.reminder-time')).toContainText(/(00|15|30|45)$/);
-    // Dropped in the past: it slides back, nothing changes.
+    // Dropped in the past: it slides back, nothing changes. D-156: the first drop's slide into
+    // place (D-93) finished first, so the press lands on the event, not where it was a moment ago
+    // (twice on CI: the press missed and no drag started).
+    await event.evaluate((element) =>
+      Promise.all(
+        [element, ...(element.parentElement ? [element.parentElement] : [])]
+          .flatMap((each) => each.getAnimations({ subtree: true }))
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
     const again = await event.boundingBox();
     if (!again) throw new Error('no timeline event');
     await main.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
