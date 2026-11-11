@@ -129,6 +129,7 @@ test('F sends a task from its list, with Go to Focus; the task line never change
   await main.keyboard.press('f');
   await expect(main.locator('.toast')).toContainText('Sent to Focus');
   await row('fx2').click();
+  await expect(row('fx2')).toHaveClass(/\bsel\b/);
   await main.keyboard.press('f');
   await expect(main.locator('.toast')).toContainText('Sent to Focus');
   expect(await readFile(join(flint, 'Backend.md'), 'utf8')).toBe(BACKEND);
@@ -159,6 +160,7 @@ test('Start inverts the timer card; Shift+Space pauses it back to dark; Shift+F 
   await expect(main.locator('.focus-go')).toHaveText('Pause');
   await expect(main.locator('.focus-skip')).toBeVisible();
   await row('fx2').click();
+  await expect(row('fx2')).toHaveClass(/\bsel\b/);
   await main.keyboard.press('Shift+Space');
   await expect(card).not.toHaveClass(/\binverted\b/);
   await expect(main.locator('.focus-go')).toHaveText('Resume');
@@ -231,12 +233,17 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   await showMini();
   await expect.poll(() => app.windows().some((page) => page.url().includes('/mini/'))).toBe(true);
   const mini = app.windows().find((page) => page.url().includes('/mini/')) as Page;
-  await mini.keyboard.press('Control+2');
   const tab = mini.locator('.mini-tabs .mini-tab-list');
+  await expect(tab).toHaveText('Inbox');
+  // The list tab active first (D-156: wait for it), so the next click opens its picker.
+  await mini.keyboard.press('Control+2');
+  await expect(tab).toHaveClass(/\bon\b/);
   await tab.click();
   const picker = mini.locator('.fl-picker');
+  await expect(picker.locator('.fl-picker-search')).toBeFocused();
   await expect(picker.locator('.fl-picker-row').first()).toContainText('Focus');
   await mini.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
   // From another list, Inbox and Focus come first.
   await mini.locator('.mini-tabs .mini-tab-pick').click();
   await picker.locator('.fl-picker-row', { hasText: 'Backend' }).click();
