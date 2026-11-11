@@ -276,9 +276,29 @@ test('on a wide window the side panel is off on Focus until shown there, level w
   const panel = main.locator('.context-panel:not(.panel-leaving)');
   await nav('Inbox').click();
   await expect(panel).toBeVisible();
+  // D-175: the panel changes with the page on screen, never on the page being left (it appeared
+  // or went on the old page while the next one loaded, and the column jumped before it faded in).
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { panelOnOldPage: string[] }).panelOnOldPage = seen;
+    new MutationObserver(() => {
+      const shown = document.querySelector('.context-panel:not(.panel-leaving)') !== null;
+      const focus = document.querySelector('.content .focus-timer') !== null;
+      const header = document.querySelector('.content > .list-header h1')?.textContent ?? '';
+      if (focus && shown) seen.push('a panel on Focus');
+      if (header.startsWith('Inbox') && !shown) seen.push('no panel on Inbox');
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
   await nav('Focus').click();
   await expect(main.locator('.focus-timer')).toBeVisible();
   await expect(panel).toHaveCount(0);
+  await nav('Inbox').click();
+  await expect(panel).toBeVisible();
+  await nav('Focus').click();
+  await expect(main.locator('.focus-timer')).toBeVisible();
+  expect(
+    await main.evaluate(() => (window as unknown as { panelOnOldPage: string[] }).panelOnOldPage),
+  ).toEqual([]);
   await main.keyboard.press('Control+\\');
   await expect(panel).toBeVisible();
   await expect

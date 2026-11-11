@@ -1031,7 +1031,10 @@ export function App(): ReactElement {
       return false;
     }
   });
-  const panelOff = listId === FOCUS_ID ? !focusPanel : panelHidden;
+  // D-175: by the page on screen, not the one chosen: the panel changes in the same frame as the
+  // page (by the chosen one, it appeared or went on the old page while the new one loaded, and the
+  // column jumped before the new page faded in).
+  const panelOff = view?.id === FOCUS_ID ? !focusPanel : panelHidden;
   const panelShown = wide && !panelOff && view !== null;
   /** D-98: the Trash view on a wide screen: an opened item shows in the panel's place. */
   const trashWide = wide && !panelHidden && listId === TRASH_ID;
