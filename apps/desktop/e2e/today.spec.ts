@@ -143,15 +143,16 @@ test('the timeline: reminders under an hour apart share a row with +N, an hour a
   });
   expect(apart).toEqual({ clear: true, above: true, seen: true });
 
-  // +N opens a menu of all of them, each with its own time and list; one opens that reminder.
+  // D-169: +N opens a menu of the N behind the shown one (not the shown one again), each with its
+  // own time and list; one opens that reminder.
   await more.click();
   const items = main.locator('.fl-menu .fl-menu-item');
-  await expect(items).toHaveCount(3);
-  await expect(items.nth(0)).toContainText('14:00 · Review the dashboards');
-  await expect(items.nth(1)).toContainText('14:00 · Sign the pipeline');
-  await expect(items.nth(2)).toContainText('14:05 · Call Alex');
-  await expect(items.nth(2)).toContainText(LIST);
-  await items.nth(2).click();
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0)).toContainText('14:00 · Sign the pipeline');
+  await expect(items.nth(1)).toContainText('14:05 · Call Alex');
+  await expect(items.nth(1)).toContainText(LIST);
+  await expect(main.locator('.fl-menu')).not.toContainText('Review the dashboards');
+  await items.nth(1).click();
   await expect(main.locator('.fl-menu')).toHaveCount(0);
   await expect(main.locator('.row.sel')).toContainText('Call Alex');
 });

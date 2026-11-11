@@ -602,15 +602,20 @@ function Timeline(props: {
   const height = Math.max(y(end), below, drag?.moved ? drag.top + EVENT : 0) + EVENT / 2;
   const clock = (minutes: number): string =>
     `${two(Math.floor(minutes / 60))}:${two(minutes % 60)}`;
-  /** D-163: the reminders sharing a row, each with its own time; one opens it as a click would. */
-  const showGroup = (members: (typeof order)[number][], from: HTMLElement): void => {
+  /**
+   * D-163, D-169: the reminders behind a row's shown one (as many as its "+N" says), each with its
+   * own time; one opens it as a click would.
+   */
+  const showGroup = (members: (typeof order)[number][], shown: string, from: HTMLElement): void => {
     const box = from.getBoundingClientRect();
     openMenu(
-      members.map(({ reminder, minutes }) => ({
-        label: `${clock(minutes)} · ${reminder.title}`,
-        hint: reminder.listName,
-        action: () => onOpen(reminder),
-      })),
+      members
+        .filter(({ reminder }) => reminder.key !== shown)
+        .map(({ reminder, minutes }) => ({
+          label: `${clock(minutes)} · ${reminder.title}`,
+          hint: reminder.listName,
+          action: () => onOpen(reminder),
+        })),
       { x: box.left, y: box.bottom + 4 },
     );
   };
@@ -758,9 +763,9 @@ function Timeline(props: {
                 top: `${top}px`,
                 ...(besideNow && { right: `${NOW_PILL + 6}px` }),
               }}
-              aria-label={`${members.length} reminders at this time`}
+              aria-label={`${members.length - 1} more at this time`}
               title={`${members.length - 1} more at this time`}
-              onClick={(event) => showGroup(members, event.currentTarget)}
+              onClick={(event) => showGroup(members, key, event.currentTarget)}
             >
               +{members.length - 1}
             </button>
