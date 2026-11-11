@@ -3837,8 +3837,13 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-secondary);
 }
 
+/* D-163: a long list name ends in an ellipsis, leaving the title room. */
 .overdue-meta {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-left: auto;
   font-family: var(--fl-font-mono);
   font-size: 11px;
@@ -4094,10 +4099,23 @@ body[data-tour-step='5'] .main .row .pin-hover {
   min-width: 0;
 }
 
+/* D-163: a long list name ends in an ellipsis inside the chip (it wrapped and spilled out). */
 .reminder-card-list {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   gap: 6px;
+}
+
+.reminder-card-list svg {
+  flex: 0 0 auto;
+}
+
+.reminder-card-list-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reminder-card-until {
@@ -4354,6 +4372,36 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-faint);
 }
 
+/* D-163: reminders sharing a row: room on the right for the "+N" badge, which opens the others as
+   a menu. It moves with its row and fades in as rows do. */
+.timeline-event.grouped {
+  padding-right: 48px;
+}
+
+.timeline-more {
+  position: absolute;
+  right: 4px;
+  z-index: 1;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-secondary);
+  transition:
+    top var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1),
+    background-color var(--fl-dur-state) ease,
+    color var(--fl-dur-state) ease;
+  animation: fade-in var(--fl-dur-state) ease-out;
+}
+
+.timeline-more:hover {
+  background: var(--fl-ground-hover);
+  color: var(--fl-text-primary);
+}
+
 .timeline-text {
   min-width: 0;
   overflow: hidden;
@@ -4494,8 +4542,13 @@ body[data-tour-step='5'] .main .row .pin-hover {
   white-space: nowrap;
 }
 
+/* D-163: a long list name ends in an ellipsis, leaving the title room. */
 .today-entry-meta {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--fl-font-mono);
   font-size: 11px;
   color: var(--fl-text-faint);
@@ -7806,7 +7859,8 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-primary);
 }
 
-/* Clouds on synced items (sidebar rows and group headers), fading in when an item starts syncing. */
+/* D-163: the cloud with "!" on a sidebar row or group header with an unresolved sync conflict,
+   fading in when one appears. */
 .nav-cloud {
   display: inline-flex;
   flex: 0 0 auto;

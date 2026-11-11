@@ -12,6 +12,7 @@ import { BellIcon, CheckIcon, ChevronIcon, CloseIcon, HashIcon } from './icons.j
 import { useScrollsWhenTaller } from '../ui/scrolls.js';
 import { parseAt, untilLabel, useNow, usePresence } from '../ui/presence.js';
 import { dayPart } from './greeting.js';
+import { openMenu } from '../menu/menu.js';
 
 /**
  * The Today view's own parts (TODAY-01, TODAY-02, TODAY-03; M6, D-89, D-92; mockups 03 and 12):
@@ -348,9 +349,9 @@ export function ReminderCards(props: {
               </span>
               <span className="reminder-card-title">{reminder.title}</span>
               <span className="reminder-card-foot">
-                <span className="chip reminder-card-list">
+                <span className="chip reminder-card-list" title={reminder.listName}>
                   <HashIcon size={11} />
-                  {reminder.listName}
+                  <span className="reminder-card-list-name">{reminder.listName}</span>
                 </span>
                 <span className="reminder-card-until">{untilLabel(reminder.at, now, !first)}</span>
               </span>
@@ -439,6 +440,8 @@ function Section(props: {
 /** An event's height and the least room between two. */
 const EVENT = 26;
 const EVENT_GAP = 3;
+/** D-163: the height of a row's "+N" badge. */
+const MORE = 18;
 /** The least room between two hour labels, and the most the rail may take. */
 const LABEL_GAP = 28;
 const RAIL_MAX = 300;
@@ -550,19 +553,31 @@ function Timeline(props: {
   const { start, end, step, scale } = rail;
   const y = (minutes: number): number => (minutes - start) * scale;
   const next = reminders.find((reminder) => isComing(reminder, now))?.key;
-  // Centred on their time, pushed down where they would overlap; in order of time, the dragged
-  // one aside (it follows the pointer, above the others).
+  // Centred on their time, in order of time, the dragged one aside (it follows the pointer, above
+  // the others). D-163: reminders too close to show apart share one row at the earliest's time,
+  // so no row drifts from its hour: the next one shows if it is among them (else the earliest),
+  // with "+N" opening the others.
   const order = reminders
     .map((reminder, index) => ({ reminder, index, minutes: times[index] ?? nowAt }))
     .filter(({ reminder }) => reminder.key !== drag?.key || !drag.moved)
     .sort((a, b) => a.minutes - b.minutes);
-  const tops = new Map<string, number>();
-  let below = -Infinity;
-  for (const { reminder, minutes } of order) {
-    const top = Math.max(y(minutes) - EVENT / 2, below + EVENT_GAP);
-    below = top + EVENT;
-    tops.set(reminder.key, top);
+  const rows: { top: number; members: (typeof order)[number][] }[] = [];
+  for (const entry of order) {
+    const last = rows.at(-1);
+    if (last && y(entry.minutes) - EVENT / 2 - last.top < EVENT + EVENT_GAP)
+      last.members.push(entry);
+    else rows.push({ top: y(entry.minutes) - EVENT / 2, members: [entry] });
   }
+  const tops = new Map<string, number>();
+  /** The row each shown reminder leads, by key, when it has others behind it. */
+  const groups = new Map<string, (typeof order)[number][]>();
+  for (const row of rows) {
+    const lead = row.members.find(({ reminder }) => reminder.key === next) ?? row.members[0];
+    if (!lead) continue;
+    tops.set(lead.reminder.key, row.top);
+    if (row.members.length > 1) groups.set(lead.reminder.key, row.members);
+  }
+  const below = (rows.at(-1)?.top ?? -Infinity) + EVENT;
   if (drag?.moved) tops.set(drag.key, drag.top);
   const labels: number[] = [];
   for (let at = start; at <= end; at += step) labels.push(at);
@@ -570,6 +585,18 @@ function Timeline(props: {
   const isPast = (minutes: number): boolean => minutes * 60 <= nowAt * 60 + now.getSeconds();
   const clock = (minutes: number): string =>
     `${two(Math.floor(minutes / 60))}:${two(minutes % 60)}`;
+  /** D-163: the reminders sharing a row, each with its own time; one opens it as a click would. */
+  const showGroup = (members: (typeof order)[number][], from: HTMLElement): void => {
+    const box = from.getBoundingClientRect();
+    openMenu(
+      members.map(({ reminder, minutes }) => ({
+        label: `${clock(minutes)} · ${reminder.title}`,
+        hint: reminder.listName,
+        action: () => onOpen(reminder),
+      })),
+      { x: box.left, y: box.bottom + 4 },
+    );
+  };
   const release = (cancelled: boolean): void => {
     const current = dragRef.current;
     setDrag(null);
@@ -604,6 +631,9 @@ function Timeline(props: {
           </div>
         ))}
         {reminders.map((reminder, index) => {
+          // D-163: one behind another in its row isn't drawn.
+          if (!tops.has(reminder.key)) return null;
+          const group = groups.get(reminder.key);
           const moving = drag?.key === reminder.key && drag.moved ? drag : null;
           const shownAt = placed?.key === reminder.key ? placed.minutes : null;
           const past = moving ? isPast(moving.minutes) : !isComing(reminder, now);
@@ -617,6 +647,7 @@ function Timeline(props: {
                 state,
                 reminder.done ? 'done' : '',
                 moving ? 'dragging' : '',
+                group && !moving ? 'grouped' : '',
               ].join(' ')}
               style={{ top: `${tops.get(reminder.key) ?? 0}px` }}
               title={`${reminder.time} · ${reminder.title} · ${reminder.listName}${reminder.done ? '' : ' (drag to change the time)'}`}
@@ -687,6 +718,21 @@ function Timeline(props: {
             </button>
           );
         })}
+        {[...groups].map(([key, members]) =>
+          drag?.moved && drag.key === key ? null : (
+            <button
+              key={`more:${key}`}
+              type="button"
+              className="timeline-more"
+              style={{ top: `${(tops.get(key) ?? 0) + (EVENT - MORE) / 2}px` }}
+              aria-label={`${members.length} reminders at this time`}
+              title={`${members.length - 1} more at this time`}
+              onClick={(event) => showGroup(members, event.currentTarget)}
+            >
+              +{members.length - 1}
+            </button>
+          ),
+        )}
         <div
           className="timeline-now"
           style={{ top: `${y(nowAt + now.getSeconds() / 60)}px` }}
