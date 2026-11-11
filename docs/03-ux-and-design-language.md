@@ -130,7 +130,9 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 ### Everywhere in the main window
 | Action | Key | Status |
 |---|---|---|
-| Show or hide mini mode | Ctrl+Alt+Space, anywhere (changeable; D-109's exception to the no-Alt rule) | Decided |
+| Show or hide mini mode | Ctrl+Alt+Space, anywhere (changeable; D-109's exception to the no-Alt rule). D-177: it goes back where it came from: from the edge tab or a peek it opens mini and collapses it again; from hidden it opens and hides | Decided |
+| Collapse mini mode to the edge (MINI-04) | Ctrl+M in mini, also in a text field; before CodeMirror's Ctrl+M in mini's Note editor; no palette command (D-122) | Decided (D-177) |
+| Peek at a collapsed mini (MINI-04) | Rest the mouse on the edge tab (350 ms; Settings → Open on hover); a click opens it; drag it along an edge | Decided (D-177; timings Proposed) |
 | Mini mode | Ctrl+1/2/3 tabs, ↑/↓, Space, P, Enter opens in the main window, N composer, D/S/O on a reminder card (letters only outside text fields), Esc never hides it (D-109); Alt+↑/↓ moves the selected task, and rows drag (D-110); a click on the active list tab, or its chevron, opens the list picker for the list it shows (D-158) | Decided |
 | Command palette / fuzzy search | Ctrl+K, or the sidebar header's search button (D-107; D-106's header pill removed); in a step, Esc or Backspace in the empty field goes back one step, Esc closes from the top | Decided |
 | Keyboard cheat sheet | `?` in Navigate state (D-106) | Decided |
@@ -239,6 +241,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - Small, always-on-top, minimal chrome. Shows Today or Inbox with a toggle; compact rows.
 - **D-109:** a third tab, Note: one quick note as a sticky note, in a compact editor (mockup 05 has Today and Inbox; the Note tab joins them).
 - **D-111:** one size (a width and a height limit) for every tab; Today and Inbox fit their content up to it, Note takes it all; Reset size when it differs from the default; a slow second click on a selected row opens it; the bell turns a reminder off and on. Mini and the capture popup fade in and out (never delaying typing or the focus).
+- **D-177 (MINI-04, mockup 16):** mini can collapse to a small tab at a side edge of the screen: hover peeks without the keyboard, a click opens, the card comes out of the tab and slides back into it. The tab is the quietest thing Flint shows: no digits, no colour, one pulse at most (a reminder, a Focus phase's end).
 - **D-110:** built from the main window's own parts in a compact size, never copies: the same rows, selection glide, completion, drag, composer, toast, tabs, scrollbars and motion, so it never feels like another app. The card floats on a transparent window (mockup 05's corners and shadow), hangs from its snapped corner and fits its content up to a height limit; resized from its handles. The reminder card shows Today's next reminder and turns into the alert when one fires.
 
 ---

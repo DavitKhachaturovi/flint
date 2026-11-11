@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini mode's edge tab — Flint mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070708}
+.et *{box-sizing:border-box}
+:where(.et button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.mono{font-family:'Geist Mono',monospace}
+.tabs{display:flex;padding:3px;border-radius:12px;background:#151619;box-shadow:inset 0 0 0 1px #232529;flex-wrap:wrap;justify-content:center}
+.tabs button{height:30px;padding:0 12px;border-radius:9px;color:#8E9196;font-size:12.5px;cursor:pointer}
+.tabs button.on{background:#ECEDEE;color:#0E0F11;font-weight:500}
+
+/* The screen: 1440 × 900 at 100 %, a 48 px taskbar, a maximized app behind. */
+.screen{position:relative;width:1440px;height:900px;overflow:hidden;background:#0D0E10;user-select:none}
+.app{position:absolute;left:0;top:0;right:0;bottom:48px;display:flex;flex-direction:column;background:#17181B}
+.app .bar{height:40px;flex:0 0 auto;display:flex;align-items:center;background:#1F2023;color:#7C7F84;font-size:12px;padding-left:14px}
+.app .bar .cap{margin-left:auto;display:flex;height:100%}
+.app .bar .cap span{width:46px;display:flex;align-items:center;justify-content:center}
+.app .tool{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 12px;background:#1F2023;border-bottom:1px solid #2A2B2F}
+.app .pill{flex:1;height:30px;border-radius:15px;background:#2A2B2F}
+.app .ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#8E9196}
+.app .doc{flex:1;padding:44px 0 0 180px;display:flex;flex-direction:column;gap:14px}
+.app .ln{height:11px;border-radius:6px;background:#26272B}
+.app .sb{position:absolute;right:0;top:84px;bottom:0;width:14px;background:#1C1D20}
+.app .sb i{position:absolute;left:3px;right:3px;top:40px;height:120px;border-radius:5px;background:#3A3B40}
+.screen.light .app{background:#FFFFFF}
+.screen.light .app .bar,.screen.light .app .tool{background:#F3F3F3;color:#5F6267;border-color:#E2E2E2}
+.screen.light .app .pill{background:#E6E6E8}
+.screen.light .app .ico{color:#5F6267}
+.screen.light .app .ln{background:#ECECEE}
+.screen.light .app .sb{background:#F3F3F3}
+.screen.light .app .sb i{background:#C6C6C9}
+.taskbar{position:absolute;left:0;right:0;bottom:0;height:48px;background:#1C1C1E;border-top:1px solid #2A2A2D;display:flex;align-items:center;justify-content:center;gap:6px}
+.taskbar span{width:36px;height:36px;border-radius:6px;background:#2A2A2D}
+.taskbar span.flint{background:none;display:flex;align-items:center;justify-content:center}
+
+/* The edge tab (MINI-04, D-177: style A, the app icon cut in half by the edge). 48 × 48, centred on the screen's edge: only its inner half shows. */
+.tab{position:absolute;width:48px;height:48px;z-index:5;transition:transform 160ms cubic-bezier(.2,.9,.3,1),opacity 160ms ease;cursor:pointer;touch-action:none}
+.tab .tile{position:absolute;left:4px;top:4px;width:40px;height:40px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.55));transition:filter 120ms}
+.tab.hover .tile,.tab.drag .tile{filter:drop-shadow(0 6px 12px rgba(0,0,0,.55)) brightness(1.18)}
+.tab.right.hover{transform:translateX(-4px)}
+.tab.left.hover{transform:translateX(4px)}
+.tab.right.tucked{transform:translateX(26px);opacity:0;pointer-events:none}
+.tab.left.tucked{transform:translateX(-26px);opacity:0;pointer-events:none}
+.tab.gone{opacity:0;pointer-events:none}
+.tab.drag{cursor:grabbing}
+.tab .arc{position:absolute;left:-4px;top:-4px;width:56px;height:56px;overflow:visible;pointer-events:none}
+.tab.left .arc{transform:scaleX(-1)}
+.tab .arc path{fill:none;stroke-width:2.5;stroke-linecap:round}
+.tab .arc .track{stroke:#2C2E33}
+.tab .dot{position:absolute;top:8px;width:9px;height:9px;border-radius:50%;background:#ECEDEE;box-shadow:0 0 0 2px #191B20}
+.tab.right .dot{left:6px}
+.tab.left .dot{left:33px}
+.tab .pulse{position:absolute;top:8px;width:9px;height:9px;border-radius:50%;border:2px solid #ECEDEE;opacity:0;animation:pulse 900ms cubic-bezier(.2,.7,.3,1) 1}
+.tab.right .pulse{left:6px}
+.tab.left .pulse{left:33px}
+@keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.8);opacity:0}}
+
+/* Corner spots, shown while the tab is dragged: the icon's rounded square, half past the edge as the tab. */
+.spot{position:absolute;width:48px;height:48px;z-index:4;opacity:0;transition:opacity 160ms;pointer-events:none}
+.spot::before{content:"";position:absolute;inset:5px;border-radius:9px;border:1.5px dashed #4A4D52}
+.spot.show{opacity:1}
+.spot.near::before{border-color:#ECEDEE;border-style:solid;background:rgba(236,237,238,.06)}
+.screen.light .spot::before{border-color:#9A9DA2}
+.screen.light .spot.near::before{border-color:#0E0F11}
+
+/* The card (mockups 05 and 15). */
+.card{position:absolute;width:364px;z-index:6;border-radius:22px;background:#141517;box-shadow:0 0 0 1px #25272B,inset 0 1px 0 rgba(255,255,255,.07),0 2px 4px rgba(0,0,0,.4),0 34px 80px -18px rgba(0,0,0,.85);padding:10px;font-family:'Onest',system-ui,sans-serif;color:#E8E9EB;font-size:13px;transition:transform 220ms cubic-bezier(.2,.9,.3,1),opacity 160ms ease}
+.card.right.out{transform:translateX(calc(100% + 24px));opacity:0;pointer-events:none;transition:transform 180ms cubic-bezier(.5,0,.75,0),opacity 180ms ease}
+.card.left.out{transform:translateX(calc(-100% - 24px));opacity:0;pointer-events:none;transition:transform 180ms cubic-bezier(.5,0,.75,0),opacity 180ms ease}
+.mhead{display:flex;align-items:center;gap:4px;padding:2px 2px 10px}
+.seg{display:flex;padding:3px;border-radius:12px;background:#0E0F11;box-shadow:inset 0 0 0 1px #212327;flex:0 1 auto;min-width:0}
+.mtab{height:28px;padding:0 11px;border-radius:9px;color:#8E9196;display:flex;align-items:center;gap:5px;font-size:13px;white-space:nowrap}
+.mtab.on{background:#222428;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 2px 6px rgba(0,0,0,.4);color:#FFFFFF;font-weight:500}
+.sp{flex:1}
+.mtool{position:relative;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8E9196;flex:0 0 auto;cursor:pointer}
+.mtool:hover{background:#1F2124;color:#ECEDEE}
+.mtool.on{color:#ECEDEE}
+.mtool.lit{background:#1F2124;color:#ECEDEE}
+.tip{position:absolute;top:34px;right:-40px;white-space:nowrap;padding:6px 9px;border-radius:9px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30,0 10px 24px -8px rgba(0,0,0,.8);color:#D9DADC;font-size:12px;z-index:2;pointer-events:none}
+.tip .mono{color:#8E9196;margin-left:4px}
+.r{position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:11px}
+.r.sel{background:#1C1E21;box-shadow:0 0 0 1px #2A2C30}
+.r .ck{width:17px;height:17px;border-radius:6px;border:1.5px solid #4A4D52;flex:0 0 auto}
+.r .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .st{position:absolute;left:3px;top:8px;bottom:8px;border-radius:3px}
+.comp{display:flex;align-items:center;gap:10px;height:42px;padding:0 6px 0 12px;border-radius:13px;background:#0F1012;box-shadow:inset 0 0 0 1px #212327,inset 0 2px 4px rgba(0,0,0,.35);color:#6E7176}
+.caret{display:inline-block;width:1.5px;height:16px;background:#9AA0AB;margin-left:-6px;animation:blink 1.06s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* Settings → Mini mode, over a dimmed screen. */
+.dim{position:absolute;inset:0;background:rgba(5,5,6,.55);z-index:8;display:none}
+.settings{position:absolute;left:50%;top:150px;transform:translateX(-50%);width:600px;z-index:9;display:none;border-radius:18px;background:#151619;box-shadow:0 0 0 1px #232529,inset 0 1px 0 rgba(255,255,255,.045),0 14px 34px -12px rgba(0,0,0,.6);font-family:'Onest',system-ui,sans-serif;color:#E8E9EB;padding:20px 24px 10px}
+.settings h3{margin:0 0 6px;font-size:16px;font-weight:600;color:#ECEDEE}
+.srow{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:14px 0;border-top:1px solid #222428}
+.srow:first-of-type{border-top:0}
+.sname{font-size:13.5px;color:#ECEDEE}
+.sdesc{font-size:12px;color:#8E9196;line-height:1.5;margin-top:3px;max-width:400px}
+.srow.new .sname::after{content:"new";margin-left:8px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#0E0F11;background:#9AA0AB;border-radius:5px;padding:1px 5px;vertical-align:1px}
+.sw{position:relative;width:36px;height:20px;border-radius:999px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;flex:0 0 auto;margin-top:2px}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#8E9196}
+.sw.on{background:#ECEDEE;box-shadow:none}
+.sw.on::after{transform:translateX(16px);background:#0E0F11}
+.sel-box{height:32px;border-radius:10px;background:#222428;box-shadow:inset 0 0 0 1px #2C2E33;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;font-size:13px;color:#ECEDEE;white-space:nowrap;flex:0 0 auto}
+
+/* Close-up: the tab at 3×, beside the screen's edge. */
+.closeup{position:absolute;left:24px;bottom:72px;z-index:7;width:208px;padding:10px 12px 12px;border-radius:14px;background:#111214;box-shadow:0 0 0 1px #232529,0 14px 34px -12px rgba(0,0,0,.6);font-family:'Onest',system-ui,sans-serif}
+.closeup .lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#75787D;margin-bottom:8px}
+.zoomwrap{position:relative;width:184px;height:168px;overflow:hidden;border-radius:8px;background:#17181B}
+.screen.light .zoomwrap{background:#FFFFFF}
+.zoomwrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:1px;background:#4A4D52}
+.zoom{position:absolute;left:0;top:0;width:61.33px;height:56px;transform:scale(3);transform-origin:0 0}
+.zoom .tab{left:37.33px;top:4px;transition:none;cursor:default}
+.hidden-note{display:none;position:absolute;right:24px;bottom:64px;z-index:7;padding:10px 12px;border-radius:12px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30;color:#D9DADC;font-family:'Onest',system-ui,sans-serif;font-size:12.5px}
+.hidden-note button{margin-left:10px;height:28px;padding:0 10px;border-radius:9px;background:#ECEDEE;color:#0E0F11;font-weight:500;cursor:pointer}
+
+@media (prefers-reduced-motion: reduce){
+  .tab,.card,.card.right.out,.card.left.out,.spot{transition:none}
+  .tab .pulse{animation:none}
+  .caret{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="et" style="width: 1440px; font-family: 'Onest', system-ui, sans-serif; color: #E8E9EB">
+
+<div style="padding: 14px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="display: flex; align-items: center; gap: 12px"><span style="font-size: 13px; color: #8E9196">Mockup state</span>
+<div class="tabs" id="modes">
+<button data-mode="live">Live (try it)</button><button data-mode="collapsed">Collapsed</button><button data-mode="hover">Hover</button><button data-mode="peek">Peek</button><button data-mode="open">Open</button><button data-mode="reminder">Reminder</button><button data-mode="focusrun">Focus running</button><button data-mode="focusbreak">Focus break</button><button data-mode="drag">Dragging</button><button data-mode="bottomleft">Bottom-left</button><button data-mode="settings">Settings</button>
+</div></div>
+<div style="display: flex; align-items: center; gap: 18px">
+<span style="font-size: 13px; color: #8E9196">Behind</span>
+<div class="tabs" id="behind"><button data-behind="dark">A dark app</button><button data-behind="light">A light app</button></div>
+</div>
+</div>
+
+<div class="screen" id="screen">
+<div class="app">
+<div class="bar">An app, maximized<span class="cap"><span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"></path></svg></span><span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect></svg></span><span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"></path></svg></span></span></div>
+<div class="tool"><span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span><span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></span><span class="pill"></span><span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle></svg></span><span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg></span></div>
+<div class="doc"><span class="ln" style="width: 520px; height: 22px"></span><span class="ln" style="width: 860px"></span><span class="ln" style="width: 820px"></span><span class="ln" style="width: 880px"></span><span class="ln" style="width: 610px"></span><span class="ln" style="width: 0; height: 18px; background: none"></span><span class="ln" style="width: 840px"></span><span class="ln" style="width: 870px"></span><span class="ln" style="width: 790px"></span><span class="ln" style="width: 450px"></span></div>
+<div class="sb"><i></i></div>
+</div>
+<div class="taskbar"><span></span><span></span><span class="flint"><img src="../../../assets/icon/flint-icon-512.svg" alt="" style="width: 24px; height: 24px"></span><span></span><span></span></div>
+
+<div class="spot" id="spot-tr"></div><div class="spot" id="spot-br"></div><div class="spot" id="spot-tl"></div><div class="spot" id="spot-bl"></div>
+
+<div class="tab right" id="tab" role="button" aria-label="Mini mode · hover to peek, click to open" title="Mini mode · hover to peek, click to open"></div>
+
+<div class="card right out" id="card">
+<div class="mhead">
+<div class="seg"><span class="mtab on">Today</span><span class="mtab">Inbox<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span><span class="mtab">Note</span></div>
+<span class="sp"></span>
+<span class="mtool" title="More"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></span>
+<span class="mtool" id="reset" title="Reset size"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5"></path></svg></span>
+<span class="mtool" id="collapse" title="Collapse to the edge (Ctrl+M)"><svg id="collapse-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h11M11 8l4 4-4 4M19 5v14"></path></svg><span class="tip" id="tip">Collapse to the edge<span class="mono">Ctrl+M</span></span></span>
+<span class="mtool on" id="pin" title="Always on top: on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"></path></svg></span>
+<span class="mtool" id="close" title="Hide (Ctrl+Alt+Space)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></span>
+</div>
+<div style="display: flex; flex-direction: column; padding: 2px 0 8px">
+<div class="r" id="row1"><span class="st" style="width: 4px; background: #FFFFFF"></span><span class="ck"></span><span class="t">Fix the login redirect loop</span></div>
+<div class="r"><span class="st" style="width: 3px; background: #9AA0AB"></span><span class="ck"></span><span class="t">Review Alex's PR on response caching</span></div>
+<div class="r"><span class="ck"></span><span class="t">Book the venue for the team offsite</span></div>
+<div class="r"><span class="st" style="width: 2px; background: #55585D"></span><span class="ck"></span><span class="t">Renew the acme.example certificate</span><span class="mono" style="font-size: 11.5px; color: #8E9196">10:30</span></div>
+</div>
+<div class="comp"><span id="caret" class="caret" style="display: none"></span><span>Add to Today…</span></div>
+</div>
+
+<div class="dim" id="dim"></div>
+<div class="settings" id="settings">
+<h3>Mini mode</h3>
+<div class="srow"><div><div class="sname">Hide from screen sharing</div><div class="sdesc">Mini mode stays on your screen but isn't in a shared screen or a recording (Windows 10 2004 or later).</div></div><span class="sw on"></span></div>
+<div class="srow"><div><div class="sname">Show reminders in Flint</div><div class="sdesc">Besides the Windows notification: a card with Done, Snooze and Open in mini mode.</div></div><span class="sel-box">In mini mode when it's open<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></div>
+<div class="srow new"><div><div class="sname">Open on hover</div><div class="sdesc">Rest the mouse on the tab at the edge of the screen to look at mini mode without leaving what you're typing in; it slides back when you move away. Off: a click on the tab opens it.</div></div><span class="sw on"></span></div>
+<div class="srow new"><div><div class="sname">Start collapsed with Flint</div><div class="sdesc">Whenever Flint starts, mini mode waits as a tab at the edge of the screen. Off: it shows only when you open it.</div></div><span class="sw on"></span></div>
+</div>
+
+<div class="closeup" id="closeup"><div class="lbl">Close-up 3× · the edge</div><div class="zoomwrap"><div class="zoom"><div class="tab right" id="ztab"></div></div></div></div>
+<div class="hidden-note" id="hiddenNote">Hidden to the tray (×). <span class="mono" style="color: #8E9196">Ctrl+Alt+Space</span> opens it<button type="button" id="showAgain">Open</button></div>
+</div>
+
+<div style="min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 8px 60px; font-size: 12.5px; color: #8E9196; text-align: center; line-height: 1.5" id="caption"></div>
+</div>
+
+<script>
+var W = 1440, WORK = 852, TAB = 48, MARGIN = 24, SNAP = 48;
+var TOP_SPOT = 120, BOTTOM_SPOT = WORK - 48 - TAB; // tab top: 120 px from the top; its bottom 48 px above the taskbar
+var ICON = '../../../assets/icon/flint-icon-512.svg';
+var ARC = 'M28,4 H17 A13,13 0 0 0 4,17 V39 A13,13 0 0 0 17,52 H28';
+
+var S = { mode: 'live', behind: 'dark' };
+// The live model: where the tab is, and mini's state.
+var L = { edge: 'right', top: TOP_SPOT, state: 'collapsed', from: 'collapsed', hover: false };
+var dwell = null, leave = null;
+
+var $ = function (id) { return document.getElementById(id); };
+var screen = $('screen'), tab = $('tab'), card = $('card');
+
+function tabHTML(o) {
+  var h = '';
+  h += '<img class="tile" src="' + ICON + '" alt="">';
+  if (o.arc) {
+    var d = ARC; // the rounded square's visible half
+    h += '<svg class="arc" viewBox="0 0 56 56" aria-hidden="true"><path class="track" d="' + d + '"></path>' +
+      '<path d="' + d + '" pathLength="100" stroke="' + (o.arc === 'break' ? '#9AA0AB' : '#FFFFFF') +
+      '" stroke-dasharray="' + o.progress + ' 100"></path></svg>';
+  }
+  if (o.dot) h += '<span class="dot"></span>' + (o.pulse ? '<span class="pulse"></span>' : '');
+  return h;
+}
+
+function placeTab(el, edge, top) {
+  el.classList.toggle('right', edge === 'right');
+  el.classList.toggle('left', edge === 'left');
+  el.style.left = (edge === 'right' ? W - TAB / 2 : -TAB / 2) + 'px';
+  el.style.top = top + 'px';
+}
+
+function placeCard(edge, top, shown) {
+  card.classList.toggle('right', edge === 'right');
+  card.classList.toggle('left', edge === 'left');
+  card.style.left = (edge === 'right' ? W - MARGIN - 364 : MARGIN) + 'px';
+  var h = card.offsetHeight;
+  var upper = top + TAB / 2 < WORK / 2;
+  var y = upper ? top : top + TAB - h; // D-177 Q3: level with the tab, growing away from the nearer end
+  y = Math.max(8, Math.min(WORK - h - 8, y));
+  card.style.top = y + 'px';
+  card.classList.toggle('out', !shown);
+  $('collapse-ico').style.transform = edge === 'left' ? 'scaleX(-1)' : '';
+  $('tip').style.right = edge === 'left' ? 'auto' : '-40px';
+  $('tip').style.left = edge === 'left' ? '-40px' : 'auto';
+  // Where the card rests (not where its slide is): it and the strip to the screen's edge count as the card.
+  zone = { x0: edge === 'right' ? W - MARGIN - 364 : 0, x1: edge === 'right' ? W : MARGIN + 364, y0: y, y1: y + h };
+}
+var zone = null, pointer = null;
+
+function spots(show, nearId) {
+  var all = { 'spot-tr': ['right', TOP_SPOT], 'spot-br': ['right', BOTTOM_SPOT], 'spot-tl': ['left', TOP_SPOT], 'spot-bl': ['left', BOTTOM_SPOT] };
+  Object.keys(all).forEach(function (id) {
+    var el = $(id);
+    el.style.left = (all[id][0] === 'right' ? W - TAB / 2 : -TAB / 2) + 'px';
+    el.style.top = all[id][1] + 'px';
+    el.classList.toggle('show', show);
+    el.classList.toggle('near', id === nearId);
+  });
+}
+
+function nearSpot(edge, top) {
+  var cands = [[TOP_SPOT, edge === 'right' ? 'spot-tr' : 'spot-tl'], [BOTTOM_SPOT, edge === 'right' ? 'spot-br' : 'spot-bl']];
+  for (var i = 0; i < cands.length; i++) if (Math.abs(top - cands[i][0]) <= SNAP) return cands[i];
+  return null;
+}
+
+var CAPTIONS = {
+  live: 'Try it. Rest the mouse on the tab: it nudges out at once, and after 350 ms the card comes out without taking the keyboard. Move away and it slides back after 1 s. Click the tab (or into the peek) to open it: it stays until you collapse it (the button or Ctrl+M). Drag the tab along an edge, or across to the other side; near a corner spot it snaps.',
+  collapsed: 'Collapsed: the tab at the top-right spot, 120 px below the top of the screen (clear of the caption buttons and a browser\'s toolbar), always on top and hidden from screen sharing. Only the tab takes the mouse; everything else on the screen is clickable as before.',
+  hover: 'The mouse on the tab: it nudges out 4 px and lightens at once, so you see it noticed you; after 350 ms the card comes out. Leave before that and nothing happens.',
+  peek: 'Peek (hover): the card slides out of the tab, its top level with the tab, 24 px from the edge, and the tab tucks away. It doesn\'t take the keyboard: what you type still goes to your app. Move away (the strip to the edge counts as the card) and it slides back after 1 s.',
+  open: 'Open (a click on the tab, a click into a peek, or the hotkey): mini as today, with the keyboard; it stays until you collapse it. The header, right to left: ×, the pin, Collapse to the edge (new, Ctrl+M), Reset size (shown here because mini was resized), ⋯.',
+  reminder: 'A reminder fires while mini is collapsed: a white dot on the tab and one soft pulse (none under reduce-motion); the Windows notification as always. A peek or open shows the reminder card. The dot goes when the reminder is dealt with.',
+  focusrun: 'A Focus session runs: a thin line around the icon\'s visible half fills as the session goes (from the top, round the corner, down), white while you focus. No digits. One pulse when a phase ends.',
+  focusbreak: 'A break: the line in the accent gray (--fl-accent), as mini\'s timer in a break.',
+  drag: 'Dragging the tab: the four corner spots show, as the icon\'s rounded square half past the edge. Let go within 48 px of one and it snaps there (here, top-right); anywhere else on a side edge it stays where you let go. Past the middle of the screen it moves to the other edge. Remembered per monitor setup.',
+  bottomleft: 'The bottom-left spot, 48 px above the taskbar: the tab is mirrored on the left edge, and in the lower half of the screen the card grows upward, its bottom level with the tab. Shown as a peek.',
+  settings: 'Settings → Mini mode: two new rows below the existing two, both on by default. (The "new" labels mark them in this mockup only; Settings has no such label.)'
+};
+
+function render() {
+  var m = S.mode;
+  screen.classList.toggle('light', S.behind === 'light');
+  document.querySelectorAll('#modes button').forEach(function (b) { b.className = b.dataset.mode === m ? 'on' : ''; });
+  document.querySelectorAll('#behind button').forEach(function (b) { b.className = b.dataset.behind === S.behind ? 'on' : ''; });
+  $('caption').textContent = CAPTIONS[m];
+
+  var edge = 'right', top = TOP_SPOT, shown = false, hover = false, o = {}, near = null, showSpots = false;
+  var openLook = false, tip = false, hidden = false;
+  if (m === 'live') {
+    edge = L.edge; top = L.top; shown = L.state === 'peek' || L.state === 'open'; hover = L.hover && L.state === 'collapsed';
+    openLook = L.state === 'open'; hidden = L.state === 'hidden';
+    if (L.dragging) { showSpots = true; var n = nearSpot(L.edge, L.top); near = n && n[1]; }
+  }
+  if (m === 'hover') hover = true;
+  if (m === 'peek') shown = true;
+  if (m === 'open') { shown = true; openLook = true; tip = true; }
+  if (m === 'reminder') o = { dot: true, pulse: true };
+  if (m === 'focusrun') o = { arc: 'run', progress: 38 };
+  if (m === 'focusbreak') o = { arc: 'break', progress: 62 };
+  if (m === 'drag') { top = TOP_SPOT + 34; showSpots = true; near = 'spot-tr'; }
+  if (m === 'bottomleft') { edge = 'left'; top = BOTTOM_SPOT; shown = true; }
+
+  tab.innerHTML = tabHTML(o);
+  placeTab(tab, edge, top);
+  tab.classList.toggle('hover', hover);
+  tab.classList.toggle('tucked', shown);
+  tab.classList.toggle('gone', hidden || m === 'settings');
+  tab.classList.toggle('drag', m === 'drag' || !!L.dragging && m === 'live');
+  spots(showSpots, near);
+
+  $('reset').style.display = (m === 'open') ? 'flex' : 'none';
+  $('tip').style.display = tip ? 'block' : 'none';
+  $('collapse').classList.toggle('lit', tip);
+  $('row1').classList.toggle('sel', openLook);
+  $('caret').style.display = openLook ? 'inline-block' : 'none';
+  placeCard(edge, top, shown && !hidden);
+
+  var z = $('ztab');
+  z.innerHTML = tabHTML(o);
+  z.classList.toggle('hover', hover);
+  $('closeup').style.display = (m === 'settings' || m === 'peek' || m === 'open' || m === 'bottomleft') ? 'none' : 'block';
+  $('dim').style.display = $('settings').style.display = m === 'settings' ? 'block' : 'none';
+  $('hiddenNote').style.display = hidden && m === 'live' ? 'block' : 'none';
+}
+
+// ---- Live behaviour (MINI-04 as decided: D-177 Q1–Q4) ----
+function live() { return S.mode === 'live'; }
+function clearTimers() { clearTimeout(dwell); clearTimeout(leave); dwell = leave = null; }
+function setState(st) {
+  clearTimers();
+  if (st === 'open' && L.state !== 'open' && L.state !== 'peek') L.from = L.state; // the hotkey goes back where it came from
+  if (st === 'open' && L.state === 'peek') L.from = 'collapsed';
+  L.state = st;
+  L.hover = false;
+  render();
+  checkPeek();
+}
+
+tab.addEventListener('pointerenter', function () {
+  if (!live() || L.state !== 'collapsed' || L.dragging) return;
+  L.hover = true; render();
+  clearTimeout(dwell);
+  dwell = setTimeout(function () { if (L.state === 'collapsed') setState('peek'); }, 350);
+});
+tab.addEventListener('pointerleave', function () {
+  if (!live() || L.dragging) return;
+  clearTimeout(dwell); dwell = null;
+  if (L.hover) { L.hover = false; render(); }
+});
+
+var press = null;
+tab.addEventListener('pointerdown', function (e) {
+  if (!live()) return;
+  press = { x: e.clientX, y: e.clientY, top: L.top };
+  clearTimeout(dwell); dwell = null; // a press means a click or a drag, never a peek
+  tab.setPointerCapture(e.pointerId);
+});
+tab.addEventListener('pointermove', function (e) {
+  if (!press) return;
+  if (!L.dragging && Math.abs(e.clientY - press.y) + Math.abs(e.clientX - press.x) > 4) { L.dragging = true; clearTimers(); L.hover = false; }
+  if (!L.dragging) return;
+  var box = screen.getBoundingClientRect();
+  L.edge = e.clientX - box.left < W / 2 ? 'left' : 'right';
+  L.top = Math.max(0, Math.min(WORK - TAB, press.top + (e.clientY - press.y)));
+  render();
+});
+tab.addEventListener('pointerup', function () {
+  if (!press) return;
+  press = null;
+  if (L.dragging) {
+    L.dragging = false;
+    var n = nearSpot(L.edge, L.top);
+    if (n) L.top = n[0];
+    render();
+    return;
+  }
+  setState('open');
+});
+
+// A peek slides back 1 s after the mouse leaves the card's place (the strip to the edge included);
+// coming back within that second keeps it.
+function checkPeek() {
+  if (!live() || L.state !== 'peek' || !zone) return;
+  var inside = pointer && pointer.x >= zone.x0 && pointer.x <= zone.x1 && pointer.y >= zone.y0 && pointer.y <= zone.y1;
+  if (inside) { clearTimeout(leave); leave = null; }
+  else if (!leave) leave = setTimeout(function () { leave = null; if (L.state === 'peek') setState('collapsed'); }, 1000);
+}
+document.addEventListener('pointermove', function (e) {
+  var box = screen.getBoundingClientRect();
+  pointer = { x: e.clientX - box.left, y: e.clientY - box.top };
+  checkPeek();
+});
+card.addEventListener('pointerdown', function (e) {
+  if (!live()) return;
+  var t = e.target.closest('.mtool');
+  if (t && t.id === 'collapse') { setState('collapsed'); return; }
+  if (t && t.id === 'close') { setState('hidden'); return; }
+  if (t && t.id === 'pin') { t.classList.toggle('on'); }
+  if (L.state === 'peek') setState('open');
+});
+$('showAgain').addEventListener('click', function () { setState('open'); });
+
+document.addEventListener('keydown', function (e) {
+  if (!live()) return;
+  if (e.ctrlKey && !e.altKey && (e.key === 'm' || e.key === 'M') && L.state === 'open') { e.preventDefault(); setState('collapsed'); }
+  if (e.ctrlKey && e.altKey && e.code === 'Space') {
+    e.preventDefault();
+    if (L.state === 'open') setState(L.from === 'hidden' ? 'hidden' : 'collapsed');
+    else { if (L.state !== 'peek') L.from = L.state; setState('open'); }
+  }
+});
+
+document.querySelectorAll('#modes button').forEach(function (b) { b.addEventListener('click', function () { clearTimers(); S.mode = b.dataset.mode; if (S.mode === 'live') { L.state = 'collapsed'; L.hover = false; } render(); }); });
+document.querySelectorAll('#behind button').forEach(function (b) { b.addEventListener('click', function () { S.behind = b.dataset.behind; render(); }); });
+render();
+</script>
+</body>
+</html>

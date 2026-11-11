@@ -121,7 +121,7 @@ flint/
 2. **Keep the popup tiny**: its own small bundle (input, chips, autocomplete, paste handling). A lighter popup also recovers faster when Windows has paged out an app that has been idle for hours, which matters more for Electron because it has more memory to page back in.
 3. **No blank/white flash**: both Electron (hidden window shown blank in some cases) and WebView2 have known issues here. Mitigations: keep the popup rendered while hidden, give every window a `backgroundColor` matching the current theme, and verify the popup's renderer isn't throttled in a way that delays its first frame after `show()` (tune `backgroundThrottling` for the popup and verify in the spike).
 4. **Open on the active monitor** (CAP-09): position using the cursor's display before showing.
-5. **Only main window + popup alive at idle**; mini mode on demand (then kept hidden).
+5. **Only main window + popup alive at idle**; mini mode on demand (then kept hidden). **D-177 (1.7.0):** with **Start collapsed with Flint** on (the default), mini is created at startup for its edge tab (MINI-04), **after** the capture popup is pre-warmed, so the popup's readiness doesn't wait for it; off, mini is on demand as before.
 6. **Rendering discipline:** memoized rows, update only changed rows, animate with transforms/opacity only, virtualize very long lists (Proposed: above a few hundred rows).
 7. **Main-process work never blocks the UI**: file I/O is async; parsing large files off the hot path.
 8. **A quit loses nothing and never sticks (D-138):** it waits, at most 3 s, for what is still being written (a capture just handed over, the draft, a list change, the pins and Today's order); an error nothing caught while quitting is logged and the quit goes on.
