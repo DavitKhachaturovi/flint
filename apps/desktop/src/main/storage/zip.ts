@@ -63,7 +63,9 @@ export async function zipFolder(folder: string, out: string, root = 'Flint'): Pr
       const data = await readFile(path).catch(() => null);
       const info = await stat(path).catch(() => null);
       if (!data || !info) continue;
-      const name = Buffer.from(`${root}/${relative(folder, path).split(sep).join('/')}`, 'utf8');
+      const inside = relative(folder, path).split(sep).join('/');
+      // A root of '' puts the files at the top (an .mcpb bundle, AGENT-03).
+      const name = Buffer.from(root === '' ? inside : `${root}/${inside}`, 'utf8');
       const packed = deflateRawSync(data);
       const stored = packed.length >= data.length;
       const body = stored ? data : packed;

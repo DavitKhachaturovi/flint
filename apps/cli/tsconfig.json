@@ -1,0 +1,14 @@
+// flint.exe (AGENT-02, AGENT-03): rolldown bundles it (scripts/build-sea.mjs); this config only type-checks.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "paths": {
+      "@flint/core/*": ["../../packages/core/src/*/index.ts"]
+    }
+  },
+  "include": ["src", "package.json"]
+}

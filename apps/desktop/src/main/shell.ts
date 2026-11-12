@@ -100,6 +100,8 @@ export interface E2EHooks {
   miniEdge?: () => { mode: 'card' | 'tab'; view: string; tab: unknown };
   miniStartCollapsed?: () => void;
   miniToggle?: () => void;
+  /** AGENT-04: Save for claude.ai… writes here instead of asking (tests never show a dialog). */
+  saveSkillTo?: string;
   /** D-182: the screen locks (true) or unlocks (false), as Windows would say. */
   screenLock?: (locked: boolean) => void;
   /**

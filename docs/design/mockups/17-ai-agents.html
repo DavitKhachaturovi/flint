@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI agents and the shortcuts sheet — Flint mockup</title>
+<!-- Tokens and fonts from the repository itself: no network request (APP-09, D-60). -->
+<link rel="stylesheet" href="../tokens.css">
+<style>
+@font-face{font-family:'Onest';src:url('../../../apps/desktop/src/renderer/fonts/Onest-Variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block}
+@font-face{font-family:'Geist Mono';src:url('../../../apps/desktop/src/renderer/fonts/GeistMono-Variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block}
+@font-face{font-family:'FiraGO';src:url('../../../apps/desktop/src/renderer/fonts/FiraGO-Regular.woff2') format('woff2');font-weight:400;unicode-range:U+10A0-10FF,U+1C90-1CBF,U+2D00-2D2F}
+
+/* ── The page around the window (not the app) ───────────────────────────── */
+body{margin:0;background:color-mix(in srgb,var(--fl-ground-window),black 45%);font-family:var(--fl-font-ui);color:var(--fl-text-primary);font-size:14px}
+.stage{width:1600px;margin:0 auto;padding-bottom:40px}
+.stage *{box-sizing:border-box}
+:where(.stage button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.switcher{height:60px;display:flex;align-items:center;justify-content:center;gap:14px}
+.switcher .lab{font-size:13px;color:var(--fl-text-muted)}
+.tabs{display:flex;padding:3px;border-radius:12px;background:var(--fl-ground-card);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.tabs button{height:30px;padding:0 12px;border-radius:9px;color:var(--fl-text-muted);font-size:12.5px;transition:background-color var(--fl-dur-fast),color var(--fl-dur-fast)}
+.tabs button:hover{color:var(--fl-text-primary)}
+.tabs button.on{background:var(--fl-strong-bg);color:var(--fl-strong-fg);font-weight:500}
+.sim{height:30px;padding:0 12px;border-radius:9px;font-size:12.5px;color:var(--fl-text-secondary);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.sim:hover{color:var(--fl-text-primary);background:var(--fl-ground-hover)}
+.sim:disabled{opacity:.4}
+.caption{min-height:44px;display:flex;align-items:center;justify-content:center;padding:8px 80px;font-size:12.5px;line-height:1.5;color:var(--fl-text-muted);text-align:center}
+.notes{margin:8px 40px 0;padding:20px 24px;border-radius:var(--fl-radius-card);background:var(--fl-ground-card);box-shadow:var(--fl-shadow-card);display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;font-size:12.5px;line-height:1.55;color:var(--fl-text-secondary)}
+.notes h2{grid-column:1/-1;margin:0 0 6px;font-size:15px;font-weight:600;color:var(--fl-text-highlight)}
+.notes h3{margin:10px 0 4px;font-size:11px;font-weight:400;letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.notes ul{margin:0;padding-left:16px}
+.notes li{margin:3px 0}
+.notes b{color:var(--fl-text-primary);font-weight:500}
+.notes code{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-primary)}
+
+/* ── The window ─────────────────────────────────────────────────────────── */
+.win{position:relative;width:1600px;height:1100px;display:flex;overflow:hidden;background:var(--fl-ground-window);border-radius:8px;box-shadow:0 0 0 1px var(--fl-edge-card)}
+.caps{position:absolute;right:0;top:0;height:40px;display:flex;align-items:center;color:var(--fl-text-faint);z-index:4}
+.caps span{width:46px;display:flex;justify-content:center}
+
+/* Sidebar (app.css .sidebar, .nav, .tile, .nav-group, .sidebar-foot) */
+.sidebar{flex:0 0 236px;display:flex;flex-direction:column;gap:3px;padding:14px 12px;background:var(--fl-ground-sidebar);border-right:1px solid var(--fl-edge-divider);position:relative}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 20px;font-weight:600;font-size:17px;letter-spacing:-.01em;color:var(--fl-text-primary)}
+.brand img{width:34px;height:34px;display:block}
+.brand .search{margin-left:auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--fl-text-faint)}
+.nav{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px 7px 7px;border-radius:var(--fl-radius-row);text-align:left;font-size:14px;transition:background-color var(--fl-dur-fast),box-shadow var(--fl-dur-fast)}
+.nav:hover{background:var(--fl-ground-hover)}
+.nav.ctx{background:var(--fl-ground-hover);box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}
+.nav-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fl-text-heading-soft)}
+.nav-count{font-family:var(--fl-font-mono);font-size:var(--fl-size-meta);color:var(--fl-text-faint)}
+.nav.quick .nav-name,.nav.quick .tile{color:var(--fl-text-muted)}
+.tile{width:26px;height:26px;flex:0 0 auto;border-radius:var(--fl-radius-tile);display:flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-heading-soft)}
+.tile svg{display:block}
+.section-label{padding:22px 10px 8px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.nav-group{margin:2px 0;padding:3px;border-radius:14px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-divider),inset 0 1px 0 color-mix(in srgb,var(--fl-text-highlight) 3%,transparent)}
+.nav-group-head{display:flex;align-items:center;gap:6px;width:100%;padding:7px 10px 3px 6px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.nav-group-head .g{flex:1}
+.nav-group-head .nav-count{letter-spacing:0}
+.nav-group .nav{padding-left:15px}
+.sidebar-foot{margin-top:auto;display:flex;gap:6px;padding-top:12px}
+.sidebar-foot .nav{flex:1 1 0;height:36px;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-card)}
+.sidebar-foot .nav.on{background:var(--fl-ground-float);box-shadow:0 0 0 1px var(--fl-edge-float),var(--fl-shadow-selected)}
+.sidebar-foot .nav.on .nav-name{color:var(--fl-text-highlight);font-weight:500}
+.sidebar-foot .tile{width:22px;height:22px}
+.sidebar-foot .nav-name{flex:0 1 auto;font-size:13px}
+
+/* Main area */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.titlebar{flex:0 0 40px}
+.scroller{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;scroll-behavior:smooth}
+.scroller::-webkit-scrollbar{width:var(--fl-scroll-size)}
+.scroller::-webkit-scrollbar-thumb{background:var(--fl-scroll-thumb);border-radius:var(--fl-radius-pill);border:2px solid transparent;background-clip:content-box}
+.scroller::-webkit-scrollbar-thumb:hover{background:var(--fl-scroll-thumb-hover);background-clip:content-box}
+@media (prefers-reduced-motion: reduce){.scroller{scroll-behavior:auto}}
+.pair{display:flex;justify-content:center;align-items:flex-start;gap:28px;padding:0 24px}
+.content{flex:0 0 820px;display:flex;flex-direction:column;gap:16px;padding:4px 0 120px}
+.card{background:var(--fl-ground-card);border-radius:var(--fl-radius-card);box-shadow:var(--fl-shadow-card)}
+.context-panel{position:sticky;top:16px;flex:0 0 440px;margin-top:4px}
+.panel-inner{padding:16px 14px 14px 20px}
+.panel-label{font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+
+/* Settings (app.css .settings-*) */
+.settings-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 4px 6px}
+.settings-header h1{margin:0;font-size:var(--fl-size-title);font-weight:700;letter-spacing:-.025em;color:var(--fl-text-heading-soft)}
+.settings-find{width:220px;height:32px;padding:0 12px;border:0;border-radius:10px;outline:none;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font:inherit;font-size:13px;color:var(--fl-text-primary);transition:box-shadow var(--fl-dur-fast) ease}
+.settings-find:focus{box-shadow:inset 0 0 0 1px var(--fl-accent)}
+.settings-find::placeholder{color:var(--fl-text-faint)}
+.settings-section{display:flex;flex-direction:column;padding:14px 18px 8px;animation:today-in var(--fl-dur-state) cubic-bezier(.2,.9,.3,1)}
+.settings-section-label{padding-bottom:6px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:52px;padding:10px 0;border-top:1px solid var(--fl-edge-divider);transition:opacity var(--fl-dur-state) ease}
+.settings-section-label + .settings-row,.settings-row.first{border-top:0}
+.settings-row.top{align-items:flex-start}
+.settings-text{min-width:0;display:flex;flex-direction:column;gap:3px}
+.settings-name{font-size:14px;color:var(--fl-text-body)}
+.settings-note{font-size:12.5px;line-height:1.5;color:var(--fl-text-muted)}
+.settings-path{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-secondary);overflow-wrap:anywhere}
+.settings-control{flex:0 0 auto;display:flex;align-items:center;gap:6px}
+.settings-lead{display:flex;align-items:center;gap:12px;min-width:0}
+.settings-warning{color:var(--fl-text-highlight)}
+.settings-said{animation:panel-crossfade var(--fl-dur-state) ease}
+.settings-row.dim{opacity:.45}
+.settings-row.dim .settings-control{pointer-events:none}
+code.c{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-secondary)}
+.switch{position:relative;width:36px;height:20px;flex:0 0 auto;border-radius:var(--fl-radius-pill);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);transition:background-color var(--fl-dur-base) ease,box-shadow var(--fl-dur-base) ease}
+.switch-knob{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--fl-text-muted);transition:transform var(--fl-dur-base) var(--fl-ease-spring),background-color var(--fl-dur-base) ease}
+.switch.on{background:var(--fl-strong-bg);box-shadow:none}
+.switch.on .switch-knob{transform:translateX(16px);background:var(--fl-strong-fg)}
+.trash-tabs{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--fl-ground-sidebar);box-shadow:0 0 0 1px var(--fl-edge-divider)}
+.trash-tab{position:relative;height:28px;padding:0 12px;border-radius:9px;font-size:13px;color:var(--fl-text-muted);transition:background-color var(--fl-dur-fast) ease,box-shadow var(--fl-dur-fast) ease,color var(--fl-dur-fast) ease}
+.trash-tab:hover{color:var(--fl-text-primary)}
+.trash-tab.on{background:var(--fl-ground-float);box-shadow:0 0 0 1px var(--fl-edge-float);color:var(--fl-text-primary)}
+.trash-action{height:28px;padding:0 10px;border-radius:8px;font-size:12.5px;color:var(--fl-text-muted);white-space:nowrap;transition:background-color var(--fl-dur-fast) ease,color var(--fl-dur-fast) ease}
+.trash-action:hover{background:var(--fl-ground-tile);color:var(--fl-text-primary)}
+.trash-action:active{transform:scale(.97)}
+.trash-action.strong{color:var(--fl-text-primary)}
+.primary-button{height:34px;padding:0 16px;border-radius:var(--fl-radius-button);background:var(--fl-strong-bg);box-shadow:var(--fl-shadow-primary-button);color:var(--fl-strong-fg);font-weight:500;white-space:nowrap;transition:transform var(--fl-dur-fast) var(--fl-ease-spring),background-color var(--fl-dur-fast) ease}
+.primary-button:hover{background:var(--fl-text-highlight)}
+.secondary-button{height:30px;padding:0 12px;border-radius:var(--fl-radius-button);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-primary);font-size:13px;white-space:nowrap;transition:transform var(--fl-dur-fast) var(--fl-ease-spring),background-color var(--fl-dur-fast) ease,box-shadow var(--fl-dur-fast) ease}
+.secondary-button:hover{background:var(--fl-ground-float);box-shadow:inset 0 0 0 1px var(--fl-edge-float)}
+.secondary-button:active,.primary-button:active{transform:scale(.97)}
+.keycap{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:var(--fl-radius-check);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font-family:var(--fl-font-mono);font-size:11.5px;white-space:nowrap;color:var(--fl-text-primary)}
+.settings-index{display:flex;flex-direction:column;gap:2px}
+.settings-index .panel-label{padding-bottom:8px}
+.settings-index-item{height:32px;padding:0 10px;border-radius:9px;text-align:left;font-size:13.5px;color:var(--fl-text-muted);transition:background-color var(--fl-dur-fast) ease,color var(--fl-dur-fast) ease}
+.settings-index-item:hover{background:var(--fl-ground-hover);color:var(--fl-text-primary)}
+.settings-index-item.on{background:var(--fl-ground-float);color:var(--fl-text-primary)}
+.settings-index-item .new{margin-left:8px;font-family:var(--fl-font-mono);font-size:10px;letter-spacing:.04em;color:var(--fl-text-faint)}
+.link-patterns{display:flex;flex-direction:column;gap:2px;margin:0 0 10px;padding:0;list-style:none}
+.link-pattern{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 6px;border-radius:10px;transition:background-color var(--fl-dur-fast) ease}
+.link-pattern:hover{background:var(--fl-ground-hover)}
+.link-pattern-label{flex:1 1 auto;min-width:0;font-size:13px;color:var(--fl-text-body)}
+.link-pattern-actions{display:flex;align-items:center;gap:4px}
+.claude-folder-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--fl-font-mono);font-size:12px;color:var(--fl-text-faint)}
+.sync-tile{width:30px;height:30px;border-radius:9px}
+
+/* ── New for AI agents (Proposed, built from the parts above) ───────────── */
+.agent-status{display:flex;align-items:center;gap:7px;margin-top:3px;font-size:12.5px;color:var(--fl-text-secondary)}
+.agent-status i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--fl-strong-bg);transition:background-color var(--fl-dur-state) ease,box-shadow var(--fl-dur-state) ease}
+.agent-status.off i{background:transparent;box-shadow:inset 0 0 0 1.5px var(--fl-checkbox-border)}
+.agent-status.paused{color:var(--fl-text-highlight)}
+.agent-status.paused i{background:transparent;box-shadow:inset 0 0 0 1.5px var(--fl-text-highlight)}
+.agent-status.ro i{background:var(--fl-accent)}
+/* Limits: the numbers float under the level the pointer is on. */
+.limit-tip{position:absolute;top:50%;right:calc(100% + 10px);translate:0 -50%;z-index:5;width:232px;padding:10px 12px 11px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);pointer-events:none;text-align:left;animation:tip-in var(--fl-dur-fast) ease-out}
+.limit-tip .t{font-size:12.5px;font-weight:600;color:var(--fl-text-highlight);margin-bottom:4px}
+.limit-tip .h{margin:4px 0 1px;font-family:var(--fl-font-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fl-text-faint)}
+.limit-tip .t span{font-weight:400;color:var(--fl-text-faint)}
+.limit-tip div.l{display:flex;gap:10px;align-items:baseline;font-size:12.5px;line-height:1.75;color:var(--fl-text-secondary)}
+.limit-tip div.l b{flex:0 0 38px;text-align:right;font-family:var(--fl-font-mono);font-weight:400;font-size:12px;color:var(--fl-text-primary)}
+.limit-tip .sep{height:1px;margin:5px 0;background:var(--fl-edge-float)}
+@keyframes tip-in{from{opacity:0;transform:translateX(4px)}}
+.stage [hidden]{display:none!important}
+/* Sub-lists under a row: apps, hidden items, recent changes (the link-patterns list). */
+.sub{margin:-2px 0 10px}
+.client-name{flex:0 0 150px;font-size:13px;color:var(--fl-text-body)}
+.client-state{flex:1 1 auto;font-family:var(--fl-font-mono);font-size:11px;color:var(--fl-text-faint);transition:opacity var(--fl-dur-state) ease}
+.cmd{margin:0 6px 6px 6px;padding:10px 12px;border-radius:10px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-divider);display:flex;flex-direction:column;gap:7px}
+.cmd .line{font-family:var(--fl-font-mono);font-size:11.5px;line-height:1.55;color:var(--fl-text-primary);overflow-wrap:anywhere}
+.cmd .line .p{color:var(--fl-text-faint)}
+.cmd .settings-note{font-size:12px}
+.copied{display:inline-block;animation:panel-crossfade var(--fl-dur-state) ease}
+.item-kind{flex:0 0 auto;font-family:var(--fl-font-mono);font-size:11px;color:var(--fl-text-faint)}
+.hidden-tile{width:24px;height:24px;border-radius:7px}
+.change{display:flex;align-items:center;gap:12px;min-height:38px;padding:3px 6px;border-radius:10px;transition:background-color var(--fl-dur-fast) ease,opacity var(--fl-dur-state) ease}
+.change:hover{background:var(--fl-ground-hover)}
+.change .who{flex:0 0 96px;font-size:12.5px;color:var(--fl-text-secondary);white-space:nowrap}
+.change .what{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--fl-text-body);transition:color var(--fl-dur-state) ease}
+.change .when{flex:0 0 auto;font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-faint)}
+.change .act{flex:0 0 64px;display:flex;justify-content:flex-end}
+.change .undone{height:28px;padding:0 10px;display:inline-flex;align-items:center;font-size:12.5px;color:var(--fl-text-faint);animation:panel-crossfade var(--fl-dur-state) ease}
+.change.is-undone .who,.change.is-undone .what{color:var(--fl-text-faint)}
+.change.enter{animation:change-in var(--fl-dur-state) var(--fl-ease-spring)}
+.fold{overflow:hidden;animation:fold-away var(--fl-dur-state) ease forwards}
+@keyframes change-in{from{opacity:0;transform:translateY(-8px)}}
+@keyframes fold-away{to{opacity:0;max-height:0;min-height:0;padding-top:0;padding-bottom:0;transform:translateX(8px)}}
+.empty-line{padding:2px 6px 12px;font-size:12.5px;color:var(--fl-text-faint);animation:panel-crossfade var(--fl-dur-state) ease}
+.fl-flash{animation:fl-flash 900ms ease-out}
+@keyframes fl-flash{0%,30%{background:var(--fl-ground-tile)}}
+
+/* Toast (app.css .toast) */
+.toast{position:absolute;left:50%;bottom:28px;z-index:60;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:10px 10px 10px 16px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);color:var(--fl-text-primary);white-space:nowrap;animation:rise var(--fl-dur-base) var(--fl-ease-spring)}
+.toast .btns{display:flex;gap:2px}
+.toast button{padding:4px 10px;border-radius:var(--fl-radius-check);color:var(--fl-text-highlight)}
+.toast button:hover{background:var(--fl-ground-tile)}
+@keyframes rise{from{opacity:0;transform:translate(-50%,10px)}}
+
+/* Right-click menu (menu.css .fl-menu) */
+.fl-menu{position:absolute;z-index:200;min-width:236px;padding:5px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:13px;animation:fl-menu-in var(--fl-dur-base) ease-out}
+.fl-menu-item{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%;padding:7px 10px;border-radius:8px;color:var(--fl-text-primary);text-align:left}
+.fl-menu-item:hover,.fl-menu-item.active{background:var(--fl-ground-tile)}
+.fl-menu-hint{font-family:var(--fl-font-ui);font-size:14px;color:var(--fl-text-faint)}
+.fl-menu-check{display:flex;color:var(--fl-text-secondary)}
+.fl-menu-divider{height:1px;margin:5px 6px;background:var(--fl-edge-float)}
+@keyframes fl-menu-in{from{opacity:0}}
+
+/* The palette's card: the `?` sheet (app.css .palette-*, .cheat-*) */
+.palette-layer{position:absolute;inset:0;z-index:50;display:flex;justify-content:center;align-items:flex-start;padding:132px 24px 24px;background:color-mix(in srgb,var(--fl-ground-window) 28%,transparent);animation:palette-dim var(--fl-dur-fast) ease}
+.palette-layer.leaving{animation:palette-dim-out var(--fl-dur-fast) ease forwards}
+@keyframes palette-dim{from{background:transparent}}
+@keyframes palette-dim-out{to{background:transparent}}
+.palette{width:780px;max-height:min(600px,76%);display:flex;flex-direction:column;overflow:hidden;border-radius:var(--fl-radius-popup);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);animation:palette-in var(--fl-dur-base) cubic-bezier(.2,.9,.3,1)}
+.palette-layer.leaving .palette{animation:palette-out var(--fl-dur-fast) ease forwards}
+@keyframes palette-in{from{opacity:0;transform:translateY(-6px) scale(.985)}}
+@keyframes palette-out{to{opacity:0;transform:translateY(-4px) scale(.99)}}
+.palette-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--fl-edge-divider)}
+.palette-crumb{flex:0 0 auto;font-size:13px;color:var(--fl-text-secondary)}
+.palette-field{flex:1 1 auto;min-width:0;height:30px;border:0;outline:none;background:transparent;font:inherit;font-size:15px;color:var(--fl-text-primary)}
+.palette-field::placeholder{color:var(--fl-text-faint)}
+.palette-label{padding:8px 4px 4px;font-family:var(--fl-font-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fl-text-faint);display:flex;justify-content:space-between;gap:10px}
+.palette-label .hint{letter-spacing:0;text-transform:none;font-family:var(--fl-font-ui);font-size:11.5px}
+.palette-empty{margin:0;padding:18px 12px;font-size:13px;color:var(--fl-text-muted)}
+.cheat-columns{overflow-y:auto;padding:6px 10px 14px;columns:2 320px;column-gap:24px}
+.cheat-columns::-webkit-scrollbar{width:var(--fl-scroll-size)}
+.cheat-columns::-webkit-scrollbar-thumb{background:var(--fl-scroll-thumb);border-radius:var(--fl-radius-pill);border:2px solid transparent;background-clip:content-box}
+.cheat-group{break-inside:avoid;padding-bottom:6px}
+.cheat-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:30px;padding:0 4px;font-size:13px;color:var(--fl-text-body)}
+.cheat-row .keycap{height:22px;font-size:11px}
+.cheat-said{padding:0 4px 6px;font-size:12px;line-height:1.45;color:var(--fl-text-muted);animation:panel-crossfade var(--fl-dur-state) ease}
+.cheat-said.settings-warning{color:var(--fl-text-highlight)}
+/* D-102's recording keycap, in the sheet's row size. */
+.hotkey-record{min-width:132px;height:26px;justify-content:center;transition:background-color var(--fl-dur-fast) ease,box-shadow var(--fl-dur-fast) ease,color var(--fl-dur-fast) ease}
+.hotkey-record:hover{background:var(--fl-ground-hover)}
+.hotkey-record.recording{color:var(--fl-text-secondary);box-shadow:inset 0 0 0 1px var(--fl-accent);animation:hotkey-listening 1.6s ease-in-out infinite}
+@keyframes hotkey-listening{50%{box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}}
+.hotkey-record.taken:not(.recording){color:var(--fl-text-muted);text-decoration:line-through}
+
+@keyframes today-in{from{opacity:0;transform:translateY(6px)}}
+@keyframes panel-crossfade{from{opacity:0}}
+</style>
+</head>
+<body>
+<div class="stage">
+
+<div class="switcher">
+<span class="lab">Mockup state</span>
+<div class="tabs" id="tabs">
+<button data-mode="off">Off</button><button data-mode="on">On · two apps</button><button data-mode="readonly">Read-only</button><button data-mode="paused">Paused</button><button data-mode="undone">Undone change</button><button data-mode="hidden">Hidden from agents</button><button data-mode="sheet">Shortcuts sheet</button><button data-mode="capture">Settings · Capture</button><button data-mode="find">Find “hotkey”</button>
+</div>
+<button class="sim" id="sim" title="Live: an agent change arrives while you look">Simulate an agent change</button>
+</div>
+
+<div class="win" id="win">
+
+<div class="caps" aria-hidden="true">
+<span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg></span>
+<span><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+<span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span>
+</div>
+
+<aside class="sidebar" id="sidebar">
+<div class="brand"><img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo">Flint<span class="search" title="Search or run a command (Ctrl+K)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span></div>
+<button class="nav"><span class="tile" data-icon="today"></span><span class="nav-name">Today</span><span class="nav-count">6</span></button>
+<button class="nav"><span class="tile" data-icon="inbox"></span><span class="nav-name">Inbox</span><span class="nav-count">12</span></button>
+<button class="nav"><span class="tile" data-icon="focus"></span><span class="nav-name">Focus</span><span class="nav-count">3</span></button>
+<button class="nav quick"><span class="tile" data-icon="plus"></span><span class="nav-name">Quick note</span></button>
+<div class="section-label">Lists</div>
+<button class="nav"><span class="tile" data-icon="list"></span><span class="nav-name">Backend</span><span class="nav-count">9</span></button>
+<button class="nav"><span class="tile" data-icon="list"></span><span class="nav-name">Infra</span><span class="nav-count">4</span></button>
+<button class="nav"><span class="tile" data-icon="list"></span><span class="nav-name">Website</span><span class="nav-count">7</span></button>
+<button class="nav" id="nav-payroll"><span class="tile" data-icon="list"></span><span class="nav-name">Payroll</span><span class="nav-count">3</span></button>
+<button class="nav"><span class="tile" data-icon="note"></span><span class="nav-name">Release plan</span></button>
+<div class="nav-group">
+<div class="nav-group-head"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(90deg)"><path d="m9 6 6 6-6 6"/></svg><span class="g">Personal</span><span class="nav-count">2</span></div>
+<button class="nav"><span class="tile" data-icon="list"></span><span class="nav-name">Groceries</span><span class="nav-count">5</span></button>
+<button class="nav"><span class="tile" data-icon="note"></span><span class="nav-name">Trip ideas</span></button>
+</div>
+<div class="sidebar-foot">
+<button class="nav on"><span class="tile" data-icon="sliders"></span><span class="nav-name">Settings</span></button>
+<button class="nav"><span class="tile" data-icon="trash"></span><span class="nav-name">Trash</span></button>
+</div>
+</aside>
+
+<div class="main">
+<div class="titlebar"></div>
+<div class="scroller" id="scroller">
+<div class="pair">
+<div class="content" id="content">
+<header class="settings-header"><h1>Settings</h1><input class="settings-find" id="find" placeholder="Find a setting" aria-label="Find a setting" spellcheck="false"></header>
+<div id="sections"></div>
+</div>
+<aside class="context-panel card"><div class="panel-inner"><nav class="settings-index" id="index"><div class="panel-label">Settings</div></nav></div></aside>
+</div>
+</div>
+</div>
+
+<div id="toast-host"></div>
+<div id="menu-host"></div>
+<div id="sheet-host"></div>
+</div>
+
+<div class="caption" id="caption"></div>
+
+<section class="notes" aria-label="Notes for Davit">
+<h2>Notes for Davit</h2>
+<div>
+<h3>Choices I made (Proposed)</h3>
+<ul>
+<li><b>Off: nothing is hidden or dimmed.</b> You can hide lists, pick read-only and limits, and add apps before the first agent ever connects; and Recent agent changes must stay usable after you turn agents off in a hurry, so you can still undo. The Off state here is a first start (both lists empty) to show the empty lines.</li>
+<li><b>The status is a line under the switch's note</b> with a 7 px dot: filled white while on, accent while read-only, an outline when off, white text and an outlined dot while paused. Resume sits left of the switch, as Reset tips does in About.</li>
+<li><b>Read-only dims the Limits row</b> (45 %, not clickable) and its note says why; the chosen level is kept for when read-only goes off.</li>
+<li><b>Limits' numbers</b> are a floating card beside the hovered level (the menus' ground and shadow), "In one request" and "In an hour" split by a hairline. I read the delete limits as per request (they are listed with the request limits in AGENT-01).</li>
+<li><b>Connect an app</b> is a list under its row, like Settings → Claude's folders: the app's name, a faint mono "Connected" while it is connected now, the quiet fallback (Copy setup) before the main action (a secondary button), as D-104 puts the primary action last. Claude Code's command shows in a well under its row with the note about the skill and the <code>flint</code> command.</li>
+<li><b>Skill:</b> not installed → "Install for Claude Code"; installed and current → "Installed for Claude Code · version 1.8.0" and no button; an older copy (Read-only state) → its version and <b>Update</b>.</li>
+<li><b>Recent agent changes:</b> one 38 px row each: the agent (secondary), the change, the time in mono, Undo. Undone: the row's text goes faint and Undo crossfades to "Undone". New entries slide in from above (Simulate in the bar). The pause toast's Review scrolls here.</li>
+<li><b>Hidden from agents</b> in the right-click menu sits next to Sync with Google Drive (both per-item switches), checked on the right like the sort menu's check. Show to agents folds the row away.</li>
+<li><b>The sheet:</b> the Anywhere in Windows group's label says "Click a key to change it"; "(changeable)" leaves its action names. The recording and warning messages are a line under the row, D-102's exact words.</li>
+<li><b>Capture's Hotkeys link row</b> turns into the warning while another app holds a hotkey ("Ctrl+Alt+X is used by another app, so it doesn't work. Choose another in the shortcuts sheet."), so a taken hotkey still shows where people look for it.</li>
+<li><b>Keyboard shortcuts' one row</b> is named "All shortcuts", its note "Also with ? or Ctrl+K. The four hotkeys that work anywhere in Windows change there."</li>
+</ul>
+</div>
+<div>
+<h3>Questions and spec points</h3>
+<ul>
+<li><b>Skill's Update button vs AGENT-04.</b> AGENT-04 says Flint updates a copy it installed by itself, so an Update button would only ever show for a copy Flint didn't install (which it must not touch) or one it failed to update. Proposed: the version line only, Update only after a failed automatic update. Your brief asked for "Installed · version 1.8.0 with Update"; shown once, on an older copy.</li>
+<li><b>Settings' search opening the sheet "with the filter filled" (D-186).</b> Filled with "hotkey" or "shortcut", the sheet would show "No shortcut matches." Proposed: the search shows the row; clicking it opens the sheet, filtered only when the words match something in it, and the Anywhere in Windows group also answers to "hotkey" and "global" (the Find state does this). Opening the sheet while you type would take the caret away, so it never opens by itself.</li>
+<li><b>The conflict message.</b> Your brief's "Ctrl+Alt+X is used by another app. Choose another." is shorter than D-102's text; I kept D-102's ("… so it doesn't work. Choose another.") as D-186 asks for the same messages.</li>
+<li><b>Capture's section name.</b> Kept "Capture &amp; hotkeys" in the index: its link row still answers "where are my hotkeys". Rename to "Capture" if you prefer.</li>
+<li><b>Toast after undoing.</b> "Undone, except 1 task changed since" carries Undo (03 §4: toasts carry Undo when reversible, and AGENT-07 puts the undo on Ctrl+Z's stack).</li>
+<li><b>No mark on hidden items in the sidebar</b> (as synced items lost their cloud, D-163); only the menu's check and Settings show it. Say if you'd like a quiet mark.</li>
+<li><b>Other status lines</b> (not in a state; Proposed wording): pipe name taken: "Off · Another program is using Flint's agent channel, so agents can't start." PATH skipped (Q14): "The flint command isn't on your PATH (it was too long to change safely). The apps above use its full path, so they work."</li>
+</ul>
+</div>
+</section>
+</div>
+
+<script>
+/* ---------- Icons ---------- */
+var I = {
+  today:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>',
+  inbox:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></svg>',
+  focus:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2h5"/></svg>',
+  plus:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  list:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>',
+  note:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>',
+  group:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
+  sliders:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>',
+  trash:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
+  cloud:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z"/></svg>',
+  check:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
+};
+document.querySelectorAll('[data-icon]').forEach(function(el){ el.innerHTML = I[el.dataset.icon]; });
+
+/* ---------- Settings: the sections, the real rows (Settings.tsx), abbreviated ---------- */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function sw(on, id){ return '<button class="switch' + (on ? ' on' : '') + '" role="switch"' + (id ? ' id="' + id + '"' : '') + '><span class="switch-knob"></span></button>'; }
+function choice(opts, on, id){ return '<div class="trash-tabs"' + (id ? ' id="' + id + '"' : '') + '>' + opts.map(function(o){ return '<button class="trash-tab' + (o === on ? ' on' : '') + '" data-v="' + esc(o) + '">' + esc(o) + '</button>'; }).join('') + '</div>'; }
+function row(name, note, control, opts){
+  opts = opts || {};
+  var text = '<div class="settings-text"><span class="settings-name">' + name + '</span>' + (note ? '<span class="settings-note"' + (opts.noteId ? ' id="' + opts.noteId + '"' : '') + '>' + note + '</span>' : '') + (opts.extra || '') + '</div>';
+  if (opts.lead) text = '<div class="settings-lead">' + opts.lead + text + '</div>';
+  var find = (name + ' ' + (note || '') + ' ' + (opts.words || '')).replace(/<[^>]+>/g,'').toLowerCase();
+  return '<div class="settings-row' + (opts.cls ? ' ' + opts.cls : '') + '"' + (opts.id ? ' id="' + opts.id + '"' : '') + ' data-find="' + esc(find).replace(/"/g,'&quot;') + '">' + text + (control ? '<div class="settings-control">' + control + '</div>' : '') + '</div>';
+}
+var btn = function(t, cls, id){ return '<button class="' + (cls || 'trash-action') + '"' + (id ? ' id="' + id + '"' : '') + '>' + t + '</button>'; };
+
+var PRIVACY = 'Flint itself sends nothing. Whatever an agent reads from Flint goes to that agent\u2019s AI provider (for Claude, Anthropic), under its terms. Agents only reach Flint on this PC, while this is on. Agents can read every list and note you haven\u2019t hidden from them.';
+
+var SECTIONS = [
+  {id:'general', name:'General', html:
+    row('Start with Windows','Flint waits in the tray, so your hotkey and reminders work from the moment you sign in.', sw(true), {words:'autostart login tray'}) +
+    row('Flint folder','<span class="settings-path">C:\\Users\\Alex\\Flint</span>', btn('Open folder') + btn('Change\u2026'), {words:'folder location path'})},
+  {id:'capture', name:'Capture &amp; hotkeys', html:
+    row('Hotkeys','Quick capture, capturing a selection and mini mode\u2019s two: they work over any app, even in a full-screen call.', btn('View and change shortcuts\u2026','trash-action strong','open-sheet-2'), {words:'hotkey hotkeys shortcut shortcuts rebind global quick capture selection mini', id:'row-hotkeys', noteId:'hotkeys-note'}) +
+    row('Hide the capture popup from screen sharing','You still see it; a shared screen or a recording doesn\u2019t (Windows 10 2004 or later).', sw(false), {words:'screen share teams recording privacy'})},
+  {id:'reminders', name:'Reminders', html:
+    row('Notifications','A reminder shows as a Windows notification with Done, Snooze and Open. Off, reminders still wait in Today\u2019s Overdue card.', sw(true)) +
+    row('Reminder sound','Flint chime: heard even when Do Not Disturb or Focus silences notifications.', choice(['Windows sound','Flint chime'],'Flint chime') + btn('Play')) +
+    row('Hide task text in notifications','The notification says only \u201cFlint reminder\u201d, so nothing shows while you share your screen.', sw(false))},
+  {id:'mini', name:'Mini mode', html:
+    row('Hide from screen sharing','Mini mode stays on your screen but isn\u2019t in a shared screen or a recording (Windows 10 2004 or later).', sw(false)) +
+    row('Open on hover','Rest the mouse on the tab at the edge of the screen to look at mini mode without leaving what you\u2019re typing in.', sw(true)) +
+    row('Start collapsed with Flint','Whenever Flint starts, mini mode waits as a tab at the edge of the screen.', sw(true))},
+  {id:'today', name:'Today &amp; lists', html:
+    row('Ask about unfinished pins','On a new day\u2019s first look at Today: keep yesterday\u2019s unfinished pinned tasks, or unpin them.', sw(true)) +
+    row('Archive completed tasks','Old completed tasks move to the archive (Trash \u2192 Archived), where you can bring them back.', choice(['Off','7 days','14 days','30 days'],'14 days'))},
+  {id:'sync', name:'Sync', html:
+    row('Sync with Google Drive','Keep chosen lists and notes in step across your devices, through your own Drive.', btn('Connect Google Drive','primary-button'), {lead:'<span class="tile sync-tile">' + I.cloud + '</span>', words:'sync google drive cloud'})},
+  {id:'links', name:'Links', html:
+    row('Link patterns','Short forms that become links: type AB#1234 for a work item, and a pasted link shows as AB#1234.', btn('Add a link pattern'))},
+  {id:'clipboard', name:'Clipboard', html:
+    row('Clipboard history','Shows Windows\u2019 clipboard history (Win+V must be on) in the side panel and in Paste from clipboard history\u2026 (Ctrl+Shift+H). Flint never stores or sends it.', sw(true))},
+  {id:'claude', name:'Claude', html:
+    row('Give to Claude','Flint opens Claude Code with the task in its composer. Flint sends nothing itself; you review it and send it from Claude.', '', {words:'claude code give folder'}) +
+    '<ul class="link-patterns"><li class="link-pattern"><span class="link-pattern-label" style="flex:0 0 150px">Backend</span><span class="claude-folder-path">C:\\Code\\backend</span><span class="link-pattern-actions">' + btn('Change\u2026') + btn('Forget') + '</span></li></ul>'},
+  {id:'agents', name:'AI agents', isNew:true, html:''},
+  {id:'data', name:'Data', html:
+    row('Take a snapshot','A copy of the Flint folder, only when something changed.', choice(['30 min','Hourly','2 h','4 h'],'Hourly')) +
+    row('Keep hourly snapshots','', choice(['1 day','2 days','3 days','1 week'],'2 days')) +
+    row('Space snapshots use','38 MB on this computer.', btn('Clear old snapshots')) +
+    row('Restore from a snapshot','', btn('Snapshots\u2026')) +
+    row('Export Flint folder','Everything, as one zip file.', btn('Export\u2026'))},
+  {id:'appearance', name:'Appearance', html:
+    row('Interface size','Ctrl+= and Ctrl+\u2212 too; kept for each display.', choice(['80%','90%','100%','110%','125%','150%'],'100%')) +
+    row('Animation speed','All of Flint\u2019s motion, slower or quicker.', choice(['Relaxed','Normal','Quick'],'Normal'))},
+  {id:'shortcuts', name:'Keyboard shortcuts', html:
+    row('All shortcuts','Also with <span class="keycap" style="height:20px;font-size:10.5px;padding:0 6px">?</span> or Ctrl+K. The four hotkeys that work anywhere in Windows change there.', btn('View and change shortcuts\u2026','trash-action strong','open-sheet'), {words:'hotkey hotkeys shortcut shortcuts keyboard keys rebind cheat sheet', id:'row-shortcuts'})},
+  {id:'about', name:'About', html:
+    row('Privacy','Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude. AI agents you turn on in Settings \u2192 AI agents can read your lists and notes; what they read goes to their AI provider, not through Flint.', '', {words:'privacy telemetry network'}) +
+    row('Flint 1.8.0','Up to date \u00b7 checked 14:02', btn('Check for updates')) +
+    row('Automatic updates','Checks GitHub when Flint starts and every few hours, downloads a new version in the background and installs it when you restart Flint.', sw(true))}
+];
+
+/* ---------- The new section: AI agents (02 AGENT-05, rows 1-8 in order) ---------- */
+var CLIENTS = [
+  {id:'desktop', name:'Claude Desktop', main:'Add to Claude Desktop', fallback:null},
+  {id:'code', name:'Claude Code', main:'Copy command', fallback:null},
+  {id:'cursor', name:'Cursor', main:'Add to Cursor', fallback:'Copy setup'},
+  {id:'vscode', name:'VS Code', main:'Add to VS Code', fallback:'Copy setup'}
+];
+function agentsHtml(){
+  var clients = '<ul class="link-patterns sub" id="clients">' + CLIENTS.map(function(c){
+    return '<li class="link-pattern" data-client="' + c.id + '"><span class="client-name">' + c.name + '</span><span class="client-state" data-state="' + c.id + '"></span><span class="link-pattern-actions">' +
+      (c.fallback ? btn(c.fallback) : '') + btn(c.main, 'secondary-button', 'cl-' + c.id) + '</span></li>' +
+      (c.id === 'code' ? '<li class="cmd"><span class="line"><span class="p">&gt; </span>claude mcp add --scope user flint -- "C:\\Users\\Alex\\AppData\\Local\\Programs\\flint\\resources\\bin\\flint.exe" mcp</span><span class="settings-note">Claude Code can also work through the <code class="c">flint</code> command in its terminal; the skill below teaches it how.</span></li>' : '');
+  }).join('') + '</ul>';
+  return '' +
+    row('AI agents','Let AI agents such as Claude, Cursor and VS Code read and change your lists and notes, through the <code class="c">flint</code> command and an MCP server on this PC.',
+      btn('Resume','trash-action strong','resume') + sw(false,'sw-agents'),
+      {cls:'first top', extra:'<span class="agent-status" id="status"><i></i><span id="status-text"></span></span>', words:'ai agent agents claude cursor vs code mcp cli command on off pause resume'}) +
+    row('Read-only','Agents can find and read, but not change anything.', sw(false,'sw-ro'), {words:'read only agents'}) +
+    row('Limits','<span id="limits-note">How much agents can change in one request and in an hour.</span>',
+      '<div style="position:relative" id="limits-wrap">' + choice(['Low','Medium','High'],'Medium','limits') + '<div id="limit-tip-host"></div></div>', {id:'row-limits', words:'limits low medium high hour request delete'}) +
+    row('Connect an app','Add Flint to each app once. The app starts Flint when it needs it.', '', {words:'connect claude desktop code cursor vs code mcp setup command'}) + clients +
+    row('Flint skill','<span>Teaches Claude how Flint works and how to use it well.</span><br><span>Save for claude.ai: works in the Claude desktop app with Flint added; a chat in the browser can\u2019t reach Flint on this PC.</span>',
+      '<span id="skill-control"></span>', {cls:'top', extra:'<span class="agent-status" id="skill-status" style="color:var(--fl-text-secondary)"></span>', words:'skill install claude code claude.ai save zip'}) +
+    row('Hidden from agents','Agents can\u2019t find, read or change these. Right-click a list, note or group to hide it.', '', {id:'row-hidden', words:'hidden hide show agents private'}) +
+    '<ul class="link-patterns sub" id="hidden-list"></ul>' +
+    row('Recent agent changes','What agents changed, newest first. Undo puts it back, except what you changed since.', '', {id:'row-recent', words:'recent changes undo history agents'}) +
+    '<ul class="link-patterns sub" id="recent-list"></ul>' +
+    row('Privacy', PRIVACY, '', {words:'privacy anthropic provider network'});
+}
+SECTIONS.forEach(function(s){ if (s.id === 'agents') s.html = agentsHtml(); });
+document.getElementById('sections').innerHTML = SECTIONS.map(function(s){
+  return '<section class="card settings-section" id="settings-' + s.id + '" data-name="' + s.name.replace('&amp;','&').toLowerCase() + '" style="margin-bottom:16px"><div class="panel-label settings-section-label">' + s.name + '</div>' + s.html + '</section>';
+}).join('');
+var index = document.getElementById('index');
+SECTIONS.forEach(function(s){
+  var b = document.createElement('button');
+  b.className = 'settings-index-item'; b.dataset.id = s.id; b.innerHTML = s.name;
+  b.addEventListener('click', function(){ scrollToEl(document.getElementById('settings-' + s.id), 16); });
+  index.appendChild(b);
+});
+
+/* ---------- Data for the states ---------- */
+var RECENT = {
+  normal: [
+    {who:'Claude', what:'Added 5 tasks to Backend', when:'14:02'},
+    {who:'Claude Code', what:'Completed \u201cFix login loop\u201d', when:'13:40'},
+    {who:'Claude', what:'Set a reminder on \u201cRenew the acme.example certificate\u201d', when:'12:31'},
+    {who:'Cursor', what:'Edited note \u201cRelease plan\u201d', when:'11:15'},
+    {who:'Claude', what:'Moved 3 tasks from Inbox to Website', when:'10:52'},
+    {who:'Command line', what:'Added list \u201cGroceries\u201d to Personal', when:'Yesterday 18:20'}
+  ],
+  paused: [
+    {who:'Claude', what:'Set the priority of 200 tasks in Backend', when:'14:31'},
+    {who:'Claude', what:'Moved 200 tasks from Inbox to Website', when:'14:24'},
+    {who:'Claude', what:'Added 100 tasks to Infra', when:'14:10'},
+    {who:'Claude Code', what:'Completed \u201cFix login loop\u201d', when:'13:40'},
+    {who:'Cursor', what:'Edited note \u201cRelease plan\u201d', when:'11:15'},
+    {who:'Command line', what:'Added list \u201cGroceries\u201d to Personal', when:'Yesterday 18:20'}
+  ],
+  fresh: []
+};
+var HIDDEN = {
+  normal: [{name:'Payroll', kind:'list', icon:'list'}, {name:'Personal', kind:'group \u00b7 2 lists', icon:'group'}],
+  fresh: []
+};
+var MODES = {
+  off:      {agents:'off', ro:false, recent:'fresh', hidden:'fresh', skill:'none', clients:[], scroll:'agents',
+             caption:'Off (a first start): the switch off, status "Off". Nothing below is hidden or dimmed: hiding, read-only, limits and apps can all be set up before turning agents on. Empty lists say so.'},
+  on:       {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'agents',
+             caption:'On with Claude Desktop and Claude Code connected. Point at a level of Limits for its numbers (Medium shown). Live: the switches, Limits, Copy command, Undo, Show to agents; the index scrolls the page.', tip:true},
+  readonly: {agents:'on', ro:true, recent:'normal', hidden:'normal', skill:'old', clients:['desktop'], scroll:'agents',
+             caption:'Read-only: the status says agents can only find and read (accent dot); Limits is dimmed with its reason. Here the skill copy is older, with Update.'},
+  paused:   {agents:'paused', ro:false, recent:'paused', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'agents', toast:'paused',
+             caption:'Paused by the hourly limit: the status in white with Resume; the one toast as it appears over the window, with Review (scrolls to Recent agent changes) and Resume.'},
+  undone:   {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'row-hidden', undone:[0], toast:'undone',
+             caption:'Recent agent changes after Undo on the newest entry: it stays, faint, marked "Undone"; the toast says one task was skipped because you changed it since.'},
+  hidden:   {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'row-hidden', menu:true,
+             caption:'Hidden from agents in context: the list\u2019s right-click menu with "Hidden from agents" checked, next to Sync with Google Drive; Settings lists Payroll and the group Personal with Show to agents.'},
+  sheet:    {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'settings-appearance', sheet:true,
+             caption:'The shortcuts sheet (D-186), opened from Settings\u2019 one Keyboard shortcuts row (also ? and Ctrl+K). Anywhere in Windows is editable: mini mode\u2019s hotkey being recorded; Ctrl+Alt+X taken by another app. Live: click a key, press new keys; Esc cancels.'},
+  capture:  {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'top',
+             caption:'Settings \u2192 Capture & hotkeys keeps "Hide the capture popup from screen sharing" and one link row, Hotkeys: View and change shortcuts\u2026'},
+  find:     {agents:'on', ro:false, recent:'normal', hidden:'normal', skill:'current', clients:['desktop','code'], scroll:'top', find:'hotkey',
+             caption:'Finding "hotkey" shows both link rows (Capture & hotkeys, Keyboard shortcuts). Clicking one opens the sheet filtered to "hotkey", which keeps the Anywhere in Windows group. Live: type in Find a setting.'}
+};
+
+/* ---------- State ---------- */
+var S = {};
+var $ = function(id){ return document.getElementById(id); };
+
+function setStatus(){
+  var st = $('status'), t;
+  st.className = 'agent-status';
+  if (S.agents === 'off') { st.classList.add('off'); t = 'Off'; }
+  else if (S.agents === 'paused') { st.classList.add('paused'); t = 'Paused after 500 changes in an hour'; }
+  else {
+    var names = S.clients.map(function(c){ return c === 'desktop' ? 'Claude' : c === 'code' ? 'Claude Code' : c === 'cursor' ? 'Cursor' : 'VS Code'; });
+    var who = names.length ? ' \u00b7 ' + names.join(' and ') + ' connected' : ' \u00b7 No app connected yet';
+    if (S.ro) { st.classList.add('ro'); t = 'On, read-only: agents can only find and read' + who; }
+    else t = 'On' + who;
+  }
+  var span = $('status-text');
+  if (span.textContent !== t) { var n = span.cloneNode(); n.textContent = t; n.className = 'settings-said'; span.replaceWith(n); }
+  $('resume').hidden = S.agents !== 'paused';
+  $('sw-agents').classList.toggle('on', S.agents !== 'off');
+  $('sw-ro').classList.toggle('on', S.ro);
+  $('row-limits').classList.toggle('dim', S.ro);
+  var ln = S.ro ? 'Read-only: agents change nothing, so limits don\u2019t apply.' : 'How much agents can change in one request and in an hour.';
+  var ls = $('limits-note');
+  if (ls.textContent !== ln) { var m = ls.cloneNode(); m.textContent = ln; m.className = 'settings-said'; ls.replaceWith(m); }
+  document.querySelectorAll('[data-state]').forEach(function(el){
+    var on = S.agents !== 'off' && S.clients.indexOf(el.dataset.state) >= 0;
+    el.textContent = on ? 'Connected' : '';
+  });
+  $('sim').disabled = S.agents !== 'on' || S.ro;
+}
+function setSkill(){
+  var c = $('skill-control'), st = $('skill-status');
+  if (S.skill === 'none') { c.innerHTML = btn('Save for claude.ai\u2026') + btn('Install for Claude Code','secondary-button','skill-install'); st.innerHTML = ''; st.hidden = true; }
+  else if (S.skill === 'old') { c.innerHTML = btn('Save for claude.ai\u2026') + btn('Update','secondary-button','skill-update'); st.hidden = false; st.innerHTML = '<span class="settings-said">Installed for Claude Code \u00b7 version 1.7.0 \u00b7 1.8.0 is here</span>'; }
+  else { c.innerHTML = btn('Save for claude.ai\u2026'); st.hidden = false; st.innerHTML = '<span class="settings-said">Installed for Claude Code \u00b7 version 1.8.0</span>'; }
+  var go = function(){ S.skill = 'current'; setSkill(); };
+  if ($('skill-install')) $('skill-install').onclick = go;
+  if ($('skill-update')) $('skill-update').onclick = go;
+}
+function renderHidden(){
+  var ul = $('hidden-list');
+  if (!S.hiddenItems.length) { ul.innerHTML = '<li class="empty-line">Nothing is hidden.</li>'; return; }
+  ul.innerHTML = S.hiddenItems.map(function(h, i){
+    return '<li class="link-pattern" data-h="' + i + '"><span class="tile hidden-tile">' + I[h.icon] + '</span><span class="link-pattern-label" style="flex:0 0 auto">' + h.name + '</span><span class="item-kind" style="flex:1">' + h.kind + '</span><span class="link-pattern-actions">' + btn('Show to agents') + '</span></li>';
+  }).join('');
+  ul.querySelectorAll('[data-h] button').forEach(function(b){
+    b.onclick = function(){
+      var li = b.closest('li'), name = S.hiddenItems[+li.dataset.h].name;
+      li.style.maxHeight = li.offsetHeight + 'px'; li.classList.add('fold');
+      setTimeout(function(){ S.hiddenItems = S.hiddenItems.filter(function(h){ return h.name !== name; }); renderHidden(); }, reduced() ? 0 : 260);
+    };
+  });
+}
+function changeHtml(c, i){
+  return '<li class="change' + (c.undone ? ' is-undone' : '') + (c.enter ? ' enter' : '') + '" data-c="' + i + '"><span class="who">' + c.who + '</span><span class="what">' + c.what + '</span><span class="when">' + c.when + '</span><span class="act">' + (c.undone ? '<span class="undone">Undone</span>' : btn('Undo')) + '</span></li>';
+}
+function renderRecent(){
+  var ul = $('recent-list');
+  if (!S.recent.length) { ul.innerHTML = '<li class="empty-line">No agent changes yet.</li>'; return; }
+  ul.innerHTML = S.recent.slice(0, 20).map(changeHtml).join('');
+  S.recent.forEach(function(c){ c.enter = false; });
+  ul.querySelectorAll('.change .act button').forEach(function(b){
+    b.onclick = function(){
+      var i = +b.closest('li').dataset.c;
+      S.recent[i].undone = true; renderRecent();
+      showToast(i === 0 && S.recent[0].what.indexOf('Added 5') === 0 ? 'undone' : 'undoneAll');
+    };
+  });
+}
+
+/* Limits: the floating numbers on hover (and shown at rest in the "On" state). */
+var LIMITS = {
+  Low:    {n:['25','10','2','150']},
+  Medium: {n:['100','25','5','500'], d:true},
+  High:   {n:['250','100','20','2,000']}
+};
+function showTip(level){
+  var host = $('limit-tip-host');
+  if (!level) { host.innerHTML = ''; return; }
+  var L = LIMITS[level].n;
+  host.innerHTML = '<div class="limit-tip"><div class="t">' + level + (LIMITS[level].d ? ' <span>\u00b7 the default</span>' : '') + '</div>' +
+    '<div class="h">In one request</div>' +
+    '<div class="l"><b>' + L[0] + '</b>items</div>' +
+    '<div class="l"><b>' + L[1] + '</b>task deletes</div>' +
+    '<div class="l"><b>' + L[2] + '</b>list, note or group deletes</div><div class="sep"></div>' +
+    '<div class="h">In an hour</div>' +
+    '<div class="l"><b>' + L[3] + '</b>changes, all agents</div></div>';
+}
+var limits = $('limits');
+limits.querySelectorAll('.trash-tab').forEach(function(b){
+  b.addEventListener('mouseenter', function(){ if (!S.ro) showTip(b.dataset.v); });
+  b.addEventListener('mouseleave', function(){ showTip(S.pinTip ? 'Medium' : null); });
+  b.addEventListener('click', function(){ limits.querySelectorAll('.trash-tab').forEach(function(x){ x.classList.toggle('on', x === b); }); });
+});
+
+/* Toast */
+var toastTimer;
+function showToast(kind){
+  var host = $('toast-host');
+  clearTimeout(toastTimer);
+  if (!kind) { host.innerHTML = ''; return; }
+  var t = {
+    paused: ['Claude made 500 changes in the last hour. Agent changes are paused.', ['Review','Resume']],
+    undone: ['Undone, except 1 task changed since', ['Undo']],
+    undoneAll: ['Undone', ['Undo']]
+  }[kind];
+  host.innerHTML = '<div class="toast" role="status"><span>' + t[0] + '</span><span class="btns">' + t[1].map(function(b){ return '<button data-t="' + b + '">' + b + '</button>'; }).join('') + '</span></div>';
+  host.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){
+      if (b.dataset.t === 'Review') scrollToEl($('row-recent'), 16);
+      if (b.dataset.t === 'Resume') { S.agents = 'on'; setStatus(); }
+      if (b.dataset.t === 'Undo') { S.recent.forEach(function(c){ c.undone = false; }); renderRecent(); }
+      showToast(null);
+    };
+  });
+  if (S.live) toastTimer = setTimeout(function(){ showToast(null); }, 6000);
+}
+
+/* Right-click menu on a sidebar list */
+function showMenu(on, x, y, name){
+  var host = $('menu-host');
+  document.querySelectorAll('.nav.ctx').forEach(function(n){ n.classList.remove('ctx'); });
+  if (!on) { host.innerHTML = ''; return; }
+  var hidden = S.hiddenItems.some(function(h){ return h.name === name; });
+  var item = function(label, hint, extra){ return '<button class="fl-menu-item' + (extra || '') + '"><span class="fl-menu-label">' + label + '</span>' + (hint ? '<span class="fl-menu-hint">' + hint + '</span>' : '') + '</button>'; };
+  host.innerHTML = '<div class="fl-menu" role="menu" style="left:' + x + 'px;top:' + y + 'px">' +
+    item('Rename') + item('Duplicate') + item('Convert to note') + '<div class="fl-menu-divider"></div>' +
+    item('Sort tasks by', '\u203a') + item('Move to top') + item('Move to group', '\u203a') + '<div class="fl-menu-divider"></div>' +
+    item('Claude folder', '\u203a') + '<div class="fl-menu-divider"></div>' +
+    item('Sync with Google Drive') +
+    '<button class="fl-menu-item' + (S.menuHover ? ' active' : '') + '" id="menu-hide"><span class="fl-menu-label">Hidden from agents</span>' + (hidden ? '<span class="fl-menu-check">' + I.check + '</span>' : '') + '</button>' +
+    '<div class="fl-menu-divider"></div>' + item('Delete list') + '</div>';
+  $('menu-hide').onclick = function(){
+    if (hidden) S.hiddenItems = S.hiddenItems.filter(function(h){ return h.name !== name; });
+    else S.hiddenItems = [{name:name, kind:'list', icon:'list'}].concat(S.hiddenItems);
+    renderHidden(); showMenu(false);
+  };
+}
+$('sidebar').addEventListener('contextmenu', function(e){
+  var nav = e.target.closest('.nav');
+  if (!nav || nav.closest('.sidebar-foot') || !nav.querySelector('.nav-count') && !nav.querySelector('[data-icon=note]')) return;
+  e.preventDefault();
+  var r = $('win').getBoundingClientRect();
+  S.menuHover = false;
+  showMenu(true, e.clientX - r.left + 2, e.clientY - r.top + 2, nav.querySelector('.nav-name').textContent);
+  nav.classList.add('ctx');
+});
+document.addEventListener('mousedown', function(e){ if (!e.target.closest('.fl-menu')) showMenu(false); });
+
+/* ---------- The shortcuts sheet (CheatSheet.tsx + D-186) ---------- */
+var HOTKEYS = [
+  {id:'capture', action:'Quick capture', keys:'Ctrl+Shift+Space'},
+  {id:'selection', action:'Capture the selected text', keys:'Ctrl+Shift+X'},
+  {id:'mini', action:'Show or hide mini mode', keys:'Ctrl+Alt+Space'},
+  {id:'miniSelection', action:'Capture the selected text into mini mode\u2019s note', keys:'Ctrl+Alt+X'}
+];
+var GROUPS = [
+  {name:'Anywhere in Flint', rows:[['Ctrl+N','New task in the open list'],['Ctrl+Shift+N','New list or note'],['Ctrl+Shift+J','Quick note'],['Ctrl+Shift+H','Paste from clipboard history'],['Ctrl+F','Find in the list or note'],['Ctrl+Z / Ctrl+Y','Undo / redo'],['Alt+\u2190 / Alt+\u2192','Back / forward'],['Ctrl+\\','Show or hide the side panel'],['Ctrl+= / Ctrl+\u2212 / Ctrl+0','Interface size']]},
+  {name:'A task list', rows:[['\u2191 / \u2193','Select the task above or below'],['Shift+\u2191 / Shift+\u2193','Select several'],['Ctrl+A','Select every open task'],['Enter','Edit the selected task'],['N','Add a task (the composer)'],['Space','Complete or reopen'],['1 / 2 / 3 / 0','Priority low, medium, high, none'],['P','Pin to Today, or unpin'],['F','Send to Focus, or take out'],['R','Set or change the reminder'],['G','Give to Claude (Claude Code)'],['Alt+\u2191 / Alt+\u2193','Move the task up or down'],['Tab / Shift+Tab','Make a subtask, or not'],['Shift+Enter','Open the task as a page'],['Delete','Delete (to Trash, with Undo)']]},
+  {name:'Focus', rows:[['Shift+Space','Start or pause the timer'],['Shift+F','Focus on this (the active task)'],['\u2212 / +','One session fewer or more (the estimate)']]},
+  {name:'Editing a task', rows:[['Enter','Save and start the next task'],['Shift+Enter','Go on into its notes'],['Esc','Stop editing (it is saved)'],['!h !m !l','Priority, as you type'],['##list','Send it to a list'],['@15:00, @tomorrow','A reminder']]},
+  {name:'Notes', rows:[['/','Insert a block (slash commands)'],['Ctrl+B / Ctrl+I / Ctrl+E','Bold / italic / inline code'],['Ctrl+Shift+V','Paste as plain text'],['Ctrl+Shift+M','Monospace for this note']]},
+  {name:'Mini mode', rows:[['Ctrl+1 / 2 / 3','Today / the list tab / Note'],['Space','Complete or reopen'],['P','Pin to Today, or unpin'],['Ctrl+M','Collapse to the edge']]}
+];
+var DOES = {capture:'opens the capture popup', selection:'captures the selected text', mini:'shows or hides mini mode', miniSelection:'adds the selected text to mini mode\u2019s note'};
+var TAKEN_BY_OTHERS = ['Ctrl+Alt+X','Ctrl+Shift+S','Ctrl+Alt+Delete'];
+
+function sheetHtml(filter){
+  var q = (filter || '').trim().toLowerCase();
+  var anywhere = HOTKEYS.filter(function(h){ return !q || 'anywhere in windows hotkey hotkeys global'.indexOf(q) >= 0 || (h.keys + ' ' + h.action).toLowerCase().indexOf(q) >= 0; });
+  var out = '';
+  if (anywhere.length) {
+    out += '<section class="cheat-group"><div class="palette-label">Anywhere in Windows<span class="hint">Click a key to change it</span></div>' + anywhere.map(function(h){
+      var rec = S.recording === h.id, taken = S.taken === h.id && !rec;
+      var said = rec ? 'Esc cancels.' : (S.said[h.id] || (taken ? h.keys + ' is used by another app, so it doesn\u2019t work. Choose another.' : ''));
+      return '<div class="cheat-row"><span>' + h.action + '</span><button class="keycap hotkey-record' + (rec ? ' recording' : '') + (taken ? ' taken' : '') + '" data-hk="' + h.id + '" title="' + (taken ? 'Another app uses this combination' : 'Click, then press the new keys') + '">' + (rec ? 'Press the new keys\u2026' : h.keys) + '</button></div>' +
+        (said ? '<div class="cheat-said' + (taken || /used by|already|Use Ctrl/.test(said) ? ' settings-warning' : '') + '">' + said + '</div>' : '');
+    }).join('') + '</section>';
+  }
+  GROUPS.forEach(function(g){
+    var rows = g.rows.filter(function(r){ return !q || g.name.toLowerCase().indexOf(q) >= 0 || (r[0] + ' ' + r[1]).toLowerCase().indexOf(q) >= 0; });
+    if (!rows.length) return;
+    out += '<section class="cheat-group"><div class="palette-label">' + g.name + '</div>' + rows.map(function(r){ return '<div class="cheat-row"><span>' + r[1] + '</span><span class="keycap">' + esc(r[0]) + '</span></div>'; }).join('') + '</section>';
+  });
+  return out || '<p class="palette-empty">No shortcut matches.</p>';
+}
+function openSheet(filter){
+  S.sheet = true;
+  $('sheet-host').innerHTML = '<div class="palette-layer" id="layer"><div class="palette cheat-sheet" role="dialog" aria-label="Keyboard shortcuts"><div class="palette-head"><span class="palette-crumb">Keyboard shortcuts</span><input class="palette-field" id="sheet-field" placeholder="Find a shortcut" spellcheck="false" value="' + esc(filter || '') + '"><span class="keycap">Esc</span></div><div class="cheat-columns" id="cheat"></div></div></div>';
+  $('sheet-field').addEventListener('input', paintSheet);
+  $('layer').addEventListener('mousedown', function(e){ if (e.target === e.currentTarget) closeSheet(); });
+  paintSheet();
+}
+/* Proposed: while another app holds a hotkey, Capture's link row says so (D-102's words). */
+function paintHotkeysNote(){
+  var n = $('hotkeys-note'), h = HOTKEYS.filter(function(x){ return x.id === S.taken; })[0];
+  var t = h ? h.keys + ' is used by another app, so it doesn’t work. Choose another in the shortcuts sheet.' : 'Quick capture, capturing a selection and mini mode’s two: they work over any app, even in a full-screen call.';
+  if (n.textContent === t) return;
+  var m = n.cloneNode(); m.textContent = t; m.className = 'settings-note settings-said' + (h ? ' settings-warning' : ''); n.replaceWith(m);
+}
+function paintSheet(){
+  paintHotkeysNote();
+  var c = $('cheat'); if (!c) return;
+  c.innerHTML = sheetHtml($('sheet-field').value);
+  c.querySelectorAll('[data-hk]').forEach(function(b){
+    b.onclick = function(){ S.recording = S.recording === b.dataset.hk ? null : b.dataset.hk; S.said = {}; paintSheet(); };
+  });
+}
+function closeSheet(){
+  var layer = $('layer'); if (!layer) return;
+  S.sheet = false; S.recording = null;
+  if (reduced()) { $('sheet-host').innerHTML = ''; return; }
+  layer.classList.add('leaving');
+  setTimeout(function(){ if (!S.sheet) $('sheet-host').innerHTML = ''; }, 120);
+}
+function accel(e){
+  var mods = [];
+  if (e.ctrlKey) mods.push('Ctrl'); if (e.altKey) mods.push('Alt'); if (e.shiftKey) mods.push('Shift'); if (e.metaKey) mods.push('Win');
+  var k = e.key;
+  if (['Control','Alt','Shift','Meta'].indexOf(k) >= 0) return null;
+  if (k === ' ') k = 'Space'; else if (k.length === 1) k = k.toUpperCase();
+  if (e.code && /^Key[A-Z]$/.test(e.code)) k = e.code.slice(3);
+  if (e.code && /^Digit\d$/.test(e.code)) k = e.code.slice(5);
+  return {mods:mods, keys:mods.concat([k]).join('+')};
+}
+document.addEventListener('keydown', function(e){
+  if (S.sheet && S.recording) {
+    e.preventDefault();
+    if (e.key === 'Escape') { S.recording = null; S.said = {}; paintSheet(); return; }
+    var a = accel(e); if (!a) return;
+    var id = S.recording, said;
+    var others = HOTKEYS.filter(function(h){ return h.id !== id; }).map(function(h){ return h.keys; });
+    if (!a.mods.some(function(m){ return m !== 'Shift'; })) said = 'Use Ctrl, Alt or Win together with a key.';
+    else if (others.indexOf(a.keys) >= 0) said = 'That is already another Flint hotkey.';
+    else if (TAKEN_BY_OTHERS.indexOf(a.keys) >= 0) said = a.keys + ' is already used by another app. Try another combination.';
+    else {
+      HOTKEYS.forEach(function(h){ if (h.id === id) h.keys = a.keys; });
+      if (S.taken === id) S.taken = null;
+      said = 'Saved: ' + a.keys + ' ' + DOES[id] + '.' + (a.mods.indexOf('Alt') >= 0 ? ' Note: Alt is often a push-to-talk key (Discord).' : '');
+    }
+    S.recording = null; S.said = {}; S.said[id] = said; paintSheet();
+    return;
+  }
+  if (S.sheet && e.key === 'Escape') { closeSheet(); return; }
+  var typing = /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName);
+  if (e.key === '?' && (!typing || (S.sheet && $('sheet-field').value === ''))) { e.preventDefault(); if (S.sheet) closeSheet(); else openSheet(''); }
+});
+
+/* ---------- Settings: find, index, scrolling ---------- */
+function reduced(){ return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+var scroller = $('scroller');
+function scrollToEl(el, gap, instant){
+  if (!el) return;
+  var top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - gap;
+  scroller.scrollTo({top: top, behavior: instant || reduced() ? 'instant' : 'smooth'});
+}
+function markIndex(){
+  var y = scroller.getBoundingClientRect().top + 60, cur = null;
+  document.querySelectorAll('.settings-section').forEach(function(s){ if (!s.hidden && s.getBoundingClientRect().top <= y) cur = s.id.slice(9); });
+  if (!cur) { var f = document.querySelector('.settings-section:not([hidden])'); cur = f && f.id.slice(9); }
+  index.querySelectorAll('.settings-index-item').forEach(function(b){ b.classList.toggle('on', b.dataset.id === cur); });
+}
+scroller.addEventListener('scroll', markIndex);
+function applyFind(q){
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('.settings-section').forEach(function(s){
+    var byName = q && s.dataset.name.indexOf(q) >= 0;
+    var any = !q || byName;
+    s.querySelectorAll('.settings-row').forEach(function(r){
+      var hit = !q || byName || r.dataset.find.indexOf(q) >= 0;
+      r.hidden = !hit; if (hit) any = true;
+      var next = r.nextElementSibling;
+      if (next && next.tagName === 'UL') next.hidden = !hit;
+    });
+    s.hidden = !any;
+    var first = true;
+    s.querySelectorAll('.settings-row').forEach(function(r){ if (r.hidden) return; r.style.borderTopColor = first ? 'transparent' : ''; first = false; });
+  });
+  markIndex();
+}
+$('find').addEventListener('input', function(e){ applyFind(e.target.value); });
+document.addEventListener('click', function(e){
+  if (e.target.id === 'open-sheet' || e.target.id === 'open-sheet-2') openSheet($('find').value.trim());
+});
+
+/* ---------- Live controls ---------- */
+$('sw-agents').addEventListener('click', function(){ S.agents = S.agents === 'off' ? 'on' : 'off'; if (S.agents === 'on' && !S.clients.length) S.clients = []; setStatus(); });
+$('sw-ro').addEventListener('click', function(){ S.ro = !S.ro; if (S.ro) showTip(null); setStatus(); });
+$('resume').addEventListener('click', function(){ S.agents = 'on'; setStatus(); showToast(null); });
+CLIENTS.forEach(function(c){
+  var b = $('cl-' + c.id);
+  b.addEventListener('click', function(){
+    if (c.id !== 'code') return;
+    b.innerHTML = '<span class="copied">Copied</span>';
+    setTimeout(function(){ b.innerHTML = '<span class="copied">Copy command</span>'; }, 1500);
+  });
+});
+var simN = 0;
+$('sim').addEventListener('click', function(){
+  if (S.agents !== 'on' || S.ro) return;
+  var samples = [
+    {who:'Claude', what:'Added 2 tasks to Inbox'},
+    {who:'Claude Code', what:'Completed \u201cWrite the migration for user settings\u201d'},
+    {who:'Cursor', what:'Appended to note \u201cRelease plan\u201d'}
+  ];
+  var s = samples[simN++ % samples.length];
+  var d = new Date(2026, 10, 13, 14, 3 + simN);
+  S.recent.unshift({who:s.who, what:s.what, when:'14:' + String(d.getMinutes()).padStart(2,'0'), enter:true});
+  renderRecent();
+  scrollToEl($('row-recent'), 120);
+});
+
+/* ---------- Modes ---------- */
+function setMode(mode){
+  var m = MODES[mode];
+  S = {mode:mode, agents:m.agents, ro:m.ro, clients:m.clients.slice(), skill:m.skill, said:{}, recording:null, taken:null, sheet:false, live:false,
+       recent: RECENT[m.recent].map(function(c, i){ return {who:c.who, what:c.what, when:c.when, undone:(m.undone || []).indexOf(i) >= 0}; }),
+       hiddenItems: HIDDEN[m.hidden].slice(), pinTip: !!m.tip};
+  var keys0 = ['Ctrl+Shift+Space','Ctrl+Shift+X','Ctrl+Alt+Space','Ctrl+Alt+X'];
+  HOTKEYS.forEach(function(h, i){ h.keys = keys0[i]; });
+  document.querySelectorAll('#tabs [data-mode]').forEach(function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
+  $('caption').textContent = m.caption;
+  $('find').value = m.find || ''; applyFind($('find').value);
+  setStatus(); setSkill(); renderHidden(); renderRecent();
+  limits.querySelectorAll('.trash-tab').forEach(function(x){ x.classList.toggle('on', x.dataset.v === 'Medium'); });
+  showTip(m.tip ? 'Medium' : null);
+  showToast(m.toast || null);
+  $('sheet-host').innerHTML = '';
+  if (m.sheet) { S.recording = 'mini'; S.taken = 'miniSelection'; openSheet(''); }
+  else if (mode === 'capture' || mode === 'find') S.taken = 'miniSelection';
+  paintHotkeysNote();
+  // the scroll position for the state, at once
+  if (m.scroll === 'top') scroller.scrollTo({top:0, behavior:'instant'});
+  else scrollToEl($(m.scroll === 'agents' ? 'settings-agents' : m.scroll), 16, true);
+  markIndex();
+  showMenu(false);
+  if (m.menu) {
+    var nav = $('nav-payroll'), r = $('win').getBoundingClientRect(), nr = nav.getBoundingClientRect();
+    S.menuHover = true;
+    showMenu(true, nr.left - r.left + 150, nr.top - r.top + 18, 'Payroll');
+    nav.classList.add('ctx');
+  }
+  S.live = true;
+}
+document.querySelectorAll('#tabs [data-mode]').forEach(function(b){ b.addEventListener('click', function(){ setMode(b.dataset.mode); }); });
+setMode('on');
+</script>
+</body>
+</html>

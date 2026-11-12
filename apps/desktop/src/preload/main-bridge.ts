@@ -1,4 +1,11 @@
 import type { SyncAction, SyncEverythingPreview, SyncStatusView } from '../shared/sync.js';
+import type {
+  AgentChangedEvent,
+  AgentsAction,
+  AgentsActionOutcome,
+  AgentsPausedEvent,
+  AgentsSettingsView,
+} from '../shared/agents.js';
 import { ipcRenderer, webUtils } from 'electron';
 import type { LinkPattern } from '../shared/link-patterns.js';
 import type { TipId } from '../shared/tips.js';
@@ -246,6 +253,27 @@ export const main = {
   },
   onSyncChanged(listener: (view: SyncStatusView) => void): void {
     ipcRenderer.on(Channels.mainSyncChanged, (_event, view: SyncStatusView) => listener(view));
+  },
+  /** AGENT-05 (D-185): Settings → AI agents. */
+  agents(): Promise<AgentsSettingsView | null> {
+    return invoke(Channels.mainAgents) as Promise<AgentsSettingsView | null>;
+  },
+  agentsAct(action: AgentsAction): Promise<AgentsActionOutcome | null> {
+    return invoke(Channels.mainAgentsAct, action) as Promise<AgentsActionOutcome | null>;
+  },
+  onAgentsChanged(listener: () => void): void {
+    ipcRenderer.on(Channels.mainAgentsChanged, () => listener());
+  },
+  /** AGENT-07: an agent changed these; the rows on screen flash once. */
+  onAgentChanged(listener: (event: AgentChangedEvent) => void): void {
+    ipcRenderer.on(Channels.mainAgentChanged, (_event, changed: AgentChangedEvent) =>
+      listener(changed),
+    );
+  },
+  onAgentsPaused(listener: (event: AgentsPausedEvent) => void): void {
+    ipcRenderer.on(Channels.mainAgentsPaused, (_event, paused: AgentsPausedEvent) =>
+      listener(paused),
+    );
   },
   /** The main window came on screen. */
   onShown(listener: () => void): void {

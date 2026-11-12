@@ -1,0 +1,17 @@
+{
+  "name": "@flint/cli",
+  "version": "1.7.0",
+  "private": true,
+  "description": "flint.exe: the flint command and the MCP server, a thin client of the running Flint's agent API (docs/02 AGENT-02, AGENT-03; D-185).",
+  "author": "Davit Khachaturovi",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-sea.mjs --bundle-only",
+    "build:exe": "node scripts/build-sea.mjs"
+  },
+  "devDependencies": {
+    "@flint/core": "0.0.0",
+    "postject": "1.0.0-alpha.6"
+  }
+}

@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
@@ -78,6 +79,23 @@ import { Workspace, type CreatedList } from './capture/workspace.js';
 import { createCapturePopup, type CapturePopup, type FocusSample } from './popup.js';
 import { isAbsoluteFolder, SettingsFile } from './settings.js';
 import { claudeState, giveToClaude, readGiveRequest, withFolder } from './claude.js';
+import { isPreset, LIMIT_PRESETS } from '@flint/core/agents';
+import type { AgentsAction, AgentsActionOutcome, AgentsSettingsView } from '../shared/agents.js';
+import { AgentService } from './agents/service.js';
+import {
+  claudeCodeCommand,
+  cliPath,
+  cursorLink,
+  installedSkill,
+  installSkill,
+  saveSkillZip,
+  setupJson,
+  skillVersion,
+  updateInstalledSkill,
+  vscodeLink,
+  writeMcpb,
+  type SetupPaths,
+} from './agents/setup.js';
 import {
   displayKey,
   isZoomRequest,
@@ -1680,6 +1698,197 @@ async function start(): Promise<void> {
     builtInLinksOff: settingsFile.current.builtInLinksOff,
   });
 
+  // AGENT-01 to AGENT-07 (D-185): AI agents reach Flint through its own operations, over a pipe
+  // that exists only while they are turned on (Settings → AI agents).
+  const agentPaths: SetupPaths = {
+    resources: app.isPackaged ? process.resourcesPath : null,
+    appPath: app.getAppPath(),
+    userData: app.getPath('userData'),
+    skillSource: app.isPackaged
+      ? join(process.resourcesPath, 'skill', 'flint')
+      : join(app.getAppPath(), 'resources', 'skill', 'flint'),
+    version: app.getVersion(),
+  };
+  const agents = new AgentService({
+    userData: app.getPath('userData'),
+    version: app.getVersion(),
+    workspace: () => workspace,
+    settings: () => settingsFile.current,
+    saveSettings: async (patch) => {
+      await settingsFile.update(patch);
+      if (patch.linkPatterns) toWindows(Channels.mainChanged);
+    },
+    now: () => new Date(),
+    changed: (keys, lists) => toWindows(Channels.mainAgentChanged, { keys, lists }),
+    paused: (agent, limit) => {
+      if (!mainWindow.isDestroyed())
+        mainWindow.webContents.send(Channels.mainAgentsPaused, { agent, limit });
+    },
+    stateChanged: () => {
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainAgentsChanged);
+    },
+    log,
+  });
+  void agents.start().catch((error: unknown) => log(`agents: start failed: ${String(error)}`));
+  // AGENT-04: a skill Flint installed for Claude Code follows Flint's version.
+  if (!testDataDirectory())
+    void updateInstalledSkill(agentPaths.skillSource).catch(() => undefined);
+  // Q14: whether flint.exe's folder made it onto the user's PATH (the installer may skip it).
+  let cliOnPath: boolean | null = null;
+  if (agentPaths.resources)
+    execFile('reg', ['query', 'HKCU\\Environment', '/v', 'Path'], (error, stdout) => {
+      cliOnPath = error
+        ? false
+        : stdout.toLowerCase().includes(join(agentPaths.resources ?? '', 'bin').toLowerCase());
+    });
+  const agentsView = async (): Promise<AgentsSettingsView> => {
+    const view = agents.view();
+    const summaries = workspace.summaries(new Date());
+    const groups = workspace.sidebarManual().filter((item) => item.kind === 'group');
+    const skill = await installedSkill().catch(() => null);
+    return {
+      ...view,
+      presets: LIMIT_PRESETS,
+      hidden: view.hidden.flatMap((id): AgentsSettingsView['hidden'][number][] => {
+        const list = summaries.find((each) => each.id === id);
+        if (list)
+          return [{ id, name: list.name, kind: list.mode === 'note' ? 'note' : 'list' } as const];
+        const group = groups.find((each) => each.id === id);
+        return group?.kind === 'group' ? [{ id, name: group.name, kind: 'group' } as const] : [];
+      }),
+      cli: { path: cliPath(agentPaths), onPath: cliOnPath },
+      claudeCodeCommand: claudeCodeCommand(agentPaths),
+      skill: {
+        installed: skill?.version ?? null,
+        ours: skill?.ours ?? false,
+        bundled: await skillVersion(agentPaths.skillSource),
+      },
+    };
+  };
+  ipcMain.handle(Channels.mainAgents, (event) =>
+    event.sender === mainWindow.webContents ? agentsView() : null,
+  );
+  ipcMain.handle(Channels.mainAgentsAct, async (event, action: AgentsAction) => {
+    if (event.sender !== mainWindow.webContents || typeof action !== 'object' || action === null)
+      return null;
+    const hooks = e2eHooks();
+    const open = async (link: string): Promise<boolean> => {
+      if (hooks) {
+        hooks.opened.push(link);
+        return true;
+      }
+      return shell.openExternal(link).then(
+        () => true,
+        () => false,
+      );
+    };
+    const outcome = async (): Promise<AgentsActionOutcome> => {
+      switch (action.kind) {
+        case 'on':
+          await agents.setOn(action.on === true);
+          return { ok: true };
+        case 'readOnly':
+          await agents.setReadOnly(action.readOnly === true);
+          return { ok: true };
+        case 'limits':
+          if (!isPreset(action.preset)) return { ok: false };
+          await agents.setLimits(action.preset);
+          return { ok: true };
+        case 'pause':
+          await agents.pause();
+          return { ok: true };
+        case 'resume':
+          await agents.resume();
+          return { ok: true };
+        case 'undo': {
+          const undone = await agents.undo(typeof action.id === 'string' ? action.id : undefined);
+          if (!undone) return { ok: false, message: 'Nothing to undo' };
+          toWindows(Channels.mainChanged);
+          return {
+            ok: true,
+            message:
+              undone.skipped > 0
+                ? `Undone, except ${undone.skipped} ${undone.skipped === 1 ? 'item' : 'items'} changed since`
+                : 'Undone',
+          };
+        }
+        case 'hide':
+          if (typeof action.id !== 'string') return { ok: false };
+          await agents.hide(action.id, action.hide === true);
+          toWindows(Channels.mainChanged);
+          return { ok: true };
+        case 'connect': {
+          if (action.app === 'claude-desktop') {
+            const icon = app.isPackaged
+              ? join(process.resourcesPath, 'flint-icon-120.png')
+              : join(app.getAppPath(), '..', '..', 'assets', 'icon', 'flint-icon-120.png');
+            const bundle = await writeMcpb(agentPaths, icon);
+            if (hooks) {
+              hooks.opened.push(bundle);
+              return { ok: true, message: 'Claude Desktop asks to install it' };
+            }
+            const problem = await shell.openPath(bundle);
+            return problem === ''
+              ? { ok: true, message: 'Claude Desktop asks to install it' }
+              : { ok: false, message: 'Claude Desktop isn’t installed. Copy setup instead.' };
+          }
+          if (action.app === 'cursor')
+            return (await open(cursorLink(agentPaths)))
+              ? { ok: true, message: 'Cursor asks to install it' }
+              : { ok: false, message: 'Cursor isn’t installed. Copy setup instead.' };
+          if (action.app === 'vscode')
+            return (await open(vscodeLink(agentPaths)))
+              ? { ok: true, message: 'VS Code asks to install it' }
+              : { ok: false, message: 'VS Code isn’t installed. Copy setup instead.' };
+          return { ok: false };
+        }
+        case 'copy': {
+          const text =
+            action.app === 'claude-code'
+              ? claudeCodeCommand(agentPaths)
+              : setupJson(
+                  agentPaths,
+                  action.app === 'vscode'
+                    ? 'vscode'
+                    : action.app === 'cursor'
+                      ? 'cursor'
+                      : 'claude-desktop',
+                );
+          await clipboard.writeText(text);
+          return { ok: true, message: 'Copied' };
+        }
+        case 'installSkill': {
+          const done = await installSkill(agentPaths.skillSource);
+          if (done === 'not-ours')
+            return {
+              ok: false,
+              message: 'A Flint skill you added yourself is there; Flint leaves it.',
+            };
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainAgentsChanged);
+          return { ok: true, message: 'Installed for Claude Code' };
+        }
+        case 'saveSkill': {
+          const picked = hooks?.saveSkillTo
+            ? { canceled: false, filePath: hooks.saveSkillTo }
+            : await dialog.showSaveDialog(mainWindow, {
+                title: 'Save the Flint skill for claude.ai',
+                defaultPath: join(app.getPath('downloads'), 'flint-skill.zip'),
+                filters: [{ name: 'Zip', extensions: ['zip'] }],
+              });
+          if (picked.canceled || !picked.filePath) return { ok: false };
+          await saveSkillZip(agentPaths.skillSource, picked.filePath);
+          return { ok: true, message: 'Saved. Upload it in claude.ai → Customize → Skills.' };
+        }
+        default:
+          return { ok: false };
+      }
+    };
+    return outcome().catch((error: unknown) => {
+      log(`agents: ${action.kind} failed: ${String(error)}`);
+      return { ok: false, message: 'That didn’t work; see Flint’s log.' };
+    });
+  });
+
   // D-138: a quit waits (at most 3 s) for what is still being written: a capture handed over a
   // moment ago, the draft Esc just sent, a list change, the pins and Today's order.
   const capturesInFlight = new Set<Promise<void>>();
@@ -1693,6 +1902,8 @@ async function start(): Promise<void> {
     log('quitting: saving what is still being written');
     const saved = Promise.allSettled([
       drafts.settled(),
+      // AGENT-01: the pipe closes and no token is left behind.
+      agents.stop(),
       workspace.settled(),
       focusSaved(),
       ...capturesInFlight,

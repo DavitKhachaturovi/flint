@@ -35,6 +35,18 @@ extraResources:
     filter:
       - tray-*.png
       - icon.ico
+  # AGENT-02, AGENT-03 (D-185): flint.exe (the CLI and MCP server, built by `npm run build:exe -w
+  # @flint/cli`), the skill (AGENT-04), and the icon an .mcpb bundle carries.
+  - from: ../cli/dist
+    to: bin
+    filter:
+      - flint.exe
+  - from: resources/skill
+    to: skill
+  - from: ../../assets/icon
+    to: .
+    filter:
+      - flint-icon-120.png
   # The OFL asks for its licence to travel with the fonts (docs/09 §7).
   - from: src/renderer/fonts
     to: licenses/fonts

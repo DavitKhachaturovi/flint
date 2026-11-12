@@ -359,7 +359,8 @@ export class AgentApi {
     }
     const pool: VItem[] = [];
     if (!kind || kind === 'list' || kind === 'note')
-      pool.push(...view.lists.filter((list) => !kind || list.kind === kind));
+      // A list and a note are both "lists" to an agent: `flint list rename` works on a note too.
+      pool.push(...view.lists);
     if (!kind || kind === 'group') pool.push(...view.groups);
     if (!kind || kind === 'task') {
       if (scope) pool.push(...view.tasksOf(scope));

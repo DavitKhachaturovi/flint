@@ -17,6 +17,8 @@ const TESTS = [
   'apps/desktop/src/renderer/main-window/**/*.test.ts',
   // D-143: the highlighter's linear matchers (no DOM needed).
   'apps/desktop/src/renderer/highlight/**/*.test.ts',
+  // D-185: flint.exe, the CLI and the MCP server (AGENT-02, AGENT-03).
+  'apps/cli/src/**/*.test.ts',
 ];
 /** D-156: the tests that measure time. */
 const TIMING = '**/*.timing.test.ts';

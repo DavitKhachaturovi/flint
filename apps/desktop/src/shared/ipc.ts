@@ -246,6 +246,15 @@ export const Channels = {
   mainSyncPreview: 'main:sync-preview',
   /** Main → main window: sync's status changed. */
   mainSyncChanged: 'main:sync-changed',
+  /** AGENT-05 (D-185): Settings → AI agents' view and actions. */
+  mainAgents: 'main:agents',
+  mainAgentsAct: 'main:agents-act',
+  /** Main → main window: the view changed (a switch, a connection, a change recorded). */
+  mainAgentsChanged: 'main:agents-changed',
+  /** Main → windows: an agent changed these tasks and lists (AGENT-07: they flash once). */
+  mainAgentChanged: 'main:agent-changed',
+  /** Main → main window: agent changes paused after the hourly budget (the toast, once). */
+  mainAgentsPaused: 'main:agents-paused',
   /** Main window → main: the user's link patterns (NOTE-07, D-84). */
   mainLinkPatterns: 'main:link-patterns',
   /** TASK-18, D-151: Give to Claude's folders, and the giving itself (a prompt, never a link). */
