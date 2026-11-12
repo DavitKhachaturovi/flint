@@ -334,7 +334,15 @@ export class GoogleDrive implements Drive {
       const now = await this.json<ApiFile>(
         `${DRIVE_API}/files/${encodeURIComponent(file.id)}?fields=${FILE_FIELDS}`,
       );
-      if (this.remote(now, file.kind).revision !== options.expect) throw new DriveError('changed');
+      const current = this.remote(now, file.kind);
+      if (current.revision !== options.expect) {
+        // D-181: for the log: what this run expected, what Drive has, and who wrote it when.
+        const short = (revision: string): string => revision.slice(0, 8) || 'none';
+        throw new DriveError(
+          'changed',
+          `expected ${short(options.expect)}, Drive has ${short(current.revision)}, written by ${current.device ?? 'unknown'} at ${now.modifiedTime ?? '?'}`,
+        );
+      }
     }
     const metadata: Record<string, unknown> = {
       ...(options.name !== undefined

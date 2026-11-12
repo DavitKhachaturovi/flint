@@ -215,10 +215,32 @@ export class SyncService {
     this.emit();
     // Another PC wrote while this run did, or a note was being typed in: again in a moment.
     if (report.again) {
+      this.logAgain(report.againWhy);
       clearTimeout(this.changeTimer);
       this.changeTimer = setTimeout(() => void this.request(), AFTER_CHANGE_MS);
       this.changeTimer.unref?.();
     }
+  }
+
+  /** D-181: the reason last logged for running again, and how many runs in a row gave it. */
+  private againLogged = { text: '', count: 0 };
+
+  /**
+   * D-181: why a run asks for another, in the log: a new reason at once, the same one again after
+   * 10, 100 and 1000 runs in a row (so a run every few seconds doesn't fill the log).
+   */
+  private logAgain(why: readonly string[]): void {
+    const text = why.length > 0 ? why.join('; ') : 'no reason given';
+    if (text === this.againLogged.text) {
+      const count = ++this.againLogged.count;
+      if (count === 10 || count === 100 || count === 1000)
+        this.options.log(`sync: again, the same ${count} runs in a row: ${text}`);
+      return;
+    }
+    this.againLogged = { text, count: 1 };
+    this.options.log(
+      `sync: again in ${AFTER_CHANGE_MS / 1000} s (this PC is ${this.options.local.device}): ${text}`,
+    );
   }
 
   /** Offline or failed: again by itself, backing off up to the 3-minute cycle (D-161 Q8). */

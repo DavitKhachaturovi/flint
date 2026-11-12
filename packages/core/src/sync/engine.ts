@@ -42,6 +42,8 @@ export interface SyncReport {
   readonly remoteGroups: readonly SyncedGroup[];
   /** Something changed in Drive while this run wrote: run again soon. */
   readonly again: boolean;
+  /** D-181: why it runs again (a note being typed in, a file Drive changed meanwhile), for the log. */
+  readonly againWhy: readonly string[];
   readonly message?: string;
 }
 
@@ -201,6 +203,7 @@ export class SyncEngine {
     const conflicts = new Map<string, number>();
     const didNotFit: { name: string; size: number }[] = [];
     let again = false;
+    const againWhy: string[] = [];
     const report = (status: SyncReport['status'], extra: Partial<SyncReport> = {}): SyncReport => ({
       status,
       downloaded,
@@ -210,14 +213,16 @@ export class SyncEngine {
       remoteOnly: [],
       remoteGroups: [],
       again,
+      againWhy,
       ...extra,
     });
     if (this.state.mode === null) return report('synced');
     try {
       return await this.runOnce(
         { downloaded, uploaded, conflicts, didNotFit },
-        (value) => {
-          again = again || value;
+        (why) => {
+          again = true;
+          againWhy.push(why);
         },
         report,
       );
@@ -232,7 +237,10 @@ export class SyncEngine {
             : error.problem === 'changed'
               ? 'synced'
               : 'error';
-        if (error.problem === 'changed') again = true;
+        if (error.problem === 'changed') {
+          again = true;
+          againWhy.push(`Drive changed during the run: ${error.message}`);
+        }
         return report(status, { message: error.message });
       }
       return report('error', { message: error instanceof Error ? error.message : String(error) });
@@ -246,7 +254,7 @@ export class SyncEngine {
       conflicts: Map<string, number>;
       didNotFit: { name: string; size: number }[];
     },
-    setAgain: (value: boolean) => void,
+    setAgain: (why: string) => void,
     report: (status: SyncStatus, extra?: Partial<SyncReport>) => SyncReport,
   ): Promise<SyncReport> {
     const { drive, local, bases, state } = this;
@@ -340,7 +348,7 @@ export class SyncEngine {
     ]);
     for (const id of ids) {
       if (local.busy?.(id)) {
-        setAgain(true);
+        setAgain(`${id}: being typed in`);
         continue;
       }
       const previous = state.items[id];
@@ -509,7 +517,7 @@ export class SyncEngine {
         } catch (error) {
           if (error instanceof DriveError && error.problem === 'changed') {
             // Another PC wrote it meanwhile: this PC keeps its merged text; the next run merges again.
-            setAgain(true);
+            setAgain(`${id}: changed in Drive (${error.message})`);
             await bases.set(id, known?.theirs ?? text);
             state.items[id] = {
               fileId: file.id,
@@ -697,7 +705,7 @@ export class SyncEngine {
           this.metaCache.set(name, { revision: written.revision, text: pretty });
         } catch (error) {
           if (error instanceof DriveError && error.problem === 'changed') {
-            setAgain(true);
+            setAgain(`${name}: changed in Drive (${error.message})`);
             return;
           }
           throw error;

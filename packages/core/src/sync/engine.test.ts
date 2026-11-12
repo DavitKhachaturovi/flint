@@ -401,6 +401,26 @@ describe('SyncEngine (SYNC-01, D-161)', () => {
     expect(drive.contents().get('Groceries')).toContain('Eggs');
   });
 
+  it('a run that has to run again says why, for the log (D-181)', async () => {
+    const { drive, work } = await twoPcs();
+    await work.sync();
+    work.edit('groc', (text) => text + '- [ ] Stamps [id:: ssssss]\n');
+    drive.beforeWrite = (file) => {
+      drive.beforeWrite = null;
+      // Another PC writes the list between this run's read and its write.
+      const theirs = `${drive.contents().get('Groceries') ?? ''}- [ ] Tape [id:: tttttt]\n`;
+      drive.update(file, new TextEncoder().encode(theirs), { device: 'laptop' });
+    };
+    const report = await work.sync();
+    expect(report.again).toBe(true);
+    expect(report.againWhy).toEqual(['groc: changed in Drive (changed)']);
+    // The next run merges it and has nothing more to do.
+    const next = await work.sync();
+    expect(next.again).toBe(false);
+    expect(next.againWhy).toEqual([]);
+    expect(work.text('groc')).toContain('Tape');
+  });
+
   it('a write racing another PC merges again on the next run', async () => {
     const { drive, laptop, work } = await twoPcs();
     laptop.edit('groc', (text) => text.replace('Oat milk', 'Oat milk, eggs'));
