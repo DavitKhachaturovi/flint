@@ -28,6 +28,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
     today.json                  ← Today's manual order (task IDs), pin days, the rollover prompt's last answer (D-90)
     focus.json                  ← Focus's sprint: task IDs in order, each with its estimate and count (FOCUS-02, FOCUS-03, D-170)
     sidebar.json                ← sidebar groups and the manual order of lists, notes and groups (LIST-05, LIST-06, D-73)
+    agents.json                 ← AGENT-06 (D-185): the lists, notes and groups hidden from AI agents: { "flint": 1, "hidden": { "<list or group ID>": "<ISO time of the change>" }, "shown": { … } } (Proposed format; `shown` keeps un-hiding times for sync's later-change rule)
     archive/                    ← auto-archived completed tasks, one task list per list: `<list ID>.md` (TASK-06, D-88)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
 ```
@@ -47,6 +48,8 @@ App data (not in the Flint folder):
   draft-attachments            ← images pasted into the draft, until the capture is saved (CAP-06)
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
   sync\                         ← Google Drive sync: the encrypted account, state.json, the merge bases (SYNC-01, §7, D-161)
+  agent-token                   ← AGENT-01 (D-185): the 256-bit token agents' requests must carry; only while agents are on, renewed at each start and turn-on
+  agent-changes.json            ← AGENT-07 (D-185): the last 100 agent changes or 7 days (label, agent, time, inverse operations, the Trash files they made), for Recent agent changes and their Undo
 %LOCALAPPDATA%\Flint\
   snapshots\                    ← local snapshots (DATA-04)
   logs\                         ← local logs only, never uploaded (APP-09)
@@ -145,6 +148,7 @@ The app never shows fields as text; it renders them as the stripe, bell, pin, an
 
 ### Bookkeeping in `.flint/meta.json` and `.flint/today.json`
 - Rule: **everything that matters lives in the markdown line; side files hold only bookkeeping that is harmless to lose.**
+- **D-185 (AGENT-01):** `meta.json` entries (tasks and notes) may also hold `createdBy` and `touchedBy`, the name of the AI agent that created or last changed the item (written only for agent changes; an edit by the user removes `touchedBy`). Optional, so older Flint versions keep them (unknown keys are kept).
 - `meta.json`, per task ID: `created`, `lastTouched` (any edit, move, priority change, completion), and **D-85** `captured` (when it came from the capture popup, for Recently captured); per note ID its `created` (first sighting). `lastTouched` must be recorded from v1 so stale-task fading (TASK-13, Later) needs no migration. Missing entries are created on first sight. For completed tasks also `completedAfter`: the ID of the task that preceded it when it was completed, so un-checking can return it to its previous position (TASK-06, **Proposed**).
 - `today.json`: the manual order of Today. Today membership itself is the `pinned` field in the line (D-85), so losing this file only loses the order. **D-90 (Proposed format):** `{ "flint": 1, "order": [task IDs], "pinnedOn": { task ID: "YYYY-MM-DD" }, "answered": "YYYY-MM-DD" | null }`: the order, the day each task was pinned (for the rollover prompt; a pin first seen counts as pinned that day) and the day the prompt was last answered; unknown keys are kept.
 - `focus.json` (D-170): Focus's sprint, the one place a task's membership is kept (never in its line, so the format doesn't change). **Proposed format:** `{ "flint": 1, "tasks": [{ "id": task ID, "estimate": 1, "count": 0 }] }` in the sprint's order; a task no longer found (deleted, its list gone) isn't shown but stays in the file, so undoing the delete brings it back into Focus; **Clear finished** drops it (D-171); unknown keys are kept. Losing it empties the sprint and its counts, never a task. Per PC: not synced (like `today.json`).
@@ -255,6 +259,7 @@ My Drive/Flint/                 ← found by its Drive ID, so renaming or moving
     removed.json                ← what left Drive and why: { "<list ID>": { "how": "deleted" | "unsynced", "at": "<ISO time>", "device": "DAVIT-LAPTOP" } }, kept 90 days (Proposed)
     compat.json                 ← SYNC-02 (D-166): { "flint": 1, "sync": 1, "raisedBy": null | { "device", "app", "version" }, "devices": { "<device name>": { "app": "Flint" | "Flint for Android", "version": "1.6.0", "sync": 1, "seen": "<ISO time>" } } }
 ```
+- **D-185 (AGENT-01, AGENT-06):** `items.json` also carries per task `createdBy` / `touchedBy` when set, and per synced list or note `agents: { "hidden": true | false, "at": "<ISO time>" }`; `groups.json` the same `agents` per group. Hidden from agents merges by the later `at`. New optional fields: the sync version stays 1 (SYNC-02).
 - **Sync version (SYNC-02, D-166):** every run reads `compat.json` first. A `sync` higher than this app supports stops the run before anything else is read or written. Missing, it is created with `sync: 1` (Drive folders from 1.5.x). Each run updates its own `devices` entry. Unknown keys anywhere in the `.flint-sync` files are kept when a file is rewritten (a round-trip test), so a field added later never breaks an older app. A synced file whose frontmatter `flint:` is higher than this app reads (§3) is never merged or written by this app; it downloads as it is and stays read-only.
 - Only files Flint created are visible to it (`drive.file`); a file added to the folder by hand in Drive is not seen. Each file's Drive `appProperties` carry `flintId` (the list ID, or the attachment's file name), so Flint never matches by name alone.
 - **Deletes** move files to Drive's own trash (Google keeps them 30 days), never deleted for good, and are recorded in `removed.json`: `deleted` means "to Trash on every PC", `unsynced` means "each PC keeps its copy and stops syncing it". A file that disappears from Drive without a record (removed in Drive itself) counts as `unsynced`.

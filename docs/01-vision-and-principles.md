@@ -56,7 +56,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 
 **Not in v1 (may be revisited later):**
 - ~~**Syncing of any kind** (OneDrive, cloud, server).~~ **D-161 (1.5.0):** opt-in **Google Drive sync** of chosen lists and notes (SYNC-01), through the user's own Drive with no Flint server; still not: a Flint server or account, folder-sync services for the Flint folder (OneDrive, Dropbox), sharing with other people, iCloud. OneDrive through Microsoft Graph stays Later.
-- **Integrations** with other apps (planned later, through the CLI and the shared packages; see 05 §7).
+- **Integrations** with other apps (planned later, through the CLI and the shared packages; see 05 §7). **D-185 (1.8.0):** AI agents (MCP clients and the `flint` command) can use Flint through its own agent API on this PC, off by default (02 §11). Other app integrations stay Later.
 
 **Considered and not selected** (ideas raised during design that were *not* chosen; do not implement without a new decision):
 - Auto-stamping captures with context (active git branch/repo, window title).

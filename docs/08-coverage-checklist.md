@@ -1347,3 +1347,32 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 16 | Tests: the tab's placement, snapping and the card's level as pure functions (`mini-place.ts`); end to end in `mini.spec.ts` on the test clock: collapse, peek without the keyboard, slide back, click to open, Ctrl+M, the hotkey's way back, the dot, the start setting | MINI-04 · Built (1.7.0, D-178) | 05 §5, D-107, D-156 |
 | 17 | Preview feedback: the reminder alert's X (only the card goes, the task stays overdue); a click anywhere on a peek opens it (also the header's drag region, through main); mini's ⋯ only while the list tab shows Focus | MINI-04, REM-06, FOCUS-06 · Built (1.7.0, D-179) | 02, D-179 |
 | 18 | Fixes in 1.7.0: the timeline's "+N" menu shows done and overdue (D-180); sync logs why a run runs again (D-181); an idle PC no longer syncs every few seconds (D-183: unchanged groups applied on every run); reminders due while the screen is locked wait for the unlock (D-182) | TODAY-03, SYNC-01, REM-07 · Built (1.7.0) | 02, D-180, D-181, D-182, D-183 |
+
+---
+## CH. 1.8.0: AI agents and the shortcuts sheet (13 Nov 2026, D-185 grill Q1–Q15, D-186, mockup 17)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | The agent API in main, every action through the workspace's operations, writes in its queue; off by default, turned on only in Flint | AGENT-01 · Decided (1.8.0) | 02 §11, 05 §5, D-185 |
+| 2 | The named pipe per identity and user, the 256-bit token file renewed at start and turn-on, constant-time check, no details on a wrong token, refused when the name is taken | AGENT-01 · Decided | 02, 04, 05, D-185 Q3 |
+| 3 | `createdBy` / `touchedBy` in `meta.json`, synced; client names from MCP, `--as`, `FLINT_AGENT`, `CLAUDECODE`; shown in the panel's footer, a note's header, Recent changes; no row mark | AGENT-01 · Decided | 02, 04, D-185 Q4 |
+| 4 | IDs or exact names, never a guess; `ambiguous` / `not_found` with candidates; batches all or nothing; open tasks first | AGENT-01 · Decided | 02, D-185 Q6 |
+| 5 | Times: Flint's phrases and ISO with offsets, `none`; echoed in both forms; `now` and the time zone in every answer; `bad_time`; shorthand on in the CLI (`--literal`), off in MCP | AGENT-01 · Decided | 02, D-185 Q7 |
+| 6 | Limits Low / Medium / High, fixed sizes, connections and timeouts; `too_large`; the hourly pause with its toast, Paused state and palette commands | AGENT-01 · Decided | 02, D-185 Q8 |
+| 7 | Never for agents: Trash emptying and restore, snapshots, settings (but link patterns), sync and its per-item switch, clipboard history, Focus's timer, hotkeys, the folder, the agent switches, Hidden from agents, undo | AGENT-01 · Decided | 02, D-185 Q8, Q10 |
+| 8 | Large content: snippets with line numbers, line ranges, the default cut with `truncated`, outlines, paged lists, capped bodies | AGENT-01, AGENT-03 · Decided | 02, D-185 Q10 |
+| 9 | Attachments from a path by MEDIA-02/03's rules; programs and scripts refused | AGENT-01 · Decided | 02, D-185 Q11 |
+| 10 | `flint.exe`, a Node single executable in `resources\bin`; noun-verb commands, the `flint add` alias, `--json`, standard input, exit codes 0–5, help at every level, `flint help agents` | AGENT-02 · Decided | 02, 05, D-185 Q1, Q11 |
+| 11 | Flint not running: started in the tray, 20 s wait, `--no-start`, exit 3; agents off: exit 4 with the message | AGENT-02 · Decided | 02, D-185 Q2 |
+| 12 | `flint mcp`: six `flint_` tools with examples; Flint started on the first tool call; read-only lists two tools, `tools/list_changed` | AGENT-03 · Decided | 02, D-185 Q10 |
+| 13 | Add to Claude Desktop (a `.mcpb` generated on click), Claude Code's command, Add to Cursor / VS Code with Copy setup; full paths everywhere | AGENT-03 · Decided | 02, D-185 Q13 |
+| 14 | The skill: Install for Claude Code (updated when older), Save for claude.ai… with the desktop-app note | AGENT-04 · Decided | 02, D-185 |
+| 15 | Settings → AI agents, its own section in the index: switch and status, read-only, limits, Connect an app, skill, Hidden from agents, Recent changes, privacy; About's sentence; the palette commands | AGENT-05, APP-09, D-106 · Decided | 02, D-185 Q13 |
+| 16 | Mockup 17 reviewed by Davit before the Settings UI (off, on with clients, read-only, paused, Recent changes with an undone entry, the shortcuts sheet) | AGENT-05, NAV-02 · To do | 09, D-185 Q13 |
+| 17 | Hidden from agents per list, note and group (a group hides its lists), right-click, palette, Settings list; synced; enforced in one place; a test per path; a review round | AGENT-06 · Decided | 02, 04, 05, D-185 Q15 |
+| 18 | Recent agent changes: one request one change, `agent-changes.json` (100 or 7 days), undo out of order skipping later changes, notes by three-way merge, undo on the user's Ctrl+Z | AGENT-07 · Decided | 02, 04, D-185 Q5 |
+| 19 | Agent changes in open windows: the user's motion plus one flash per changed visible row (max 20), never focus, scroll, selection or list; no per-change toast; in the motion census | AGENT-07, UI-10 · Decided | 02, 03 §5, D-185 Q12 |
+| 20 | The installer's guarded PATH step and its exact removal on uninstall; unit tests of the matching and guards; a manual install and uninstall | AGENT-02 · Decided | 05 §6, D-185 Q14 |
+| 21 | The `?` sheet as the place to view and change shortcuts: the four global hotkeys editable, Settings' one row, Capture's link row, search opening the sheet | NAV-02, APP-08 · Decided (1.8.0) | 02, D-186 |
+| 22 | Every shortcut rebindable | APP-17 · Later | 02, 06 §3, D-186 |
+| 23 | Tests against temporary Flint folders only (unit, the CLI and MCP against a running Flint, end to end), never Davit's data | AGENT-* · Decided | 06, D-185 |
