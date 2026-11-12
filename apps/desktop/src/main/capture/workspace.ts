@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { statSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, stat, unlink } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
@@ -46,6 +47,7 @@ import {
   type ListInfo,
 } from '@flint/core/shorthand';
 import { atDefaultTime, formatLocalDateTime, fromDate, toDate } from '@flint/core/time';
+import { opKeys, planInverse, planText, taskFingerprint } from '@flint/core/agents';
 import type {
   ChangeOutcome,
   SidebarAction,
@@ -258,6 +260,65 @@ interface StepFiles {
 }
 
 export type ListMode = 'tasks' | 'note';
+
+/**
+ * AGENT-07 (D-185 Q5): one step of an AI agent's change, as plain data, so it can be undone out of
+ * order and after a restart, never over a later change (`@flint/core/agents`' undo planning).
+ */
+export type AgentStep =
+  /** Operations on tasks: their inverse, and how each task looked right after the change. */
+  | {
+      readonly kind: 'ops';
+      readonly path: string;
+      readonly inverse: Op;
+      readonly after: Readonly<Record<string, string | null>>;
+    }
+  /** A whole text (a note's, a converted list's): undone by a three-way merge. */
+  | {
+      readonly kind: 'text';
+      readonly path: string;
+      readonly before: string;
+      readonly after: string;
+    }
+  /** A list or note made: to Trash on undo, only while still exactly as made. */
+  | { readonly kind: 'created'; readonly listId: string; readonly text: string }
+  /** A list or note deleted to Trash: restored on undo. */
+  | { readonly kind: 'deletedList'; readonly trash: string }
+  | {
+      readonly kind: 'renamed';
+      readonly listId: string;
+      readonly from: string;
+      readonly to: string;
+    }
+  /** The sidebar's groups and order: put back only while unchanged since. */
+  | { readonly kind: 'sidebar'; readonly before: string; readonly after: string }
+  /** A deleted task's Trash file: removed once the task is back. */
+  | { readonly kind: 'taskTrash'; readonly trash: string };
+
+/** What an agent run did (AGENT-01). */
+export interface AgentRunOutcome<T> {
+  readonly result?: T;
+  readonly error?: unknown;
+  readonly steps: readonly AgentStep[];
+  /** Task keys and lists changed, for the windows' flash (AGENT-07, D-185 Q12). */
+  readonly keys: readonly string[];
+  readonly lists: readonly string[];
+}
+
+/** An exclusive run: an agent's request, or the user undoing one (`agent` null). */
+interface Exclusive {
+  readonly agent: string | null;
+  readonly applied: { readonly path: string; readonly op: Op; readonly inverse: Op }[];
+}
+
+interface AgentSnapshot {
+  readonly lists: ReadonlyMap<
+    string,
+    { readonly name: string; readonly path: string; readonly text: string }
+  >;
+  readonly sidebar: string;
+  readonly trash: ReadonlySet<string>;
+}
 
 /** What a list action did, or why it couldn't (shown next to the name being typed). */
 export type ListOutcome = ListActionOutcome;
@@ -579,11 +640,18 @@ export class Workspace {
 
   /** Changes run one at a time: watcher refreshes, captures and undos never interleave. */
   private queue: Promise<unknown> = Promise.resolve();
+  /**
+   * AGENT-01: an exclusive run (an agent's request, or undoing one) holds the queue from start to
+   * end; the calls it makes run at once, and everything else waits until it is done, so the user's
+   * own changes never land in the middle of an agent's (or get attributed to it).
+   */
+  private readonly exclusive = new AsyncLocalStorage<Exclusive>();
   private serial<T>(
     work: () => Promise<T>,
     /** D-183: whether it changed anything (by default it did); nothing changed tells no one. */
     changed: (result: T) => boolean = () => true,
   ): Promise<T> {
+    if (this.exclusive.getStore()) return work();
     const run = this.queue.catch(() => undefined).then(work);
     this.queue = run;
     // Whatever changed, the main window shows it (M4).
@@ -2757,6 +2825,201 @@ export class Workspace {
     return this.serial(() => this.step(this.redoStack, this.undoStack, now));
   }
 
+  /**
+   * AGENT-01 (D-185): an AI agent's request as one exclusive run. Its changes never go on the
+   * window's undo stack (Q5): the run says what it did as data (`AgentStep`s) for Recent agent
+   * changes instead. A failure part-way still reports what was done, so it can be undone.
+   */
+  agentRun<T>(agent: string, work: () => Promise<T>): Promise<AgentRunOutcome<T>> {
+    return this.serial(async () => {
+      const run: Exclusive = { agent, applied: [] };
+      const undoStart = this.undoStack.length;
+      const redo = [...this.redoStack];
+      const before = await this.agentSnapshot();
+      let result: T | undefined;
+      let error: unknown;
+      try {
+        result = await this.exclusive.run(run, work);
+      } catch (caught) {
+        error = caught;
+      } finally {
+        this.undoStack.splice(undoStart);
+        this.redoStack.splice(0, this.redoStack.length, ...redo);
+      }
+      const after = await this.agentSnapshot();
+      return {
+        ...(error === undefined ? { result: result as T } : { error }),
+        ...this.agentSteps(before, after, run.applied),
+      };
+    });
+  }
+
+  private async agentSnapshot(): Promise<AgentSnapshot> {
+    return {
+      lists: new Map(
+        this.lists.map((list) => [
+          this.listId(list.entry),
+          {
+            name: list.entry.name,
+            path: list.entry.path,
+            text: serializeDocument(list.file.document),
+          },
+        ]),
+      ),
+      sidebar: writeSidebar(this.sidebarFile),
+      trash: new Set(await readdir(trashFolder(this.folder)).catch(() => [])),
+    };
+  }
+
+  private agentSteps(
+    before: AgentSnapshot,
+    after: AgentSnapshot,
+    applied: Exclusive['applied'],
+  ): Pick<AgentRunOutcome<unknown>, 'steps' | 'keys' | 'lists'> {
+    const steps: AgentStep[] = [];
+    const created = [...after.lists.keys()].filter((id) => !before.lists.has(id));
+    const createdPaths = new Set(created.map((id) => after.lists.get(id)?.path));
+    const keys = new Set<string>();
+    const changedLists = new Set<string>();
+    const texts = new Map<string, { before: string }>();
+    for (const part of applied) {
+      const list = this.lists.find(({ entry }) => entry.path === part.path);
+      if (list) changedLists.add(this.listId(list.entry));
+      for (const key of opKeys(part.inverse)) keys.add(key);
+      if (createdPaths.has(part.path)) continue;
+      if (part.inverse.type === 'setText') {
+        if (!texts.has(part.path)) texts.set(part.path, { before: part.inverse.text });
+        continue;
+      }
+      const document = list?.file.document;
+      const fingerprints = Object.fromEntries(
+        opKeys(part.inverse).map((key) => [key, document ? taskFingerprint(document, key) : null]),
+      );
+      steps.push({ kind: 'ops', path: part.path, inverse: part.inverse, after: fingerprints });
+    }
+    for (const [path, text] of texts) {
+      const list = this.lists.find(({ entry }) => entry.path === path);
+      if (list)
+        steps.push({
+          kind: 'text',
+          path,
+          before: text.before,
+          after: serializeDocument(list.file.document),
+        });
+    }
+    for (const id of created) {
+      const list = after.lists.get(id);
+      if (list) steps.push({ kind: 'created', listId: id, text: list.text });
+      changedLists.add(id);
+    }
+    const newTrash = [...after.trash].filter((name) => !before.trash.has(name));
+    for (const [id, list] of before.lists) {
+      const now = after.lists.get(id);
+      if (!now) {
+        const trash = newTrash.find((name) => name.endsWith(`-${basename(list.path)}`));
+        if (trash) steps.push({ kind: 'deletedList', trash });
+      } else if (now.name !== list.name) {
+        steps.push({ kind: 'renamed', listId: id, from: list.name, to: now.name });
+        changedLists.add(id);
+      }
+    }
+    for (const trash of newTrash) {
+      if (!steps.some((step) => step.kind === 'deletedList' && step.trash === trash))
+        steps.push({ kind: 'taskTrash', trash });
+    }
+    if (after.sidebar !== before.sidebar)
+      steps.push({ kind: 'sidebar', before: before.sidebar, after: after.sidebar });
+    return { steps, keys: [...keys], lists: [...changedLists] };
+  }
+
+  /**
+   * AGENT-07 (D-185 Q5): the user undoes an agent's change. Out of order, never over a later
+   * change: tasks changed since are skipped, a text is merged, a list made is trashed only if
+   * unchanged. It is the user's own action: one step on the window's undo stack (Ctrl+Z redoes it).
+   */
+  undoAgentSteps(
+    steps: readonly AgentStep[],
+    label: string,
+    now: Date,
+  ): Promise<{ readonly undone: number; readonly skipped: number }> {
+    return this.serial(() =>
+      this.exclusive.run({ agent: null, applied: [] }, async () => {
+        const start = this.undoStack.length;
+        let undone = 0;
+        let skipped = 0;
+        // Newest first; a deleted task's Trash file goes last, once its task is back.
+        const ordered = [...steps]
+          .reverse()
+          .sort((a, b) => Number(a.kind === 'taskTrash') - Number(b.kind === 'taskTrash'));
+        for (const step of ordered) {
+          const outcome = await this.undoAgentStep(step, label, now).catch(
+            () => 'skipped' as const,
+          );
+          if (outcome === 'undone') undone += 1;
+          else if (outcome === 'skipped') skipped += 1;
+        }
+        this.mergeSince(start, `Undid ${label}`);
+        return { undone, skipped };
+      }),
+    );
+  }
+
+  private async undoAgentStep(
+    step: AgentStep,
+    label: string,
+    now: Date,
+  ): Promise<'undone' | 'skipped' | 'nothing'> {
+    switch (step.kind) {
+      case 'ops': {
+        const list = this.lists.find(({ entry }) => entry.path === step.path);
+        if (!list || list.file.readOnly) return 'skipped';
+        const plan = planInverse(list.file.document, step.inverse, step.after);
+        if (plan.op) await this.record(list, plan.op, label, now);
+        if (plan.skipped.length > 0) return 'skipped';
+        return plan.op ? 'undone' : 'nothing';
+      }
+      case 'text': {
+        const list = this.lists.find(({ entry }) => entry.path === step.path);
+        if (!list || list.file.readOnly) return 'skipped';
+        const text = planText(step.before, step.after, serializeDocument(list.file.document));
+        if (text === null) return 'skipped';
+        await this.record(list, { type: 'setText', list: list.file.path, text }, label, now);
+        return 'undone';
+      }
+      case 'created': {
+        const list = this.find(step.listId);
+        if (!list) return 'nothing';
+        if (serializeDocument(list.file.document) !== step.text) return 'skipped';
+        const outcome = await this.deleteList(step.listId, now);
+        return outcome.ok ? 'undone' : 'skipped';
+      }
+      case 'deletedList':
+        return (await this.restoreFromTrash(step.trash, now)) ? 'undone' : 'skipped';
+      case 'renamed': {
+        const list = this.find(step.listId);
+        if (!list || list.entry.name !== step.to) return 'skipped';
+        return (await this.renameList(step.listId, step.from, now)).ok ? 'undone' : 'skipped';
+      }
+      case 'sidebar': {
+        if (writeSidebar(this.sidebarFile) !== step.after) return 'skipped';
+        const previous = this.sidebarFile;
+        const restored = readSidebar(step.before);
+        await this.saveSidebar(restored);
+        this.remember(this.sidebarStep(label, previous, restored));
+        return 'undone';
+      }
+      case 'taskTrash': {
+        const path = trashPath(this.folder, step.trash);
+        const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
+        if (!path || text === null) return 'nothing';
+        const keys = [...allTasks(parseDocument(text))].map(({ task }) => task.key);
+        const back = keys.every((key) => this.locate(key) !== null);
+        if (back) await unlink(path).catch(() => undefined);
+        return 'nothing';
+      }
+    }
+  }
+
   private async step(from: UndoEntry[], to: UndoEntry[], now: Date): Promise<string | null> {
     const entry = from.pop();
     // A list deleted since (an undone new list, or by another program) can't be redone into.
@@ -3068,14 +3331,20 @@ export class Workspace {
     if (!applied) throw new Error(`could not change ${list.entry.name}`);
     await list.file.save({ now: fromDate(now), isTaken: this.isTaken });
     // docs/04 §3: what changed was touched; new tasks (with their IDs written now) are first seen.
+    // AGENT-01 (D-185 Q4): by the agent whose request this is, or by the user (clearing touchedBy).
+    const run = this.exclusive.getStore();
+    const by = run?.agent ?? undefined;
     this.meta.touch(
       applied.touched.map((each) => each.key),
       now,
+      by,
     );
     this.meta.seen(
       [...allTasks(list.file.document)].map(({ task }) => task.key),
       now,
+      by,
     );
+    run?.applied.push({ path: list.entry.path, op, inverse: applied.inverse });
     // A conversion (LIST-04), or undoing one, changes the list's mode.
     list.entry = { ...list.entry, mode: documentMode(list.file.document) };
     return applied;

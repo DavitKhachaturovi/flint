@@ -40,7 +40,8 @@ export interface AgentIdentity {
   readonly via: 'mcp' | 'cli';
 }
 
-export type AgentTool = 'status' | 'find' | 'read' | 'create' | 'update' | 'delete' | 'linkPatterns';
+export type AgentTool =
+  'status' | 'find' | 'read' | 'create' | 'update' | 'delete' | 'linkPatterns';
 
 export interface AgentRequest {
   readonly protocol: number;
@@ -133,14 +134,12 @@ export type Priority = 'high' | 'medium' | 'low';
  * Where a task goes in its list: `top` (the default, as capture, CAP-05), `bottom`, or next to
  * another task (its ID or exact title, in the same list and at the same level).
  */
-export type TaskPosition = 'top' | 'bottom' | { readonly after: string } | { readonly before: string };
+export type TaskPosition =
+  'top' | 'bottom' | { readonly after: string } | { readonly before: string };
 
 /** Where a list, note or group goes in the sidebar's manual order (LIST-06). */
 export type SidebarPosition =
-  | 'top'
-  | 'bottom'
-  | { readonly after: string }
-  | { readonly before: string };
+  'top' | 'bottom' | { readonly after: string } | { readonly before: string };
 
 /** A line range of a note or a body, 1-based and inclusive. */
 export interface LineRange {
@@ -209,7 +208,11 @@ export interface FindHit {
 
 export interface Overview {
   readonly lists: readonly OverviewList[];
-  readonly groups: readonly { readonly id: string; readonly name: string; readonly lists: readonly string[] }[];
+  readonly groups: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly lists: readonly string[];
+  }[];
   /** Today's pinned tasks. */
   readonly today: readonly FindHit[];
   /** Reminders still to come (and overdue ones), soonest first, at most 20. */
@@ -227,8 +230,7 @@ export interface OverviewList {
 }
 
 export type FindResult =
-  | { readonly overview: Overview }
-  | { readonly hits: readonly FindHit[]; readonly more: boolean };
+  { readonly overview: Overview } | { readonly hits: readonly FindHit[]; readonly more: boolean };
 
 // ─── read ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -323,7 +325,11 @@ export interface NoteOut {
   /** How to read on, when truncated. */
   readonly hint?: string;
   /** `outline: true`. */
-  readonly outline?: readonly { readonly line: number; readonly level: number; readonly text: string }[];
+  readonly outline?: readonly {
+    readonly line: number;
+    readonly level: number;
+    readonly text: string;
+  }[];
   readonly createdBy?: string;
   readonly touchedBy?: string;
 }
@@ -332,13 +338,21 @@ export interface GroupOut {
   readonly kind: 'group';
   readonly id: string;
   readonly name: string;
-  readonly lists: readonly { readonly id: string; readonly name: string; readonly kind: 'list' | 'note' }[];
+  readonly lists: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: 'list' | 'note';
+  }[];
 }
 
 export interface ArchivedOut {
   readonly kind: 'archived';
   readonly list: { readonly id: string; readonly name: string };
-  readonly tasks: readonly { readonly id: string; readonly title: string; readonly completed: string }[];
+  readonly tasks: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly completed: string;
+  }[];
 }
 
 export type ReadOut = TaskOut | ListOut | NoteOut | GroupOut | ArchivedOut;

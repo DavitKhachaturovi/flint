@@ -16,7 +16,14 @@ export interface TaskMeta {
   readonly created: string;
   readonly lastTouched: string;
   readonly captured?: string;
+  /** AGENT-01 (D-185 Q4): the AI agent that created it, and the one that changed it last. */
+  readonly createdBy?: string;
+  readonly touchedBy?: string;
 }
+
+/** An agent's name as stored: a short label (the client says what it is). */
+const AGENT_NAME = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim().slice(0, 32) : undefined;
 
 const two = (value: number): string => String(value).padStart(2, '0');
 export const localStamp = (now: Date): string =>
@@ -42,13 +49,20 @@ export class TaskMetaFile {
       this.extra = extra;
       if (typeof tasks === 'object' && tasks !== null)
         for (const [id, value] of Object.entries(tasks as Record<string, unknown>)) {
-          const { created, lastTouched, captured } = (value ?? {}) as Record<string, unknown>;
+          const { created, lastTouched, captured, createdBy, touchedBy } = (value ?? {}) as Record<
+            string,
+            unknown
+          >;
+          const madeBy = AGENT_NAME(createdBy);
+          const changedBy = AGENT_NAME(touchedBy);
           if (typeof created === 'string' && STAMP.test(created))
             this.tasks.set(id, {
               created,
               lastTouched:
                 typeof lastTouched === 'string' && STAMP.test(lastTouched) ? lastTouched : created,
               ...(typeof captured === 'string' && STAMP.test(captured) && { captured }),
+              ...(madeBy !== undefined && { createdBy: madeBy }),
+              ...(changedBy !== undefined && { touchedBy: changedBy }),
             });
         }
     } catch {
@@ -61,28 +75,59 @@ export class TaskMetaFile {
   }
 
   /** Tasks Flint sees for the first time get their entry (docs/04: created on first sight). */
-  seen(ids: Iterable<string>, now: Date): void {
+  seen(ids: Iterable<string>, now: Date, by?: string): void {
     let changed = false;
     const stamp = localStamp(now);
     for (const id of ids) {
       if (id.startsWith('~') || this.tasks.has(id)) continue;
-      this.tasks.set(id, { created: stamp, lastTouched: stamp });
+      this.tasks.set(id, {
+        created: stamp,
+        lastTouched: stamp,
+        ...(by !== undefined && { createdBy: by, touchedBy: by }),
+      });
       changed = true;
     }
     if (changed) this.schedule();
   }
 
-  /** Tasks Flint just changed. */
-  touch(ids: Iterable<string>, now: Date): void {
+  /**
+   * Tasks Flint just changed: by an AI agent (`by`, AGENT-01), or by the user, which clears
+   * `touchedBy` (`createdBy` stays).
+   */
+  touch(ids: Iterable<string>, now: Date, by?: string): void {
     let changed = false;
     const stamp = localStamp(now);
     for (const id of ids) {
       if (id.startsWith('~')) continue;
       const known = this.tasks.get(id);
-      this.tasks.set(id, { ...known, created: known?.created ?? stamp, lastTouched: stamp });
+      const { touchedBy: _previous, ...rest } = known ?? { created: stamp, lastTouched: stamp };
+      void _previous;
+      this.tasks.set(id, {
+        ...rest,
+        created: known?.created ?? stamp,
+        lastTouched: stamp,
+        // A task first seen in an agent's change was made by it.
+        ...(by !== undefined && known === undefined && { createdBy: by }),
+        ...(by !== undefined && { touchedBy: by }),
+      });
       changed = true;
     }
     if (changed) this.schedule();
+  }
+
+  /** SYNC-01 (D-185 Q4): another PC's agent names for a task, when this PC has none. */
+  adoptAgents(id: string, createdBy: unknown, touchedBy: unknown): void {
+    const known = this.tasks.get(id);
+    if (!known) return;
+    const madeBy = AGENT_NAME(createdBy);
+    const changedBy = AGENT_NAME(touchedBy);
+    if (known.createdBy === (madeBy ?? known.createdBy) && known.touchedBy === changedBy) return;
+    this.tasks.set(id, {
+      ...known,
+      ...(madeBy !== undefined && known.createdBy === undefined && { createdBy: madeBy }),
+      ...(changedBy !== undefined && { touchedBy: changedBy }),
+    });
+    this.schedule();
   }
 
   /**
