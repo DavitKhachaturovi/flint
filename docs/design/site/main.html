@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · main window</title>
+<link rel="stylesheet" href="flint-ui.css">
+</head>
+<body>
+<div style="position:relative;width:1920px;height:1080px;display:flex;background:#0D0E10">
+
+<aside style="width:248px;flex:0 0 auto;background:#111214;border-right:1px solid #1C1E21;padding:14px 12px;display:flex;flex-direction:column;gap:3px">
+  <div style="display:flex;align-items:center;gap:10px;padding:6px 4px 16px 8px"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:30px;height:30px;display:block"><span style="font-weight:600;font-size:16px;color:#ECEDEE;flex:1">Flint</span><span style="color:#8E9196;display:flex;padding-right:6px"><i data-i="search" data-s="15"></i></span></div>
+  <div class="nav"><span class="tile"><i data-i="today"></i></span><span class="grow">Today</span><span class="cnt">2</span></div>
+  <div class="nav"><span class="tile"><i data-i="inbox"></i></span><span class="grow">Inbox</span><span class="cnt">3</span></div>
+  <div class="nav"><span class="tile"><i data-i="focus"></i></span><span class="grow">Focus</span><span class="cnt">4</span></div>
+  <div class="nav"><span class="tile"><i data-i="plus"></i></span><span class="grow">Quick note</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 6px 6px 10px"><span class="lbl">Lists</span><span style="display:flex;align-items:center;gap:4px;color:#8E9196"><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="cloudok" data-s="16" data-w="1.9"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="filter"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="plus"></i></span></span></div>
+  <div style="border-radius:14px;background:#151619;box-shadow:0 0 0 1px #1F2124;padding:3px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196" style="transform:rotate(90deg)"></i><span class="lbl" style="flex:1">Work</span><span class="cnt">2</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="list"></i></span><span class="grow">Backend</span><span class="cnt">5</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="note"></i></span><span class="grow">Standup notes</span></div>
+  </div>
+  <div class="nav on"><span class="tile strong"><i data-i="list"></i></span><span class="grow">Website relaunch</span><span class="cnt" style="color:#ECEDEE">6</span></div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Infra</span><span class="cnt">2</span></div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Reading list</span><span class="cnt">1</span></div>
+  <div style="margin-top:auto;display:flex;gap:8px;padding-top:10px">
+    <div class="fbtn"><i data-i="settings"></i>Settings</div>
+    <div class="fbtn"><i data-i="trash"></i>Trash</div>
+  </div>
+</aside>
+
+<div class="caps">
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span>
+</div>
+
+<div style="flex:1;min-width:0;display:flex;justify-content:center;gap:28px;padding:56px 32px 24px">
+  <div style="width:820px;flex:0 0 auto;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:6px;padding:0 4px 4px"><span style="font-size:30px;font-weight:700;letter-spacing:-0.025em;color:#B9BDC4">Website relaunch<span style="color:#FFFFFF"> · 6 open</span></span><span style="color:#8E9196;font-size:13.5px">Everything for the new site, before Thursday's demo.</span></div>
+    <div class="card" style="height:92px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between">
+      <span style="color:#6E7176;font-size:14.5px">Add a task…</span>
+      <span style="display:flex;align-items:center;gap:16px;color:#8E9196"><i data-i="flag" data-s="15" data-w="1.9"></i><i data-i="hash" data-s="15" data-w="1.9"></i><i data-i="bell" data-s="15" data-w="1.9"></i><span style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:#75787D">or type <span class="chip" style="height:22px;color:#ECEDEE">!h ##list @15:00</span> · Shift+Enter for notes</span></span>
+    </div>
+    <div class="card" style="padding:6px">
+      <div class="row sel"><span class="stripe" style="width:4px;background:#FFFFFF"></span><span class="check"></span><span style="flex:1">Fix the login redirect loop on Safari</span><span class="ind"><i data-i="pin" data-s="13" data-w="1.8"></i><span style="display:inline-flex;align-items:center;gap:4px"><i data-i="bell" data-s="13" data-w="1.8"></i>Today 15:00</span><i data-i="lines" data-s="14" data-w="1.8"></i></span></div>
+      <div class="row"><span class="check"></span><span style="flex:1">Review the pricing page copy</span><span class="ind"><i data-i="pin" data-s="13" data-w="1.8"></i></span></div>
+      <div class="row"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1">Compress the hero images</span></div>
+      <div class="row" style="margin-left:32px"><span class="check"></span><span style="flex:1">Export WebP versions</span></div>
+      <div class="row done" style="margin-left:32px"><span class="check on"><i data-i="check" data-s="12" data-w="3" data-c="#0E0F11"></i></span><span style="flex:1">Measure the current sizes</span><span class="ind">Yesterday</span></div>
+      <div class="row"><span class="check"></span><span style="flex:1">Set up redirects for the old blog URLs</span></div>
+      <div class="row"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1">Accessibility pass on the signup form</span><span class="ind"><span style="display:inline-flex;align-items:center;gap:4px"><i data-i="bell" data-s="13" data-w="1.8"></i>Tomorrow 10:00</span></span></div>
+      <div class="row"><span class="check"></span><span style="flex:1">Update the sitemap</span></div>
+      <div class="row done"><span class="check on"><i data-i="check" data-s="12" data-w="3" data-c="#0E0F11"></i></span><span style="flex:1">Move DNS to the new provider</span><span class="ind">Yesterday</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="width:440px;flex:0 0 auto;align-self:flex-start;padding:20px;display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between"><span class="lbl">Task</span><span style="display:flex;gap:6px;color:#8E9196"><span style="width:28px;height:28px;display:flex;align-items:center;justify-content:center"><i data-i="open" data-w="1.9"></i></span><span style="width:28px;height:28px;display:flex;align-items:center;justify-content:center"><i data-i="panel" data-w="1.9"></i></span></span></div>
+    <div style="display:flex;gap:12px;align-items:flex-start"><span class="check" style="margin-top:4px"></span><span style="font-size:20px;font-weight:600;line-height:1.3;color:#FFFFFF">Fix the login redirect loop on Safari</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px"><span class="chip"><span style="width:4px;height:12px;border-radius:2px;background:#FFFFFF"></span>High</span><span class="chip"><i data-i="hash" data-s="11"></i>Website relaunch</span><span class="chip"><i data-i="bell" data-s="11"></i>Today 15:00</span><span class="chip"><i data-i="pin" data-s="11"></i>Pinned</span></div>
+    <div class="sec"><span class="lbl">Notes</span>
+      <span style="color:#A4A7AB;font-size:14px;line-height:1.65">Happens after the session cookie expires; the callback keeps bouncing between two URLs.</span>
+      <div class="code"><div class="bar"><span>stack trace</span><i data-i="copy" data-s="12" data-w="1.8"></i></div><pre><span style="color:#FFFFFF;font-weight:600">TypeError: Cannot read properties of undefined (reading 'returnTo')</span>
+   at handleCallback (<span style="color:#C9CCCF;text-decoration:underline;text-decoration-color:#3A3D42;text-underline-offset:3px">auth/callback.ts:42:18</span>)
+   at processTicksAndRejections (node:internal/process/task_queues:105:5)</pre></div>
+    </div>
+    <div class="sec"><span class="lbl">Subtasks · 1 of 2</span>
+      <span class="urow" style="padding:6px 4px"><span class="check" style="width:18px;height:18px;border-radius:6px"></span>Clear the stale returnTo cookie</span>
+      <span class="urow" style="padding:6px 4px;color:#75787D"><span class="check on" style="width:18px;height:18px;border-radius:6px"><i data-i="check" data-s="11" data-w="3" data-c="#0E0F11"></i></span>Reproduce in Safari 17</span>
+      <span class="urow" style="padding:6px 4px;color:#8E9196"><i data-i="plus"></i>Add subtask</span>
+    </div>
+    <div class="mono" style="font-size:11.5px;color:#6E7176;border-top:1px solid #1F2124;padding-top:12px">Created 10 Mar · edited just now</div>
+    <div style="border-top:1px solid #1F2124;padding-top:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196"></i><span class="lbl" style="flex:1">Clipboard 3</span><span style="font-size:12.5px;color:#8E9196">Clear all</span><i data-i="eyeoff" data-s="14" data-c="#8E9196"></i></div>
+      <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:#8E9196"><span style="width:140px;height:6px;border-radius:3px;background:#232529"></span><span style="flex:1">Text</span><span class="mono" style="font-size:11.5px">1m</span></div>
+      <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:#8E9196"><span style="width:240px;height:6px;border-radius:3px;background:#232529"></span><span style="flex:1">Link</span><span class="mono" style="font-size:11.5px">8m</span></div>
+      <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:#8E9196"><span style="width:290px;height:6px;border-radius:3px;background:#232529"></span><span style="flex:1">Text</span><span class="mono" style="font-size:11.5px">25m</span></div>
+    </div>
+  </div>
+</div>
+</div>
+<script src="icons.js"></script>
+</body>
+</html>

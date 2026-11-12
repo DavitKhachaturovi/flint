@@ -77,8 +77,27 @@ export default defineConfig(
         window: 'readonly',
         document: 'readonly',
         setTimeout: 'readonly',
-        Image: 'readonly',
+        performance: 'readonly',
         IntersectionObserver: 'readonly',
+      },
+    },
+  },
+  {
+    // The site's media renderer (D-184): Node, plus the functions it runs in the browser page.
+    files: ['scripts/render-site-media.mjs'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        performance: 'readonly',
+        setTimeout: 'readonly',
+        atob: 'readonly',
+        btoa: 'readonly',
+        Blob: 'readonly',
+        createImageBitmap: 'readonly',
+        VideoEncoder: 'readonly',
+        VideoFrame: 'readonly',
+        Buffer: 'readonly',
       },
     },
   },

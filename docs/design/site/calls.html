@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · on a call</title>
+<link rel="stylesheet" href="flint-ui.css">
+<style>
+.stage{position:relative;width:1440px;height:810px;overflow:hidden;background:#0A0B0D}
+.grid{position:absolute;inset:72px 40px 40px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:16px}
+.tilev{position:relative;border-radius:22px;background:radial-gradient(120% 90% at 50% 0%,#17181B,#0F1012 70%);box-shadow:inset 0 0 0 1px #17181B;display:flex;align-items:center;justify-content:center}
+.tilev.talk{box-shadow:inset 0 0 0 2px #9AA0AB}
+.av{width:92px;height:92px;border-radius:50%;background:#1A1B1E;box-shadow:inset 0 0 0 1px #232529;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:500;color:#8E9196;letter-spacing:.02em}
+.name{position:absolute;left:16px;bottom:14px;padding:4px 10px;border-radius:8px;background:rgba(10,11,13,.7);font-size:13px;color:#C9CCCF}
+.top{position:absolute;left:40px;right:40px;top:22px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#8E9196}
+.share{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;background:#141517;box-shadow:inset 0 0 0 1px #232529;font-family:'Geist Mono',monospace;font-size:12px;color:#C9CCCF}
+.share b{width:7px;height:7px;border-radius:50%;background:#ECEDEE;font-weight:400}
+.edge{left:1416px;top:120px;transition:transform 160ms cubic-bezier(.2,.9,.3,1),opacity 160ms ease}
+.edge.hover{transform:translateX(-4px)}.edge.hover img{filter:drop-shadow(0 6px 12px rgba(0,0,0,.55)) brightness(1.18)}
+.edge.tucked{transform:translateX(26px);opacity:0}
+.mini{right:24px;top:120px;transition:transform 220ms cubic-bezier(.2,.9,.3,1),opacity 160ms ease}
+.mini.out{transform:translateX(calc(100% + 24px));opacity:0;transition:transform 180ms cubic-bezier(.5,0,.75,0),opacity 180ms ease}
+.popwrap{position:absolute;left:50%;top:250px;width:680px;margin-left:-340px;display:flex;flex-direction:column;align-items:center;gap:14px;transition:transform 240ms cubic-bezier(.2,.9,.3,1),opacity 200ms ease}
+.popwrap.hidden{opacity:0;transform:translateY(28px) scale(.985);pointer-events:none;transition:transform 260ms cubic-bezier(.5,0,.75,0),opacity 220ms ease}
+.popwrap .pop{width:100%}
+.chip-in{animation:chipin 200ms cubic-bezier(.2,.9,.3,1.15)}
+@keyframes chipin{from{opacity:0;transform:scale(.9)}}
+.send{transition:transform 200ms cubic-bezier(.2,.9,.3,1.5)}
+.send.down{transform:scale(.9)}
+.keys{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:14px;background:#141517;box-shadow:0 0 0 1px #232529,0 14px 34px -12px rgba(0,0,0,.6);font-size:13px;color:#8E9196;transition:opacity 220ms ease,transform 220ms ease}
+.keys.off{opacity:0;transform:translateX(-50%) translateY(8px)}
+.keys .keycap{height:26px;font-size:12.5px}
+.cursor{position:absolute;left:720px;top:520px;width:22px;height:22px;z-index:20;transition:left 900ms cubic-bezier(.45,0,.2,1),top 900ms cubic-bezier(.45,0,.2,1);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.r{transition:background-color 120ms ease,box-shadow 120ms ease}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="top"><span>Sprint review · <span class="mono">24:12</span></span><span class="share"><b></b>Sharing your screen</span><span style="width:120px"></span></div>
+  <div class="grid">
+    <div class="tilev talk"><span class="av">AL</span><span class="name">Alex</span></div>
+    <div class="tilev"><span class="av">EM</span><span class="name">Emma</span></div>
+    <div class="tilev"><span class="av">SK</span><span class="name">Sam</span></div>
+    <div class="tilev"><span class="av">JR</span><span class="name">Jack</span></div>
+    <div class="tilev"><span class="av">OB</span><span class="name">Olivia</span></div>
+    <div class="tilev"><span class="av">You</span><span class="name">You</span></div>
+  </div>
+
+  <div class="edge" id="tab"><img src="../../../site/assets/flint-icon.svg" alt=""></div>
+
+  <div class="mini out" id="mini">
+    <div class="mhead">
+      <div class="mseg"><span class="mtab on">Today</span><span class="mtab">Inbox<i data-i="down" data-s="9" data-w="2.8"></i></span><span class="mtab">Note</span></div>
+      <span style="flex:1"></span>
+      <span class="mtool"><i data-i="dots" data-w="2.4"></i></span>
+      <span class="mtool"><i data-i="collapse"></i></span>
+      <span class="mtool on"><i data-i="pin" data-w="1.9"></i></span>
+      <span class="mtool"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+    </div>
+    <div style="display:flex;flex-direction:column;padding:2px 0 8px">
+      <div class="r" id="m1"><span class="st" style="width:4px;background:#FFFFFF"></span><span class="ck"></span><span class="t">Fix the login redirect loop</span></div>
+      <div class="r" id="m2"><span class="st" style="width:3px;background:#9AA0AB"></span><span class="ck"></span><span class="t">Review Alex's PR on response caching</span></div>
+      <div class="r"><span class="ck"></span><span class="t">Book the venue for the team offsite</span></div>
+      <div class="r"><span class="st" style="width:2px;background:#55585D"></span><span class="ck"></span><span class="t">Renew the acme.example certificate</span><span class="mono" style="font-size:11.5px;color:#8E9196">10:30</span></div>
+    </div>
+    <div class="comp"><span>Add to Today…</span></div>
+  </div>
+
+  <div class="popwrap hidden" id="popwrap">
+    <div class="pop">
+      <span class="grip"></span>
+      <span class="close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+      <div class="chips" id="chips"></div>
+      <div class="title"><span id="typed"></span><span class="caret"></span><span class="ph" id="ph">Capture a thought…</span></div>
+      <div class="tools">
+        <div class="tg"><span class="tool"><i data-i="plus" data-s="16"></i></span><span class="tool"><i data-i="flag" data-s="16"></i></span><span class="tool"><i data-i="hash" data-s="16"></i></span><span class="tool"><i data-i="bell" data-s="16"></i></span></div>
+        <div class="tg" style="gap:14px"><span class="target"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:16px;height:16px"><span id="target">Inbox</span></span><span class="send" id="send"><i data-i="up" data-s="15"></i></span></div>
+      </div>
+    </div>
+    <span style="font-size:12.5px;color:#75787D">Enter saves · Esc closes and keeps your draft · Shift Enter for a new line</span>
+  </div>
+
+  <div class="keys off" id="keys"><span class="keycap">Ctrl</span><span class="keycap">Shift</span><span class="keycap">Space</span><span style="margin-left:6px">from any app</span></div>
+
+  <svg class="cursor" id="cursor" viewBox="0 0 24 24"><path d="M5 3l14 8.2-6.2 1.4L10 19z" fill="#FFFFFF" stroke="#0E0F11" stroke-width="1.4" stroke-linejoin="round"/></svg>
+</div>
+<script src="icons.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var tab = $('tab'), mini = $('mini'), pop = $('popwrap'), cur = $('cursor'), keys = $('keys');
+  var TEXT = 'Ask about the staging DNS change !h ##backend @16:00';
+  var CHIPS = [
+    { token: '!h', html: '<span class="pstripe"></span>High' },
+    { token: '##backend', html: '<i data-i="hash" data-s="12"></i>Backend', target: 'Backend' },
+    { token: '@16:00', html: '<i data-i="bell" data-s="12"></i>Today 16:00' },
+  ];
+  var X = '<span class="x"><svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>';
+  function move(x, y) { cur.style.left = x + 'px'; cur.style.top = y + 'px'; }
+  function show(text) {
+    $('typed').textContent = text;
+    $('ph').style.display = text ? 'none' : '';
+    CHIPS.forEach(function (c) {
+      var done = text.indexOf(c.token + ' ') >= 0 || text.slice(-c.token.length) === c.token;
+      if (done && !c.on) {
+        c.on = true;
+        var el = document.createElement('span');
+        el.className = 'pchip chip-in';
+        el.innerHTML = c.html + X;
+        $('chips').appendChild(el);
+        window.flintIcons(el);
+        if (c.target) $('target').textContent = c.target;
+      }
+    });
+  }
+  function reset() { CHIPS.forEach(function (c) { c.on = false; }); $('chips').innerHTML = ''; $('target').textContent = 'Inbox'; show(''); }
+  var run = 0;
+  function finish() { mini.classList.add('out'); tab.classList.remove('tucked','hover'); pop.classList.add('hidden'); keys.classList.add('off'); ['m1','m2'].forEach(function (id) { $(id).classList.remove('sel'); }); }
+  // One pass is about 13 s (CALL_MS on the site); the site plays it once each time the tab shows (postMessage 'flint-play').
+  async function play(token) {
+    var w = function (ms) { return wait(ms).then(function () { if (token !== run) throw 0; }); };
+    finish(); reset();
+    move(760, 560); await w(600);
+    move(1424, 140); await w(950);
+    tab.classList.add('hover'); await w(350);
+    tab.classList.remove('hover'); tab.classList.add('tucked'); mini.classList.remove('out'); await w(500);
+    move(1240, 186); await w(700); $('m1').classList.add('sel');
+    await w(600); $('m1').classList.remove('sel');
+    move(1240, 230); await w(600); $('m2').classList.add('sel');
+    await w(700); $('m2').classList.remove('sel');
+    move(620, 470); await w(1000);
+    mini.classList.add('out'); tab.classList.remove('tucked'); await w(700);
+    keys.classList.remove('off'); await w(450);
+    pop.classList.remove('hidden'); await w(500);
+    for (var at = 1; at <= TEXT.length; at++) { show(TEXT.slice(0, at)); await w(TEXT[at - 1] === ' ' ? 110 : 60); }
+    keys.classList.add('off'); await w(800);
+    $('send').classList.add('down'); await w(160); $('send').classList.remove('down');
+    pop.classList.add('hidden'); await w(900);
+  }
+  function start(loop) { var token = ++run; play(token).then(function () { if (window.parent !== window) window.parent.postMessage('flint-done', '*'); if (loop && token === run) start(true); }, function () {}); }
+  window.addEventListener('message', function (e) { if (e.data === 'flint-play') start(false); });
+  start(window.parent === window);
+})();
+</script>
+</body>
+</html>

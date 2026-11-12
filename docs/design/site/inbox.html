@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · Inbox and triage</title>
+<link rel="stylesheet" href="flint-ui.css">
+<style>
+.cursor{position:absolute;left:1500px;top:700px;width:24px;height:24px;z-index:30;transition:left 800ms cubic-bezier(.45,0,.2,1),top 800ms cubic-bezier(.45,0,.2,1);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.keys{position:absolute;left:50%;bottom:220px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:14px;background:#141517;box-shadow:0 0 0 1px #232529,0 14px 34px -12px rgba(0,0,0,.6);font-size:13px;color:#8E9196;transition:opacity 180ms ease,transform 180ms ease;z-index:25}
+.keys.off{opacity:0;transform:translateX(-50%) translateY(8px)}
+.keys .keycap{height:28px;font-size:13px;padding:0 10px}
+.view{transition:opacity 260ms ease,transform 320ms cubic-bezier(.2,.7,.3,1)}
+.view.off{opacity:0;transform:translateY(6px);pointer-events:none}
+.subtitle-link{color:#ECEDEE;text-decoration:underline;text-decoration-color:#2C2E33;text-underline-offset:3px}
+.sbtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:10px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;color:#ECEDEE;font-size:13.5px;transition:background-color 260ms ease,box-shadow 260ms ease}
+.sbtn.on{background:#1B1D20;box-shadow:inset 0 0 0 1px #2A2C30}
+.sbtn.dis{opacity:.45}
+.pbtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:10px;background:#ECEDEE;color:#0E0F11;font-weight:500;font-size:13.5px;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.tk{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:7px;font-family:'Geist Mono',monospace;font-size:10.5px;box-shadow:inset 0 0 0 1px currentColor;opacity:.5}
+.prios{position:relative;display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:#111214;box-shadow:0 0 0 1px #1C1E21}
+.prio{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:9px;color:#8E9196;font-size:13px}
+.prio.on{color:#ECEDEE}
+.prio .tk{box-shadow:none;opacity:.8}
+.glide{position:absolute;top:3px;left:0;height:28px;border-radius:9px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30;transition:transform 260ms cubic-bezier(.2,.9,.3,1.15),width 260ms cubic-bezier(.2,.9,.3,1.15)}
+.sw{height:14px;border-radius:3px}
+.tcard{position:relative;display:flex;flex-direction:column;gap:10px;min-height:180px;padding:22px 24px 22px 28px}
+.tcard .stripe{left:6px;top:22px;bottom:22px;transition:background-color 200ms ease,width 200ms ease}
+.picker{position:absolute;width:260px;padding:6px;z-index:20;transition:opacity 160ms ease,transform 200ms cubic-bezier(.2,.9,.3,1)}
+.picker.off{opacity:0;transform:translateY(-4px) scale(.985);pointer-events:none}
+.pick{display:flex;align-items:center;gap:10px;padding:5px 8px 5px 5px;border-radius:9px;font-size:13.5px;color:#E3E4E6}
+.pick.on{background:#1A1B1E;box-shadow:inset 0 0 0 1px #2C2E33}
+.rowwrap{overflow:hidden;transition:height 300ms cubic-bezier(.2,.7,.3,1),opacity 300ms ease}
+</style>
+</head>
+<body>
+<div id="stage" style="position:relative;width:1920px;height:1080px;display:flex;background:#0D0E10">
+
+<aside style="width:248px;flex:0 0 auto;background:#111214;border-right:1px solid #1C1E21;padding:14px 12px;display:flex;flex-direction:column;gap:3px">
+  <div style="display:flex;align-items:center;gap:10px;padding:6px 4px 16px 8px"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:30px;height:30px;display:block"><span style="font-weight:600;font-size:16px;color:#ECEDEE;flex:1">Flint</span><span style="color:#8E9196;display:flex;padding-right:6px"><i data-i="search" data-s="15"></i></span></div>
+  <div class="nav"><span class="tile"><i data-i="today"></i></span><span class="grow">Today</span><span class="cnt">2</span></div>
+  <div class="nav on"><span class="tile strong"><i data-i="inbox"></i></span><span class="grow">Inbox</span><span class="cnt" style="color:#ECEDEE" id="navCount">4</span></div>
+  <div class="nav"><span class="tile"><i data-i="focus"></i></span><span class="grow">Focus</span><span class="cnt">4</span></div>
+  <div class="nav"><span class="tile"><i data-i="plus"></i></span><span class="grow">Quick note</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 6px 6px 10px"><span class="lbl">Lists</span><span style="display:flex;align-items:center;gap:4px;color:#8E9196"><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="cloudok" data-s="16" data-w="1.9"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="filter"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="plus"></i></span></span></div>
+  <div style="border-radius:14px;background:#151619;box-shadow:0 0 0 1px #1F2124;padding:3px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196" style="transform:rotate(90deg)"></i><span class="lbl" style="flex:1">Work</span><span class="cnt">2</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="list"></i></span><span class="grow">Backend</span><span class="cnt" id="backendCount">5</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="note"></i></span><span class="grow">Standup notes</span></div>
+  </div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Website relaunch</span><span class="cnt">6</span></div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Infra</span><span class="cnt">2</span></div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Reading list</span><span class="cnt">1</span></div>
+  <div style="margin-top:auto;display:flex;gap:8px;padding-top:10px"><div class="fbtn"><i data-i="settings"></i>Settings</div><div class="fbtn"><i data-i="trash"></i>Trash</div></div>
+</aside>
+
+<div class="caps">
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span>
+</div>
+
+<div style="flex:1;min-width:0;display:flex;justify-content:center;gap:28px;padding:56px 32px 24px">
+  <div style="position:relative;width:820px;flex:0 0 auto">
+    <div class="view" id="listView" style="position:absolute;inset:0 0 auto 0;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:6px;padding:0 4px 4px"><span style="font-size:30px;font-weight:700;letter-spacing:-0.025em;color:#B9BDC4">Inbox<span style="color:#FFFFFF"> · <span id="openCount">4</span> open</span></span><span style="color:#8E9196;font-size:13.5px">Everything you captured, waiting to be sorted. · <span class="subtitle-link" id="triageLink">Triage · <span id="triageCount">4</span></span></span></div>
+      <div class="card" style="height:92px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between">
+        <span style="font-size:14.5px;color:#FFFFFF;white-space:nowrap"><span id="typed"></span><span id="caret" class="caret" style="display:inline-block;width:1.5px;height:17px;background:#9AA0AB;vertical-align:-3px;margin-left:1px"></span><span id="ph" style="color:#6E7176">Add a task…</span></span>
+        <span style="display:flex;align-items:center;gap:16px;color:#8E9196"><i data-i="flag" data-s="15" data-w="1.9"></i><i data-i="hash" data-s="15" data-w="1.9"></i><i data-i="bell" data-s="15" data-w="1.9"></i><span id="compChips" style="display:flex;gap:6px"></span><span style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:#75787D">or type <span class="chip" style="height:22px;color:#ECEDEE">!h ##list @15:00</span> · Shift+Enter for notes</span></span>
+      </div>
+      <div class="card" style="padding:6px" id="rows">
+        <div class="row"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1">Ask about the staging DNS timeout</span></div>
+        <div class="row"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1;display:flex;align-items:center;gap:8px">Review <span class="chip" style="height:24px">PR 42</span></span></div>
+        <div class="row"><span class="check"></span><span style="flex:1">Broken chart legend on staging dashboard</span><span class="ind"><i data-i="image" data-s="14" data-w="1.8"></i></span></div>
+        <div class="row"><span class="check"></span><span style="flex:1">Write the deploy notes for the team</span></div>
+      </div>
+    </div>
+
+    <section class="view off" id="triage" style="position:absolute;inset:0 0 auto 0;display:flex;flex-direction:column;gap:14px">
+      <header style="display:flex;align-items:center;gap:12px;padding:0 4px">
+        <span class="tile" style="width:30px;height:30px;border-radius:9px"><i data-i="back"></i></span>
+        <span style="font-size:30px;font-weight:700;letter-spacing:-0.025em;color:#FFFFFF">Inbox <span style="color:#B9BDC4;font-weight:600">· Triage</span></span>
+        <span style="flex:1"></span>
+        <span class="mono" style="font-size:12px;color:#8E9196" id="tCount">1 of 6</span>
+      </header>
+      <div style="padding:6px 4px"><div style="height:3px;border-radius:999px;background:#1F2124;overflow:hidden"><span id="tProg" style="display:block;height:100%;background:#ECEDEE;transform-origin:left;transform:scaleX(0);transition:transform 320ms cubic-bezier(.2,.7,.3,1)"></span></div></div>
+      <div style="display:grid" id="tStage"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:0 4px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="sbtn" data-a="move"><i data-i="hash" data-s="13"></i>Move <span class="tk">M</span></span>
+          <span class="sbtn" data-a="done">Done <span class="tk">Space</span></span>
+          <span class="sbtn" data-a="del">Delete <span class="tk">Del</span></span>
+          <span style="flex:1"></span>
+          <span class="sbtn dis" data-a="back"><span class="tk">←</span> Back</span>
+          <span class="pbtn" data-a="keep">Keep in Inbox <span class="tk" style="opacity:.6">→</span></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="prios" id="prios"><span class="glide" id="glide"></span>
+            <span class="prio" data-p="high"><span class="sw" style="width:4px;background:#FFFFFF"></span><span class="tk">3</span></span>
+            <span class="prio" data-p="medium"><span class="sw" style="width:3px;background:#9AA0AB"></span><span class="tk">2</span></span>
+            <span class="prio" data-p="low"><span class="sw" style="width:2px;background:#55585D"></span><span class="tk">1</span></span>
+            <span class="prio" data-p="none"><span class="sw" style="width:4px;box-shadow:inset 0 0 0 1px #2C2E33"></span><span class="tk">0</span></span>
+          </span>
+          <span class="sbtn" data-a="pin" id="pinBtn"><i data-i="pin" data-s="13"></i><span id="pinText">Pin</span> <span class="tk">P</span></span>
+          <span class="sbtn" data-a="rem"><i data-i="bell" data-s="13"></i>Reminder <span class="tk">R</span></span>
+        </div>
+      </div>
+      <div class="float picker off" id="picker" style="left:4px;top:330px">
+        <div style="padding:6px 8px 8px;font-size:13.5px;color:#75787D;border-bottom:1px solid #26282C;margin-bottom:4px">Move to…</div>
+        <div class="pick" data-l="Backend"><span class="tile"><i data-i="list"></i></span>Backend</div>
+        <div class="pick" data-l="Website relaunch"><span class="tile"><i data-i="list"></i></span>Website relaunch</div>
+        <div class="pick" data-l="Infra"><span class="tile"><i data-i="list"></i></span>Infra</div>
+        <div class="pick" data-l="Reading list"><span class="tile"><i data-i="list"></i></span>Reading list</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="card" style="width:440px;flex:0 0 auto;align-self:flex-start;padding:20px;display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:18px;font-weight:600;color:#FFFFFF">Up next</span><span class="mono" style="font-size:12px;color:#8E9196">Mon 2 Nov</span></div>
+    <div class="sec"><span class="lbl">Overdue</span>
+      <span class="urow" style="background:#1A1B1E;box-shadow:inset 0 0 0 1px #24262A"><span style="position:relative;display:inline-flex;color:#C9CCCF"><i data-i="bell" data-s="14" data-w="1.8"></i><span style="position:absolute;right:-2px;top:-1px;width:5px;height:5px;border-radius:50%;background:#FFFFFF"></span></span><span style="flex:1">Rotate the storage account keys</span><span class="mono" style="font-size:11.5px;color:#8E9196">Yest 17:00</span></span>
+    </div>
+    <div class="sec"><span class="lbl">Today</span>
+      <span class="urow"><span class="mono" style="width:44px;font-size:12.5px;color:#FFFFFF">15:00</span><span style="flex:1">Fix the login redirect loop on Safari</span></span>
+      <span class="urow"><span class="mono" style="width:44px;font-size:12.5px;color:#C9CCCF">17:30</span><span style="flex:1">Deploy hotfix to staging</span></span>
+    </div>
+    <div class="sec"><span class="lbl">Tomorrow</span>
+      <span class="urow"><span class="mono" style="width:44px;font-size:12.5px;color:#A4A7AB">10:00</span><span style="flex:1">Accessibility pass on the signup form</span></span>
+    </div>
+    <div style="font-size:12px;color:#6E7176;border-top:1px solid #1F2124;padding-top:12px">Select a task to see its details here · <span class="mono">Ctrl+\</span> hides the panel</div>
+  </div>
+</div>
+
+<div class="keys off" id="keys"></div>
+<svg class="cursor" id="cursor" viewBox="0 0 24 24"><path d="M5 3l14 8.2-6.2 1.4L10 19z" fill="#FFFFFF" stroke="#0E0F11" stroke-width="1.4" stroke-linejoin="round"/></svg>
+</div>
+<script src="icons.js"></script>
+<script src="player.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var cur = $('cursor');
+  var STRIPE = { high: ['4px', '#FFFFFF'], medium: ['3px', '#9AA0AB'], low: ['2px', '#55585D'], none: ['0', 'transparent'] };
+  var BASE = $('rows').innerHTML;
+  var NEW = [
+    { text: 'Bump the CI agent image', pri: 'none' },
+    { text: 'Renew the staging certificate !h', title: 'Renew the staging certificate', pri: 'high', chip: '!h' },
+  ];
+  // Triage: oldest first (the four already here, then the two just added).
+  var QUEUE = [
+    { title: 'Broken chart legend on staging dashboard', pri: 'none', meta: 'Captured 3 days ago' },
+    { title: 'Ask about the staging DNS timeout', pri: 'medium', meta: 'Captured yesterday' },
+    { title: 'Write the deploy notes for the team', pri: 'none', meta: 'Captured yesterday' },
+  ];
+  var open = 4;
+  function counts() { $('openCount').textContent = open; $('navCount').textContent = open; $('triageCount').textContent = open; }
+  function keys(html) { var k = $('keys'); if (!html) { k.classList.add('off'); return; } k.innerHTML = html; k.classList.remove('off'); }
+  function cap(t) { return '<span class="keycap">' + t + '</span>'; }
+  function press(a) { var el = document.querySelector('[data-a="' + a + '"]'); if (el) el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.94)' }, { transform: 'scale(1)' }], { duration: 200, easing: 'ease-out' }); }
+  function glideTo(p) {
+    var on = document.querySelector('.prio[data-p="' + p + '"]');
+    document.querySelectorAll('.prio').forEach(function (e) { e.classList.toggle('on', e === on); });
+    $('glide').style.transform = 'translateX(' + (on.offsetLeft - 3) + 'px)'; $('glide').style.width = on.offsetWidth + 'px';
+  }
+  function cardHTML(t) {
+    var s = STRIPE[t.pri];
+    return '<article class="card tcard"><div class="stripe" style="width:' + s[0] + ';background:' + s[1] + '"></div>' +
+      '<div style="font-size:22px;font-weight:600;line-height:1.35;color:#FFFFFF">' + t.title + '</div>' +
+      '<div class="mono" style="display:flex;align-items:center;gap:8px;font-size:12px;color:#75787D"><span>' + t.meta + '</span><span class="chip pinchip" style="height:22px;gap:5px;color:#A4A7AB;display:none"><i data-i="pin" data-s="11"></i>Pinned</span></div>' +
+      '<div style="color:#A4A7AB;font-size:13.5px">' + (t.note || '') + '</div></article>';
+  }
+  var card = null;
+  function showCard(i, dir) {
+    var stage = $('tStage');
+    if (card) {
+      var old = card; old.style.gridArea = '1 / 1'; old.style.zIndex = 1;
+      old.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px) scale(.98)' }], { duration: 200, easing: 'ease-in', fill: 'forwards' }).onfinish = function () { old.remove(); };
+    }
+    if (i >= QUEUE.length) { card = null; return; }
+    stage.insertAdjacentHTML('beforeend', cardHTML(QUEUE[i]));
+    card = stage.lastElementChild; card.style.gridArea = '1 / 1';
+    window.flintIcons(card);
+    if (dir) card.animate([{ opacity: 0, transform: 'translateX(28px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    $('tCount').textContent = (i + 1) + ' of 6';
+    $('tProg').style.transform = 'scaleX(' + (i / 6) + ')';
+    glideTo(QUEUE[i].pri);
+    $('pinBtn').classList.remove('on'); $('pinText').textContent = 'Pin';
+  }
+  function reset() {
+    open = 4; counts();
+    $('rows').innerHTML = BASE; window.flintIcons($('rows'));
+    $('typed').textContent = ''; $('ph').style.display = ''; $('compChips').innerHTML = '';
+    $('listView').classList.remove('off'); $('triage').classList.add('off');
+    $('picker').classList.add('off'); document.querySelectorAll('.pick').forEach(function (p) { p.classList.remove('on'); });
+    $('backendCount').textContent = '5';
+    keys(null); $('tStage').innerHTML = ''; card = null;
+    cur.style.transition = 'none'; cur.style.left = '1500px'; cur.style.top = '760px'; cur.offsetWidth; cur.style.transition = '';
+  }
+  async function type(w, text) {
+    for (var i = 1; i <= text.length; i++) {
+      $('typed').textContent = text.slice(0, i); $('ph').style.display = 'none';
+      if (text.slice(0, i).slice(-2) === '!h' && !$('compChips').children.length) {
+        $('compChips').innerHTML = '<span class="chip chip-in" style="height:24px;color:#ECEDEE"><span style="width:4px;height:12px;border-radius:2px;background:#FFFFFF"></span>High</span>';
+      }
+      await w(text[i - 1] === ' ' ? 90 : 42);
+    }
+  }
+  function addRow(t) {
+    var s = STRIPE[t.pri];
+    var wrap = document.createElement('div'); wrap.className = 'rowwrap'; wrap.style.height = '0px'; wrap.style.opacity = '0';
+    wrap.innerHTML = '<div class="row">' + (t.pri !== 'none' ? '<span class="stripe" style="width:' + s[0] + ';background:' + s[1] + '"></span>' : '') + '<span class="check"></span><span style="flex:1">' + (t.title || t.text) + '</span></div>';
+    $('rows').insertBefore(wrap, $('rows').firstChild);
+    wrap.offsetWidth; wrap.style.height = '41px'; wrap.style.opacity = '1';
+    $('typed').textContent = ''; $('ph').style.display = ''; $('compChips').innerHTML = '';
+    open++; counts();
+  }
+  window.flintPlayer(12200, reset, async function (w) {
+    await w(500);
+    await type(w, NEW[0].text); keys(cap('Enter')); await w(250); addRow(NEW[0]); await w(350); keys(null);
+    await type(w, NEW[1].text); keys(cap('Enter')); await w(250); addRow(NEW[1]); await w(450); keys(null);
+    window.flintCursor(cur, $('triageLink')); await w(850);
+    $('triageLink').animate([{ opacity: 1 }, { opacity: .6 }, { opacity: 1 }], { duration: 200 });
+    keys(null); $('listView').classList.add('off'); $('triage').classList.remove('off'); showCard(0, false); await w(500);
+    cur.style.left = '1500px'; cur.style.top = '760px';
+    // 1: move to Backend.
+    await w(300); keys(cap('M')); press('move'); await w(200); $('picker').classList.remove('off'); await w(350);
+    var picks = document.querySelectorAll('.pick'); picks[0].classList.add('on'); await w(500);
+    keys(cap('Enter')); await w(200); $('picker').classList.add('off'); $('backendCount').textContent = '6'; showCard(1, true); await w(600);
+    // 2: high, pinned, kept.
+    keys(cap('3')); press('high'); glideTo('high'); var st = card.querySelector('.stripe'); st.style.width = '4px'; st.style.background = '#FFFFFF'; await w(650);
+    keys(cap('P')); press('pin'); $('pinBtn').classList.add('on'); $('pinText').textContent = 'Pinned'; card.querySelector('.pinchip').style.display = 'inline-flex'; await w(650);
+    keys(cap('→')); press('keep'); await w(150); showCard(2, true); await w(650);
+    // 3: done.
+    keys(cap('Space')); press('done'); await w(150); QUEUE.push({ title: 'Review PR 42', pri: 'medium', meta: 'Captured yesterday' }); showCard(3, true); QUEUE.pop(); await w(700);
+    keys(null);
+  });
+})();
+</script>
+</body>
+</html>

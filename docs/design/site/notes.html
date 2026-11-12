@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · a note</title>
+<link rel="stylesheet" href="flint-ui.css">
+<style>
+.keys{position:absolute;left:50%;bottom:220px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:14px;background:#141517;box-shadow:0 0 0 1px #232529,0 14px 34px -12px rgba(0,0,0,.6);font-size:13px;color:#8E9196;transition:opacity 180ms ease,transform 180ms ease;z-index:25}
+.keys.off{opacity:0;transform:translateX(-50%) translateY(8px)}
+.keys .keycap{height:28px;font-size:13px;padding:0 10px}
+.doc{display:flex;flex-direction:column;gap:14px;line-height:1.7}
+.h{font-size:18px;font-weight:600;color:#ECEDEE;margin-top:8px}
+.p{color:#C9CCCF;font-size:15px;min-height:25px}
+.c{display:inline-block;width:1.5px;height:18px;background:#9AA0AB;vertical-align:-3px;margin-left:1px;animation:blink 1.06s steps(1) infinite}
+.slash{position:absolute;z-index:20;width:300px;padding:6px;border-radius:16px;background:#1B1D20;box-shadow:0 0 0 1px #2A2C30,0 0 0 1px #2A2C30,inset 0 1px 0 rgba(255,255,255,.07),0 2px 4px rgba(0,0,0,.4),0 34px 80px -18px rgba(0,0,0,.85);transition:opacity 120ms ease,transform 160ms ease}
+.slash.off{opacity:0;transform:translateY(-3px) scale(.98);pointer-events:none}
+.si{display:flex;align-items:center;gap:12px;padding:6px 8px;border-radius:11px;font-size:14px;line-height:1.4;color:#B9BDC4}
+.si.on{background:#1A1B1E;color:#ECEDEE}
+.st{width:30px;height:30px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#1F2124;box-shadow:inset 0 0 0 1px #2C2E33;font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;color:#B9BDC4}
+.si.on .st{background:#ECEDEE;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#0E0F11}
+.sl{flex:1}
+.sd{font-family:'Geist Mono',monospace;font-size:11px;color:#75787D}
+.ol{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;font-size:13.5px;color:#A4A7AB}
+.ol.on{background:#1E2023;color:#FFFFFF}
+.olt{width:20px;height:20px;border-radius:6px;background:#1F2124;box-shadow:inset 0 0 0 1px #2A2C30;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;color:#A4A7AB;font-family:'Geist Mono',monospace;font-size:9.5px}
+.in{animation:rise 260ms cubic-bezier(.2,.9,.3,1.15)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+</style>
+</head>
+<body>
+<div style="position:relative;width:1920px;height:1080px;display:flex;background:#0D0E10">
+
+<aside style="width:248px;flex:0 0 auto;background:#111214;border-right:1px solid #1C1E21;padding:14px 12px;display:flex;flex-direction:column;gap:3px">
+  <div style="display:flex;align-items:center;gap:10px;padding:6px 4px 16px 8px"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:30px;height:30px;display:block"><span style="font-weight:600;font-size:16px;color:#ECEDEE;flex:1">Flint</span><span style="color:#8E9196;display:flex;padding-right:6px"><i data-i="search" data-s="15"></i></span></div>
+  <div class="nav"><span class="tile"><i data-i="today"></i></span><span class="grow">Today</span><span class="cnt">2</span></div>
+  <div class="nav"><span class="tile"><i data-i="inbox"></i></span><span class="grow">Inbox</span><span class="cnt">4</span></div>
+  <div class="nav"><span class="tile"><i data-i="focus"></i></span><span class="grow">Focus</span><span class="cnt">4</span></div>
+  <div class="nav"><span class="tile"><i data-i="plus"></i></span><span class="grow">Quick note</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 6px 6px 10px"><span class="lbl">Lists</span><span style="display:flex;align-items:center;gap:4px;color:#8E9196"><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="cloudok" data-s="16" data-w="1.9"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="filter"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center"><i data-i="plus"></i></span></span></div>
+  <div style="border-radius:14px;background:#151619;box-shadow:0 0 0 1px #1F2124;padding:3px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196" style="transform:rotate(90deg)"></i><span class="lbl" style="flex:1">Work</span><span class="cnt">3</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="list"></i></span><span class="grow">Backend</span><span class="cnt">5</span></div>
+    <div class="nav on" style="padding-left:14px"><span class="tile strong"><i data-i="note"></i></span><span class="grow">Sprint planning</span></div>
+    <div class="nav" style="padding-left:14px"><span class="tile"><i data-i="note"></i></span><span class="grow">Standup notes</span></div>
+  </div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Website relaunch</span><span class="cnt">6</span></div>
+  <div class="nav"><span class="tile"><i data-i="list"></i></span><span class="grow">Infra</span><span class="cnt">2</span></div>
+  <div style="margin-top:auto;display:flex;gap:8px;padding-top:10px"><div class="fbtn"><i data-i="settings"></i>Settings</div><div class="fbtn"><i data-i="trash"></i>Trash</div></div>
+</aside>
+
+<div class="caps">
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+  <span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span>
+</div>
+
+<div style="flex:1;min-width:0;display:flex;justify-content:center;gap:28px;padding:56px 32px 24px">
+  <div style="position:relative;width:820px;flex:0 0 auto;padding:0 4px">
+    <div class="doc" id="doc">
+      <span style="font-size:30px;font-weight:700;letter-spacing:-0.025em;color:#FFFFFF;line-height:1.2">Sprint planning</span>
+      <span style="color:#8E9196;font-size:13px;margin-top:-6px">29 October · edited just now</span>
+      <span class="h">Goals</span>
+      <span class="p">Ship the tenant fix to staging and agree on the gateway rollout window with the network team.</span>
+      <div id="live" class="doc"></div>
+    </div>
+    <div class="slash off" id="slash"></div>
+  </div>
+
+  <div class="card" style="width:440px;flex:0 0 auto;align-self:flex-start;padding:20px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between"><span class="lbl">Outline</span><span class="mono" style="font-size:11.5px;color:#6E7176" id="olMeta">2 sections</span></div>
+    <div style="display:flex;flex-direction:column;gap:2px" id="outline">
+      <span class="ol" style="color:#ECEDEE;font-weight:500">Sprint planning</span>
+      <span class="ol" style="padding-left:22px">Goals</span>
+    </div>
+    <div class="sec" style="border-top:1px solid #1F2124;padding-top:14px"><span class="lbl">In this note</span>
+      <span style="display:flex;justify-content:space-between;font-size:13.5px;color:#C9CCCF"><span>Checklist</span><span class="mono" style="font-size:12px;color:#8E9196" id="olCheck">none yet</span></span>
+      <span style="display:flex;justify-content:space-between;font-size:13.5px;color:#C9CCCF"><span>Edited</span><span class="mono" style="font-size:12px;color:#8E9196">just now</span></span>
+    </div>
+  </div>
+</div>
+<div class="keys off" id="keys"></div>
+</div>
+<script src="icons.js"></script>
+<script src="player.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var live = $('live'), slash = $('slash');
+  var CMDS = [
+    { label: 'Heading 1', word: 'h1', glyph: 'H1' },
+    { label: 'Heading 2', word: 'h2', glyph: 'H2' },
+    { label: 'Task list', word: 'check', glyph: '<i data-i="task"></i>' },
+    { label: 'Code block', word: 'codeblock', glyph: '{ }' },
+    { label: 'Image', word: 'image', glyph: '<i data-i="img2"></i>' },
+    { label: 'Table', word: 'table', glyph: '<i data-i="table"></i>' },
+    { label: 'Code', word: 'code', glyph: '`' },
+  ];
+  var BASE_OUTLINE = $('outline').innerHTML;
+  function keys(html) { var k = $('keys'); if (!html) { k.classList.add('off'); return; } k.innerHTML = html; k.classList.remove('off'); }
+  function cap(t) { return '<span class="keycap">' + t + '</span>'; }
+  function caretOff() { live.querySelectorAll('.c').forEach(function (c) { c.remove(); }); }
+  function line(cls, html) { caretOff(); var el = document.createElement('div'); el.className = cls + ' in'; el.innerHTML = '<span class="t">' + (html || '') + '</span><span class="c"></span>'; live.appendChild(el); return el; }
+  async function type(w, el, text, ms) { var t = el.querySelector('.t'); for (var i = 0; i < text.length; i++) { t.textContent += text[i]; await w(text[i] === ' ' ? (ms + 40) : ms); } }
+  function menu(el, q, sel) {
+    var items = CMDS.filter(function (c) { return q === '' ? c.word !== 'code' : c.word.indexOf(q) === 0 || c.label.toLowerCase().split(' ').some(function (p) { return p.indexOf(q) === 0; }); });
+    if (q === 'co') items = [CMDS[6], CMDS[3]];
+    slash.innerHTML = items.map(function (c, i) { return '<div class="si' + (i === sel ? ' on' : '') + '"><span class="st">' + c.glyph + '</span><span class="sl">' + c.label + '</span><span class="sd">/' + c.word + '</span></div>'; }).join('');
+    window.flintIcons(slash);
+    var r = el.getBoundingClientRect(), box = slash.parentElement.getBoundingClientRect();
+    slash.style.left = (r.left - box.left) + 'px'; slash.style.top = (r.bottom - box.top + 6) + 'px';
+    slash.classList.remove('off');
+  }
+  async function slashTo(w, el, q, sel) {
+    var t = el.querySelector('.t'); t.textContent = '/'; menu(el, '', 0); await w(350);
+    for (var i = 0; i < q.length; i++) { t.textContent += q[i]; menu(el, q.slice(0, i + 1), 0); await w(110); }
+    if (sel) { await w(250); keys(cap('↓')); menu(el, q, sel); await w(350); }
+    await w(250); keys(cap('Enter')); await w(150);
+    slash.classList.add('off'); t.textContent = ''; await w(150); keys(null);
+  }
+  function outline(html) { var o = document.createElement('span'); o.className = 'ol in'; o.innerHTML = html; $('outline').appendChild(o); window.flintIcons(o); }
+  function reset() {
+    live.innerHTML = ''; slash.classList.add('off'); keys(null);
+    $('outline').innerHTML = BASE_OUTLINE; $('olMeta').textContent = '2 sections'; $('olCheck').textContent = 'none yet';
+  }
+  window.flintPlayer(14000, reset, async function (w) {
+    var el = line('p'); await w(600);
+    await slashTo(w, el, 'h2');
+    el.className = 'h'; await type(w, el, 'Discussed', 45);
+    outline('<span style="padding-left:12px">Discussed</span>'); $('olMeta').textContent = '3 sections';
+    keys(cap('Enter')); await w(200); keys(null);
+    el = line('p'); await type(w, el, 'Staging DNS timeouts are back since the gateway change.', 30);
+    keys(cap('Enter')); await w(200); keys(null);
+    el = line('p'); await slashTo(w, el, 'co', 1);
+    caretOff(); el.remove();
+    var code = document.createElement('div'); code.className = 'code in'; code.style.maxWidth = '640px';
+    code.innerHTML = '<div class="bar"><span id="lang"></span><i data-i="copy" data-s="12" data-w="1.8"></i></div><pre style="font-size:12.5px;min-height:38px"><span class="t"></span><span class="c"></span></pre>';
+    live.appendChild(code); window.flintIcons(code); await w(250);
+    var t = code.querySelector('.t'), cmd = 'az network vnet-gateway show --name gw-stg';
+    for (var i = 1; i <= cmd.length; i++) { t.innerHTML = '<span style="color:#FFFFFF;font-weight:600">' + cmd.slice(0, Math.min(i, 2)) + '</span>' + (i > 2 ? '<span style="color:#C9CCCF">' + cmd.slice(2, i) + '</span>' : ''); await w(cmd[i - 1] === ' ' ? 70 : 30); }
+    $('lang').textContent = 'bash';
+    outline('<span style="padding-left:30px;display:flex;align-items:center;gap:8px;width:100%;font-size:13px"><span class="olt">{ }</span><span style="flex:1;white-space:nowrap;overflow:hidden">az network vnet-gateway show</span><span class="mono" style="font-size:11px;color:#6E7176">bash</span></span>');
+    await w(300);
+    el = line('p'); await slashTo(w, el, 'check');
+    el.className = 'p'; el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.gap = '12px';
+    el.insertAdjacentHTML('afterbegin', '<span class="check" style="width:18px;height:18px;border-radius:6px"></span>');
+    await type(w, el, 'Dry-run the reindex job', 42); $('olCheck').textContent = '0 of 1 done';
+    await w(400);
+    el = line('p'); await w(300); keys(cap('Ctrl') + cap('V')); await w(350);
+    caretOff(); el.remove();
+    var img = document.createElement('div'); img.className = 'in';
+    img.innerHTML = '<img src="../../../site/assets/media/today-wide.png" alt="" style="display:block;width:360px;height:180px;object-fit:cover;object-position:top left;border-radius:12px;box-shadow:0 0 0 1px #2A2C30">';
+    live.appendChild(img);
+    outline('<span style="padding-left:30px;display:flex;align-items:center;gap:8px;width:100%;font-size:13px"><span class="olt"><i data-i="image" data-s="11"></i></span><span style="flex:1">screenshot.png</span><span class="mono" style="font-size:11px;color:#6E7176">image</span></span>');
+    await w(500); keys(null); line('p'); await w(1200);
+  });
+})();
+</script>
+</body>
+</html>

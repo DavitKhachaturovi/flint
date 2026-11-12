@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · feature</title>
+<link rel="stylesheet" href="flint-ui.css">
+<style>
+html,body{background:#151619;color-scheme:dark}
+.v{position:relative;width:640px;height:400px;overflow:hidden;display:none}
+.v.on{display:block}
+.at{position:absolute;left:36px;top:40px}
+</style>
+</head>
+<body>
+
+<div class="v" data-v="capture"><div class="at" style="width:600px">
+  <div class="pop">
+    <span class="grip"></span>
+    <div class="chips"><span class="pchip"><i data-i="hash" data-s="12"></i>Website relaunch<span class="x"><svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></span></div>
+    <div class="title">Login loop on Safari<span class="caret"></span></div>
+    <div class="blocks"><div class="block"><div class="block-head"><span style="flex:1">stack trace · from Teams</span><i data-i="down" data-s="12"></i></div><pre class="block-code"><span style="color:#FFFFFF;font-weight:600">TypeError: Cannot read properties of undefined</span>
+    at handleCallback (<span style="text-decoration:underline;text-decoration-color:#3A3D42;text-underline-offset:3px">auth/callback.ts:42:18</span>)
+<span style="color:#8E9196">    at processTicksAndRejections (node:internal…)</span></pre></div></div>
+    <div class="tools"><div class="tg"><span class="tool"><i data-i="plus" data-s="16"></i></span><span class="tool"><i data-i="flag" data-s="16"></i></span><span class="tool"><i data-i="hash" data-s="16"></i></span><span class="tool"><i data-i="bell" data-s="16"></i></span></div><div class="tg" style="gap:14px"><span class="target"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:16px;height:16px">Website relaunch</span><span class="send"><i data-i="up" data-s="15"></i></span></div></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="shorthand"><div class="at" style="width:600px">
+  <div class="pop">
+    <div class="chips"><span class="pchip"><span class="pstripe" style="width:3px;background:#9AA0AB"></span>Medium<span class="x"><svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></span><span class="pchip"><i data-i="bell" data-s="12"></i>Tomorrow 10:00<span class="x"><svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></span></div>
+    <div class="title">Ask about the DNS timeout !m @tomorrow 10:00 ##<span class="caret"></span></div>
+    <ul class="sugs">
+      <li class="sug on"><span class="tile"><i data-i="list"></i></span>Backend</li>
+      <li class="sug"><span class="tile"><i data-i="list"></i></span>Infra</li>
+      <li class="sug"><span class="tile"><i data-i="list"></i></span>Website relaunch</li>
+      <li class="sug"><span class="tile"><i data-i="note"></i></span>Standup notes</li>
+    </ul>
+    <div class="tools"><div class="tg"><span class="tool"><i data-i="plus" data-s="16"></i></span><span class="tool"><i data-i="flag" data-s="16"></i></span><span class="tool"><i data-i="hash" data-s="16"></i></span><span class="tool"><i data-i="bell" data-s="16"></i></span></div><div class="tg" style="gap:14px"><span class="target"><img src="../../../site/assets/flint-icon.svg" alt="" style="width:16px;height:16px">Inbox</span><span class="send"><i data-i="up" data-s="15"></i></span></div></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="lists"><div class="at" style="width:700px">
+  <div class="card" style="padding:6px">
+    <div class="row sel"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1">Compress the hero images</span><span class="ind"><i data-i="lines" data-s="14" data-w="1.8"></i></span></div>
+    <div class="row" style="margin-left:32px"><span class="check"></span><span style="flex:1">Export WebP versions</span></div>
+    <div class="row done" style="margin-left:32px"><span class="check on"><i data-i="check" data-s="12" data-w="3" data-c="#0E0F11"></i></span><span style="flex:1">Measure the current sizes</span></div>
+    <div style="margin:4px 12px 10px 48px" class="code"><div class="bar"><span>bash</span><i data-i="copy" data-s="12" data-w="1.8"></i></div><pre style="font-size:12.5px"><span style="color:#6E7176;font-style:italic"># Every hero image, as WebP</span>
+<span style="color:#FFFFFF;font-weight:600">cwebp</span> -q 80 hero.png -o hero.webp</pre></div>
+    <div class="row"><span class="stripe" style="width:4px;background:#FFFFFF"></span><span class="check"></span><span style="flex:1">Fix the login redirect loop on Safari</span><span class="ind"><span style="display:inline-flex;align-items:center;gap:4px"><i data-i="bell" data-s="13" data-w="1.8"></i>Today 15:00</span></span></div>
+    <div class="row"><span class="check"></span><span style="flex:1">Update the sitemap</span></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="today"><div class="at" style="display:flex;gap:16px;top:56px">
+  <div class="card" style="width:340px;padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;gap:12px"><span class="tile strong" style="width:36px;height:36px;border-radius:10px"><i data-i="bell" data-s="16"></i></span><span class="mono" style="font-size:22px;color:#FFFFFF">17:30</span><span class="lbl" style="margin-left:auto">Next</span></div>
+    <span style="font-size:17px;font-weight:500;color:#FFFFFF">Deploy hotfix to staging</span>
+    <div style="display:flex;align-items:center;justify-content:space-between"><span class="chip">Backend</span><span class="mono" style="font-size:12.5px;color:#C9CCCF">in 1 h 18 min</span></div>
+  </div>
+  <div class="card" style="width:300px;padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:center;gap:12px"><span class="tile" style="width:36px;height:36px;border-radius:10px"><i data-i="bell" data-s="16"></i></span><span class="mono" style="font-size:22px;color:#ECEDEE">19:00</span></div>
+    <span style="font-size:17px;color:#ECEDEE">Review PR 42</span>
+    <div style="display:flex;align-items:center;justify-content:space-between"><span class="chip">Backend</span><span class="mono" style="font-size:12.5px;color:#8E9196">in 2 h 48</span></div>
+  </div>
+</div>
+<div class="at card" style="top:250px;width:660px;padding:6px">
+  <div class="lbl" style="padding:10px 12px 6px">Pinned</div>
+  <div class="row"><span class="stripe" style="width:4px;background:#FFFFFF"></span><span class="check"></span><span style="flex:1">Deploy hotfix to staging</span><span class="ind"><i data-i="pin" data-s="13" data-w="1.8"></i><span class="chip" style="height:24px">Backend</span></span></div>
+  <div class="row"><span class="stripe" style="width:3px;background:#9AA0AB"></span><span class="check"></span><span style="flex:1">Finish search reindex job</span></div>
+</div></div>
+
+<div class="v" data-v="palette"><div class="at" style="left:40px;top:36px">
+  <div class="palette" style="width:580px">
+    <div class="palette-head"><span style="color:#8E9196;display:flex"><i data-i="search" data-s="15"></i></span><span class="palette-field">dep<span class="caret" style="display:inline-block;width:1.5px;height:18px;background:#9AA0AB;margin-left:1px;animation:blink 1.06s steps(1) infinite"></span></span></div>
+    <div class="palette-results">
+      <div class="palette-group"><div class="palette-label">Tasks</div>
+        <div class="palette-item on"><span class="palette-text"><span class="palette-hit">Dep</span>loy hotfix to staging</span><span class="palette-detail">Backend</span><span class="keycap">Enter</span></div>
+        <div class="palette-item"><span class="palette-text">Write the <span class="palette-hit">dep</span>loy notes for the team</span><span class="palette-detail">Inbox</span></div>
+      </div>
+      <div class="palette-group"><div class="palette-label">Lists and notes</div>
+        <div class="palette-item"><span class="palette-text"><span class="palette-hit">Dep</span>loy checklist</span><span class="palette-detail">Infra</span></div>
+      </div>
+      <div class="palette-group"><div class="palette-label">In notes</div>
+        <div class="palette-item"><span class="palette-text">…the <span class="palette-hit">dep</span>loy window is Tuesday</span><span class="palette-detail">Sprint planning</span></div>
+      </div>
+    </div>
+    <div class="palette-foot"><span><span class="keycap">↑↓</span> navigate</span><span><span class="keycap">Enter</span> open</span><span><span class="keycap">Esc</span> close</span><span style="margin-left:auto"><span class="keycap">Ctrl K</span> opens this anywhere</span></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="sync"><div class="at" style="width:680px">
+  <div class="lbl" style="padding:0 4px 10px">Sync</div>
+  <div class="card">
+    <div class="srow"><div style="display:flex;gap:14px;align-items:center"><span style="width:38px;height:38px;border-radius:11px;background:#ECEDEE;color:#0E0F11;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px">Y</span><div><div class="sname">Google Drive</div><div class="sdesc" style="margin-top:1px">Connected as you@gmail.com · last synced 2 min ago</div></div></div><span class="btn">Sync now</span></div>
+    <div class="srow"><div><div class="sname">What syncs</div><div class="sdesc" style="max-width:300px">Everything, or only the lists, notes and groups you choose.</div></div><div class="seg"><span>Everything</span><span class="on">Chosen items</span></div></div>
+    <div class="srow"><div><div class="sname">Drive folder</div><div class="sdesc mono">My Drive › Flint</div></div><span class="btn">Open in Drive</span></div>
+    <div class="srow" style="background:#131416;border-radius:0 0 18px 18px"><div class="sdesc" style="max-width:none;color:#A4A7AB">Nothing else leaves this PC, and Flint has no server of its own.</div></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="snapshots"><div class="at" style="width:640px">
+  <div class="card" style="padding:12px 8px 8px">
+    <div class="lbl" style="padding:2px 10px 6px">Today</div>
+    <div class="snap-head" style="background:#1A1B1E"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196" style="transform:rotate(90deg)"></i><span class="snap-time">15:41</span><span class="snap-meta">2 lists differ from now</span></div>
+    <div class="snap-files">
+      <div class="snap-file changed" style="background:#1A1B1E"><span class="tile"><i data-i="list"></i></span><span class="snap-title">Backend</span><span class="snap-state">Changed since</span><span class="tact hi">Restore</span></div>
+      <div class="snap-file same"><span class="tile"><i data-i="note"></i></span><span class="snap-title">Sprint planning</span><span class="snap-state">Same as now</span></div>
+      <div class="snap-file deleted"><span class="tile"><i data-i="list"></i></span><span class="snap-title">Reading list</span><span class="snap-state">Deleted since</span><span class="tact">Restore</span></div>
+      <div style="display:flex;justify-content:flex-end;padding-top:6px"><span class="tact">Restore everything…</span></div>
+    </div>
+    <div class="snap-head"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196"></i><span class="snap-time">14:41</span><span class="snap-meta">1 list differs from now</span></div>
+    <div class="snap-head"><i data-i="chev" data-s="10" data-w="2.6" data-c="#8E9196"></i><span class="snap-time">13:40</span><span class="snap-meta">same as now</span></div>
+  </div>
+</div></div>
+
+<div class="v" data-v="mini"><img src="../../../site/assets/screens/mini.png" alt="" style="position:absolute;left:50%;top:14px;width:440px;margin-left:-220px"></div>
+
+<script src="icons.js"></script>
+<script>
+var v = (location.hash || '#capture').slice(1);
+var el = document.querySelector('[data-v="' + v + '"]');
+if (el) el.classList.add('on');
+</script>
+</body>
+</html>
