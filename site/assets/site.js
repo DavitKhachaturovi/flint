@@ -177,7 +177,7 @@ document.documentElement.classList.add('js');
       at(
         $('.intro-curtain', intro),
         [
-          { opacity: 1, '--intro-r': '0px' },
+          { opacity: 1, '--intro-r': '-140px' }, // fully closed, its soft edge included
           { opacity: 1, offset: 0.8 },
           { opacity: 0, '--intro-r': `${Math.ceil(far) + 160}px` },
         ],

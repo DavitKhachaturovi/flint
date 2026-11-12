@@ -120,7 +120,7 @@ kbd {
 @property --intro-r {
   syntax: '<length>';
   inherits: false;
-  initial-value: 0px;
+  initial-value: -140px; /* closed: the soft edge (140px) inside the centre too */
 }
 
 .intro {
