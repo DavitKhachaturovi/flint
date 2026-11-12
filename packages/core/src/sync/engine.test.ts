@@ -372,6 +372,33 @@ describe('SyncEngine (SYNC-01, D-161)', () => {
     expect(laptop.groupList).toEqual([{ id: 'g-pers', name: 'Home', lists: ['groc'] }]);
   });
 
+  it('an unchanged group is not applied again on every run (D-183)', async () => {
+    const { laptop, work } = await twoPcs();
+    laptop.groupList = [{ id: 'g-pers', name: 'Personal', lists: ['groc', 'trip'] }];
+    await laptop.sync();
+    await work.sync();
+    // Applying it told the workspace something changed, which asked for another run, for ever.
+    const applied: string[] = [];
+    for (const pc of [laptop, work]) {
+      const apply = pc.applyGroups.bind(pc);
+      pc.applyGroups = async (groups, removed) => {
+        applied.push(...groups.map((group) => group.id), ...removed);
+        await apply(groups, removed);
+      };
+    }
+    for (let run = 0; run < 3; run++) {
+      await laptop.sync();
+      await work.sync();
+    }
+    expect(applied).toEqual([]);
+    // A real change still comes through: renamed on the laptop.
+    laptop.groupList = [{ id: 'g-pers', name: 'Home', lists: ['groc', 'trip'] }];
+    await laptop.sync();
+    await work.sync();
+    expect(applied).toEqual(['g-pers']);
+    expect(work.groupList).toEqual([{ id: 'g-pers', name: 'Home', lists: ['groc', 'trip'] }]);
+  });
+
   it('a trashed Drive folder pauses sync and never touches local data (Q8)', async () => {
     const { drive, laptop } = await twoPcs();
     drive.trashFolder(laptop.engine.state.folderId as string);

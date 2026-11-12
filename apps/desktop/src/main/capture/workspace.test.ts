@@ -1320,3 +1320,28 @@ describe('Today (TODAY-01, TODAY-02, TODAY-03, M6, D-89, D-92)', () => {
     expect(keys(workspace, later)).toEqual(['aaaa', 'cccc']);
   });
 });
+
+describe('sync and the sidebar (SYNC-01, D-183)', () => {
+  const header = '---\nflint: 1\nid: inbox\nmode: tasks\n---\n';
+  it('a synced group applied as it already is tells no one; a real change does', async () => {
+    await writeFile(join(folder, 'Inbox.md'), `${header}- [ ] one [id:: aaa1]\n`);
+    for (const [name, id] of [
+      ['Alpha', 'al01'],
+      ['Beta', 'be01'],
+    ])
+      await writeFile(join(folder, `${name}.md`), `---\nflint: 1\nid: ${id}\nmode: tasks\n---\n`);
+    const workspace = await open();
+    await workspace.applySyncGroups([{ id: 'g1', name: 'Work', lists: ['al01', 'be01'] }], []);
+    const changes: string[] = [];
+    workspace.onChange(() => changes.push('changed'));
+    // As it is (sync used to apply every synced group on every run): no change, no sync again.
+    await workspace.applySyncGroups([{ id: 'g1', name: 'Work', lists: ['al01', 'be01'] }], []);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes).toEqual([]);
+    // Renamed on another PC: the sidebar changes, and says so.
+    await workspace.applySyncGroups([{ id: 'g1', name: 'Office', lists: ['al01', 'be01'] }], []);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes.length).toBeGreaterThan(0);
+    expect(workspace.sidebar().items[0]).toMatchObject({ kind: 'group', name: 'Office' });
+  });
+});

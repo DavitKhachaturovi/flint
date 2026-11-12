@@ -634,7 +634,13 @@ export class SyncEngine {
         lists: mergeMembers(b?.lists ?? [], m.lists, t.lists),
       };
       toWrite.push(merged);
-      toApply.push(merged);
+      // D-183: applied here only when it differs from the group here (its members as this PC has
+      // them; lists it doesn't have can't be in its group). Applying an unchanged group on every
+      // run told the workspace something changed, which asked for the next run 5 s later, for ever.
+      const mergedHere = merged.lists.filter(
+        (list) => m.lists.includes(list) || localById.has(list),
+      );
+      if (merged.name !== m.name || !sameMembers(mergedHere, m.lists)) toApply.push(merged);
     }
     if (toApply.length > 0 || toRemove.length > 0) await local.applyGroups(toApply, toRemove);
     groupsFile.groups = toWrite;

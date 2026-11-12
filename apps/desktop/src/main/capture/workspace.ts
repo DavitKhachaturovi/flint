@@ -579,12 +579,18 @@ export class Workspace {
 
   /** Changes run one at a time: watcher refreshes, captures and undos never interleave. */
   private queue: Promise<unknown> = Promise.resolve();
-  private serial<T>(work: () => Promise<T>): Promise<T> {
+  private serial<T>(
+    work: () => Promise<T>,
+    /** D-183: whether it changed anything (by default it did); nothing changed tells no one. */
+    changed: (result: T) => boolean = () => true,
+  ): Promise<T> {
     const run = this.queue.catch(() => undefined).then(work);
     this.queue = run;
     // Whatever changed, the main window shows it (M4).
     void run.then(
-      () => this.notify(),
+      (result) => {
+        if (changed(result)) this.notify();
+      },
       () => this.notify(),
     );
     return run;
@@ -2903,7 +2909,8 @@ export class Workspace {
     }[],
     removed: readonly string[],
   ): Promise<void> {
-    return this.serial(async () => {
+    // D-183: the sidebar as it was tells no one (a sync run would answer it with another run).
+    const run = this.serial(async () => {
       let items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
       for (const id of removed) items = deleteGroup(items, id);
       const known = new Set(this.syncEntries().map((entry) => entry.id));
@@ -2926,8 +2933,11 @@ export class Workspace {
           });
       }
       const after = fromItems(items, this.sidebarFile.extra);
-      if (writeSidebar(after) !== writeSidebar(this.sidebarFile)) await this.saveSidebar(after);
-    });
+      if (writeSidebar(after) === writeSidebar(this.sidebarFile)) return false;
+      await this.saveSidebar(after);
+      return true;
+    }, Boolean);
+    return run.then(() => undefined);
   }
 
   /** SYNC-01: sync wrote or removed a file in the folder; read it now (DATA-06), as the watcher would. */
