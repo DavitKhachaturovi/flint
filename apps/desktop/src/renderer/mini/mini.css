@@ -51,8 +51,10 @@ body {
 }
 
 /* D-111: the reset button, left of the pin, only while the size differs from the default; it
-   opens its place and fades in, and closes it again. */
-.mini-reset {
+   opens its place and fades in, and closes it again. D-179: the More button (Focus settings) the
+   same way, only while the second tab shows Focus. */
+.mini-reset,
+.mini-more {
   width: 0;
   overflow: hidden;
   opacity: 0;
@@ -66,7 +68,8 @@ body {
     color var(--fl-dur-fast);
 }
 
-.fl-compact .mini-reset.on {
+.fl-compact .mini-reset.on,
+.fl-compact .mini-more.on {
   width: 28px;
   opacity: 1;
   transform: none;
@@ -279,6 +282,15 @@ body {
   font-family: var(--fl-font-mono);
   font-size: 11.5px;
   color: var(--fl-text-secondary);
+}
+
+/* D-179: the alert's X, in the card's top-right corner. */
+.mini-reminder-dismiss.tool {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  margin: -6px -6px 0 auto;
 }
 
 .mini-reminder-actions {

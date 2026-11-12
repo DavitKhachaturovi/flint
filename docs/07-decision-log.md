@@ -1603,3 +1603,10 @@ Status: **Decided** (confirmed by Davit) or **Proposed** (designed by Claude, ne
 - **Differences from mockup 16, raised with Davit:** (1) a drag shows the two corner spots of the tab's edge, the other edge's once it crosses (four at once would need a window over the whole screen during the drag, which Windows may treat as a full-screen app and hold notifications back); (2) the walkthrough's mini step mentions the tab in its text rather than ringing it (it is in another window).
 - **Found while testing:** Flint's start as the tab right after a hide (the hotkey, then a start) was hidden again by the hide's fade timer; the start now cancels it, as showing does.
 - **Tests:** unit `mini-edge.test.ts`, `mini-place.test.ts`; end to end six tests in `mini.spec.ts` (all 30 pass locally); the header-overflow test checks the new button at the minimum width.
+
+### D-179 — 1.7.0 preview: a reminder's X in mini, a click keeps a peek, ⋯ only on Focus
+- **Date:** 12 Nov 2026 · **Status:** Built on `next` (Davit's preview feedback on 1.7.0). Short entry.
+- **Dismiss (Davit):** mini's reminder alert has an **X** in its top-right corner that takes the card away and leaves the task as it is (its reminder stays overdue on Today's Overdue card; the toast, if still there, is not touched); the tab's dot goes with it. **Proposed:** no key for it (D, S, O stay the alert's keys).
+- **A click keeps a peek (fix):** MINI-04 already said a click into a peek opens it, but a peek can't take the focus (D-178), so main never heard of the click and the peek slid back. Now a press anywhere on a peeking card opens it: the page tells main (a press on its content), and main catches a press on the header's blank space or the grip, which are drag regions and reach only Windows (`WM_NCLBUTTONDOWN`).
+- **⋯ only on Focus (Davit):** mini's ⋯ (Focus settings…) shows only while the list tab shows Focus and is in view; it opens its place and fades in, and goes, as Reset size does (D-111).
+- **Tests:** `mini.spec.ts`: a click on a peeking card's list opens it, the alert's X in the reminder-dot test; `focus.spec.ts`: ⋯ hidden on Inbox and Today, shown on Focus.

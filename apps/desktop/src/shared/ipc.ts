@@ -1010,7 +1010,8 @@ export interface MiniAlert {
   readonly label: string;
 }
 
-export type MiniAlertAction = 'done' | 'snooze' | 'open';
+/** D-179: `dismiss` takes the card away and leaves the task as it is (still overdue). */
+export type MiniAlertAction = 'done' | 'snooze' | 'open' | 'dismiss';
 
 /** D-110: the corner mini mode's card hangs from (it grows away from it). */
 export type MiniCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';

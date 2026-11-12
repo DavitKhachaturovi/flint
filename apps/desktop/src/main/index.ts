@@ -2474,6 +2474,11 @@ async function start(): Promise<void> {
   if (hooks) hooks.activate = (url: string) => handleActivation(activationOf([url]));
   ipcMain.on(Channels.miniAlertAction, (event, id: unknown, action: unknown) => {
     if (!mini.owns(event.sender) || typeof id !== 'string') return;
+    // D-179: the card's X: only the card goes; the task keeps its reminder (Overdue shows it).
+    if (action === 'dismiss') {
+      dropAlert(id);
+      return;
+    }
     if (action !== 'done' && action !== 'snooze' && action !== 'open') return;
     handleActivation({ id, action: action }, 'mini');
   });

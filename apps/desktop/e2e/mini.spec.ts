@@ -484,7 +484,11 @@ test('a reminder: the toast and the card; Done in mini completes it and takes th
   const card = mini.locator('.mini-reminder.alert');
   await expect(card).toBeVisible({ timeout: 40_000 });
   await expect(card).toContainText('1 of 2');
-  await expect(card.locator('button')).toHaveText([/Done\s*D/, /Snooze 10m\s*S/, /Open\s*O/]);
+  await expect(card.locator('.mini-reminder-actions button')).toHaveText([
+    /Done\s*D/,
+    /Snooze 10m\s*S/,
+    /Open\s*O/,
+  ]);
   expect(
     ((await hook('toasts')) as string[]).filter((each) => each.includes('Ring the')),
   ).toHaveLength(2);
@@ -1278,7 +1282,7 @@ test('Collapse to the edge: the card slides into its nearer edge, the tab comes 
   expect(await miniWindow('onTop')).toBe(true);
 });
 
-test('resting on the tab peeks without the keyboard; away from it, it slides back; a click opens it, Ctrl+M collapses it (D-177 Q1, Q7)', async () => {
+test('resting on the tab peeks without the keyboard; away from it, it slides back; a click on the tab or on the peek opens it, Ctrl+M collapses it (D-177 Q1, Q7, D-179)', async () => {
   await pointer('tab');
   await expect.poll(view).toBe('peek');
   await expect(miniCard()).not.toHaveClass(/\btucked\b/);
@@ -1295,6 +1299,20 @@ test('resting on the tab peeks without the keyboard; away from it, it slides bac
   await pointer('zone');
   expect(await view()).toBe('peek');
   await pointer('away');
+  await expect.poll(view).toBe('collapsed');
+  await expect(miniCard()).toHaveClass(/\btucked\b/);
+  // D-179: a click anywhere on a peeking card, even on nothing in it, opens it: it stays.
+  await pointer('tab');
+  await expect.poll(view).toBe('peek');
+  await expect(miniCard()).not.toHaveClass(/\btucked\b/);
+  // (A press on the header's blank space or the grip reaches only Windows, as a drag region; main
+  // opens the peek then, on WM_NCLBUTTONDOWN.)
+  const list = await miniCard().locator('.mini-body').boundingBox();
+  if (!list) throw new Error('no list');
+  await mini.mouse.click(list.x + 4, list.y + list.height - 4);
+  await expect.poll(view).toBe('open');
+  await pointer('away');
+  await mini.locator('.mini-head .mini-collapse').click();
   await expect.poll(view).toBe('collapsed');
   await expect(miniCard()).toHaveClass(/\btucked\b/);
   // A click on the tab opens it; it stays, whatever the cursor does.
@@ -1371,7 +1389,7 @@ test('Flint starting shows the tab; dragged, the corner spots show; let go it st
   await pointer(null);
 });
 
-test('a reminder while collapsed: the white dot and one pulse on the tab; a peek shows its card; dealt with, the dot goes (D-177 Q5)', async () => {
+test('a reminder while collapsed: the white dot and one pulse on the tab; a peek shows its card; its X takes it and the dot away, the click keeps the peek open (D-177 Q5, D-179)', async () => {
   const at = stamp(appNow());
   await writeFile(
     join(flint, 'Errands.md'),
@@ -1385,10 +1403,15 @@ test('a reminder while collapsed: the white dot and one pulse on the tab; a peek
   await expect.poll(view).toBe('peek');
   const card = mini.locator('.mini-reminder.alert');
   await expect(card).toContainText('Ring the garage');
-  await card.locator('button', { hasText: 'Done' }).click();
+  // D-179: its X takes the card (and the dot) away and leaves the task as it is; the click opened
+  // the peek, so it stays.
+  await card.locator('.mini-reminder-dismiss').click();
+  await expect(mini.locator('.mini-reminder.alert')).toHaveCount(0);
   await expect(mini.locator('.mini-edge-dot')).toHaveCount(0);
-  await expect.poll(() => readFile(join(flint, 'Errands.md'), 'utf8')).toContain('- [x] Ring');
+  expect(await readFile(join(flint, 'Errands.md'), 'utf8')).toContain('- [ ] Ring the garage');
+  await expect.poll(view).toBe('open');
   await pointer('away');
+  await mini.keyboard.press('Control+m');
   await expect.poll(view).toBe('collapsed');
   await pointer(null);
 });

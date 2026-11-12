@@ -675,6 +675,7 @@ export function MiniApp(): ReactElement {
           tone: focusTimer.state.mode === 'focus' ? ('focus' as const) : ('break' as const),
         }
       : null;
+  const moreShown = tab === 'inbox' && focusShown;
   const selectReminder = (reminder: TodayReminder): void => setSelected(reminder.key);
 
   return (
@@ -702,6 +703,10 @@ export function MiniApp(): ReactElement {
         style={stage.style}
         data-corner={stage.corner}
         aria-hidden={tucked || undefined}
+        // D-179: a click anywhere on a peeking card opens it, so it stays.
+        onPointerDownCapture={() => {
+          if (edge.view === 'peek') window.flintMini.edgeAction('open');
+        }}
       >
         <span className="mini-grip" aria-hidden="true" />
         <header className="mini-head">
@@ -760,10 +765,13 @@ export function MiniApp(): ReactElement {
             })}
           </div>
           <span className="mini-head-space" />
-          {/* FOCUS-06 (D-170): Focus settings…, opened in the main window. */}
+          {/* FOCUS-06 (D-170): Focus settings…, opened in the main window; D-179: only while the
+              second tab shows Focus. */}
           <button
             type="button"
-            className="tool"
+            className={moreShown ? 'tool mini-more on' : 'tool mini-more'}
+            tabIndex={moreShown ? 0 : -1}
+            aria-hidden={!moreShown}
             aria-label="More"
             title="More"
             onMouseDown={(event) => event.preventDefault()}

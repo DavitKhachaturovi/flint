@@ -503,6 +503,17 @@ export function createMini(options: {
         applyEdge();
       }
     });
+    // D-179: a press on a peek opens it. The page tells main about presses on its content; a press
+    // on the header's blank space or the grip (drag regions) only reaches Windows, as
+    // WM_NCLBUTTONDOWN.
+    if (process.platform === 'win32') {
+      // After Windows has handled the press (a drag of a peek makes it an ordinary card instead).
+      made.hookWindowMessage(0x00a1, () => {
+        setImmediate(() => {
+          if (mode === 'tab' && edge.view === 'peek') openEdge();
+        });
+      });
+    }
     // Dragged by its header or grip and let go: near a corner, into it; elsewhere it stays.
     made.on('moved', () => {
       if (hooks || placing > 0 || !stageNow) return;

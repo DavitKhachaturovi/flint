@@ -5,9 +5,9 @@ What the app shows in its **What's new** card after an update (APP-15, D-117). N
 ## 1.7.0 (11 Nov 2026)
 
 - **Mini mode tucks into the edge of your screen:** press the new arrow button in mini mode's header (or **Ctrl+M**) and it slides away, leaving half of the Flint icon at the edge of your screen.
-- **Peek without leaving what you're doing:** rest the mouse on the icon and mini mode slides out; move away and it slides back a second later. Whatever you were typing keeps the keyboard. Click the icon to open mini mode properly; it then stays until you tuck it away again.
+- **Peek without leaving what you're doing:** rest the mouse on the icon and mini mode slides out; move away and it slides back a second later. Whatever you were typing keeps the keyboard. Click the icon, or anywhere on mini mode while it peeks, to open it properly; it then stays until you tuck it away again.
 - **Put it where it suits you:** drag the icon up or down the edge, or across to the other side of the screen. Near the top or bottom it snaps into place.
-- **It tells you things quietly:** a white dot means a reminder is waiting, and during a Focus session a thin line round the icon fills up as it goes.
+- **It tells you things quietly:** a white dot means a reminder is waiting, and during a Focus session a thin line round the icon fills up as it goes. Not acting on a reminder now? The X on its card puts it away; the task stays overdue on Today.
 - **There when Flint starts:** the icon waits at the edge every time Flint starts. Turn that or the hover off in Settings → Mini mode. **Ctrl+Alt+Space** still opens mini mode, and closes it back to the edge.
 
 ## 1.6.0 (11 Nov 2026)

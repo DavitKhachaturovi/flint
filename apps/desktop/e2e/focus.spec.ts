@@ -237,6 +237,10 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   const mini = app.windows().find((page) => page.url().includes('/mini/')) as Page;
   const tab = mini.locator('.mini-tabs .mini-tab-list');
   await expect(tab).toHaveText('Inbox');
+  // D-179: the More button (Focus settings) shows only while the tab shows Focus.
+  const more = mini.locator('.mini-head .mini-more');
+  await expect(more).not.toHaveClass(/\bon\b/);
+  await expect(more).toHaveAttribute('aria-hidden', 'true');
   // The list tab active first (a click on it while another tab is active switches to it; D-156:
   // wait for it), so the next click opens its picker.
   await tab.click();
@@ -256,6 +260,8 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   await expect(picker.locator('.fl-picker-row').nth(1)).toContainText('Focus');
   await picker.locator('.fl-picker-row', { hasText: 'Focus' }).click();
   await expect(tab).toContainText('Focus');
+  await expect(more).toHaveClass(/\bon\b/);
+  await expect(more).not.toHaveAttribute('aria-hidden', 'true');
   await expect(mini.locator('.mini-focus .mini-focus-digits')).toHaveText('50:00');
   await expect(mini.locator(`.row[data-key="fx2"] .focus-count-text`)).toHaveText('1/2');
   await mini.locator('.mini-focus-go').click();
@@ -263,9 +269,11 @@ test('mini: Inbox then Focus first in the picker; Focus shows the compact timer 
   await expect(mini.locator('.mini-focus')).toHaveClass(/\bfocus\b/);
   await mini.locator('.mini-tabs .trash-tab', { hasText: 'Today' }).click();
   await expect(tab.locator('.mini-tab-time')).toHaveText(/^\d\d:\d\d$/);
+  await expect(more).not.toHaveClass(/\bon\b/);
   await tab.click();
   await expect(tab).toHaveClass(/\bon\b/);
   await expect(tab.locator('.mini-tab-time')).toHaveCount(0);
+  await expect(more).toHaveClass(/\bon\b/);
   await mini.locator('.mini-focus-go').click();
   await expect(main.locator('.focus-go')).toHaveText('Resume');
 });
