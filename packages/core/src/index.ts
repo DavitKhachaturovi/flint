@@ -10,3 +10,4 @@ export * from './time/index.js';
 export * from './undo/index.js';
 export * from './sync/index.js';
 export * from './focus/index.js';
+export * from './agents/index.js';

@@ -38,6 +38,10 @@
       "types": "./dist/focus/index.d.ts",
       "default": "./dist/focus/index.js"
     },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "default": "./dist/agents/index.js"
+    },
     "./bench": {
       "types": "./dist/bench/index.d.ts",
       "default": "./dist/bench/index.js"
