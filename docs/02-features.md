@@ -890,7 +890,7 @@ Opt-in sync of chosen lists, notes and groups between your PCs through **your ow
 - Access revoked or the sign-in expired: "Needs attention · sign in again" with **Sign in again**; changes made meanwhile sync afterwards.
 - Drive full: "Google Drive is full" naming what didn't fit ("kazbegi-flight.mp4, 1.8 GB"); text and bookkeeping go first, then attachments smallest first.
 - Offline or Google unreachable: "Offline · changes sync when you're back"; retried by itself (at once when the network returns, otherwise backing off up to the 3-minute cycle).
-- A run that has to run again (another PC wrote meanwhile, a note being typed in) runs again 5 s later; **D-181:** the log says why (which note, list or bookkeeping file, the revision expected and found, which device wrote it and when).
+- A run that has to run again (another PC wrote meanwhile, a note being typed in) runs again 5 s later; **D-181:** the log says why (which note, list or bookkeeping file, the revision expected and found, which device wrote it and when). **D-183:** a run that changes nothing here asks for no other run (synced groups are applied only when they differ).
 - **Changing the Flint folder** (DATA-07) while connected: the account stays, the new folder syncs nothing until What should sync? is answered for it (Proposed).
 
 **Privacy (APP-09):** notes go only to the user's own Google Drive, only for what they choose to sync; Flint has no server. The network guard allows Google's sign-in and API hosts only from sync's own session and only while Drive is connected or a sign-in is under way (05 §5).
