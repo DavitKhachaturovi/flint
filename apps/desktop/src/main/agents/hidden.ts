@@ -47,6 +47,11 @@ export class HiddenFile {
     return [...this.hidden.keys()];
   }
 
+  /** Every item ever hidden or shown here (sync carries each one's latest change). */
+  knownIds(): string[] {
+    return [...new Set([...this.hidden.keys(), ...this.shown.keys()])];
+  }
+
   /** The user hides or shows an item (never an agent). */
   async set(id: string, hide: boolean, now: Date): Promise<void> {
     if (hide === this.hidden.has(id)) return;

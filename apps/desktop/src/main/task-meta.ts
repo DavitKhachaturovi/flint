@@ -115,16 +115,22 @@ export class TaskMetaFile {
     if (changed) this.schedule();
   }
 
-  /** SYNC-01 (D-185 Q4): another PC's agent names for a task, when this PC has none. */
+  /**
+   * SYNC-01 (D-185 Q4): the agent names sync settled on for a task: who made it (this PC's, when it
+   * has one) and who changed it last (none: the user did, on whichever PC changed it later).
+   */
   adoptAgents(id: string, createdBy: unknown, touchedBy: unknown): void {
     const known = this.tasks.get(id);
     if (!known) return;
-    const madeBy = AGENT_NAME(createdBy);
+    const madeBy = known.createdBy ?? AGENT_NAME(createdBy);
     const changedBy = AGENT_NAME(touchedBy);
-    if (known.createdBy === (madeBy ?? known.createdBy) && known.touchedBy === changedBy) return;
+    if (known.createdBy === madeBy && known.touchedBy === changedBy) return;
+    const { createdBy: _made, touchedBy: _changed, ...rest } = known;
+    void _made;
+    void _changed;
     this.tasks.set(id, {
-      ...known,
-      ...(madeBy !== undefined && known.createdBy === undefined && { createdBy: madeBy }),
+      ...rest,
+      ...(madeBy !== undefined && { createdBy: madeBy }),
       ...(changedBy !== undefined && { touchedBy: changedBy }),
     });
     this.schedule();

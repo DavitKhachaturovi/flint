@@ -8,7 +8,8 @@ import { hostname } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument, type TaskNode } from '@flint/core';
-import type { LocalGroup, LocalItem, LocalSide, TaskTimes } from '@flint/core/sync';
+import type { AgentFlag, LocalGroup, LocalItem, LocalSide, TaskTimes } from '@flint/core/sync';
+import type { HiddenFile } from '../agents/hidden.js';
 import type { Workspace } from '../capture/workspace.js';
 import { writeFileAtomic, readListFile } from '../storage/atomic.js';
 import { tempDirectoryFor } from '../storage/list-file.js';
@@ -37,6 +38,8 @@ export interface WorkspaceSideOptions {
   /** A note being typed in with nothing saved yet (an open editor): left for the next run. */
   readonly busy: (listId: string) => boolean;
   readonly now?: () => number;
+  /** AGENT-06 (D-185): the current Flint folder's Hidden from agents, which syncs too. */
+  readonly hidden?: () => HiddenFile;
 }
 
 export class WorkspaceSide implements LocalSide {
@@ -149,7 +152,13 @@ export class WorkspaceSide implements LocalSide {
       if (!meta) continue;
       const c = parseStamp(meta.created)?.getTime();
       const t = parseStamp(meta.lastTouched)?.getTime();
-      out.set(id, { ...(c !== undefined ? { c } : {}), ...(t !== undefined ? { t } : {}) });
+      out.set(id, {
+        ...(c !== undefined ? { c } : {}),
+        ...(t !== undefined ? { t } : {}),
+        // AGENT-01 (D-185 Q4): who made and last changed it travel with its times.
+        ...(meta.createdBy !== undefined ? { cb: meta.createdBy } : {}),
+        ...(meta.touchedBy !== undefined ? { tb: meta.touchedBy } : {}),
+      });
     }
     return Promise.resolve(out);
   }
@@ -161,8 +170,27 @@ export class WorkspaceSide implements LocalSide {
         time.c !== undefined ? localStamp(new Date(time.c)) : undefined,
         time.t !== undefined ? localStamp(new Date(time.t)) : undefined,
       );
+      this.workspace.meta.adoptAgents(id, time.cb, time.tb);
     }
     return Promise.resolve();
+  }
+
+  /** AGENT-06: Hidden from agents, by list, note and group ID, with when each last changed. */
+  agentFlags(): Promise<Readonly<Record<string, AgentFlag>>> {
+    const hidden = this.options.hidden?.();
+    const flags: Record<string, AgentFlag> = {};
+    if (!hidden) return Promise.resolve(flags);
+    for (const id of hidden.knownIds()) {
+      const changed = hidden.changedAt(id);
+      if (changed) flags[id] = changed;
+    }
+    return Promise.resolve(flags);
+  }
+
+  async applyAgentFlags(flags: Readonly<Record<string, AgentFlag>>): Promise<void> {
+    const hidden = this.options.hidden?.();
+    if (!hidden) return;
+    for (const [id, flag] of Object.entries(flags)) await hidden.adopt(id, flag.hidden, flag.at);
   }
 
   renamedTasks(renamed: ReadonlyMap<string, string>): Promise<void> {

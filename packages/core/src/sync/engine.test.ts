@@ -9,7 +9,7 @@ import { FakeDrive } from './fake-drive.js';
 import { SyncEngine } from './engine.js';
 import { conflictTime } from './conflict.js';
 import { emptyState, type SyncMode } from './state.js';
-import type { BaseStore, LocalGroup, LocalItem, LocalSide, TaskTimes } from './drive.js';
+import type { AgentFlag, BaseStore, LocalGroup, LocalItem, LocalSide, TaskTimes } from './drive.js';
 
 class Pc implements LocalSide {
   readonly device: string;
@@ -129,6 +129,17 @@ class Pc implements LocalSide {
 
   async applyTaskTimes(id: string, times: ReadonlyMap<string, TaskTimes>) {
     this.times.set(id, new Map(times));
+  }
+
+  /** AGENT-06: Hidden from agents on this PC. */
+  flags: Record<string, AgentFlag> = {};
+
+  async agentFlags() {
+    return this.flags;
+  }
+
+  async applyAgentFlags(flags: Readonly<Record<string, AgentFlag>>) {
+    this.flags = { ...this.flags, ...flags };
   }
 
   async renamedTasks() {}
@@ -483,5 +494,52 @@ describe('SyncEngine (SYNC-01, D-161)', () => {
     await work.sync();
     const t = work.times.get('groc')?.get('aaaaaa')?.t ?? 0;
     expect(t).toBeLessThanOrEqual(drive.clock);
+  });
+});
+
+describe('AI agents across PCs (AGENT-01, AGENT-06, D-185)', () => {
+  it('carries who made and last changed a task; a later user edit clears "changed by"', async () => {
+    const { drive, laptop, work } = await twoPcs();
+    laptop.edit('groc', (text) => text + '- [ ] Ship it [id:: cccccc]\n');
+    laptop.times.set(
+      'groc',
+      new Map([['cccccc', { c: laptop.clock, t: laptop.clock, cb: 'Claude', tb: 'Claude' }]]),
+    );
+    await laptop.sync();
+    drive.clock += 60_000;
+    await work.sync();
+    expect(work.times.get('groc')?.get('cccccc')).toMatchObject({ cb: 'Claude', tb: 'Claude' });
+    // The user edits it on the work PC later: no agent changed it last, everywhere.
+    work.clock += 120_000;
+    drive.clock = Math.max(drive.clock, work.clock);
+    work.edit('groc', (text) => text.replace('Ship it', 'Ship it today'));
+    work.times.set('groc', new Map([['cccccc', { c: laptop.clock, t: work.clock, cb: 'Claude' }]]));
+    await work.sync();
+    await laptop.sync();
+    const times = laptop.times.get('groc')?.get('cccccc');
+    expect(times?.cb).toBe('Claude');
+    expect(times?.tb).toBeUndefined();
+  });
+
+  it('syncs Hidden from agents for synced items; the later change wins', async () => {
+    const { laptop, work } = await twoPcs();
+    laptop.flags = { groc: { hidden: true, at: '2026-03-10T09:05:00.000Z' } };
+    await laptop.sync();
+    await work.sync();
+    expect(work.flags['groc']).toEqual({ hidden: true, at: '2026-03-10T09:05:00.000Z' });
+    // Shown again on the work PC later.
+    work.flags = { groc: { hidden: false, at: '2026-03-10T09:10:00.000Z' } };
+    await work.sync();
+    await laptop.sync();
+    expect(laptop.flags['groc']?.hidden).toBe(false);
+    // An older change from the laptop doesn't win back.
+    laptop.flags = { groc: { hidden: true, at: '2026-03-10T09:07:00.000Z' } };
+    await laptop.sync();
+    expect(laptop.flags['groc']?.hidden).toBe(false);
+    // Something not synced never travels.
+    laptop.flags = { ...laptop.flags, local: { hidden: true, at: '2026-03-10T09:20:00.000Z' } };
+    await laptop.sync();
+    await work.sync();
+    expect(work.flags['local']).toBeUndefined();
   });
 });

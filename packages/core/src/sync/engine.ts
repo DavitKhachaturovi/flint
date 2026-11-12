@@ -12,6 +12,7 @@ import {
   type LocalGroup,
   type LocalSide,
   type RemoteFile,
+  type AgentFlag,
   type TaskTimes,
 } from './drive.js';
 import { mergeLists, type ListVersions } from './merge.js';
@@ -54,6 +55,8 @@ interface GroupsFile {
 interface ItemsFile {
   flint: 1;
   items: Record<string, { tasks?: Record<string, TaskTimes>; linked?: Record<string, LinkedFile> }>;
+  /** AGENT-06 (D-185): Hidden from agents for synced lists, notes and groups; the later change wins. */
+  agents?: Record<string, AgentFlag>;
 }
 interface RemovedFile {
   flint: 1;
@@ -551,11 +554,20 @@ export class SyncEngine {
       for (const key of new Set([...mineTimes.keys(), ...Object.keys(theirTimes)])) {
         const a = mineTimes.get(key);
         const b = theirTimes[key];
-        const t = Math.max(Math.min(a?.t ?? 0, now), Math.min(b?.t ?? 0, limit));
+        const ta = Math.min(a?.t ?? 0, now);
+        const tt = Math.min(b?.t ?? 0, limit);
+        const t = Math.max(ta, tt);
         const cs = [a?.c, b?.c].filter((value): value is number => typeof value === 'number');
+        // AGENT-01 (D-185 Q4): who made it comes from the side that saw it first; who changed it
+        // last from the side with the later change (none there: the user changed it, so none).
+        const first = (a?.c ?? Infinity) <= (b?.c ?? Infinity) ? a : b;
+        const cb = first?.cb ?? a?.cb ?? b?.cb;
+        const tb = (ta >= tt ? a : b)?.tb;
         combined[key] = {
           ...(cs.length > 0 ? { c: Math.min(...cs) } : {}),
           ...(t > 0 ? { t } : {}),
+          ...(cb !== undefined ? { cb } : {}),
+          ...(tb !== undefined ? { tb } : {}),
         };
       }
       const entry = (itemsFile.items[id] ??= {});
@@ -721,6 +733,27 @@ export class SyncEngine {
         this.metaCache.set(name, { revision: written.revision, text: pretty });
       }
     };
+    // AGENT-06 (D-185 Q15): Hidden from agents travels with synced lists, notes and groups; per
+    // item, the later change wins, on every PC.
+    if (local.agentFlags && local.applyAgentFlags) {
+      const synced = new Set([
+        ...Object.keys(state.items),
+        ...groupsFile.groups.map((group) => group.id),
+      ]);
+      const mine = await local.agentFlags();
+      const theirs: Record<string, AgentFlag> =
+        itemsFile.agents && typeof itemsFile.agents === 'object' ? { ...itemsFile.agents } : {};
+      const adopt: Record<string, AgentFlag> = {};
+      for (const id of synced) {
+        const here = mine[id];
+        const there = theirs[id];
+        if (here && (!there || here.at > there.at)) theirs[id] = here;
+        else if (there && (!here || there.at > here.at)) adopt[id] = there;
+      }
+      for (const id of Object.keys(theirs)) if (!synced.has(id)) delete theirs[id];
+      if (Object.keys(theirs).length > 0 || itemsFile.agents) itemsFile.agents = theirs;
+      if (Object.keys(adopt).length > 0) await local.applyAgentFlags(adopt);
+    }
     await writeMeta('groups.json', groupsBefore, groupsFile, groupsFileRemote);
     await writeMeta('items.json', itemsBefore, itemsFile, itemsFileRemote);
     await writeMeta('removed.json', removedBefore, removedFile, removedFileRemote);

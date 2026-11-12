@@ -103,6 +103,15 @@ export interface LocalGroup {
 export interface TaskTimes {
   readonly c?: number;
   readonly t?: number;
+  /** AGENT-01 (D-185 Q4): the AI agent that created the task, and the one that changed it last. */
+  readonly cb?: string;
+  readonly tb?: string;
+}
+
+/** AGENT-06 (D-185 Q15): a list's, note's or group's Hidden from agents, and when it last changed (ISO). */
+export interface AgentFlag {
+  readonly hidden: boolean;
+  readonly at: string;
 }
 
 /** This PC's side: the Flint folder through the workspace (atomic, re-read before write). */
@@ -130,6 +139,10 @@ export interface LocalSide {
   taskTimes(listId: string): Promise<ReadonlyMap<string, TaskTimes>>;
   /** Takes newer times from the other PC. */
   applyTaskTimes(listId: string, times: ReadonlyMap<string, TaskTimes>): Promise<void>;
+  /** AGENT-06: this PC's Hidden-from-agents flags (lists, notes, groups), by ID. */
+  agentFlags?(): Promise<Readonly<Record<string, AgentFlag>>>;
+  /** AGENT-06: flags another PC changed later than this one. */
+  applyAgentFlags?(flags: Readonly<Record<string, AgentFlag>>): Promise<void>;
   /** Re-IDed incoming tasks (Today's order and reminder bookkeeping follow them). */
   renamedTasks(renamed: ReadonlyMap<string, string>): Promise<void>;
   readAttachment(name: string): Promise<Uint8Array | null>;
