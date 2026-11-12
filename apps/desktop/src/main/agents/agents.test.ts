@@ -368,7 +368,7 @@ describe('writes (AGENT-01)', () => {
     await ok('find', {});
     await service.resume();
     await ok('create', { items: many.slice(0, 1) });
-  });
+  }, 60_000); // 150 real task writes to reach the hourly limit: slow under a full parallel run.
 
   it('adds, changes and deletes link patterns, checked as Settings does', async () => {
     await ok('linkPatterns', {

@@ -17,7 +17,7 @@
     "node": ">=24.22.1 <25"
   },
   "scripts": {
-    "build": "npm run build -w @flint/core && npm run build -w @flint/desktop",
+    "build": "npm run build -w @flint/core && npm run build -w @flint/cli && npm run build -w @flint/desktop",
     "typecheck": "tsc -p packages/core/tsconfig.build.json --noEmit && tsc -p packages/core/tsconfig.json && tsc -p apps/desktop/tsconfig.json && tsc -p apps/cli/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --project unit && vitest run --project timing --no-file-parallelism",

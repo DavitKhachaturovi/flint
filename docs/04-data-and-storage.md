@@ -49,6 +49,8 @@ App data (not in the Flint folder):
   reminders-state.json          ← last-fired bookkeeping for missed-reminder recovery (REM-07)
   sync\                         ← Google Drive sync: the encrypted account, state.json, the merge bases (SYNC-01, §7, D-161)
   agent-token                   ← AGENT-01 (D-185): the 256-bit token agents' requests must carry; only while agents are on, renewed at each start and turn-on
+  agent-state.json              ← AGENT-01 (D-185, Proposed): no secret; Flint's process ID, whether agents are on, read-only or paused, the pipe's name and the version, for `flint.exe`
+  mcpb/, Flint.mcpb             ← AGENT-03: the Claude Desktop bundle Add to Claude Desktop writes and opens (rewritten each time)
   agent-changes.json            ← AGENT-07 (D-185): the last 100 agent changes or 7 days (label, agent, time, inverse operations, the Trash files they made), for Recent agent changes and their Undo
 %LOCALAPPDATA%\Flint\
   snapshots\                    ← local snapshots (DATA-04)

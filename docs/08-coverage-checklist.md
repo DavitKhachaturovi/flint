@@ -1353,7 +1353,7 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | The agent API in main, every action through the workspace's operations, writes in its queue; off by default, turned on only in Flint | AGENT-01 · Decided (1.8.0) | 02 §11, 05 §5, D-185 |
+| 1 | The agent API in main, every action through the workspace’s operations, writes in its queue; off by default, turned on only in Flint | AGENT-01 · Built (1.8.0, UI to come) | 02 §11, 05 §5, D-185 |
 | 2 | The named pipe per identity and user, the 256-bit token file renewed at start and turn-on, constant-time check, no details on a wrong token, refused when the name is taken | AGENT-01 · Decided | 02, 04, 05, D-185 Q3 |
 | 3 | `createdBy` / `touchedBy` in `meta.json`, synced; client names from MCP, `--as`, `FLINT_AGENT`, `CLAUDECODE`; shown in the panel's footer, a note's header, Recent changes; no row mark | AGENT-01 · Decided | 02, 04, D-185 Q4 |
 | 4 | IDs or exact names, never a guess; `ambiguous` / `not_found` with candidates; batches all or nothing; open tasks first | AGENT-01 · Decided | 02, D-185 Q6 |
