@@ -100,6 +100,8 @@ export interface E2EHooks {
   miniEdge?: () => { mode: 'card' | 'tab'; view: string; tab: unknown };
   miniStartCollapsed?: () => void;
   miniToggle?: () => void;
+  /** D-182: the screen locks (true) or unlocks (false), as Windows would say. */
+  screenLock?: (locked: boolean) => void;
   /**
    * MINI-02, D-157: the capture-into-note hotkey after its copy step (tests never send keys to
    * another app): what the selection was, as the hotkey would have read it.

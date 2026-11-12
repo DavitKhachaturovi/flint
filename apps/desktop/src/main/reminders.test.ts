@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fromDate } from '@flint/core/time';
 import {
   dueReminders,
+  heldStillDue,
   MAX_SEPARATE_MISSED,
   nextReminderAt,
   planToasts,
@@ -126,5 +127,40 @@ describe('toasts for due reminders', () => {
       count: 4,
       titles: ['task m1', 'task m2', 'task m3', 'task m4'],
     });
+  });
+});
+
+describe('reminders while the screen is locked (D-182)', () => {
+  it('shows at the unlock only what is still due: open, at the same time, turned on; missed once late', () => {
+    const fired = [
+      { task: task('a1', minutes(-0.5)), missed: false },
+      { task: task('d2', minutes(-1)), missed: false },
+      { task: task('m3', minutes(-1)), missed: false },
+      { task: task('s4', minutes(-1)), missed: false },
+      { task: task('g5', minutes(-1)), missed: false },
+      { task: task('o6', minutes(-90)), missed: true },
+    ];
+    // Held twice (the same reminder from two checks) counts once.
+    const held = [...fired, fired[0]!];
+    // Meanwhile, on another PC or the phone: done, turned off, snoozed, deleted.
+    const tasks = [
+      task('a1', minutes(-0.5)),
+      task('d2', minutes(-1), { done: true }),
+      task('m3', minutes(-1), { muted: true }),
+      task('s4', minutes(9)),
+      task('o6', minutes(-90)),
+    ];
+    // Unlocked a minute later: a1 is on time still; o6 was missed.
+    const shown = heldStillDue(held, tasks, minutes(1));
+    expect(shown.map((entry) => [entry.task.id, entry.missed])).toEqual([
+      ['o6', true],
+      ['a1', false],
+    ]);
+    // Unlocked an hour later: both missed.
+    expect(heldStillDue(held, tasks, minutes(60)).map((entry) => entry.missed)).toEqual([
+      true,
+      true,
+    ]);
+    expect(heldStillDue([], tasks, now)).toEqual([]);
   });
 });

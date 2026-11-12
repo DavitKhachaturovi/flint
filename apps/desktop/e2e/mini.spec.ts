@@ -42,6 +42,7 @@ type Hooks = {
   hideMini?: () => void;
   miniVisible?: () => boolean;
   toasts: string[];
+  chimes?: number;
   closedToasts?: string[];
   miniSurface?: { rects: Box[] };
   // MINI-04, D-177.
@@ -511,6 +512,45 @@ test('a reminder: the toast and the card; Done in mini completes it and takes th
   );
   await expect(mini.locator('.mini-reminder.alert')).toHaveCount(0);
   await expect(mini.locator('.mini-reminder')).toContainText('Next · 15:00');
+});
+
+test('a reminder due while the screen is locked waits for the unlock: no toast, chime or card on the lock screen (REM-06, D-182)', async () => {
+  const lock = (locked: boolean): Promise<void> =>
+    app.evaluate((_electron, value) => {
+      const found = (globalThis as { __flintE2E?: { screenLock?: (locked: boolean) => void } })
+        .__flintE2E;
+      found?.screenLock?.(value);
+    }, locked);
+  const toasts = async (): Promise<string[]> =>
+    ((await hook('toasts')) as string[]).filter((each) => each.includes('Ring the vet'));
+  await lock(true);
+  const chimes = Number((await hook('chimes')) ?? 0);
+  const file = join(flint, 'Vet.md');
+  await writeFile(
+    file,
+    `---\nflint: 1\nid: vet\nmode: tasks\n---\n- [ ] Ring the vet [reminder:: ${stamp(appNow())}] [id:: rv1]\n`,
+  );
+  // Due and recorded as shown (so it never comes twice), but held.
+  await expect
+    .poll(() => readFile(join(dataDirectory, 'appdata', 'reminders-state.json'), 'utf8'), {
+      timeout: 40_000,
+    })
+    .toContain('"rv1"');
+  expect(await toasts()).toEqual([]);
+  expect(Number((await hook('chimes')) ?? 0)).toBe(chimes);
+  await expect(mini.locator('.mini-reminder.alert')).toHaveCount(0);
+  // Unlocked: the toast and the card come.
+  await lock(false);
+  await expect.poll(toasts).toEqual(['Reminder | Ring the vet']);
+  const card = mini.locator('.mini-reminder.alert');
+  await expect(card).toContainText('Ring the vet');
+  // A second unlock shows nothing again.
+  await lock(true);
+  await lock(false);
+  expect(await toasts()).toHaveLength(1);
+  await card.locator('.mini-reminder-dismiss').click();
+  await expect(mini.locator('.mini-reminder.alert')).toHaveCount(0);
+  await rm(file);
 });
 
 test('the Note tab: made on the first keystroke, one window edits it at a time (D-109, Q5)', async () => {

@@ -2257,6 +2257,11 @@ async function start(): Promise<void> {
       show: showReminders,
       log,
     });
+    if (hooks)
+      hooks.screenLock = (locked) => {
+        if (locked) reminders.lock();
+        else reminders.unlock();
+      };
     // A list changed (a capture, an edit, another program): a new or moved reminder may be sooner.
     let pending: NodeJS.Timeout | undefined;
     workspace.onChange(() => {

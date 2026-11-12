@@ -67,6 +67,28 @@ export function dueReminders(
   return { due, fired: next };
 }
 
+/**
+ * D-182: the reminders that came due while the screen was locked (Windows drops a toast shown on
+ * the lock screen), as they stand at the unlock: only tasks still open, at the same time and not
+ * turned off, once each, oldest first; missed when they are more than `LATE_MS` past by then.
+ */
+export function heldStillDue(
+  held: readonly Due[],
+  tasks: readonly ReminderTask[],
+  now: Date,
+): Due[] {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const out = new Map<string, Due>();
+  for (const entry of held) {
+    const task = byId.get(entry.task.id);
+    if (!task || task.done || task.muted || firedKey(task.at) !== firedKey(entry.task.at)) continue;
+    out.set(task.id, { task, missed: now.getTime() - toDate(task.at).getTime() > LATE_MS });
+  }
+  return [...out.values()].sort(
+    (a, b) => toDate(a.task.at).getTime() - toDate(b.task.at).getTime(),
+  );
+}
+
 /** When the next not-yet-shown reminder of an open task comes due, if any. */
 export function nextReminderAt(
   tasks: readonly ReminderTask[],
