@@ -504,11 +504,21 @@ export class Workspace {
     };
   }
 
+  /** AGENT-01: the sidebar in its manual order (what agents' positions are about). */
+  sidebarManual(): SidebarView['items'] {
+    return arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+  }
+
   /**
    * LIST-05, LIST-06: a change to the sidebar's groups or order. Groups and order are undoable
    * (the file before and after); the sort and folded groups are this machine's (ui-state.json).
    */
-  sidebarAction(action: SidebarAction, now: Date): Promise<SidebarOutcome> {
+  sidebarAction(
+    action: SidebarAction,
+    now: Date,
+    /** AGENT-01: an agent reorders the manual order under any sort (it shows once sorted manually). */
+    anySort = false,
+  ): Promise<SidebarOutcome> {
     return this.serial(async () => {
       void now;
       if (action.kind === 'sort') {
@@ -525,7 +535,11 @@ export class Workspace {
         return { ok: true, label: '' };
       }
       // Reordering follows the manual order; under a sort it would be invisible (D-73).
-      if ((action.kind === 'move' || action.kind === 'step') && this.sidebarSort !== 'manual')
+      if (
+        (action.kind === 'move' || action.kind === 'step') &&
+        this.sidebarSort !== 'manual' &&
+        !anySort
+      )
         return { ok: false, problem: 'Switch the sort to Manual to reorder' };
       const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
       const groups = items.filter((item) => item.kind === 'group');
@@ -1112,7 +1126,12 @@ export class Workspace {
       case 'reminder': {
         if (!findTask(document, change.key)) return null;
         return outcome(
-          await this.record(list, setReminder(path, change.key, change.at), 'Reminder set', now),
+          await this.record(
+            list,
+            setReminder(path, change.key, change.at),
+            change.at ? 'Reminder set' : 'Reminder removed',
+            now,
+          ),
           change.key,
         );
       }
@@ -2157,12 +2176,18 @@ export class Workspace {
    * an undo step (nothing the user did now). The archive is written first: a crash in between leaves
    * a copy, never a loss. The number archived.
    */
-  archiveDone(now: Date, days: number): Promise<number> {
+  archiveDone(
+    now: Date,
+    days: number,
+    /** AGENT-01: only this list's done tasks (an agent's archiveDone). */
+    only?: string,
+  ): Promise<number> {
     return this.serial(async () => {
       const cutoff = now.getTime() - days * 86_400_000;
       let count = 0;
       for (const list of this.lists) {
         if (list.entry.mode === 'note' || list.file.readOnly) continue;
+        if (only !== undefined && this.listId(list.entry) !== only) continue;
         const keys = list.file.document.blocks.flatMap((block) => {
           if (block.kind !== 'task' || block.line.status === ' ') return [];
           const completion = block.line.fields.completion;

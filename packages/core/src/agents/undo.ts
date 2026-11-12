@@ -1,7 +1,6 @@
 import { findTask, type FlintDocument, type TaskNode } from '../format/document.js';
 import { formatTaskLine } from '../format/task-line.js';
 import type { Op } from '../model/ops.js';
-import { anchorOf } from '../model/tree.js';
 import { mergeText } from '../sync/text-merge.js';
 
 /**
@@ -11,7 +10,11 @@ import { mergeText } from '../sync/text-merge.js';
  * (a whole text) is undone by a three-way merge, so the user's later typing survives.
  */
 
-/** How a task looks: its line, its body, its subtasks and where it stands. Null: no such task. */
+/**
+ * How a task looks: its line, its body, its subtasks and its parent. Null: no such task. Its place
+ * among its siblings isn't part of it: undoing one of a change's own steps moves its neighbours'
+ * anchors, which mustn't make the next step look changed.
+ */
 export function taskFingerprint(document: FlintDocument, key: string): string | null {
   const found = findTask(document, key);
   if (!found) return null;
@@ -20,7 +23,6 @@ export function taskFingerprint(document: FlintDocument, key: string): string | 
     bodyText(found.task),
     found.task.children.flatMap((child) => (child.kind === 'task' ? [child.key] : [])),
     found.parent?.key ?? null,
-    anchorOf(document, key) ?? null,
   ]);
 }
 

@@ -804,7 +804,8 @@ export type ListChange =
   | {
       readonly kind: 'reminder';
       readonly key: string;
-      readonly at: {
+      /** AGENT-01 (D-185): null removes the reminder (an agent's `remind: none`). */
+      readonly at: null | {
         readonly year: number;
         readonly month: number;
         readonly day: number;

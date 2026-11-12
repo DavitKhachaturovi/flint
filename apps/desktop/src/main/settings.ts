@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { isPreset, type LimitsPreset } from '@flint/core/agents';
 import { writeFileAtomic } from './storage/atomic.js';
 import { readLinkPatterns, type LinkPattern } from '../shared/link-patterns.js';
 import { DEFAULT_FOCUS_SETTINGS, readFocusSettings, type FocusSettings } from '../shared/focus.js';
@@ -74,6 +75,10 @@ export interface Settings {
   readonly lastSeenVersion: string | null;
   /** APP-14, D-118: Don't show tips (off by default: tips show). */
   readonly tipsOff: boolean;
+  /** AGENT-05 (D-185): AI agents may use Flint (off by default), only read, and how much. */
+  readonly agentsOn: boolean;
+  readonly agentsReadOnly: boolean;
+  readonly agentsLimits: LimitsPreset;
   /** NAV-08, D-128: Windows' clipboard history in the side panel and the picker (on by default). */
   readonly clipboardHistory: boolean;
   /** D-128: its contents shown at rest, not only on a resting pointer (off by default). */
@@ -128,6 +133,9 @@ export function defaultSettings(development = false): Settings {
     miniStartCollapsed: true,
     lastSeenVersion: null,
     tipsOff: false,
+    agentsOn: false,
+    agentsReadOnly: false,
+    agentsLimits: 'medium',
     clipboardHistory: true,
     clipboardShowContents: false,
     checkForUpdates: true,
@@ -262,6 +270,9 @@ export function readSettings(stored: Stored, development = false): Settings {
     miniStartCollapsed: pick(stored, 'miniStartCollapsed', isBoolean, defaults.miniStartCollapsed),
     lastSeenVersion: isString(stored['lastSeenVersion']) ? stored['lastSeenVersion'] : null,
     tipsOff: pick(stored, 'tipsOff', isBoolean, defaults.tipsOff),
+    agentsOn: pick(stored, 'agentsOn', isBoolean, defaults.agentsOn),
+    agentsReadOnly: pick(stored, 'agentsReadOnly', isBoolean, defaults.agentsReadOnly),
+    agentsLimits: pick(stored, 'agentsLimits', isPreset, defaults.agentsLimits),
     clipboardHistory: pick(stored, 'clipboardHistory', isBoolean, defaults.clipboardHistory),
     checkForUpdates: pick(stored, 'checkForUpdates', isBoolean, defaults.checkForUpdates),
     clipboardShowContents: pick(
