@@ -9,7 +9,15 @@ name: Pages
 on:
   push:
     branches: [next, main]
-    paths: ['site/**', '.github/workflows/pages.yml']
+    # The version and the release notes too: the hero's "Latest release" line comes from them (D-184).
+    paths:
+      [
+        'site/**',
+        '.github/workflows/pages.yml',
+        'scripts/site-release.mjs',
+        'apps/desktop/package.json',
+        'docs/release-notes.md',
+      ]
   workflow_dispatch:
 
 permissions:
@@ -34,6 +42,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The hero's "Latest release" line, from apps/desktop/package.json and docs/release-notes.md
+      # (D-184): plain Node, no dependencies (the runner's own Node).
+      - name: Latest release line
+        run: node scripts/site-release.mjs
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
