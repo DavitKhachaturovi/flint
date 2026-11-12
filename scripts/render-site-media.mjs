@@ -32,6 +32,8 @@ const STILLS = {
     width: 640,
     height: 400,
   })),
+  // The link preview (og:image), drawn over the hero window above.
+  share: [{ src: 'share.html', file: 'share.png', width: 1200, height: 630 }],
 };
 
 /** `still`: the moment (ms) shown under reduced motion, a frame that tells the video's story. */
@@ -315,7 +317,7 @@ const ready = (page) =>
   });
 
 try {
-  for (const group of ['hero', 'features']) {
+  for (const group of ['hero', 'features', 'share']) {
     if (!want(group)) continue;
     for (const still of STILLS[group]) {
       const page = await browser.newPage({

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flint · share card</title>
+<!-- The link preview (og:image) for flintnotes.app, 1200 × 630, rendered at 2x by
+     scripts/render-site-media.mjs (D-184): the hero's panel and glows, the title, the icon with the
+     intro's sparks off the stone's tip, the app window peeking in. -->
+<style>
+@font-face{font-family:'Onest';src:url('../../../site/assets/fonts/Onest-Variable.woff2') format('woff2');font-weight:100 900}
+@font-face{font-family:'Geist Mono';src:url('../../../site/assets/fonts/GeistMono-Variable.woff2') format('woff2');font-weight:100 900}
+html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#0D0E10;-webkit-font-smoothing:antialiased}
+.panel{position:absolute;inset:16px;border-radius:34px;overflow:hidden;background:#121418}
+.glow{position:absolute;inset:0;background:radial-gradient(70% 70% at 0% 0%,rgba(93,91,124,.55),transparent 62%),radial-gradient(65% 70% at 100% 0%,rgba(127,139,160,.45),transparent 60%),radial-gradient(80% 60% at 70% 115%,rgba(127,139,160,.55),transparent 60%)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(ellipse 55% 60% at 30% 45%,black 10%,transparent 75%)}
+.text{position:absolute;left:64px;top:60px;width:560px;font-family:'Onest',system-ui,sans-serif}
+.brand{display:flex;align-items:center;gap:14px;font-size:26px;font-weight:600;letter-spacing:-.01em;color:#fff}
+.icon{position:relative;width:64px;height:64px}
+.icon img{display:block;width:64px;height:64px}
+.sparks{position:absolute;left:12.7px;top:51.9px}
+.sparks i{position:absolute;left:-6px;top:-1px;width:12px;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(213,220,230,0),#F2F5F9);box-shadow:0 0 6px rgba(213,220,230,.9)}
+h1{margin:92px 0 0;font-size:92px;line-height:.98;letter-spacing:-.045em;font-weight:500;color:#fff}
+p{margin:28px 0 0;font-family:'Geist Mono',monospace;font-size:20px;line-height:1.6;color:#ECEDEE}
+.foot{position:absolute;left:64px;bottom:52px;font-family:'Geist Mono',monospace;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:#B9BDC4}
+.window{position:absolute;left:640px;top:190px;width:720px;padding:9px;border-radius:24px;background:linear-gradient(180deg,#2A2C30,#151619 30%,#0E0F11);box-shadow:0 0 0 1px #2C2E33,inset 0 1px 0 rgba(255,255,255,.12),0 50px 90px -30px rgba(0,0,0,.95)}
+.window img{display:block;width:100%;border-radius:16px;box-shadow:0 0 0 1px #1C1E21}
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="glow"></div>
+  <div class="grid"></div>
+  <div class="window"><img src="../../../site/assets/media/hero-window.png" alt=""></div>
+  <div class="text">
+    <div class="brand">
+      <span class="icon">
+        <img src="../../../site/assets/flint-icon.svg" alt="">
+        <span class="sparks">
+          <i style="transform:translate(-14px,9px) rotate(146deg)"></i>
+          <i style="transform:translate(-17px,1px) rotate(171deg)"></i>
+          <i style="transform:translate(-8px,15px) rotate(122deg)"></i>
+          <i style="transform:translate(-26px,14px) rotate(152deg) scaleX(.7);opacity:.7"></i>
+          <i style="transform:translate(-20px,24px) rotate(131deg) scaleX(.6);opacity:.55"></i>
+        </span>
+      </span>
+      Flint
+    </div>
+    <h1>Catch the spark.</h1>
+    <p>Notes and tasks for developers. Press a hotkey from any app, type, press Enter.</p>
+  </div>
+  <div class="foot">{ Free and open source · Windows }</div>
+</div>
+</body>
+</html>
