@@ -500,24 +500,6 @@ h1 {
   color: var(--fl-text-highlight);
   text-wrap: balance;
 }
-
-/* The hero's title (Davit, 13 Nov 2026): the line at full size, the promise smaller, in two
-   balanced lines, so the buttons stay above the fold at 768 px. */
-.h1-main,
-.h1-sub {
-  display: block;
-}
-
-.h1-sub {
-  max-width: 22em;
-  margin: 0.55em auto 0;
-  font-size: clamp(26px, min(2.6vw, 4.4vh), 48px);
-  line-height: 1.14;
-  letter-spacing: -0.025em;
-  color: var(--fl-text-heading-soft);
-  text-wrap: balance;
-}
-
 .hero-lede {
   max-width: 720px;
   margin: 36px 0 0;
