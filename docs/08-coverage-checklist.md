@@ -1248,6 +1248,9 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 4 | GitHub Pages from `site/` on pushes to main; custom domain, HTTPS, DNS and domain verifications | WEB-01 · Built (1.5.0); DNS and settings Davit's | 05 §6, 06 |
 | 5 | Consent screen Branding: support address, home page, privacy link, authorised domain; Publish app | SYNC-01, WEB-01 · Davit's, after the site is live | 06 §6 |
 | 6 | Terms of use at /terms/ (MIT, as is, your content, Drive under Google's terms), linked from the footers and the consent screen | WEB-01 · Built (after 1.5.0); the Branding link Davit's | 02, D-162, `site/terms/index.html` |
+| 7 | Redesign from Claude Design's reference: every section, its copy and motion; reduce-motion still; privacy and terms with the new nav and footer | WEB-01 · Built on `next` (D-184), Davit's review pending | 02, D-184, `docs/design/site/` |
+| 8 | The screens as media: 2x PNG stills and frame-exact videos (WebM, MP4, posters, stills) from `scripts/render-site-media.mjs` | WEB-01 · Built (D-184) | D-184, `site/assets/media/` |
+| 9 | The hero's "Latest release" from the app's version and release notes, written by `scripts/site-release.mjs` in the Pages workflow | WEB-01 · Built (D-184) | 05 §6, D-184 |
 
 ## CC. 1.5.1: Davit's feedback on 1.5.0 (11 Nov 2026, D-163)
 
