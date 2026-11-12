@@ -1280,6 +1280,11 @@ const edgeTab = (): ReturnType<Page['locator']> => mini.locator('.mini-edge-tab'
 const miniCard = (): ReturnType<Page['locator']> => mini.locator('.mini-card');
 /** A point on the tab's half on screen (the window ends at the edge, through the tab's middle). */
 const onTab = async (): Promise<{ x: number; y: number }> => {
+  // Out of the edge and still (D-156): measured mid-slide, a click missed it on CI.
+  await expect(edgeTab()).not.toHaveClass(/\btucked\b/);
+  await expect
+    .poll(() => edgeTab().evaluate((element) => getComputedStyle(element).translate))
+    .toBe('none');
   const box = await edgeTab().boundingBox();
   if (!box) throw new Error('no tab');
   const width = await mini.evaluate(() => window.innerWidth);
@@ -1302,14 +1307,15 @@ test('Collapse to the edge: the card slides into its nearer edge, the tab comes 
   // Snapped into the top-right corner, the card collapses to that corner's spot (Q3), and the
   // window is the strip along that edge: it ends in the tab's middle.
   await expect(edgeTab()).toHaveCSS('top', '120px');
-  // Once it has slid out of the edge (D-89: its slide-in plays first).
-  const width = await mini.evaluate(() => window.innerWidth);
+  // Once it has slid out of the edge (D-89: its slide-in plays first), and the window is the strip
+  // (its width read each time: read once, before the window became the strip, it failed on CI).
   await expect
     .poll(async () => {
       const box = await edgeTab().boundingBox();
-      return box && Math.round(box.x + box.width / 2);
+      const width = await mini.evaluate(() => window.innerWidth);
+      return box && Math.round(box.x + box.width / 2) - width;
     })
-    .toBe(width);
+    .toBe(0);
   // D-89: the card slid away.
   await expect.poll(motion).toContain('transitionend mini-card translate');
   // Only the tab's half on screen takes clicks: the card is out of the surface.
