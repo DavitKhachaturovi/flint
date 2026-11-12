@@ -614,6 +614,12 @@ function Timeline(props: {
         .map(({ reminder, minutes }) => ({
           label: `${clock(minutes)} · ${reminder.title}`,
           hint: reminder.listName,
+          // D-180: as the rows show them: done struck through, overdue faded.
+          ...(reminder.done
+            ? { state: 'done' as const }
+            : !isComing(reminder, now)
+              ? { state: 'overdue' as const }
+              : {}),
           action: () => onOpen(reminder),
         })),
       { x: box.left, y: box.bottom + 4 },

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -176,6 +176,50 @@ test('the timeline: a passed reminder not done is overdue, faded but not struck 
   expect(doneLook.strike).toBe('line-through');
   // Faded as a passed one is.
   expect(overdueLook.color).toBe(doneLook.color);
+});
+
+test('the +N menu shows each reminder as its row would: done struck through, overdue faded (TODAY-03, D-180)', async () => {
+  await main.locator('.sidebar > .nav').first().click();
+  const file = join(dataDirectory, 'Flint', `${LIST}.md`);
+  const before = await readFile(file, 'utf8');
+  const badges = main.locator('.today-timeline .timeline-more');
+  const items = main.locator('.fl-menu .fl-menu-item');
+  const progress = main.locator('.today-progress');
+  const doneBefore = await progress.getAttribute('aria-valuenow');
+  const look = (item: typeof items): Promise<{ strike: string; color: string }> =>
+    item.locator('.fl-menu-label').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { strike: style.textDecorationLine, color: style.color };
+    });
+  // 09:50, passed and not done, behind 10:20: overdue.
+  await badges.filter({ hasText: '+1' }).click();
+  const overdue = items.filter({ hasText: 'Pay the rent' });
+  await expect(overdue).toHaveClass(/\boverdue\b/);
+  const overdueLook = await look(overdue);
+  expect(overdueLook.strike).toBe('none');
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.fl-menu')).toHaveCount(0);
+  // 14:05 done (in the file, as another program would): struck through; 14:00 still to come: plain.
+  await writeFile(
+    file,
+    before.replace(
+      '- [ ] Call Alex [reminder:: 2026-03-10T14:05]',
+      '- [x] Call Alex [reminder:: 2026-03-10T14:05] [completion:: 2026-03-10T09:30]',
+    ),
+  );
+  await expect(progress).toHaveAttribute('aria-valuenow', String(Number(doneBefore) + 1));
+  await badges.filter({ hasText: '+2' }).click();
+  const done = items.filter({ hasText: 'Call Alex' });
+  await expect(done).toHaveClass(/\bdone\b/);
+  const doneLook = await look(done);
+  expect(doneLook.strike).toBe('line-through');
+  expect(doneLook.color).toBe(overdueLook.color);
+  const later = items.filter({ hasText: 'Sign the pipeline' });
+  await expect(later).not.toHaveClass(/\b(done|overdue)\b/);
+  expect((await look(later)).color).not.toBe(overdueLook.color);
+  await main.keyboard.press('Escape');
+  await writeFile(file, before);
+  await expect(progress).toHaveAttribute('aria-valuenow', String(doneBefore));
 });
 
 test('a reminder card keeps a long list name on one line, ending in an ellipsis (TODAY-03, D-163)', async () => {

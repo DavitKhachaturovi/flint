@@ -15,6 +15,11 @@ export interface MenuItem {
   readonly disabled?: boolean;
   /** LIST-06: the current choice among several (the sort menu), shown with a check on the right. */
   readonly checked?: boolean;
+  /**
+   * D-180: a task's state, as the row it stands for shows it: `done` struck through and faded,
+   * `overdue` faded (Today's "+N" menu).
+   */
+  readonly state?: 'done' | 'overdue';
   /** What the item does; an item with a submenu opens that instead (D-78). */
   readonly action?: () => void;
   readonly submenu?: readonly MenuEntry[];
@@ -134,10 +139,15 @@ export function openMenu(
       }
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'fl-menu-item';
+      button.className = entry.state ? `fl-menu-item ${entry.state}` : 'fl-menu-item';
       button.setAttribute('role', 'menuitem');
       button.disabled = entry.disabled === true;
-      button.append(Object.assign(document.createElement('span'), { textContent: entry.label }));
+      button.append(
+        Object.assign(document.createElement('span'), {
+          className: 'fl-menu-label',
+          textContent: entry.label,
+        }),
+      );
       const hint = entry.submenu ? '›' : entry.hint;
       if (hint)
         button.append(

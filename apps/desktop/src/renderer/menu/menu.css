@@ -45,6 +45,17 @@
   color: var(--fl-text-faint);
 }
 
+/* D-180: a task's state, as Today's timeline shows it: done struck through, overdue faded. */
+.fl-menu-item.done,
+.fl-menu-item.overdue {
+  color: var(--fl-text-faint);
+}
+
+.fl-menu-item.done .fl-menu-label {
+  text-decoration: line-through;
+  text-decoration-color: var(--fl-edge-chip);
+}
+
 .fl-menu-hint {
   font-family: var(--fl-font-mono);
   font-size: var(--fl-size-meta);
