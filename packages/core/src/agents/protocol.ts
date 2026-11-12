@@ -13,6 +13,8 @@ export const AGENT_PROTOCOL = 1;
 
 /** Files in Flint's app-data folder (`%APPDATA%\Flint`, docs/04 §2). */
 export const AGENT_TOKEN_FILE = 'agent-token';
+/** Every agent pipe's name starts so; `flint.exe` opens no other (D-185 security review L5). */
+export const AGENT_PIPE_PREFIX = '\\\\.\\pipe\\flint-agents-';
 export const AGENT_STATE_FILE = 'agent-state.json';
 
 /**

@@ -1,6 +1,7 @@
 import { copyFile, mkdir, stat } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isLocalPath } from './renderer-url.js';
 
 /**
  * Files added to notes and task bodies (MEDIA-01, MEDIA-02, MEDIA-03, D-84): pictures, videos and
@@ -88,7 +89,8 @@ export function linkedPath(link: string, folder: string): string | null {
   if (/^file:\/\//i.test(link)) {
     try {
       const path = fileURLToPath(link);
-      return isAbsolute(path) ? path : null;
+      // D-185 security review M3: never a network share or device path.
+      return isAbsolute(path) && isLocalPath(path) ? path : null;
     } catch {
       return null;
     }
@@ -123,7 +125,9 @@ const stamp = (now: Date): string => {
 /** A name in `attachments/` that doesn't clash: the time, a short random part, the extension. */
 function attachmentName(source: string, now: Date): string {
   const random = Math.random().toString(36).slice(2, 6);
-  return `${stamp(now)}-${random}${extname(source).toLowerCase()}`;
+  // D-185 security review M4: only a plain extension carries over to the copy's name.
+  const extension = extname(source).toLowerCase();
+  return `${stamp(now)}-${random}${/^\.[a-z0-9]{1,10}$/.test(extension) ? extension : ''}`;
 }
 
 async function copyIn(source: string, folder: string, now: Date): Promise<string> {
@@ -139,6 +143,10 @@ export async function attachFile(
   folder: string,
   now: Date,
 ): Promise<AttachOutcome> {
+  // D-185 security review M3, M4: files on this PC only (no network share or device path), no
+  // alternate data stream or trailing dot or space hiding the real extension.
+  if (!isLocalPath(source) || /[. ]$/.test(source))
+    return { ok: false, problem: 'Only files on this PC can be attached.' };
   const kind = fileKind(source);
   if (kind === 'blocked')
     return { ok: false, problem: 'Flint never attaches programs or scripts.' };
@@ -164,6 +172,10 @@ export async function copyIntoFlint(
 ): Promise<AttachOutcome> {
   const source = /^file:\/\//i.test(link) ? linkedPath(link, folder) : null;
   if (!source) return { ok: false, problem: 'Only a linked file can be copied in.' };
+  // D-185 security review M3, M4: files on this PC only (no network share or device path), no
+  // alternate data stream or trailing dot or space hiding the real extension.
+  if (!isLocalPath(source) || /[. ]$/.test(source))
+    return { ok: false, problem: 'Only files on this PC can be attached.' };
   const kind = fileKind(source);
   if (kind === 'blocked')
     return { ok: false, problem: 'Flint never attaches programs or scripts.' };

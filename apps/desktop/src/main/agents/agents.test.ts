@@ -482,3 +482,60 @@ describe('Recent agent changes (AGENT-07)', () => {
     expect(service.view().changes[0]?.undone).toBe(true);
   });
 });
+
+describe('the security review’s findings (D-185)', () => {
+  it('H1: shorthand ##list never reaches a hidden list, nor names it', async () => {
+    await service.hide('payroll', true);
+    const response = await call('create', {
+      items: [{ kind: 'task', title: 'Leak test ##Pay' }],
+      parseShorthand: true,
+    });
+    expect(JSON.stringify(response)).not.toMatch(/payroll/i);
+    expect(await file('Payroll.md')).toBe(PAYROLL);
+  });
+
+  it('M1, M2: link patterns stay small and simple; kinds only digits or word', async () => {
+    const add = (short: string, url: string, kinds?: unknown) =>
+      refused('linkPatterns', { action: 'add', short, url, ...(kinds !== undefined && { kinds }) });
+    expect(await add('{a}{b}XY', 'https://x.example/{a}/{b}')).toBe('invalid');
+    expect(await add('A#{a}-{b}-{c}', 'https://x.example/{a}/{b}/{c}')).toBe('invalid');
+    expect(await add('AB#{id}', 'https://x.example/')).toBe('invalid');
+    expect(await add('AB#{id}', 'https://x.example/{id}', { id: { deep: 1 } })).toBe('invalid');
+    expect(settings.linkPatterns).toEqual([]);
+  });
+
+  it('M3, M4: attachments only from this PC’s own drives, no data streams', async () => {
+    const attach = (path: string) =>
+      refused('update', { items: [{ ref: 'be03', attach: { path } }] });
+    expect(await attach('\\\\attacker.example\\share\\a.png')).toBe('invalid');
+    expect(await attach('//attacker.example/share/a.png')).toBe('invalid');
+    expect(await attach('\\\\?\\UNC\\attacker.example\\share\\a.png')).toBe('invalid');
+    expect(await attach('C:\\Temp\\payload.exe::$DATA')).toBe('invalid');
+    expect(await attach('C:\\Temp\\notes.txt.')).toBe('invalid');
+    // A real file on this PC still attaches (copied into attachments/).
+    const picture = join(base, 'shot.png');
+    await writeFile(picture, 'not really a png');
+    await ok('update', { items: [{ ref: 'be03', attach: { path: picture } }] });
+    expect(await file('Backend.md')).toMatch(/!\[shot\.png\]\(attachments\/[^)]+\.png\)/);
+  });
+
+  it('L1: a huge reference is refused before any matching', async () => {
+    expect(await refused('read', { items: [{ ref: 'x'.repeat(5000) }] })).toBe('invalid');
+  });
+
+  it('L2: a name taken by a hidden list is never confirmed', async () => {
+    await service.hide('payroll', true);
+    const response = await call('create', { items: [{ kind: 'list', name: 'Payroll' }] });
+    expect(response.ok).toBe(false);
+    expect(JSON.stringify(response)).not.toMatch(/exists|payroll/i);
+  });
+
+  it('L4: an unreadable agents.json makes agents wait instead of hiding nothing', async () => {
+    await writeFile(join(folder, '.flint', 'agents.json'), '{ not json');
+    await service.hidden().load();
+    expect(await refused('find', {})).toBe('internal');
+    await writeFile(join(folder, '.flint', 'agents.json'), '{"flint":1,"hidden":{},"shown":{}}');
+    await service.hidden().load();
+    await ok('find', {});
+  });
+});

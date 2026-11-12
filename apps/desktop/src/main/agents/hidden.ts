@@ -6,14 +6,17 @@ import { tempDirectoryFor } from '../storage/list-file.js';
 /**
  * AGENT-06 (D-185 Q15): the lists, notes and groups hidden from AI agents, in `.flint/agents.json`
  * (docs/04 §2): `{ "flint": 1, "hidden": { id: time }, "shown": { id: time } }`. The times are
- * when each was last hidden or shown, so sync can take the later change (04 §7). Tolerant: a
- * missing or broken file hides nothing; unknown keys are kept.
+ * when each was last hidden or shown, so sync can take the later change (04 §7). A missing file
+ * hides nothing; a file that can't be read is `broken`, and agents wait until it is fixed (it
+ * could be hiding something: D-185 security review L4). Unknown keys are kept.
  */
 export class HiddenFile {
   private hidden = new Map<string, string>();
   private shown = new Map<string, string>();
   private extra: Record<string, unknown> = {};
   private readonly listeners = new Set<() => void>();
+  /** Not read yet, or there but unreadable: agents are refused until it reads (L4). */
+  broken = true;
   readonly path: string;
 
   constructor(folder: string) {
@@ -21,8 +24,18 @@ export class HiddenFile {
   }
 
   async load(): Promise<void> {
+    let text: string;
     try {
-      const parsed = JSON.parse(await readFile(this.path, 'utf8')) as unknown;
+      text = await readFile(this.path, 'utf8');
+    } catch (error) {
+      this.broken = (error as NodeJS.ErrnoException).code !== 'ENOENT';
+      this.hidden = new Map();
+      this.shown = new Map();
+      return;
+    }
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      if (typeof parsed !== 'object' || parsed === null) throw new Error('not an object');
       const {
         hidden,
         shown,
@@ -33,7 +46,9 @@ export class HiddenFile {
       this.extra = extra;
       this.hidden = times(hidden);
       this.shown = times(shown);
+      this.broken = false;
     } catch {
+      this.broken = true;
       this.hidden = new Map();
       this.shown = new Map();
     }
@@ -68,7 +83,11 @@ export class HiddenFile {
   }
 
   /** SYNC-01 (04 §7): another device's flag for an item, taken when it is the later change. */
-  async adopt(id: string, hide: boolean, at: string): Promise<void> {
+  async adopt(id: string, hide: unknown, when: unknown, now = Date.now()): Promise<void> {
+    // L3: only a real flag with a real time from another device; a time in the future counts as now.
+    const parsed = typeof when === 'string' ? Date.parse(when) : Number.NaN;
+    if (typeof hide !== 'boolean' || Number.isNaN(parsed)) return;
+    const at = new Date(Math.min(parsed, now)).toISOString();
     const mine = this.hidden.get(id) ?? this.shown.get(id);
     if (mine !== undefined && mine >= at) return;
     if (hide === this.hidden.has(id) && mine !== undefined) return;

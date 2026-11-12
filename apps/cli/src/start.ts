@@ -6,7 +6,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { AgentState } from '@flint/core/agents';
+import { AGENT_PIPE_PREFIX, type AgentState } from '@flint/core/agents';
+import { dirname } from 'node:path';
 import { connectPipe, type Connection } from './client.js';
 import { FlintError, MESSAGES } from './errors.js';
 import { isAlive, readState, readToken } from './locate.js';
@@ -48,7 +49,8 @@ export interface ReachDeps {
 
 /** Starts `Flint.exe --hidden` detached, so it outlives `flint` and keeps no console. */
 export function startFlint(exe: string): void {
-  const child = spawn(exe, ['--hidden'], { detached: true, stdio: 'ignore' });
+  // From its own folder (D-185 security review M5): never the folder `flint` was run in.
+  const child = spawn(exe, ['--hidden'], { detached: true, stdio: 'ignore', cwd: dirname(exe) });
   child.on('error', () => {
     // A start that fails shows as the pipe never answering (`unreachable`).
   });
@@ -80,7 +82,8 @@ export async function reachFlint(options: ReachOptions): Promise<Reached> {
     if (state && deps.isAlive(state.pid)) {
       if (!state.on) throw new FlintError({ code: 'off', message: MESSAGES.off });
       const token = deps.readToken(options.dir);
-      if (state.pipe && token) {
+      // D-185 security review L5: only Flint's own pipe names are ever opened.
+      if (state.pipe?.startsWith(AGENT_PIPE_PREFIX) && token) {
         try {
           return { connection: await deps.connect(state.pipe), state, token };
         } catch {

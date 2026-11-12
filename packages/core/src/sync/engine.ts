@@ -741,8 +741,18 @@ export class SyncEngine {
         ...groupsFile.groups.map((group) => group.id),
       ]);
       const mine = await local.agentFlags();
-      const theirs: Record<string, AgentFlag> =
-        itemsFile.agents && typeof itemsFile.agents === 'object' ? { ...itemsFile.agents } : {};
+      const theirs: Record<string, AgentFlag> = {};
+      // D-185 security review L3: only well-formed flags from Drive.
+      if (itemsFile.agents && typeof itemsFile.agents === 'object')
+        for (const [id, flag] of Object.entries(itemsFile.agents as Record<string, unknown>)) {
+          const { hidden, at } = (flag ?? {}) as Record<string, unknown>;
+          if (
+            typeof hidden === 'boolean' &&
+            typeof at === 'string' &&
+            !Number.isNaN(Date.parse(at))
+          )
+            theirs[id] = { hidden, at };
+        }
       const adopt: Record<string, AgentFlag> = {};
       for (const id of synced) {
         const here = mine[id];

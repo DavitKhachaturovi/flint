@@ -44,8 +44,8 @@ export function cliPath(paths: SetupPaths): string {
   return server.command === 'node' ? (server.args[0] ?? '') : server.command;
 }
 
-const quote = (text: string): string =>
-  /[\s"]/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text;
+/** Always quoted (D-185 security review): a path with `&`, `^` or `%` must stay one argument. */
+const quote = (text: string): string => `"${text.replace(/"/g, '\\"')}"`;
 
 /** Claude Code: `claude mcp add --scope user flint -- "<path>\flint.exe" mcp`. */
 export function claudeCodeCommand(paths: SetupPaths): string {

@@ -1,6 +1,6 @@
 /**
  * AGENT-02, AGENT-03 end to end inside one process: the real CLI and MCP server, the real pipe
- * client and the real locating, against a fake Flint (a named pipe on `\\.\pipe\flint-test-…` and a
+ * client and the real locating, against a fake Flint (a named pipe on `\\.\pipe\flint-agents-test-…` and a
  * temporary app-data folder with `agent-state.json` and `agent-token`).
  */
 import { writeFileSync } from 'node:fs';
@@ -251,7 +251,7 @@ describe('the MCP server over a real pipe', () => {
 
 describe('the pipe client', () => {
   it('rejects pending requests when the connection closes, and refuses to send after', async () => {
-    const pipe = `\\\\.\\pipe\\flint-test-close-${process.pid}-${Date.now()}`;
+    const pipe = `\\\\.\\pipe\\flint-agents-test-close-${process.pid}-${Date.now()}`;
     const server = createServer((socket) => socket.once('data', () => socket.destroy()));
     await new Promise<void>((resolve) => server.listen(pipe, resolve));
     cleanups.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
@@ -270,7 +270,7 @@ describe('the pipe client', () => {
   });
 
   it("answers a request that gets no answer with Flint didn't answer", async () => {
-    const pipe = `\\\\.\\pipe\\flint-test-silent-${process.pid}-${Date.now()}`;
+    const pipe = `\\\\.\\pipe\\flint-agents-test-silent-${process.pid}-${Date.now()}`;
     const sockets: Socket[] = [];
     const server = createServer((socket) => sockets.push(socket));
     await new Promise<void>((resolve) => server.listen(pipe, resolve));
@@ -298,6 +298,8 @@ describe('the pipe client', () => {
   });
 
   it('rejects a pipe nobody listens on', async () => {
-    await expect(connectPipe(`\\\\.\\pipe\\flint-test-nobody-${process.pid}`)).rejects.toThrow();
+    await expect(
+      connectPipe(`\\\\.\\pipe\\flint-agents-test-nobody-${process.pid}`),
+    ).rejects.toThrow();
   });
 });

@@ -315,9 +315,13 @@ export class SettingsFile {
   }
 
   async update(changes: Partial<Settings>): Promise<Settings> {
-    this.stored = { ...this.stored, ...changes, version: 1 };
+    // D-185 security review M2: written out before it is taken, so a value that can't be written
+    // never sticks in memory and breaks every later save.
+    const stored = { ...this.stored, ...changes, version: 1 };
+    const text = `${JSON.stringify(stored, null, 2)}\n`;
+    this.stored = stored;
     this.current = readSettings(this.stored, this.development);
-    await writeFileAtomic(this.path, `${JSON.stringify(this.stored, null, 2)}\n`, {
+    await writeFileAtomic(this.path, text, {
       tempDirectory: join(dirname(this.path), 'tmp'),
     });
     return this.current;

@@ -130,12 +130,18 @@ export class AgentService {
   // ─── the switches (only from Flint's own window) ───────────────────────────────────────────────
 
   setOn(on: boolean): Promise<void> {
-    this.switching = this.switching.then(async () => {
-      await this.deps.saveSettings({ agentsOn: on });
-      if (on) await this.enable();
-      else await this.disable(true);
+    // Security review M2: turning off closes the pipe even when the setting couldn't be saved, and
+    // one failed switch never blocks the next.
+    const next = this.switching.then(async () => {
+      try {
+        await this.deps.saveSettings({ agentsOn: on });
+      } finally {
+        if (on) await this.enable();
+        else await this.disable(true);
+      }
     });
-    return this.switching;
+    this.switching = next.catch(() => undefined);
+    return next;
   }
 
   async setReadOnly(readOnly: boolean): Promise<void> {

@@ -129,7 +129,7 @@ export interface FakeFlint {
 }
 
 /**
- * A fake Flint: a pipe server on `\\.\pipe\flint-test-<random>` answering newline-delimited JSON,
+ * A fake Flint: a pipe server on `\\.\pipe\flint-agents-test-<random>` answering newline-delimited JSON,
  * with `agent-state.json` and `agent-token` written into `dir`.
  */
 export async function startFakeFlint(
@@ -137,7 +137,7 @@ export async function startFakeFlint(
   answer: (request: AgentRequest) => unknown = () => ({ changed: [], text: ['Done.'] }),
   options: { readonly writeFiles?: boolean } = {},
 ): Promise<FakeFlint> {
-  const pipe = `\\\\.\\pipe\\flint-test-${randomBytes(8).toString('hex')}`;
+  const pipe = `\\\\.\\pipe\\flint-agents-test-${randomBytes(8).toString('hex')}`;
   const token = randomBytes(32).toString('hex');
   const requests: AgentRequest[] = [];
   const sockets = new Set<Socket>();

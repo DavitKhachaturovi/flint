@@ -21,7 +21,7 @@ export const VERSION: string = pkg.version;
 export function placeFor(env: Env, choice: ReachChoice): { dir: string; exe: string | null } {
   const development = isDevelopment(env, choice.dev);
   return {
-    dir: appDataDir(env, development),
+    dir: appDataDir(env, development, isSea()),
     exe: flintExePath(env, { development, execPath: process.execPath, isSea: isSea() }),
   };
 }

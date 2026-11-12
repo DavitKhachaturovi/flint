@@ -17,8 +17,9 @@ export const isDevelopment = (env: Env, devFlag: boolean): boolean =>
  * Flint's app-data folder (docs/04 §2): `FLINT_APP_DATA` (tests), else `%APPDATA%\Flint`, or
  * `%APPDATA%\Flint (development)` for the development build (D-33's identity names).
  */
-export function appDataDir(env: Env, development: boolean): string {
-  const override = env['FLINT_APP_DATA'];
+export function appDataDir(env: Env, development: boolean, installed = false): string {
+  // D-185 security review: the installed flint.exe ignores the test overrides.
+  const override = installed ? undefined : env['FLINT_APP_DATA'];
   if (override) return override;
   const roaming = env['APPDATA'] || join(homedir(), 'AppData', 'Roaming');
   return join(roaming, development ? 'Flint (development)' : 'Flint');
@@ -87,7 +88,8 @@ export function flintExePath(
   env: Env,
   options: { readonly development: boolean; readonly execPath: string; readonly isSea: boolean },
 ): string | null {
-  const override = env['FLINT_EXE'];
+  // D-185 security review: the installed flint.exe ignores the test override.
+  const override = options.isSea ? undefined : env['FLINT_EXE'];
   if (override) return resolve(override);
   if (options.development) return null;
   if (options.isSea) return resolve(dirname(options.execPath), '..', '..', 'Flint.exe');

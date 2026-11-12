@@ -1,6 +1,11 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type Server, type Socket } from 'node:net';
-import { FIXED_LIMITS, type AgentRequest, type AgentResponse } from '@flint/core/agents';
+import {
+  AGENT_PIPE_PREFIX,
+  FIXED_LIMITS,
+  type AgentRequest,
+  type AgentResponse,
+} from '@flint/core/agents';
 
 /**
  * AGENT-01 (D-185 Q3): the agents' named pipe. Node gives a pipe Windows' default permissions
@@ -9,15 +14,24 @@ import { FIXED_LIMITS, type AgentRequest, type AgentResponse } from '@flint/core
  * request per line, one answer per line, in order; at most 8 connections, 30 s per request.
  */
 
-/** `\\.\pipe\flint-agents-<hash>`: per app-data folder, so per build identity and user. */
+/** Every agent pipe's name starts so (`flint.exe` refuses any other). */
+export const PIPE_PREFIX = AGENT_PIPE_PREFIX;
+
+/**
+ * `\\.\pipe\flint-agents-<hash>-<random>`: per app-data folder (so per build identity and user),
+ * and new at every turn-on, so nobody can take the name ahead of Flint (security review, L5).
+ */
 export function pipeName(userData: string): string {
   const hash = createHash('sha256').update(userData.toLowerCase()).digest('hex').slice(0, 20);
-  return `\\\\.\\pipe\\flint-agents-${hash}`;
+  return `${PIPE_PREFIX}${hash}-${randomBytes(8).toString('hex')}`;
 }
 
-/** Constant-time comparison (Davit, D-185 Q3). */
+/** A connection must send a request with the right token within this time, or it is closed. */
+const AUTH_MS = 5_000;
+
+/** Constant-time comparison (Davit, D-185 Q3). An empty token never matches (L6). */
 export function sameToken(given: unknown, token: string): boolean {
-  if (typeof given !== 'string') return false;
+  if (typeof given !== 'string' || token === '') return false;
   const a = Buffer.from(given, 'utf8');
   const b = Buffer.from(token, 'utf8');
   // Compared at the same length either way, so the time says nothing about the token.
@@ -78,8 +92,16 @@ export class AgentPipe {
     socket.setEncoding('utf8');
     let buffer = '';
     let queue = Promise.resolve();
+    // L5: a connection that doesn't prove itself soon is closed, so idle ones can't hold the slots.
+    let trusted = false;
+    const untrusted = setTimeout(() => {
+      if (!trusted) socket.destroy();
+    }, AUTH_MS);
     const send = (response: AgentResponse): void => {
-      if (!socket.destroyed) socket.write(`${JSON.stringify(response)}\n`);
+      if (socket.destroyed) return;
+      socket.write(`${JSON.stringify(response)}\n`);
+      if (!response.ok && response.error.code === 'unauthorized') socket.end();
+      else trusted = true;
     };
     socket.on('data', (chunk: string) => {
       buffer += chunk;
@@ -98,10 +120,14 @@ export class AgentPipe {
         buffer = buffer.slice(end + 1);
         end = buffer.indexOf('\n');
         if (line === '') continue;
-        queue = queue.then(() => this.answer(line, connection).then(send));
+        // L6: nothing queued runs once the connection or the pipe is gone.
+        queue = queue.then(() =>
+          socket.destroyed || !this.server ? undefined : this.answer(line, connection).then(send),
+        );
       }
     });
     const close = (): void => {
+      clearTimeout(untrusted);
       this.sockets.delete(socket);
       this.handlers.closed?.(connection);
     };

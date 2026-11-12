@@ -104,7 +104,16 @@ export function resolveLinkedFile(url: string): string | null {
   } catch {
     return null;
   }
-  return isAbsolute(path) && isMedia(path) ? path : null;
+  return isAbsolute(path) && isLocalPath(path) && isMedia(path) ? path : null;
+}
+
+/**
+ * D-185 security review M3: a path on this PC's own drives: never a network share (`\\host\…`,
+ * `//host/…`) or a device path (`\\?\`, `\\.\`), which would make Flint reach another computer
+ * (and send the user's Windows credentials to it), and no alternate data stream (`a.png:x`).
+ */
+export function isLocalPath(path: string): boolean {
+  return /^[a-z]:[\\/]/i.test(path) && !path.includes(':', 2);
 }
 
 function resolveIn(url: string, host: string, root: string): string | null {

@@ -202,14 +202,18 @@ describe('locating Flint', () => {
     expect(isDevelopment({}, false)).toBe(false);
   });
 
-  it('finds Flint.exe two folders above flint.exe, or FLINT_EXE', () => {
+  it('finds Flint.exe two folders above flint.exe (the installed one ignores FLINT_EXE)', () => {
     const sea = {
       development: false,
       execPath: 'C:\\P\\flint\\resources\\bin\\flint.exe',
       isSea: true,
     };
     expect(flintExePath({}, sea)).toBe('C:\\P\\flint\\Flint.exe');
-    expect(flintExePath({ FLINT_EXE: 'D:\\fake\\Flint.exe' }, sea)).toBe('D:\\fake\\Flint.exe');
+    // D-185 security review: the test override never applies to the installed exe.
+    expect(flintExePath({ FLINT_EXE: 'D:\\fake\\Flint.exe' }, sea)).toBe('C:\\P\\flint\\Flint.exe');
+    expect(flintExePath({ FLINT_EXE: 'D:\\fake\\Flint.exe' }, { ...sea, isSea: false })).toBe(
+      'D:\\fake\\Flint.exe',
+    );
     expect(flintExePath({ LOCALAPPDATA: 'C:\\L' }, { ...sea, isSea: false })).toBe(
       'C:\\L\\Programs\\flint\\Flint.exe',
     );

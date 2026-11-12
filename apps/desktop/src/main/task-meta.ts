@@ -22,8 +22,15 @@ export interface TaskMeta {
 }
 
 /** An agent's name as stored: a short label (the client says what it is). */
-const AGENT_NAME = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim() !== '' ? value.trim().slice(0, 32) : undefined;
+const AGENT_NAME = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  // Synced from other devices too (D-185 security review): no control characters.
+  const text = [...value]
+    .filter((char) => char >= ' ' && char !== '\u007f')
+    .join('')
+    .trim();
+  return text === '' ? undefined : text.slice(0, 32);
+};
 
 const two = (value: number): string => String(value).padStart(2, '0');
 export const localStamp = (now: Date): string =>

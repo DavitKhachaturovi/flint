@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 /**
  * AGENT-02 (D-185 Q14): `flint path add` / `flint path remove`, run by the installer and the
@@ -74,10 +74,12 @@ export function parseRegQuery(output: string, name: string): PathValue | null {
 }
 
 const KEY = 'HKCU\\Environment';
+/** By its full path (D-185 security review M5): never a reg.exe from the current folder. */
+const REG = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'reg.exe');
 
 function run(args: readonly string[]): Promise<{ code: number; stdout: string }> {
   return new Promise((resolve) => {
-    execFile('reg', [...args], { windowsHide: true }, (error, stdout) => {
+    execFile(REG, [...args], { windowsHide: true }, (error, stdout) => {
       resolve({ code: error ? 1 : 0, stdout: String(stdout) });
     });
   });

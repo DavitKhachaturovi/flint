@@ -343,13 +343,23 @@ export class AgentApi {
   }
 
   private visible(): Visible {
-    return new Visible(this.deps.workspace(), this.deps.hidden(), this.deps.now());
+    const hidden = this.deps.hidden();
+    // Security review L4: never guess what's hidden; agents wait until the file reads.
+    if (hidden.broken)
+      throw fail(
+        'internal',
+        'Flint can’t read which lists are hidden from agents (.flint/agents.json) yet, so agents wait. Try again in a moment.',
+      );
+    return new Visible(this.deps.workspace(), hidden, this.deps.now());
   }
 
   /** Resolves `ref` among the visible items of `kind` (any kind when unset). */
   private resolve(view: Visible, ref: unknown, kind?: ItemKind, inList?: string): VItem {
     if (typeof ref !== 'string' || ref.trim() === '')
       throw fail('invalid', 'Each item needs a "ref": an ID or an exact name.');
+    // Security review L1: a huge reference would make suggestions take minutes.
+    if (ref.length > FIXED_LIMITS.titleChars)
+      throw fail('invalid', `A "ref" is at most ${FIXED_LIMITS.titleChars} characters.`);
     let scope: VList | undefined;
     if (inList !== undefined) {
       const list = this.resolve(view, inList, undefined, undefined);
@@ -772,14 +782,19 @@ export class AgentApi {
     const changed: Changed[] = [];
     const text: string[] = [];
     let count = 0;
-    const run = await this.deps.workspace().agentRun(agent, async () => {
-      for (const each of planned) {
-        const done = await each.run();
-        changed.push(...done.changed);
-        text.push(...done.text);
-        count += done.count ?? done.changed.length;
-      }
-    });
+    const run = await this.deps.workspace().agentRun(
+      agent,
+      async () => {
+        for (const each of planned) {
+          const done = await each.run();
+          changed.push(...done.changed);
+          text.push(...done.text);
+          count += done.count ?? done.changed.length;
+        }
+      },
+      // Security review H1: shorthand's ##list never reaches a list hidden from agents.
+      (listId) => !this.hiddenNow(listId),
+    );
     const label = summarise(changed, text);
     const result: WriteResult = { changed, text };
     return {
@@ -810,8 +825,26 @@ export class AgentApi {
     );
   }
 
+  /** AGENT-06: a list or note hidden from agents now, itself or through its group. */
+  private hiddenNow(listId: string): boolean {
+    const hidden = this.deps.hidden();
+    if (hidden.isHidden(listId)) return true;
+    return this.deps
+      .workspace()
+      .sidebarManual()
+      .some(
+        (item) => item.kind === 'group' && item.lists.includes(listId) && hidden.isHidden(item.id),
+      );
+  }
+
   delete(agent: string, raw: unknown): Promise<WriteOutcome> {
     const items = itemsOf(raw) as DeleteArgs['items'][number][];
+    // Security review L1: the count comes first, before any item is resolved.
+    if (items.length > this.deps.limits().itemsPerRequest)
+      throw fail(
+        'too_large',
+        `At most ${this.deps.limits().itemsPerRequest} items in one request (this has ${items.length}). Split the work.`,
+      );
     // Counted before resolving, by kind when given (a resolved list is recounted below).
     const view = this.visible();
     let taskDeletes = 0;
@@ -935,7 +968,7 @@ export class AgentApi {
           view.lists.some((list) => sameName(list.name, name)) ||
           workspace.listInfos().some((info) => sameName(info.name, name))
         )
-          throw fail('invalid', `A list or note called "${name}" already exists.`);
+          throw fail('invalid', 'That name isn’t available; choose another.');
         const text = item.kind === 'note' ? optionalString(item.text, 'text') : undefined;
         checkText(text, 'text');
         const group =
@@ -949,7 +982,7 @@ export class AgentApi {
             const outcome = group
               ? await workspace.newListInGroup(name, mode, group.id, now2)
               : await workspace.newList(name, mode, now2);
-            if (!outcome.ok) throw fail('invalid', outcome.problem);
+            if (!outcome.ok) throw fail('invalid', neutral(outcome.problem));
             if (text !== undefined && text !== '')
               await workspace.saveNote(outcome.listId, text, now2);
             this.touchNote(outcome.listId);
@@ -1187,7 +1220,7 @@ export class AgentApi {
         !sameName(name, list.name) &&
         workspace.listInfos().some((info) => sameName(info.name, name))
       )
-        throw fail('invalid', `A list or note called "${name}" already exists.`);
+        throw fail('invalid', 'That name isn’t available; choose another.');
     }
     const group =
       item.group === null
@@ -1270,13 +1303,13 @@ export class AgentApi {
         }
         if (keepName !== undefined) {
           const kept = await workspace.keepQuickNote(id, keepName, now());
-          if (!kept.ok) throw fail('invalid', kept.problem);
+          if (!kept.ok) throw fail('invalid', neutral(kept.problem));
           id = kept.listId;
           shownName = keepName;
           what.push(`kept as "${keepName}"`);
         } else if (name !== undefined && name !== list.name) {
           const renamed = await workspace.renameList(id, name, now());
-          if (!renamed.ok) throw fail('invalid', renamed.problem);
+          if (!renamed.ok) throw fail('invalid', neutral(renamed.problem));
           shownName = name;
           what.push(`renamed to "${name}"`);
         }
@@ -1302,7 +1335,7 @@ export class AgentApi {
         }
         if (item.duplicate) {
           const copy = await workspace.duplicateList(id, now());
-          if (!copy.ok) throw fail('invalid', copy.problem);
+          if (!copy.ok) throw fail('invalid', neutral(copy.problem));
           what.push(`duplicated (id ${copy.listId})`);
         }
         if (item.archiveDone) {
@@ -1678,8 +1711,11 @@ export class AgentApi {
     if (!isObject(attach) || typeof attach['path'] !== 'string')
       throw fail('invalid', 'attach is { path }: an absolute path to an existing file.');
     const path = attach['path'];
-    if (!/^[a-z]:[\\/]/i.test(path) && !path.startsWith('\\\\'))
-      throw fail('invalid', 'The attachment path must be absolute (C:\\…).');
+    // Security review M3, M4: a local drive path only (no network share or device path, which
+    // would make Flint reach another computer), no alternate data stream (`x.exe::$DATA`), no
+    // trailing dot or space (Windows drops them, changing the extension).
+    if (!/^[a-z]:\\/i.test(path) || path.includes(':', 2) || /[. ]$/.test(path))
+      throw fail('invalid', 'The attachment path must be a file on this PC (C:\\…).');
     if (fileKind(path) === 'blocked')
       throw fail('invalid', 'Flint never attaches programs or scripts.');
     return path;
@@ -1766,6 +1802,23 @@ function checkPattern(pattern: LinkPattern, others: readonly LinkPattern[]): Lin
     throw fail('invalid', 'The URL starts with https:// (or http://).');
   if (!/\{[a-z][a-z0-9]*\}/i.test(pattern.short))
     throw fail('invalid', 'The short form needs a part that changes, like {id}.');
+  // Security review M1, M2: a short, simple pattern only (one with many changing parts side by
+  // side can take seconds to match a long word on every keystroke); kinds only digits or word.
+  if (pattern.short.length > 100 || pattern.url.length > 2000)
+    throw fail('invalid', 'The short form is at most 100 characters, the URL 2,000.');
+  const parts = [...pattern.short.matchAll(/\{([a-z][a-z0-9]*)\}/gi)].map((match) => match[1]);
+  if (parts.length > 2) throw fail('invalid', 'A short form has at most two parts that change.');
+  if (/\}\{/.test(pattern.short))
+    throw fail('invalid', 'Put fixed text between the parts that change, like {project}#{id}.');
+  if (parts.some((part) => !pattern.url.includes(`{${part}}`)))
+    throw fail('invalid', 'Every part that changes in the short form must be in the URL.');
+  if (pattern.kinds !== undefined) {
+    if (typeof pattern.kinds !== 'object' || pattern.kinds === null || Array.isArray(pattern.kinds))
+      throw fail('invalid', '"kinds" maps each changing part to "digits" or "word".');
+    for (const [name, kind] of Object.entries(pattern.kinds))
+      if (!parts.includes(name) || (kind !== 'digits' && kind !== 'word'))
+        throw fail('invalid', '"kinds" maps each changing part to "digits" or "word".');
+  }
   const fixed = fixedPartProblem(pattern);
   if (fixed) throw fail('invalid', fixed);
   if (compileLinkPatterns([pattern]).length !== 1)
@@ -1796,4 +1849,12 @@ export function summarise(changed: readonly Changed[], text: readonly string[]):
   const deleted = changed.filter((each) => each.what === 'deleted');
   if (deleted.length === changed.length) return `Deleted ${deleted.length} items`;
   return `Changed ${changed.length} items`;
+}
+
+/**
+ * Security review L2: a name taken by a list hidden from agents mustn't be confirmed to them; every
+ * "that name exists" says the same neutral thing.
+ */
+function neutral(problem: string): string {
+  return /exists|taken/i.test(problem) ? 'That name isn’t available; choose another.' : problem;
 }
