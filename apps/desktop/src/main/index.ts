@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
@@ -1730,22 +1731,30 @@ async function start(): Promise<void> {
     log,
   });
   void agents.start().catch((error: unknown) => log(`agents: start failed: ${String(error)}`));
+  // AGENT-04: where Claude Code's skills are; a test run has its own home, never the user's.
+  const testHome = testDataDirectory();
+  const skillHome = testHome ? join(testHome, 'home') : homedir();
   // AGENT-04: a skill Flint installed for Claude Code follows Flint's version.
   if (!testDataDirectory())
     void updateInstalledSkill(agentPaths.skillSource).catch(() => undefined);
   // Q14: whether flint.exe's folder made it onto the user's PATH (the installer may skip it).
   let cliOnPath: boolean | null = null;
   if (agentPaths.resources)
-    execFile('reg', ['query', 'HKCU\\Environment', '/v', 'Path'], (error, stdout) => {
-      cliOnPath = error
-        ? false
-        : stdout.toLowerCase().includes(join(agentPaths.resources ?? '', 'bin').toLowerCase());
-    });
+    // By its full path (D-185 security review M5): never a reg.exe from the current folder.
+    execFile(
+      join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'reg.exe'),
+      ['query', 'HKCU\\Environment', '/v', 'Path'],
+      (error, stdout) => {
+        cliOnPath = error
+          ? false
+          : stdout.toLowerCase().includes(join(agentPaths.resources ?? '', 'bin').toLowerCase());
+      },
+    );
   const agentsView = async (): Promise<AgentsSettingsView> => {
     const view = agents.view();
     const summaries = workspace.summaries(new Date());
     const groups = workspace.sidebarManual().filter((item) => item.kind === 'group');
-    const skill = await installedSkill().catch(() => null);
+    const skill = await installedSkill(skillHome).catch(() => null);
     return {
       ...view,
       presets: LIMIT_PRESETS,
@@ -1858,7 +1867,7 @@ async function start(): Promise<void> {
           return { ok: true, message: 'Copied' };
         }
         case 'installSkill': {
-          const done = await installSkill(agentPaths.skillSource);
+          const done = await installSkill(agentPaths.skillSource, skillHome);
           if (done === 'not-ours')
             return {
               ok: false,
@@ -2265,6 +2274,8 @@ async function start(): Promise<void> {
           local: new WorkspaceSide({
             workspace: () => workspace,
             busy: (listId) => noteEditors.busy(listId),
+            // AGENT-06 (D-185 Q15): Hidden from agents syncs with the items it's on.
+            hidden: () => agents.hidden(),
           }),
           folderName: BUILD === 'installed' ? 'Flint' : 'Flint (development)',
           items: () =>

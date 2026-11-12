@@ -134,6 +134,8 @@ import { Palette, PaletteButton, type PaletteItem, type PaletteSources } from '.
 import { GiveToClaude } from './GiveToClaude.js';
 import { CLAUDE_DOWNLOAD_URL, folderName } from '../../shared/claude.js';
 import { CheatSheet } from './CheatSheet.js';
+import { useAgents } from './AgentsSettings.js';
+import { flashAgentRows } from '../ui/agent-flash.js';
 import { Lightbox } from './Lightbox.js';
 import { foldAway, unfold, watchDrag, type DragUnit } from '../ui/drag.js';
 import { bodyImages } from '../../shared/body-markdown.js';
@@ -547,12 +549,31 @@ export function App(): ReactElement {
   useEffect(() => {
     if (sync.phase === 'setup') setSyncDialog((current) => current ?? { kind: 'setup' });
   }, [sync.phase]);
-  /** The right-click menu's "Sync with Google Drive" for a list, note or group (checked while it syncs). */
+  // AGENT-05 to AGENT-07 (D-185): AI agents' state (Settings, the menus, the palette, headers).
+  const agents = useAgents();
+  /** AGENT-06: the IDs hidden from agents (lists, notes, groups). */
+  const agentsHidden = useMemo(
+    () => new Set((agents.view?.hidden ?? []).map((item) => item.id)),
+    [agents.view],
+  );
+  /** The right-click menu's per-item switches: Sync with Google Drive (checked while it syncs) and
+   * AGENT-06's Hidden from agents beside it (checked while hidden; not on Inbox, Proposed). */
   const syncMenu = useRef<
     (id: string, name: string, mode: 'tasks' | 'note' | 'group', lists?: number) => MenuEntry[]
   >(() => []);
-  syncMenu.current = (id, name, mode, lists) => {
-    if (!isConnected(sync)) return [];
+  syncMenu.current = (id, name, mode, count) => {
+    const hidden = agentsHidden.has(id);
+    const agentsEntry: MenuEntry[] =
+      agents.view && !lists.find((list) => list.id === id)?.inbox
+        ? [
+            {
+              label: 'Hidden from agents',
+              checked: hidden,
+              action: () => void window.flintMain.agentsAct({ kind: 'hide', id, hide: !hidden }),
+            },
+          ]
+        : [];
+    if (!isConnected(sync)) return agentsEntry.length > 0 ? ['divider', ...agentsEntry] : [];
     const on = mode === 'group' ? groupSyncs(sync, id) : listSyncs(sync, id);
     return [
       'divider',
@@ -560,10 +581,11 @@ export function App(): ReactElement {
         label: 'Sync with Google Drive',
         checked: on,
         action: () => {
-          if (on) setSyncDialog({ kind: 'stop', id, name, mode, lists: lists ?? 0 });
+          if (on) setSyncDialog({ kind: 'stop', id, name, mode, lists: count ?? 0 });
           else void syncAct({ kind: 'start', id });
         },
       },
+      ...agentsEntry,
       // D-161 (Proposed, Davit's wish): a synced list's or note's own file in Drive.
       ...(on && mode !== 'group'
         ? [
@@ -751,6 +773,11 @@ export function App(): ReactElement {
     });
     // APP-11, D-100: the tray's Settings; D-67: the animation speed, now and when it changes.
     window.flintMain.onShowSettings((section) => {
+      // D-186: the tray's taken-hotkey warning opens the shortcuts sheet, where hotkeys change.
+      if (section === 'shortcuts-sheet') {
+        setCheatSheet(true);
+        return;
+      }
       goRef.current({ list: SETTINGS_ID, page: null });
       // D-102: a section asked for (the tray's taken-hotkey warning): brought into view.
       if (section)
@@ -1617,6 +1644,8 @@ export function App(): ReactElement {
   };
   const triageDetails = useCallback((key: string | null): void => setSelected(key), []);
   const [cheatSheet, setCheatSheet] = useState(false);
+  /** D-186: the sheet opened from Settings' search starts filtered by it. */
+  const [cheatFilter, setCheatFilter] = useState('');
   /** D-106: Trash's tab asked for (an archived task found with Ctrl+K). */
   const [trashTab, setTrashTab] = useState<{
     readonly tab: 'deleted' | 'archived';
@@ -4482,6 +4511,144 @@ export function App(): ReactElement {
         200,
       );
   };
+  const openSettingsRef = useRef(openSettings);
+  openSettingsRef.current = openSettings;
+  /**
+   * AGENT-07: undoing an agent's change (Settings' list, the palette) is the user's own action: on
+   * the window's Ctrl+Z stack, so its toast carries Undo (Davit, 13 Nov 2026), which is Ctrl+Z.
+   */
+  const undoAgentChange = useCallback(
+    (id?: string): void => {
+      void window.flintMain.agentsAct({ kind: 'undo', ...(id && { id }) }).then((outcome) => {
+        if (!outcome) return;
+        showToast(outcome.message ?? (outcome.ok ? 'Undone' : 'Nothing to undo'), outcome.ok);
+      });
+    },
+    [showToast],
+  );
+  useEffect(() => {
+    // D-185 Q8: the one toast when the hourly budget pauses agent changes: Review, Resume.
+    window.flintMain.onAgentsPaused(({ agent, limit }) => {
+      showToastRef.current(
+        `${agent} made ${limit.toLocaleString('en-US')} changes in the last hour. Agent changes are paused.`,
+        false,
+        { label: 'Review', run: () => openSettingsRef.current('agents-recent') },
+        {
+          dismiss: {
+            label: 'Resume',
+            strong: true,
+            run: () => void window.flintMain.agentsAct({ kind: 'resume' }),
+          },
+          ms: UPDATE_TOAST_MS,
+        },
+      );
+    });
+    // AGENT-07, D-185 Q12: the rows an agent changed light up once (never moving anything).
+    window.flintMain.onAgentChanged(({ keys }) => flashAgentRows(keys));
+  }, []);
+  // AGENT-06: names change with renames; Settings shows the list fresh each time it opens.
+  const refreshAgents = agents.refresh;
+  useEffect(() => {
+    if (listId === SETTINGS_ID) refreshAgents();
+  }, [listId, refreshAgents]);
+  /** AGENT-06: hidden from agents itself, or in a hidden group (its header says so). */
+  const hiddenFromAgents = (id: string): boolean =>
+    agentsHidden.has(id) ||
+    (sidebarView?.items ?? []).some(
+      (item) => item.kind === 'group' && agentsHidden.has(item.id) && item.lists.includes(id),
+    );
+  /**
+   * AGENT-05 (D-106): on / off, read-only, pause / resume, undo the last change, Add to Claude
+   * Desktop, install the skill, the settings, and hiding the open list or note.
+   */
+  const agentCommands = (): PaletteItem[] => {
+    const state = agents.view;
+    if (!state) return [];
+    const words = 'ai agents agent claude cursor vs code mcp cli flint command';
+    const act = (action: Parameters<typeof window.flintMain.agentsAct>[0]): void =>
+      void window.flintMain.agentsAct(action).then((outcome) => {
+        if (outcome?.message) showToast(outcome.message, false);
+      });
+    const last = state.changes.find((change) => change.undoable && !change.undone);
+    const place =
+      view &&
+      view.id !== TODAY_ID &&
+      view.id !== FOCUS_ID &&
+      !view.id.startsWith('@') &&
+      !lists.find((list) => list.id === view.id)?.inbox
+        ? view
+        : null;
+    return [
+      {
+        id: 'agents:on',
+        label: state.on ? 'Turn AI agents off' : 'Turn AI agents on',
+        keywords: words,
+        run: () => act({ kind: 'on', on: !state.on }),
+      },
+      {
+        id: 'agents:read-only',
+        label: state.readOnly ? 'Read-only for agents off' : 'Read-only for agents',
+        keywords: `${words} read only`,
+        run: () => act({ kind: 'readOnly', readOnly: !state.readOnly }),
+      },
+      ...(state.on
+        ? [
+            {
+              id: 'agents:pause',
+              label: state.paused ? 'Resume agent changes' : 'Pause agent changes',
+              keywords: `${words} pause resume stop`,
+              run: () => act({ kind: state.paused ? 'resume' : 'pause' }),
+            },
+          ]
+        : []),
+      ...(last
+        ? [
+            {
+              id: 'agents:undo',
+              label: 'Undo last agent change',
+              detail: `${last.agent} · ${last.label}`,
+              keywords: `${words} undo recent changes`,
+              run: () => undoAgentChange(last.id),
+            },
+          ]
+        : []),
+      {
+        id: 'agents:claude-desktop',
+        label: 'Add to Claude Desktop',
+        keywords: `${words} connect setup extension mcpb`,
+        run: () => act({ kind: 'connect', app: 'claude-desktop' }),
+      },
+      {
+        id: 'agents:skill',
+        label: 'Install the Flint skill',
+        keywords: `${words} skill claude code`,
+        run: () => act({ kind: 'installSkill' }),
+      },
+      {
+        id: 'agents:settings',
+        label: 'Open AI agents settings',
+        keywords: `${words} settings`,
+        run: () => openSettings('agents'),
+      },
+      ...(place
+        ? [
+            agentsHidden.has(place.id)
+              ? {
+                  id: 'agents:show',
+                  label: `Show "${place.name}" to agents`,
+                  keywords: `${words} hidden hide show`,
+                  run: () => act({ kind: 'hide', id: place.id, hide: false }),
+                }
+              : {
+                  id: 'agents:hide',
+                  label: `Hide "${place.name}" from agents`,
+                  keywords: `${words} hidden hide private`,
+                  run: () => act({ kind: 'hide', id: place.id, hide: true }),
+                },
+          ]
+        : []),
+    ];
+  };
   /** D-106: a right-click menu's entries as palette items (a submenu is a second step). */
   const fromMenu = (entries: readonly MenuEntry[], prefix: string): PaletteItem[] =>
     entries.flatMap((entry): PaletteItem[] => {
@@ -4921,6 +5088,8 @@ export function App(): ReactElement {
                 },
               },
             ]),
+      // AGENT-05 to AGENT-07 (D-185, D-106): AI agents from Ctrl+K (no shortcuts).
+      ...agentCommands(),
       // APP-06, D-136: the check shows its progress in Settings → About (errors never as a toast).
       {
         id: 'app:check-updates',
@@ -5048,7 +5217,14 @@ export function App(): ReactElement {
             readOnly: view.readOnly !== null,
           }
         : view.mode === 'note'
-          ? { kind: 'note', text: view.noteText ?? '', edited: view.edited, created: view.created }
+          ? {
+              kind: 'note',
+              text: view.noteText ?? '',
+              edited: view.edited,
+              created: view.created,
+              createdBy: view.createdBy,
+              touchedBy: view.touchedBy,
+            }
           : // D-89: on a task's page, a selected subtask shows its own details (its notes too).
             pageTask && (!selectedRow || selectedRow.key === pageTask.key)
             ? { kind: 'page', task: pageTask }
@@ -5304,6 +5480,34 @@ export function App(): ReactElement {
           </button>
         )}
       </span>
+    );
+  }
+
+  /**
+   * The header's status line: sync's (above), and beside it "Hidden from agents" while the list or
+   * note (or its group) is hidden (AGENT-06, Davit 13 Nov 2026; no mark in the sidebar), and for a
+   * note the agent that last changed or made it (AGENT-01, D-185 Q4, Proposed place).
+   */
+  function headerStatus(shown: ListView, kind: 'list' | 'note'): ReactElement | null {
+    const synced = syncLine(shown.id, kind);
+    const hidden = hiddenFromAgents(shown.id);
+    const by =
+      kind === 'note' && shown.touchedBy
+        ? `Edited ${shown.edited ?? ''} by ${shown.touchedBy}`.replace('  ', ' ')
+        : kind === 'note' && shown.createdBy
+          ? `Created ${shown.created ?? ''} by ${shown.createdBy}`.replace('  ', ' ')
+          : null;
+    if (!hidden && !by) return synced;
+    return (
+      <div className="header-status">
+        {synced}
+        {by && (
+          <span key={by} className="agents-header-line agents-by">
+            {by}
+          </span>
+        )}
+        {hidden && <span className="agents-header-line">Hidden from agents</span>}
+      </div>
     );
   }
 
@@ -5717,6 +5921,12 @@ export function App(): ReactElement {
                     syncProblem={sync.problem ? <ProblemRow problem={sync.problem} /> : null}
                     onSyncChoose={() => setSyncDialog({ kind: 'choose' })}
                     onSyncDisconnect={() => setSyncDialog({ kind: 'disconnect' })}
+                    agents={agents.view}
+                    onAgentUndo={undoAgentChange}
+                    onShortcuts={(filter) => {
+                      setCheatFilter(filter);
+                      setCheatSheet(true);
+                    }}
                     onSyncMode={(mode) => {
                       if (mode === 'everything' && sync.mode === 'chosen') {
                         void window.flintMain
@@ -5928,7 +6138,7 @@ export function App(): ReactElement {
                           Read-only: Flint can&apos;t change this file ({view.readOnly}).
                         </span>
                       )}
-                      {syncLine(view.id, 'list')}
+                      {headerStatus(view, 'list')}
                     </header>
                   )}
 
@@ -5975,7 +6185,7 @@ export function App(): ReactElement {
                           Read-only: Flint can&apos;t change this file ({view.readOnly}).
                         </span>
                       )}
-                      {syncLine(view.id, 'note')}
+                      {headerStatus(view, 'note')}
                     </header>
                     <NoteEditor
                       key={noteEditorKey(view.id)}
@@ -6433,7 +6643,15 @@ export function App(): ReactElement {
             );
           })()}
         {/* NAV-02, D-106: the `?` cheat sheet. */}
-        {cheatSheet && <CheatSheet onClose={() => setCheatSheet(false)} />}
+        {cheatSheet && (
+          <CheatSheet
+            filter={cheatFilter}
+            onClose={() => {
+              setCheatSheet(false);
+              setCheatFilter('');
+            }}
+          />
+        )}
         {lightbox && (
           <Lightbox
             images={lightbox.images}

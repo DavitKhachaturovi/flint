@@ -392,16 +392,21 @@ test('pasted or selected text is never shorthand; typed text is (D-45, CAP-03)',
     .toContain('- [ ] deploy the hotfix @15:00, see ##infra !l [priority:: high] [id:: ');
 });
 
-test('recording a hotkey in Settings → Capture & hotkeys (APP-08, D-102)', async () => {
+test('recording a hotkey in the shortcuts sheet, from Settings → Capture (APP-08, D-102, D-186)', async () => {
   const main = app.windows().find((page) => page.url().includes('main-window'));
   if (!main) throw new Error('main window page not found');
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
-  const capture = main
-    .locator('.settings-row', { hasText: 'Quick capture' })
+  // D-186: Capture's link row opens the `?` sheet, where the hotkeys change.
+  await main
+    .locator('#settings-capture')
+    .getByRole('button', { name: 'View and change shortcuts…' })
+    .click();
+  const sheet = main.locator('.cheat-sheet');
+  await expect(sheet).toBeVisible();
+  const capture = sheet
+    .locator('.cheat-row', { hasText: 'Quick capture' })
     .locator('.hotkey-record');
-  const note = main
-    .locator('.settings-row', { hasText: 'Quick capture' })
-    .locator('.settings-note');
+  const note = sheet.locator('.cheat-row:has-text("Quick capture") + .cheat-said');
   await expect(capture).toHaveText('Ctrl+Shift+Space');
   await capture.click();
   await expect(capture).toHaveText('Press the new keys…');
@@ -414,10 +419,12 @@ test('recording a hotkey in Settings → Capture & hotkeys (APP-08, D-102)', asy
   await expect
     .poll(() => readFile(join(dataDirectory, 'appdata', 'settings.json'), 'utf8').catch(() => ''))
     .toContain('"captureHotkey": "Control+Shift+F9"');
-  // Esc cancels a recording, the hotkey as it was.
+  // Esc cancels a recording, the hotkey as it was; the sheet stays until the next Esc.
   await capture.click();
   await main.keyboard.press('Escape');
   await expect(capture).toHaveText('Ctrl+Shift+F9');
+  await main.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
   await main.locator('.sidebar > .nav').first().click();
 });
 
@@ -3179,12 +3186,14 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
   await expect(main.locator('.settings-header h1')).toHaveText('Settings');
   // D-109: Mini mode is the tenth section; D-128: Clipboard the eleventh; D-151: Claude the twelfth.
-  // D-161: Sync, after Today & lists (D-176: Focus's settings are only on its page).
-  await expect(main.locator('.settings-section')).toHaveCount(13);
-  await expect(main.locator('.settings-index-item')).toHaveCount(13);
+  // D-161: Sync, after Today & lists (D-176: Focus's settings are only on its page); D-185: AI
+  // agents, after Claude.
+  await expect(main.locator('.settings-section')).toHaveCount(14);
+  await expect(main.locator('.settings-index-item')).toHaveCount(14);
   await main.locator('.settings-index-item', { hasText: 'Keyboard shortcuts' }).click();
   await expect(main.locator('#settings-shortcuts')).toBeInViewport();
-  await expect(main.locator('#settings-shortcuts')).toContainText('Ctrl+Shift+J');
+  // D-186: one row; the `?` sheet shows them all.
+  await expect(main.locator('#settings-shortcuts')).toContainText('All shortcuts');
 
   // A switch: applied and saved at once.
   const rollover = main.locator('.switch[aria-label="Ask about unfinished pins"]');
@@ -3304,7 +3313,7 @@ test('M8 step 1: Settings, one page with its index, every change applied and sav
   await expect(main.locator('.settings-section')).toHaveCount(1);
   await expect(main.locator('.settings-section')).toHaveAttribute('aria-label', 'Reminders');
   await main.keyboard.press('Escape');
-  await expect(main.locator('.settings-section')).toHaveCount(13);
+  await expect(main.locator('.settings-section')).toHaveCount(14);
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('main-window'),

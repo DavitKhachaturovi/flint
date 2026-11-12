@@ -2,6 +2,14 @@
 
 What the app shows in its **What's new** card after an update (APP-15, D-117). Newest first. Each version gets 2–5 highlights in plain language: what's new and how to use it (e.g. "Mini mode for calls: Ctrl+Alt+Space"). No decision numbers, tests or file names; those stay in [`release-notes.md`](release-notes.md), the detailed log. Written with every version bump.
 
+## 1.8.0 (13 Nov 2026)
+
+- **Let AI agents work with Flint:** turn on **Settings → AI agents** and Claude, Cursor, VS Code and other AI apps can find, read, add and change your tasks and notes for you: "add a task to Backend to fix the login loop, remind me tomorrow at 9". It's off until you turn it on, and you can make it read-only.
+- **One click to connect:** **Add to Claude Desktop**, **Add to Cursor** and **Add to VS Code** set it up; for Claude Code, copy the command shown. Flint also installs a skill that teaches Claude how Flint works, and a `flint` command for the terminal (try `flint --help`).
+- **You stay in charge:** every change an agent makes shows in **Recent agent changes**, where **Undo** puts it back (keeping anything you changed since). Right-click a list, note or group and choose **Hidden from agents** to keep it private from them.
+- **Your notes, your call:** Flint itself sends nothing anywhere; what an agent reads goes to that agent's AI provider. Agents only reach Flint on your PC, and only while this is on.
+- **Shortcuts in one place:** press **?** to see every shortcut, and click one of the four hotkeys that work anywhere in Windows to change it.
+
 ## 1.7.0 (11 Nov 2026)
 
 - **Mini mode tucks into the edge of your screen:** press the new arrow button in mini mode's header (or **Ctrl+M**) and it slides away, leaving half of the Flint icon at the edge of your screen.

@@ -56,6 +56,10 @@ export const NoteIcon = ({ size = 14 }: IconProps): ReactElement =>
     <path key="b" d="M14 3v6h6M8 13h8M8 17h5" />,
   ]);
 
+/** AGENT-06 (mockup 17): a group, in Settings → AI agents' Hidden from agents list. */
+export const GroupIcon = ({ size = 13 }: IconProps): ReactElement =>
+  svg(size, <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />);
+
 export const SettingsIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />);
 

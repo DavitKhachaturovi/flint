@@ -309,6 +309,8 @@ export interface AgentRunOutcome<T> {
 interface Exclusive {
   readonly agent: string | null;
   readonly applied: { readonly path: string; readonly op: Op; readonly inverse: Op }[];
+  /** AGENT-06: the lists an agent may see; shorthand's ##list never reaches a hidden one. */
+  readonly visible?: (listId: string) => boolean;
 }
 
 interface AgentSnapshot {
@@ -941,13 +943,16 @@ export class Workspace {
     }
     // NAV-07, D-85: a note's created date is its first sighting.
     if (loaded.entry.mode === 'note') this.meta.seen([id], now);
-    const created = loaded.entry.mode === 'note' ? this.meta.get(id)?.created : undefined;
+    const noteMeta = loaded.entry.mode === 'note' ? this.meta.get(id) : undefined;
+    const created = noteMeta?.created;
     return {
       ...view,
       ...(this.monoNotes.includes(id) && { mono: true }),
       ...(this.sourceNotes.includes(id) && { source: true }),
       ...(edited !== undefined && { edited }),
       ...(created !== undefined && { created: dayLabel(created, now) }),
+      ...(noteMeta?.createdBy !== undefined && { createdBy: noteMeta.createdBy }),
+      ...(noteMeta?.touchedBy !== undefined && { touchedBy: noteMeta.touchedBy }),
     };
   }
 
@@ -1091,7 +1096,7 @@ export class Workspace {
       case 'edit': {
         const found = findTask(document, change.key);
         if (!found) return null;
-        const parsed = parseCapture(change.text, { now, lists: this.listInfos() });
+        const parsed = parseCapture(change.text, { now, lists: this.shorthandLists() });
         const ops: Op[] = [];
         // D-45: an empty task line is fine with a body; without one, emptying it changes nothing.
         const title = parsed.title.trim();
@@ -1515,7 +1520,7 @@ export class Workspace {
   ): Promise<ChangeOutcome | null> {
     const parsed = parseCapture(change.text, {
       now,
-      lists: this.listInfos(),
+      lists: this.shorthandLists(),
       ...(change.chooseNewList && { chooseNewList: true }),
     });
     // D-45, D-88: an untitled task is fine when it has notes (pasted code, TASK-09).
@@ -2855,9 +2860,14 @@ export class Workspace {
    * window's undo stack (Q5): the run says what it did as data (`AgentStep`s) for Recent agent
    * changes instead. A failure part-way still reports what was done, so it can be undone.
    */
-  agentRun<T>(agent: string, work: () => Promise<T>): Promise<AgentRunOutcome<T>> {
+  agentRun<T>(
+    agent: string,
+    work: () => Promise<T>,
+    /** AGENT-06 (security review H1): which lists the agent may see. */
+    visible?: (listId: string) => boolean,
+  ): Promise<AgentRunOutcome<T>> {
     return this.serial(async () => {
-      const run: Exclusive = { agent, applied: [] };
+      const run: Exclusive = { agent, applied: [], ...(visible && { visible }) };
       const undoStart = this.undoStack.length;
       const redo = [...this.redoStack];
       const before = await this.agentSnapshot();
@@ -3095,6 +3105,13 @@ export class Workspace {
   /** D-105: every list's and note's text, for counting what a link pattern would match. */
   texts(): string[] {
     return this.lists.map((list) => serializeDocument(list.file.document));
+  }
+
+  /** The lists shorthand's ##list may name: in an agent's run, only those it may see (AGENT-06). */
+  private shorthandLists(): ListInfo[] {
+    const visible = this.exclusive.getStore()?.visible;
+    const all = this.listInfos();
+    return visible ? all.filter((info) => visible(info.id)) : all;
   }
 
   listInfos(): ListInfo[] {

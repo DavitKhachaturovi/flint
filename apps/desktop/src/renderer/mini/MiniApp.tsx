@@ -49,6 +49,7 @@ import { MiniList } from './MiniList.js';
 import { MiniReminder } from './MiniReminder.js';
 import { NoteTab } from './NoteTab.js';
 import { useShowMotion, useStage } from './stage.js';
+import { flashAgentRows } from '../ui/agent-flash.js';
 
 /**
  * MINI-01, D-109, D-110 (mockup 05): mini mode, a small always-on-top card beside the main window and
@@ -295,6 +296,8 @@ export function MiniApp(): ReactElement {
     window.flintMain.onAppearance((appearance) => applySpeed(appearance.animationSpeed));
     void window.flintMini.alerts().then(setAlerts);
     window.flintMain.onChanged(() => void refreshRef.current());
+    // AGENT-07 (D-185 Q12): the rows an agent changed light up once, as in the main window.
+    window.flintMain.onAgentChanged(({ keys }) => flashAgentRows(keys));
     window.flintMini.onAlerts(setAlerts);
     window.flintMini.onShown(({ focus }) => {
       void refreshRef.current();

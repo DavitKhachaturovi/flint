@@ -283,7 +283,8 @@ export function createTray(actions: TrayActions): TrayHandle {
   const template = (): Electron.MenuItemConstructorOptions[] => [
     ...(warning
       ? ([
-          { label: warning, click: () => actions.settings('capture') },
+          // D-186: the warning opens the shortcuts sheet, where the hotkeys change.
+          { label: warning, click: () => actions.settings('shortcuts-sheet') },
           { type: 'separator' },
         ] as const)
       : []),

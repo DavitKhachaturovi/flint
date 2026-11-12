@@ -1,30 +1,39 @@
+import type { HotkeyName } from './ipc.js';
+
 /**
- * Every shortcut worth knowing, in one list (D-80, D-100): Settings' Keyboard shortcuts section
- * shows it now; the `?` cheat sheet and the Ctrl+K palette (M8 step 2) read the same list.
+ * Every shortcut worth knowing, in one list (D-80, D-100): the `?` sheet shows it (D-186: also
+ * where the four global hotkeys change), and Settings' search and the Ctrl+K palette read it.
  * Keep it in step with docs/03 §3.
  */
 
 export interface Shortcut {
   readonly keys: string;
   readonly action: string;
+  /** D-186: a global hotkey, changed in the sheet (its keys are the ones set now). */
+  readonly hotkey?: HotkeyName;
 }
 
 export interface ShortcutGroup {
   readonly name: string;
   readonly shortcuts: readonly Shortcut[];
+  /** More words the sheet's filter and Settings' search find the group by. */
+  readonly keywords?: string;
 }
 
 export const SHORTCUTS: readonly ShortcutGroup[] = [
   {
+    // D-186: the only group that changes (click a key cap in the sheet).
     name: 'Anywhere in Windows',
+    keywords: 'hotkey hotkeys global',
     shortcuts: [
-      { keys: 'Ctrl+Shift+Space', action: 'Quick capture (changeable)' },
-      { keys: 'Ctrl+Shift+X', action: 'Capture the selected text (changeable)' },
-      { keys: 'Ctrl+Alt+Space', action: 'Show or hide mini mode (changeable)' },
+      { keys: 'Ctrl+Shift+Space', action: 'Quick capture', hotkey: 'capture' },
+      { keys: 'Ctrl+Shift+X', action: 'Capture the selected text', hotkey: 'selection' },
+      { keys: 'Ctrl+Alt+Space', action: 'Show or hide mini mode', hotkey: 'mini' },
       // MINI-02, D-157: the selection into mini's note.
       {
         keys: 'Ctrl+Alt+X',
-        action: 'Capture the selected text into mini mode’s note (changeable)',
+        action: 'Capture the selected text into mini mode’s note',
+        hotkey: 'miniSelection',
       },
     ],
   },

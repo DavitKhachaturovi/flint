@@ -3,7 +3,6 @@ import {
   Children,
   cloneElement,
   isValidElement,
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -11,17 +10,26 @@ import {
   type ReactNode,
 } from 'react';
 import type {
-  HotkeyName,
-  HotkeysView,
-  RebindOutcome,
   SettingChange,
   SettingsView,
   FolderChange,
   FolderChoice,
   ClaudeState,
 } from '../../shared/ipc.js';
-import { acceleratorFor, displayAccelerator, usesAlt } from '../../shared/accelerator.js';
+import type { AgentsSettingsView } from '../../shared/agents.js';
 import { SHORTCUTS } from '../../shared/shortcuts.js';
+import { HOTKEY_NAMES, takenText, useHotkeys } from './Hotkeys.js';
+import {
+  AgentsStatusLine,
+  ClientList,
+  HiddenList,
+  LimitsChoice,
+  RecentChanges,
+  SaidLine,
+  SkillButtons,
+  SkillLine,
+  useSaid,
+} from './AgentsSettings.js';
 import { syncedAgo, type SyncMode, type SyncStatusView } from '../../shared/sync.js';
 import { CloudIcon } from './icons.js';
 import { clipboardChanged } from './ClipboardSection.js';
@@ -45,7 +53,8 @@ import {
 
 export const SETTINGS_SECTIONS = [
   { id: 'general', name: 'General' },
-  { id: 'capture', name: 'Capture & hotkeys' },
+  // D-186 (Davit, 13 Nov 2026): the hotkeys change in the `?` sheet; Capture links there.
+  { id: 'capture', name: 'Capture' },
   { id: 'reminders', name: 'Reminders' },
   { id: 'mini', name: 'Mini mode' },
   { id: 'today', name: 'Today & lists' },
@@ -53,6 +62,8 @@ export const SETTINGS_SECTIONS = [
   { id: 'links', name: 'Links' },
   { id: 'clipboard', name: 'Clipboard' },
   { id: 'claude', name: 'Claude' },
+  // AGENT-05 (D-185, mockup 17).
+  { id: 'agents', name: 'AI agents' },
   { id: 'data', name: 'Data' },
   { id: 'appearance', name: 'Appearance' },
   { id: 'shortcuts', name: 'Keyboard shortcuts' },
@@ -117,20 +128,35 @@ interface RowProps {
   /** SYNC-01: a tile before the name (the Google account, the cloud). */
   readonly lead?: ReactNode;
   readonly className?: string;
+  /** AGENT-05: more under the note (a status line, what an action said). */
+  readonly extra?: ReactNode;
+  readonly id?: string;
+}
+
+/** Whether a row's name, note or words hold the filter (a section's sub-list follows its row). */
+function rowMatches(props: Pick<RowProps, 'name' | 'note' | 'words'>, filter: string): boolean {
+  const { name, note, words = '' } = props;
+  return (
+    filter === '' ||
+    `${name} ${typeof note === 'string' ? note : ''} ${words}`.toLowerCase().includes(filter)
+  );
 }
 
 function Row(props: RowProps): ReactElement | null {
-  const { name, note, filter, words = '', children, lead } = props;
-  const haystack = `${name} ${typeof note === 'string' ? note : ''} ${words}`.toLowerCase();
-  if (filter !== '' && !haystack.includes(filter)) return null;
+  const { name, note, filter, children, lead, extra } = props;
+  if (!rowMatches(props, filter)) return null;
   const text = (
     <div className="settings-text">
       <span className="settings-name">{name}</span>
       {note && <span className="settings-note">{note}</span>}
+      {extra}
     </div>
   );
   return (
-    <div className={props.className ? `settings-row ${props.className}` : 'settings-row'}>
+    <div
+      className={props.className ? `settings-row ${props.className}` : 'settings-row'}
+      id={props.id}
+    >
       {lead ? (
         <div className="settings-lead">
           {lead}
@@ -161,12 +187,7 @@ function Section(props: {
     props.filter === '' ||
     props.matches === true ||
     name.toLowerCase().includes(props.filter) ||
-    rows.some((row) => {
-      const { name: rowName, note, words = '' } = row.props;
-      return `${rowName} ${typeof note === 'string' ? note : ''} ${words}`
-        .toLowerCase()
-        .includes(props.filter);
-    });
+    rows.some((row) => rowMatches(row.props, props.filter));
   if (!any) return null;
   return (
     <section className="card settings-section" id={`settings-${props.id}`} aria-label={name}>
@@ -187,119 +208,21 @@ function withFilter(children: ReactNode, filter: string): ReactNode {
 
 const CHIME_URL = new URL('./sounds/chime.wav', import.meta.url).href;
 
-const DOES: Record<HotkeyName, string> = {
-  capture: 'opens the capture popup',
-  selection: 'captures the selected text',
-  mini: 'shows or hides mini mode',
-  miniSelection: 'adds the selected text to mini mode’s note',
-};
+/** D-186: every shortcut's keys and action, so Settings' search finds the sheet's rows by them. */
+const SHORTCUT_WORDS = SHORTCUTS.flatMap((group) => [
+  group.name,
+  group.keywords ?? '',
+  ...group.shortcuts.map((each) => `${each.keys} ${each.action}`),
+]).join(' ');
 
-/** D-109: each global hotkey's row; D-157: the fourth, into mini mode's note. */
-const HOTKEY_ROWS: Readonly<Record<HotkeyName, string>> = {
-  capture: 'Quick capture',
-  selection: 'Capture the selected text',
-  mini: 'Show or hide mini mode',
-  miniSelection: 'Capture the selected text into mini mode’s note',
-};
+/** The four global hotkeys' own words (Capture's link row). */
+const HOTKEY_WORDS = SHORTCUTS.filter((group) => group.shortcuts.some((each) => each.hotkey))
+  .flatMap((group) => [group.keywords ?? '', ...group.shortcuts.map((each) => each.action)])
+  .join(' ');
 
-/** What each row says at rest. */
-const HOTKEY_NOTES: Readonly<Record<HotkeyName, string>> = {
-  capture: 'Works over any app, even in a full-screen call. Click to change.',
-  selection: 'Works over any app, even in a full-screen call. Click to change.',
-  mini: 'Works over any app, even in a full-screen call. Click to change.',
-  // D-157: on layouts where AltGr stands for Ctrl+Alt, AltGr+X types a character in some apps.
-  miniSelection:
-    'Adds it to the end of the Note tab, code as a code block. If AltGr+X types a character on your keyboard layout, choose another combination. Click to change.',
-};
-
-function explain(outcome: RebindOutcome, name: HotkeyName, accelerator: string): string {
-  const keys = displayAccelerator(accelerator);
-  switch (outcome) {
-    case 'saved':
-      return `Saved: ${keys} ${DOES[name]}.${usesAlt(accelerator) ? ' Note: Alt is often a push-to-talk key (Discord).' : ''}`;
-    case 'in-use':
-      return `${keys} is already used by another app. Try another combination.`;
-    case 'needs-modifier':
-      return 'Use Ctrl, Alt or Win together with a key.';
-    case 'same-as-other':
-      return 'That is already another Flint hotkey.';
-    case 'invalid':
-      return 'Flint cannot use that key. Try another.';
-  }
-}
-
-/**
- * APP-08, D-102: a global hotkey, recorded in place: click it, press the new keys. Flint tries
- * them at once; if another app owns them, the old hotkey stays and it says so. While recording,
- * the current hotkeys are off; Esc, a click elsewhere or leaving the window cancels.
- */
-function HotkeyButton(props: {
-  readonly name: HotkeyName;
-  readonly view: HotkeysView | null;
-  readonly recording: HotkeyName | null;
-  readonly onRecord: (name: HotkeyName | null) => void;
-  readonly onSaid: (name: HotkeyName, text: string) => void;
-  readonly onChanged: () => void;
-}): ReactElement {
-  const { name, view, recording, onRecord, onSaid, onChanged } = props;
-  const state = view?.[name];
-  const active = recording === name;
-  useEffect(() => {
-    if (!active) return;
-    window.flintMain.recordingHotkey(true);
-    document.body.dataset['recordingHotkey'] = '1';
-    const stop = (): void => {
-      window.flintMain.recordingHotkey(false);
-      delete document.body.dataset['recordingHotkey'];
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (event.key === 'Escape') {
-        onRecord(null);
-        onSaid(name, '');
-        return;
-      }
-      const accelerator = acceleratorFor(event);
-      if (!accelerator) return; // only modifiers so far
-      void window.flintMain.rebindHotkey(name, accelerator).then((outcome) => {
-        onRecord(null);
-        if (outcome) onSaid(name, explain(outcome, name, accelerator));
-        onChanged();
-      });
-    };
-    const onBlur = (): void => {
-      onRecord(null);
-      onSaid(name, '');
-    };
-    window.addEventListener('keydown', onKey, true);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      window.removeEventListener('keydown', onKey, true);
-      window.removeEventListener('blur', onBlur);
-      stop();
-    };
-  }, [active, name, onRecord, onSaid, onChanged]);
-  return (
-    <button
-      type="button"
-      className={[
-        'keycap',
-        'hotkey-record',
-        active ? 'recording' : '',
-        state && !state.registered ? 'taken' : '',
-      ].join(' ')}
-      title={
-        state && !state.registered
-          ? 'Another app uses this combination'
-          : 'Click, then press the new keys'
-      }
-      onClick={() => onRecord(active ? null : name)}
-    >
-      {active ? 'Press the new keys…' : state ? displayAccelerator(state.accelerator) : '…'}
-    </button>
-  );
-}
+/** AGENT-05 item 8: exactly as 02 says it. */
+const AGENTS_PRIVACY =
+  'Flint itself sends nothing. Whatever an agent reads from Flint goes to that agent’s AI provider (for Claude, Anthropic), under its terms. Agents only reach Flint on this PC, while this is on. Agents can read every list and note you haven’t hidden from them.';
 
 export function SettingsScreen(props: {
   readonly onToast: (text: string) => void;
@@ -332,6 +255,11 @@ export function SettingsScreen(props: {
   readonly onSyncChoose: () => void;
   readonly onSyncDisconnect: () => void;
   readonly onSyncMode: (mode: SyncMode) => void;
+  /** AGENT-05 (D-185): Settings → AI agents' view (null while it loads), and undoing a change. */
+  readonly agents: AgentsSettingsView | null;
+  readonly onAgentUndo: (id: string) => void;
+  /** D-186: the `?` sheet, filtered by the search when it matches something there. */
+  readonly onShortcuts: (filter: string) => void;
 }): ReactElement {
   const { onToast, onSnapshots, onLinkPatterns, onBuiltInLinksOff, zoom, onZoom, find } = props;
   const { onReplayTour, onWhatsNew, updates } = props;
@@ -507,17 +435,10 @@ export function SettingsScreen(props: {
   const sizes = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
   const size = sizes.find((level) => Math.abs(level - zoom) < 0.001);
   const [view, setView] = useState<SettingsView | null>(null);
-  // D-102: the hotkeys, the one being recorded, and what the last try said.
-  const [hotkeys, setHotkeys] = useState<HotkeysView | null>(null);
-  const [recording, setRecording] = useState<HotkeyName | null>(null);
-  const [said, setSaid] = useState<Partial<Record<HotkeyName, string>>>({});
-  const loadHotkeys = useCallback((): void => {
-    void window.flintMain.hotkeys().then(setHotkeys);
-  }, []);
-  const onSaid = useCallback(
-    (name: HotkeyName, text: string): void => setSaid((current) => ({ ...current, [name]: text })),
-    [],
-  );
+  // D-102, D-186: the hotkeys (Capture's link row warns while another app holds one).
+  const hotkeys = useHotkeys();
+  // AGENT-05: what the skill's actions said, under its row.
+  const skillSaid = useSaid();
   const [space, setSpace] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
   const [query, setQuery] = useState('');
@@ -525,8 +446,7 @@ export function SettingsScreen(props: {
   useEffect(() => {
     void window.flintMain.settings().then(setView);
     void window.flintMain.snapshotSpace().then(setSpace);
-    loadHotkeys();
-  }, [loadHotkeys]);
+  }, []);
   useEffect(() => {
     if (find > 0) field.current?.focus();
   }, [find]);
@@ -539,6 +459,131 @@ export function SettingsScreen(props: {
   const filter = query.trim().toLowerCase();
   const megabytes =
     space === null ? '…' : `${(space / 1_048_576).toFixed(space < 10_485_760 ? 1 : 0)} MB`;
+  const agentsAct = (action: Parameters<typeof window.flintMain.agentsAct>[0]): void =>
+    void window.flintMain.agentsAct(action);
+  /**
+   * AGENT-05 (D-185, mockup 17), top to bottom: the switch and its status, Read-only, Limits,
+   * Connect an app, the skill, Hidden from agents, Recent agent changes, Privacy. A sub-list
+   * shows with its row while the search finds that row.
+   */
+  const agentsRows = (agents: AgentsSettingsView): ReactNode[] => {
+    const words = 'ai agent agents mcp cli command';
+    const sub = (row: Pick<RowProps, 'name' | 'note' | 'words'>, list: ReactElement): ReactNode =>
+      rowMatches(row, filter) ? list : null;
+    const connect = {
+      name: 'Connect an app',
+      note: 'Add Flint to each app once. The app starts Flint when it needs it.',
+      words: `${words} connect claude desktop code cursor vs code vscode setup copy path`,
+    };
+    const hidden = {
+      name: 'Hidden from agents',
+      note: 'Agents can’t find, read or change these. Right-click a list, note or group to hide it.',
+      words: `${words} hidden hide show private`,
+    };
+    const recent = {
+      name: 'Recent agent changes',
+      note: 'What agents changed, newest first. Undo puts it back, except what you changed since.',
+      words: `${words} recent changes undo history`,
+    };
+    return [
+      <Row
+        key="on"
+        name="AI agents"
+        note={
+          <>
+            Let AI agents such as Claude, Cursor and VS Code read and change your lists and notes,
+            through the <code className="agents-code">flint</code> command and an MCP server on this
+            PC.
+          </>
+        }
+        extra={<AgentsStatusLine view={agents} />}
+        className="top"
+        filter={filter}
+        words={`${words} claude cursor vs code on off pause paused resume let read change lists notes server`}
+        id="settings-agents-switch"
+      >
+        {agents.on && agents.paused && (
+          <button
+            type="button"
+            className="trash-action strong agents-resume"
+            onClick={() => agentsAct({ kind: 'resume' })}
+          >
+            Resume
+          </button>
+        )}
+        <Switch on={agents.on} label="AI agents" onChange={(on) => agentsAct({ kind: 'on', on })} />
+      </Row>,
+      <Row
+        key="ro"
+        name="Read-only"
+        note="Agents can find and read, but not change anything."
+        filter={filter}
+        words={`${words} read only readonly`}
+      >
+        <Switch
+          on={agents.readOnly}
+          label="Read-only for agents"
+          onChange={(readOnly) => agentsAct({ kind: 'readOnly', readOnly })}
+        />
+      </Row>,
+      <Row
+        key="limits"
+        name="Limits"
+        note={
+          <span key={String(agents.readOnly)} className="settings-said">
+            {agents.readOnly
+              ? 'Read-only: agents change nothing, so limits don’t apply.'
+              : 'How much agents can change in one request and in an hour.'}
+          </span>
+        }
+        className={agents.readOnly ? 'agents-limits dim' : 'agents-limits'}
+        filter={filter}
+        words={`${words} limits low medium high hour request delete how much change`}
+        id="settings-agents-limits"
+      >
+        <LimitsChoice view={agents} onChange={(preset) => agentsAct({ kind: 'limits', preset })} />
+      </Row>,
+      <Row key="connect" {...connect} filter={filter} />,
+      sub(connect, <ClientList key="connect-list" view={agents} />),
+      <Row
+        key="skill"
+        name="Flint skill"
+        note={
+          <>
+            <span>Teaches Claude how Flint works and how to use it well.</span>
+            <br />
+            <span>
+              Save for claude.ai: works in the Claude desktop app with Flint added; a chat in the
+              browser can’t reach Flint on this PC.
+            </span>
+          </>
+        }
+        extra={
+          <>
+            <SkillLine view={agents} />
+            <SaidLine said={skillSaid.said['skill']} onDone={() => skillSaid.clear('skill')} />
+          </>
+        }
+        className="top"
+        filter={filter}
+        words={`${words} skill install update claude code claude.ai save zip teaches`}
+        id="settings-agents-skill"
+      >
+        <SkillButtons view={agents} act={skillSaid.act} />
+      </Row>,
+      <Row key="hidden" {...hidden} filter={filter} id="settings-agents-hidden" />,
+      sub(hidden, <HiddenList key="hidden-list" view={agents} />),
+      <Row key="recent" {...recent} filter={filter} id="settings-agents-recent" />,
+      sub(recent, <RecentChanges key="recent-list" view={agents} onUndo={props.onAgentUndo} />),
+      <Row
+        key="privacy"
+        name="Privacy"
+        note={AGENTS_PRIVACY}
+        filter={filter}
+        words={`${words} privacy anthropic provider network`}
+      />,
+    ];
+  };
   if (!view) return <div className="settings" />;
   const osReduced = reducedMotion();
   return (
@@ -615,42 +660,39 @@ export function SettingsScreen(props: {
       </Section>
 
       <Section id="capture" filter={filter}>
-        {(['capture', 'selection', 'mini', 'miniSelection'] as const).map((name) => (
-          <Row
-            key={name}
-            name={HOTKEY_ROWS[name]}
-            note={(() => {
-              const taken = hotkeys !== null && !hotkeys[name].registered;
-              const text =
-                said[name] ||
-                (taken && hotkeys
-                  ? `${displayAccelerator(hotkeys[name].accelerator)} is used by another app, so it doesn't work. Choose another.`
-                  : recording === name
-                    ? 'Esc cancels.'
-                    : HOTKEY_NOTES[name]);
-              // D-89: a new message fades in (keyed by its text).
-              return (
-                <span
-                  key={text}
-                  className={taken ? 'settings-said settings-warning' : 'settings-said'}
-                >
-                  {text}
-                </span>
-              );
-            })()}
-            filter={filter}
-            words="hotkey shortcut rebind popup selection mini"
+        {/* D-186: the hotkeys change in the `?` sheet; this row links there, and turns into
+            D-102's warning while another app holds one (mockup 17). */}
+        <Row
+          name="Hotkeys"
+          note={(() => {
+            const taken = HOTKEY_NAMES.map((name) => takenText(hotkeys.view, name)).find(
+              (text) => text !== null,
+            );
+            const text = taken
+              ? taken.replace(/Choose another\.$/, 'Choose another in the shortcuts sheet.')
+              : 'Quick capture, capturing a selection and mini mode’s two: they work over any app, even in a full-screen call.';
+            // D-89: a new message fades in (keyed by its text).
+            return (
+              <span
+                key={text}
+                className={taken ? 'settings-said settings-warning' : 'settings-said'}
+              >
+                {text}
+              </span>
+            );
+          })()}
+          filter={filter}
+          words={`hotkey hotkeys shortcut shortcuts rebind global popup ${HOTKEY_WORDS}`}
+          id="settings-hotkeys"
+        >
+          <button
+            type="button"
+            className="trash-action strong"
+            onClick={() => props.onShortcuts(query.trim())}
           >
-            <HotkeyButton
-              name={name}
-              view={hotkeys}
-              recording={recording}
-              onRecord={setRecording}
-              onSaid={onSaid}
-              onChanged={loadHotkeys}
-            />
-          </Row>
-        ))}
+            View and change shortcuts…
+          </button>
+        </Row>
         <Row
           name="Hide the capture popup from screen sharing"
           note="You still see it; a shared screen or a recording doesn't (Windows 10 2004 or later)."
@@ -880,6 +922,14 @@ export function SettingsScreen(props: {
         <ClaudeFolders lists={props.claudeLists} onFolders={props.onClaudeFolders} />
       </Section>
 
+      {/* AGENT-05 (D-185, mockup 17): off, nothing here is hidden or dimmed (only Limits, while
+          read-only), so everything can be set up before an agent ever connects. */}
+      {props.agents && (
+        <Section id="agents" filter={filter}>
+          {agentsRows(props.agents)}
+        </Section>
+      )}
+
       <Section id="data" filter={filter}>
         <Row
           name="Take a snapshot"
@@ -1021,41 +1071,38 @@ export function SettingsScreen(props: {
         </Row>
       </Section>
 
-      <Section
-        id="shortcuts"
-        filter={filter}
-        matches={SHORTCUTS.some((group) =>
-          group.shortcuts.some((each) =>
-            `${each.keys} ${each.action} ${group.name}`.toLowerCase().includes(filter),
-          ),
-        )}
-      >
-        {SHORTCUTS.map((group) => (
-          <div key={group.name} className="settings-shortcuts">
-            <div className="settings-shortcut-group">{group.name}</div>
-            {group.shortcuts
-              .filter(
-                (each) =>
-                  filter === '' ||
-                  `${each.keys} ${each.action} ${group.name}`.toLowerCase().includes(filter),
-              )
-              .map((each) => (
-                <div key={each.keys + each.action} className="settings-shortcut">
-                  <span className="settings-shortcut-action">{each.action}</span>
-                  <span className="keycap">{each.keys}</span>
-                </div>
-              ))}
-          </div>
-        ))}
+      {/* D-186: one row; the `?` sheet shows every shortcut and changes the global hotkeys. The
+          search finds it by any shortcut's keys or action, and a click opens the sheet filtered. */}
+      <Section id="shortcuts" filter={filter}>
+        <Row
+          name="All shortcuts"
+          note={
+            <>
+              Also with <span className="keycap settings-keycap">?</span> or Ctrl+K. The four
+              hotkeys that work anywhere in Windows change there.
+            </>
+          }
+          filter={filter}
+          words={`also with ? or ctrl+k the four hotkeys that work anywhere in windows change there keyboard shortcuts keys rebind cheat sheet ${SHORTCUT_WORDS}`}
+          id="settings-all-shortcuts"
+        >
+          <button
+            type="button"
+            className="trash-action strong"
+            onClick={() => props.onShortcuts(query.trim())}
+          >
+            View and change shortcuts…
+          </button>
+        </Row>
       </Section>
 
       <Section id="about" filter={filter}>
         {/* APP-09, D-16, D-132, D-136: stated plainly, first in About. */}
         <Row
           name="Privacy"
-          note="Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude."
+          note="Your notes stay on this PC unless you sync them: synced lists and notes go only to your own Google Drive, and Flint has no server of its own. Flint sends no telemetry and only contacts GitHub to check for updates, which you can turn off. Give to Claude only hands a task to the Claude app on this computer; nothing leaves your machine unless you send it from Claude. AI agents you turn on in Settings → AI agents can read your lists and notes; what they read goes to their AI provider, not through Flint."
           filter={filter}
-          words="privacy telemetry network data account offline github updates claude"
+          words="privacy telemetry network data account offline github updates claude agents"
         />
         {/* APP-06, D-136: the version, what the updater is doing, and its one action. */}
         <Row

@@ -5521,34 +5521,6 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-strong-fg);
 }
 
-.settings-shortcuts {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 0 10px;
-  border-top: 1px solid var(--fl-edge-divider);
-}
-
-.settings-section-label + .settings-shortcuts {
-  border-top: 0;
-}
-
-.settings-shortcut-group {
-  padding: 6px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fl-text-secondary);
-}
-
-.settings-shortcut {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 30px;
-  font-size: 13.5px;
-  color: var(--fl-text-body);
-}
-
 .settings-index {
   display: flex;
   flex-direction: column;
@@ -8822,4 +8794,420 @@ body[data-tour-step='5'] .main .row .pin-hover {
 .mini-focus-title .morph {
   max-width: 100%;
   text-overflow: ellipsis;
+}
+
+/* AGENT-05 to AGENT-07 (D-185, mockup 17): Settings → AI agents. The status under the switch is a
+   line with a 7 px dot: filled while on, accent while read-only, an outline when off, white text
+   and an outlined dot while paused; it crossfades as it changes. */
+.settings-row.top {
+  align-items: flex-start;
+}
+
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--fl-text-secondary);
+}
+
+.agent-status i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--fl-strong-bg);
+  transition:
+    background-color var(--fl-dur-state) ease,
+    box-shadow var(--fl-dur-state) ease;
+}
+
+.agent-status.off i {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--fl-checkbox-border);
+}
+
+.agent-status.paused,
+.agent-status.settings-warning {
+  color: var(--fl-text-highlight);
+}
+
+.agent-status.paused i {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--fl-text-highlight);
+}
+
+.agent-status.ro i {
+  background: var(--fl-accent);
+}
+
+.agents-skill-line {
+  margin-top: 1px;
+}
+
+.agents-code {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-secondary);
+}
+
+.trash-action.strong {
+  color: var(--fl-text-primary);
+}
+
+.agents-resume {
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+/* The section's buttons, the mockup's secondary size. */
+.agents-button {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* Read-only dims Limits (not clickable), its note saying why; the level is kept. */
+.settings-row.agents-limits {
+  transition: opacity var(--fl-dur-state) ease;
+}
+
+.settings-row.dim {
+  opacity: 0.45;
+}
+
+.settings-row.dim .settings-control {
+  pointer-events: none;
+}
+
+/* Limits' numbers float beside the level the pointer is on (the menus' ground and shadow). */
+.limits-wrap {
+  position: relative;
+}
+
+.limit-tip {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  translate: 0 -50%;
+  z-index: 5;
+  width: 232px;
+  padding: 10px 12px 11px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  pointer-events: none;
+  text-align: left;
+  animation: limit-tip-in var(--fl-dur-fast) ease-out;
+}
+
+@keyframes limit-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+}
+
+.limit-tip-title {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+
+.limit-tip-title span {
+  font-weight: 400;
+  color: var(--fl-text-faint);
+}
+
+.limit-tip-head {
+  margin: 4px 0 1px;
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
+}
+
+.limit-tip-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--fl-text-secondary);
+}
+
+.limit-tip-line b {
+  flex: 0 0 38px;
+  text-align: right;
+  font-family: var(--fl-font-mono);
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--fl-text-primary);
+}
+
+.limit-tip-sep {
+  height: 1px;
+  margin: 5px 0;
+  background: var(--fl-edge-float);
+}
+
+/* The lists under a row: the apps, the hidden items, the recent changes (Settings → Links'
+   list's look, mockup 17). */
+.agents-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -2px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.agents-client-name {
+  flex: 0 0 150px;
+  font-size: 13px;
+  color: var(--fl-text-body);
+}
+
+.agents-client-state {
+  flex: 1 1 auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.agents-command {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 6px 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-divider);
+}
+
+.agents-command-line {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--fl-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.agents-command-prompt {
+  color: var(--fl-text-faint);
+}
+
+.agents-command .settings-note {
+  font-size: 12px;
+}
+
+.agents-said-line,
+.agents-path-note {
+  padding: 0 6px 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.agents-said {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-secondary);
+}
+
+.agents-said.settings-warning {
+  color: var(--fl-text-highlight);
+}
+
+.agents-said.leaving {
+  animation: agents-said-out var(--fl-dur-state) ease forwards;
+}
+
+@keyframes agents-said-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.agents-hidden-tile {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+.agents-hidden-name {
+  flex: 0 0 auto;
+}
+
+.agents-kind {
+  flex: 1 1 auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11px;
+  color: var(--fl-text-faint);
+}
+
+.agents-empty {
+  padding: 2px 6px 12px;
+  font-size: 12.5px;
+  color: var(--fl-text-faint);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+/* AGENT-07: one 38 px row a change: who, what, when (mono), Undo or a faint "Undone". */
+.agents-change {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  transition:
+    background-color var(--fl-dur-fast) ease,
+    opacity var(--fl-dur-state) ease;
+}
+
+.agents-change:hover {
+  background: var(--fl-ground-hover);
+}
+
+.agents-change-who {
+  flex: 0 0 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--fl-text-secondary);
+}
+
+.agents-change-what {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--fl-text-body);
+  transition: color var(--fl-dur-state) ease;
+}
+
+.agents-change-when {
+  flex: 0 0 auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+
+.agents-change-act {
+  flex: 0 0 64px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.agents-undone {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: var(--fl-text-faint);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.agents-change.is-undone .agents-change-who,
+.agents-change.is-undone .agents-change-what {
+  color: var(--fl-text-faint);
+}
+
+/* New entries slide in from above; an item shown to agents again folds away. */
+.agents-enter {
+  animation: agents-in var(--fl-dur-state) var(--fl-ease-spring);
+}
+
+@keyframes agents-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.agents-fold {
+  overflow: hidden;
+  pointer-events: none;
+  animation: agents-fold var(--fl-dur-state) ease forwards;
+}
+
+@keyframes agents-fold {
+  to {
+    opacity: 0;
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transform: translateX(8px);
+  }
+}
+
+/* AGENT-06: "Hidden from agents" beside a list's or note's sync status (no mark in the sidebar),
+   and a note's agent (AGENT-01); they fade in like the sync line. */
+.header-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+.agents-header-line {
+  font-size: 13.5px;
+  color: var(--fl-text-muted);
+  animation: sync-mark-in var(--fl-dur-base) ease;
+}
+
+.note-card .agents-header-line {
+  font-size: 13px;
+}
+
+/* AGENT-01 (D-185 Q4): a new agent's name in the panel's footer crossfades in. */
+.panel-foot-by {
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+/* D-186: the `?` sheet's Anywhere in Windows group is editable: its hint, D-102's recording key
+   cap in the sheet's row size, and what a try said, in a line under the row. */
+.palette-label:has(.cheat-hint) {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cheat-hint {
+  font-family: var(--fl-font-ui);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cheat-row .hotkey-record {
+  min-width: 132px;
+  height: 26px;
+}
+
+.cheat-said {
+  padding: 0 4px 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fl-text-muted);
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.cheat-said.settings-warning {
+  color: var(--fl-text-highlight);
+}
+
+/* Settings → Keyboard shortcuts' `?`, small, inside its note. */
+.settings-keycap {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10.5px;
 }

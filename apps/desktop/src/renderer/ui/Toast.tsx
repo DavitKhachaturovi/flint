@@ -9,8 +9,15 @@ export interface Toast {
   readonly id: number;
   /** TASK-09, D-88: another way out ("Keep as one"), next to Undo. */
   readonly action?: { readonly label: string; readonly run: () => void };
-  /** APP-06, D-136: a button that only closes it ("Later"), after the action. */
-  readonly dismiss?: { readonly label: string; readonly run?: () => void };
+  /**
+   * APP-06, D-136: a button that only closes it ("Later"), after the action; `strong`, a second
+   * action as loud as the first (D-185 Q8: the pause toast's Review and Resume).
+   */
+  readonly dismiss?: {
+    readonly label: string;
+    readonly run?: () => void;
+    readonly strong?: boolean;
+  };
   /** D-77: playing its way out. */
   readonly leaving?: boolean;
   /** D-144: a toast that asks (Delete / Cancel): announced as an alert, not a status. */
@@ -110,7 +117,7 @@ export function ToastView(props: {
       {toast.dismiss && (
         <button
           type="button"
-          className="toast-dismiss"
+          className={toast.dismiss.strong ? undefined : 'toast-dismiss'}
           onMouseDown={keepFocus}
           onClick={() => {
             toast.dismiss?.run?.();

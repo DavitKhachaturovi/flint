@@ -56,6 +56,9 @@ export type PanelState =
       readonly text: string;
       readonly edited?: string | undefined;
       readonly created?: string | undefined;
+      /** AGENT-01 (D-185 Q4): the agent that made the note, and the one that changed it last. */
+      readonly createdBy?: string | undefined;
+      readonly touchedBy?: string | undefined;
     }
   | { readonly kind: 'page'; readonly task: TaskRow };
 
@@ -183,6 +186,8 @@ export function ContextPanel(props: {
           text={state.text}
           edited={state.edited}
           created={state.created}
+          createdBy={state.createdBy}
+          touchedBy={state.touchedBy}
           current={current}
           handlers={handlers}
         />
@@ -461,7 +466,12 @@ function TaskDetails(props: {
           </>
         )}
       </section>
-      <Stamps created={task.created} edited={task.edited} />
+      <Stamps
+        created={task.created}
+        edited={task.edited}
+        createdBy={task.createdBy}
+        touchedBy={task.touchedBy}
+      />
       <Extras text={taskText(task)} onImage={handlers.onImage} />
     </>
   );
@@ -474,16 +484,29 @@ function taskText(task: TaskRow): string {
   );
 }
 
-/** "Created 2 Nov · edited 11 min ago" (D-83, D-85). */
+/**
+ * "Created 2 Nov · edited 11 min ago" (D-83, D-85); with the agent that made it or changed it last,
+ * "Created 13 Nov by Claude · edited 2 h ago by Cursor" (AGENT-01, D-185 Q4). A new agent's name
+ * crossfades in.
+ */
 function Stamps(props: {
   readonly created?: string | undefined;
   readonly edited?: string | undefined;
+  readonly createdBy?: string | undefined;
+  readonly touchedBy?: string | undefined;
 }): ReactElement | null {
-  const { created, edited } = props;
+  const { created, edited, createdBy, touchedBy } = props;
   if (!created && !edited) return null;
+  const by = (who: string | undefined): string => (who ? ` by ${who}` : '');
   return (
-    <footer className="panel-foot">
-      {[created && `Created ${created}`, edited && `${created ? 'edited' : 'Edited'} ${edited}`]
+    <footer
+      key={`${createdBy ?? ''}|${touchedBy ?? ''}`}
+      className={createdBy || touchedBy ? 'panel-foot panel-foot-by' : 'panel-foot'}
+    >
+      {[
+        created && `Created ${created}${by(createdBy)}`,
+        edited && `${created ? 'edited' : 'Edited'} ${edited}${by(touchedBy)}`,
+      ]
         .filter(Boolean)
         .join(' · ')}
     </footer>
@@ -1048,10 +1071,12 @@ function NoteOutline(props: {
   readonly text: string;
   readonly edited?: string | undefined;
   readonly created?: string | undefined;
+  readonly createdBy?: string | undefined;
+  readonly touchedBy?: string | undefined;
   readonly current: number;
   readonly handlers: PanelHandlers;
 }): ReactElement {
-  const { text, edited, created, current, handlers } = props;
+  const { text, edited, created, createdBy, touchedBy, current, handlers } = props;
   const outline = useMemo(() => outlineOf(text), [text]);
   return (
     <>
@@ -1065,7 +1090,7 @@ function NoteOutline(props: {
         <span className="panel-label">In this note</span>
         <Facts outline={outline} handlers={handlers} />
       </section>
-      <Stamps created={created} edited={edited} />
+      <Stamps created={created} edited={edited} createdBy={createdBy} touchedBy={touchedBy} />
       <Extras text={text} onImage={handlers.onImage} />
     </>
   );

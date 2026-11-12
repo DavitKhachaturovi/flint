@@ -63,6 +63,8 @@ const MINI_PLATFORM = [
   'onFocusTimer',
   'focusCommand',
   'showFocusSettings',
+  // AGENT-07 (D-185 Q12): an agent's change flashes mini's rows too.
+  'onAgentChanged',
 ] as const satisfies readonly (keyof typeof main)[];
 
 export type MiniPlatform = Pick<typeof main, (typeof MINI_PLATFORM)[number]>;

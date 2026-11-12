@@ -419,6 +419,9 @@ export interface TaskRow {
   /** NAV-07, docs/04 §3: when Flint first saw it, and last changed it (`29 Oct`, `2 h ago`). */
   readonly created?: string;
   readonly edited?: string;
+  /** AGENT-01 (D-185 Q4): the AI agent that created it, and the one that changed it last. */
+  readonly createdBy?: string;
+  readonly touchedBy?: string;
   /** TASK-08, D-88: when Flint first saw it (`YYYY-MM-DDTHH:MM`), for the sort by date added. */
   readonly createdAt?: string;
   /** TODAY-01, D-85: pinned (the Today view in M6). */
@@ -766,6 +769,9 @@ export interface ListView {
   readonly edited?: string;
   /** NAV-07, D-85: a note's first sighting (`2 Nov`). */
   readonly created?: string;
+  /** AGENT-01 (D-185 Q4): a note's AI agent that created it, and the one that changed it last. */
+  readonly createdBy?: string;
+  readonly touchedBy?: string;
   /** TODAY-01 (M6): the Today view's reminders and rollover prompt. */
   readonly today?: TodayExtras;
   /** FOCUS-02, FOCUS-03 (D-170): the Focus view's estimates, counts and active task. */

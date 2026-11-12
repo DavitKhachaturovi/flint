@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -542,6 +542,62 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
   await step(main, 'It closes (Cancel)', 'motion', () =>
     main.locator('#settings-links .link-editor').getByRole('button', { name: 'Cancel' }).click(),
   );
+  // AGENT-05 (D-185, mockup 17): AI agents' switch (its status crossfades) and Limits' numbers.
+  await main.locator('.settings-index-item', { hasText: 'AI agents' }).click();
+  const agents = main.locator('#settings-agents');
+  await step(main, 'AI agents: turned on (the status crossfades)', 'motion', async () => {
+    await agents.getByRole('switch', { name: 'AI agents' }).click();
+    await expect(agents.locator('.agent-status-text')).toHaveText(/^On/);
+  });
+  await step(main, 'AI agents: Limits’ numbers float in', 'motion', async () => {
+    await agents.getByRole('radio', { name: 'High' }).hover();
+    await expect(agents.locator('.limit-tip')).toBeVisible();
+  });
+  // D-186: the `?` sheet, where a global hotkey is recorded.
+  await main
+    .locator('#settings-shortcuts')
+    .getByRole('button', { name: 'View and change shortcuts…' })
+    .click();
+  const quick = main
+    .locator('.cheat-sheet .cheat-row', { hasText: 'Quick capture' })
+    .locator('.hotkey-record');
+  await step(main, 'The sheet: a hotkey listens for new keys', 'motion', async () => {
+    await quick.click();
+    await expect(quick).toHaveText('Press the new keys…');
+  });
+  await step(main, 'Esc cancels the recording', 'motion', async () => {
+    await main.keyboard.press('Escape');
+    await expect(quick).not.toHaveText('Press the new keys…');
+  });
+  await main.keyboard.press('Escape');
+  await expect(main.locator('.cheat-sheet')).toHaveCount(0);
+  // AGENT-07 (D-185 Q12): an agent's change (the real `flint` command) flashes its row once.
+  await nav('Work').click();
+  await expect(row('Ship the report')).toBeVisible();
+  await step(main, 'An agent changes a task (its row flashes)', 'motion', async () => {
+    const changed = spawnSync(
+      process.execPath,
+      [join(appDirectory, '..', 'cli', 'dist', 'flint.cjs'), 'task', 'edit', 'w1', '--pin'],
+      {
+        env: {
+          ...process.env,
+          FLINT_APP_DATA: join(dataDirectory, 'appdata'),
+          FLINT_NO_START: '1',
+        },
+        encoding: 'utf8',
+        timeout: 30_000,
+      },
+    );
+    expect(changed.status, changed.stderr || changed.stdout).toBe(0);
+    await expect(main.locator('.main .row.fl-flash')).toHaveCount(1);
+  });
+  // AGENT-06: hidden from agents, the list's header says so.
+  await step(main, 'A list hidden from agents (its header says so)', 'motion', async () => {
+    await nav('Work').click({ button: 'right' });
+    await main.locator('.fl-menu [aria-checked]', { hasText: 'Hidden from agents' }).click();
+    await expect(main.locator('.list-header .agents-header-line')).toBeVisible();
+  });
+  await nav('Settings').click();
   // APP-06, D-136: the update status line and the "Update ready" toast (the fake updater).
   const emitUpdate = (event: string, arg?: unknown): Promise<void> =>
     running.evaluate(
