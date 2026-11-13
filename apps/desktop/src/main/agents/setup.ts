@@ -142,12 +142,21 @@ export function launcher(server: ServerCommand): string {
     "const { spawn } = require('node:child_process');",
     `const command = ${JSON.stringify(server.command)};`,
     `const args = ${JSON.stringify(server.args)};`,
-    "const child = spawn(command, args, { stdio: 'inherit', windowsHide: true });",
+    // The 1.8.0 preview: with stdio 'inherit', a child on Windows answered only once stdin closed,
+    // so Claude Desktop gave up; the streams are copied explicitly instead.
+    "const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true });",
+    'process.stdin.pipe(child.stdin);',
+    'child.stdout.pipe(process.stdout);',
     "child.on('error', () => {",
     "  process.stderr.write('Flint is not installed at ' + command + '. Install Flint, then add it again.\\n');",
     '  process.exit(3);',
     '});',
-    "child.on('exit', (code) => process.exit(code === null ? 0 : code));",
+    // What happened shows in the app's MCP log (its stderr), so a failure can be seen.
+    "process.stdin.on('end', () => process.stderr.write('Flint launcher: the app closed the connection.\\n'));",
+    "child.on('exit', (code) => {",
+    "  process.stderr.write('Flint launcher: flint.exe mcp ended with code ' + code + '.\\n');",
+    '  process.exit(code === null ? 0 : code);',
+    '});',
     '',
   ].join('\n');
 }

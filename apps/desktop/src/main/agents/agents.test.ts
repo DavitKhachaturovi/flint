@@ -539,3 +539,36 @@ describe('the security review’s findings (D-185)', () => {
     await ok('find', {});
   });
 });
+
+describe('an agent’s ##list (the 1.8.0 preview)', () => {
+  it('never makes a list: an unknown name is not_found and nothing changes', async () => {
+    const response = await call('create', {
+      items: [{ kind: 'task', title: 'Leak test ##Games Backlog' }],
+      parseShorthand: true,
+    });
+    expect(response.ok).toBe(false);
+    if (response.ok) return;
+    expect(response.error.code).toBe('not_found');
+    expect(response.error.message).toContain('No list called "Games"');
+    expect(workspace.listInfos().map((info) => info.name)).not.toContain('Games');
+  });
+
+  it('never guesses a near list: it suggests it instead', async () => {
+    const response = await call('create', {
+      items: [{ kind: 'task', title: 'Fix it ##backen' }],
+      parseShorthand: true,
+    });
+    expect(response.ok).toBe(false);
+    if (response.ok) return;
+    expect(response.error.code).toBe('not_found');
+    expect(response.error.suggestions?.map((each) => each.id)).toContain('backend');
+  });
+
+  it('takes an existing list by ##', async () => {
+    const created = await ok<WriteResult>('create', {
+      items: [{ kind: 'task', title: 'Fix it ##backend' }],
+      parseShorthand: true,
+    });
+    expect(created.changed[0]?.list?.id).toBe('backend');
+  });
+});

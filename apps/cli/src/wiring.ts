@@ -61,6 +61,8 @@ export async function runMcpStdio(env: Env, choice: ReachChoice): Promise<number
     running.add(handled);
   });
   await once(lines, 'close');
+  // Said in the app's MCP log, so an early end can be told from a crash (the 1.8.0 preview).
+  process.stderr.write('flint mcp: the app closed the connection (stdin ended).\n');
   await Promise.allSettled([...running]);
   watcher?.close();
   server.close();

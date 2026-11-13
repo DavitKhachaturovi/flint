@@ -9,6 +9,7 @@ import {
   resolveRef,
   sameName,
   sliceText,
+  suggest,
   textLines,
   timeText,
   timeValue,
@@ -46,7 +47,7 @@ import {
   type UpdateItem,
   type WriteResult,
 } from '@flint/core/agents';
-import { escapeInert } from '@flint/core/shorthand';
+import { escapeInert, parseCapture } from '@flint/core/shorthand';
 import {
   compareLocalDateTime,
   parseLocalDateTime,
@@ -901,6 +902,28 @@ export class AgentApi {
             `Tasks go into a task list${list ? `, not ${list.kind} "${list.name}"` : ''}.`,
           );
         const target = list;
+        // The 1.8.0 preview (D-185 Q6): an agent's ##list never makes a list or picks a near one;
+        // an unknown or near name is not_found, with the close lists to choose from.
+        if (shorthand) {
+          const lists = view.lists.map((each) => ({
+            id: each.id,
+            name: each.name,
+            mode: each.kind === 'note' ? ('note' as const) : ('tasks' as const),
+          }));
+          const parsed = parseCapture(title, { now, lists });
+          if (parsed.target.kind === 'new' || parsed.target.kind === 'close-match') {
+            const name = parsed.target.name;
+            const close =
+              parsed.target.kind === 'close-match'
+                ? [asCandidate(view.list(parsed.target.list.id) ?? list)]
+                : suggest(name, view.lists).map(asCandidate);
+            throw fail(
+              'not_found',
+              `No list called "${name}". Agents never make one from ##: make it first (flint list add), give the list with --list, or keep ## as text with --literal.`,
+              { suggestions: close },
+            );
+          }
+        }
         const position = this.taskPosition(view, target, item.position);
         const fields = this.taskFields(item, now);
         return {

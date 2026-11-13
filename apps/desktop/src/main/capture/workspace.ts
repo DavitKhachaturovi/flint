@@ -1527,6 +1527,13 @@ export class Workspace {
     if (parsed.title.trim() === '' && parsed.body.trim() === '') return null;
     let target = list;
     let created = false;
+    // AGENT-01 (the 1.8.0 preview): an agent's ##list never makes a list or picks a near one (the
+    // agent API refuses first; this is the guard behind it).
+    if (
+      this.exclusive.getStore()?.agent &&
+      (parsed.target.kind === 'new' || parsed.target.kind === 'close-match')
+    )
+      throw new Error('agents never make or guess a list from ##');
     if (parsed.target.kind === 'new') {
       target = await this.createList(parsed.target.name);
       created = true;
