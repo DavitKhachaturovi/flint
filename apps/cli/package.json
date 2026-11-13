@@ -1,6 +1,6 @@
 {
   "name": "@flint/cli",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "description": "flint.exe: the flint command and the MCP server, a thin client of the running Flint's agent API (docs/02 AGENT-02, AGENT-03; D-185).",
   "author": "Davit Khachaturovi",
