@@ -1,3 +1,4 @@
+import { win32 } from 'node:path';
 import {
   appendText,
   asCandidate,
@@ -50,6 +51,7 @@ import {
 import { escapeInert, parseCapture } from '@flint/core/shorthand';
 import {
   compareLocalDateTime,
+  fromDate,
   parseLocalDateTime,
   parseTime,
   type LocalDateTime,
@@ -259,7 +261,11 @@ function reminderOf(row: TaskRow, now: Date): ReminderInfo | undefined {
     at: timeValue(parsed.value),
     text: timeText(parsed.value, now),
     muted: row.reminderState === 'muted',
-    overdue: row.reminderState === 'overdue',
+    // Overdue for agents: its time has passed and the task is open, muted or not (muted only
+    // means no notification; preview 3, an agent read a passed muted reminder as not due).
+    overdue:
+      row.reminderState === 'overdue' ||
+      (!row.done && compareLocalDateTime(parsed.value, fromDate(now)) <= 0),
   };
 }
 
@@ -323,10 +329,26 @@ function asPriority(value: unknown): Priority | null | undefined {
   throw fail('invalid', '"priority" is high, medium, low or none.');
 }
 
-/** A filter's time: ISO (past allowed) or a phrase. */
+/**
+ * A filter's time: ISO, `now`, `today` / `yesterday` with an optional time (past allowed: that's
+ * what filters are for), or a phrase to come.
+ */
 function filterTime(text: string, now: Date): LocalDateTime {
-  const iso = parseLocalDateTime(text.trim());
+  const trimmed = text.trim().toLowerCase();
+  const iso = parseLocalDateTime(trimmed.toUpperCase());
   if (iso) return iso.value;
+  if (trimmed === 'now') return fromDate(now);
+  const day = /^(today|yesterday)(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?)?$/.exec(trimmed);
+  if (day) {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (day[1] === 'yesterday') date.setDate(date.getDate() - 1);
+    const hour = day[2] === undefined ? 0 : Number(day[2]);
+    const minute = day[3] === undefined ? 0 : Number(day[3]);
+    if (hour <= 23 && minute <= 59) {
+      date.setHours(hour, minute);
+      return fromDate(date);
+    }
+  }
   const phrase = parseTime(text, { now });
   if (phrase) return phrase;
   throw fail(
@@ -438,7 +460,7 @@ export class AgentApi {
       if (type === 'any' || type === 'list' || type === 'note')
         for (const list of view.lists) {
           if (type !== 'any' && list.kind !== type) continue;
-          if (query !== '' && nameMatches(list.name, query))
+          if (query === '' || nameMatches(list.name, query))
             named.push({
               kind: list.kind,
               id: list.id,
@@ -454,7 +476,7 @@ export class AgentApi {
         }
       if (type === 'any' || type === 'group')
         for (const group of view.groups)
-          if (query !== '' && nameMatches(group.name, query))
+          if (query === '' || nameMatches(group.name, query))
             named.push({ kind: 'group', id: group.id, name: group.name });
     }
     if (type === 'any' || type === 'task') {
@@ -1311,6 +1333,8 @@ export class AgentApi {
         let id = list.id;
         let shownName = list.name;
         let count = 1;
+        // Preview 3: a copy is its own entry, first, so a script taking the first ID gets the copy.
+        const made: Changed[] = [];
         if (text !== undefined) {
           await workspace.saveNote(id, text, now());
           what.push('edited');
@@ -1360,6 +1384,13 @@ export class AgentApi {
           const copy = await workspace.duplicateList(id, now());
           if (!copy.ok) throw fail('invalid', neutral(copy.problem));
           what.push(`duplicated (id ${copy.listId})`);
+          const copyName = copy.label.replace(/^Duplicated as /, '');
+          made.push({
+            kind: list.kind,
+            id: copy.listId,
+            name: copyName,
+            what: `created as a copy of "${shownName}"`,
+          });
         }
         if (item.archiveDone) {
           count = await workspace.archiveDone(now(), 0, id);
@@ -1367,8 +1398,17 @@ export class AgentApi {
         }
         this.touchNote(id, agent);
         return {
-          changed: [{ kind: list.kind, id, name: shownName, what: what.join(', ') || 'unchanged' }],
-          text: [`${capitalise(what.join(', ') || 'unchanged')}: "${shownName}" · id ${id}`],
+          changed: [
+            ...made,
+            { kind: list.kind, id, name: shownName, what: what.join(', ') || 'unchanged' },
+          ],
+          text: [
+            ...made.map(
+              (each) =>
+                `Created ${each.kind} "${each.name}" (a copy of "${shownName}") · id ${each.id}`,
+            ),
+            `${capitalise(what.join(', ') || 'unchanged')}: "${shownName}" · id ${id}`,
+          ],
           count: what.length > 0 ? Math.max(1, count) : 0,
         };
       },
@@ -1733,12 +1773,16 @@ export class AgentApi {
   private checkAttach(attach: unknown): string {
     if (!isObject(attach) || typeof attach['path'] !== 'string')
       throw fail('invalid', 'attach is { path }: an absolute path to an existing file.');
-    const path = attach['path'];
+    // Preview 3: `C:/Users/…` is a local drive path too; it is taken with backslashes.
+    const path = win32.normalize(attach['path']);
     // Security review M3, M4: a local drive path only (no network share or device path, which
     // would make Flint reach another computer), no alternate data stream (`x.exe::$DATA`), no
     // trailing dot or space (Windows drops them, changing the extension).
     if (!/^[a-z]:\\/i.test(path) || path.includes(':', 2) || /[. ]$/.test(path))
-      throw fail('invalid', 'The attachment path must be a file on this PC (C:\\…).');
+      throw fail(
+        'invalid',
+        'The attachment path must be a file on this PC’s drives, like C:\\Users\\Alex\\shot.png (not a network share).',
+      );
     if (fileKind(path) === 'blocked')
       throw fail('invalid', 'Flint never attaches programs or scripts.');
     return path;

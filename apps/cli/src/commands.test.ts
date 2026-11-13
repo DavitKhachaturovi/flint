@@ -210,6 +210,12 @@ const CASES: readonly (readonly [string, readonly string[], string, unknown])[] 
     { items: [{ ref: 'k3f9a2', remind: 'in 2h' }] },
   ],
   [
+    'task snooze with --remind (preview 3: as the skill showed it)',
+    ['task', 'snooze', 'k3f9a2', '--remind', '2026-11-20T15:30'],
+    'update',
+    { items: [{ ref: 'k3f9a2', remind: '2026-11-20T15:30' }] },
+  ],
+  [
     'task delete',
     ['task', 'delete', 'k3f9a2', 'Old idea', '--in', 'Inbox'],
     'delete',

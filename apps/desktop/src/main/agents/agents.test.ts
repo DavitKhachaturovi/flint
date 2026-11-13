@@ -572,3 +572,49 @@ describe('an agent’s ##list (the 1.8.0 preview)', () => {
     expect(created.changed[0]?.list?.id).toBe('backend');
   });
 });
+
+describe('from preview 3 (Claude Desktop and Claude Code)', () => {
+  it('lists every task list for a type with no query', async () => {
+    const result = await ok<FindResult>('find', { type: 'list' });
+    if (!('hits' in result)) throw new Error('no hits');
+    expect(result.hits.map((hit) => hit.name)).toEqual(['Inbox', 'Backend', 'Payroll']);
+    const notes = await ok<FindResult>('find', { type: 'note' });
+    expect('hits' in notes && notes.hits.map((hit) => hit.name)).toEqual(['Plan']);
+  });
+
+  it('calls a passed reminder overdue even when it is muted', async () => {
+    await writeFile(
+      join(folder, 'Payroll.md'),
+      '---\nflint: 1\nid: payroll\nmode: tasks\n---\n- [ ] Pay Alex [reminder:: 2026-03-10T09:00] [muted:: true] [id:: pa01]\n',
+    );
+    await workspace.fileChanged(join(folder, 'Payroll.md'));
+    const result = await ok<ReadResult>('read', { items: [{ ref: 'pa01' }] });
+    expect(result.items[0]).toMatchObject({ reminder: { muted: true, overdue: true } });
+  });
+
+  it('takes now, today and yesterday in reminder filters', async () => {
+    const result = await ok<FindResult>('find', {
+      remindAfter: 'today 0:00',
+      remindBefore: 'tomorrow 23:00',
+    });
+    expect('hits' in result && result.hits.map((hit) => hit.id)).toEqual(['pa01']);
+    await ok('find', { remindBefore: 'now' });
+    await ok('find', { remindAfter: 'yesterday 18:00' });
+  });
+
+  it('attaches from a C:/ path with forward slashes', async () => {
+    const picture = join(base, 'shot.png').split('\\').join('/');
+    await writeFile(picture, 'not really a png');
+    await ok('update', { items: [{ ref: 'be03', attach: { path: picture } }] });
+    expect(await file('Backend.md')).toMatch(/!\[shot\.png\]\(attachments\//);
+  });
+
+  it('answers a duplicate with the copy first', async () => {
+    const result = await ok<WriteResult>('update', {
+      items: [{ kind: 'list', ref: 'Backend', duplicate: true }],
+    });
+    expect(result.changed[0]).toMatchObject({ kind: 'list', name: 'Backend copy' });
+    expect(result.changed[0]?.id).not.toBe('backend');
+    expect(result.changed[1]?.id).toBe('backend');
+  });
+});

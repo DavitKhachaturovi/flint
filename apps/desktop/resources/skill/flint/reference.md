@@ -7,21 +7,21 @@ Every command prints short text by default; `--json` prints the result object (t
 | Command | Does |
 |---|---|
 | `flint` | The overview (lists, notes, groups, Today, reminders, now) |
-| `flint find [query] [--type task\|list\|note\|group] [--in <list>] [--status open\|done\|all] [--priority high\|medium\|low] [--pinned] [--remind-before <time>] [--remind-after <time>] [--limit n]` | Search; matches inside notes and task notes come with a line number and snippet |
+| `flint find [query] [--type task\|list\|note\|group] [--in <list>] [--status open\|done\|all] [--priority high\|medium\|low] [--pinned] [--remind-before <time>] [--remind-after <time>] [--limit n]` | Search; matches inside notes and task notes come with a line number and snippet. `--type list` with no query lists every task list. Filter times also take `now`, `today 0:00`, `yesterday 18:00` |
 | `flint read <ref> [--lines from:to] [--outline] [--status ...] [--limit n --offset n] [--archived]` | A list (paged tasks), a note (lines), a task, a group; `Today`, `Inbox`, `Reminders` |
 | `flint task add "<title>" [--list <list>] [--parent <task>] [--priority p] [--remind <time>] [--pin] [--body <text\|->] [--bottom \| --after <task> \| --before <task>] [--literal]` | Add a task (`flint add` is the same) |
 | `flint task edit <task> [--title t] [--body b] [--priority p\|none] [--remind <time>\|none] [--pin\|--unpin] [--focus\|--no-focus]` | Change a task |
 | `flint task done\|undone <task>` | Complete or reopen |
 | `flint task pin\|unpin <task>` | Pin to Today, or not |
-| `flint task move <task> [--list <list>] [--parent <task>\|--outdent] [--top\|--bottom\|--after <task>\|--before <task>]` | Move to another list, under a parent, or within the list |
-| `flint task snooze <task> --remind <time>` | A new reminder time |
-| `flint task delete <task>` | To Trash |
-| `flint list add\|rename\|move\|duplicate\|convert\|archive-done\|delete ...` | Task lists |
-| `flint note add "<name>" [--text <text\|->] [--quick] [--group <group>]` | A note (or a quick note) |
-| `flint note append <note> --text <text\|->`, `flint note replace <note> --find <passage> --with <text>`, `flint note keep <quick note> --name <name>`, `flint note delete <note>` | Note text and quick notes |
-| `flint group add\|rename\|add-list\|remove-list\|move\|delete ...` | Sidebar groups |
-| `flint attach <file> --to <task\|note>` | Attach a file (copied up to 25 MB, linked above; programs and scripts refused) |
-| `flint links list\|add\|edit\|delete ...` | Link patterns (`--short "AB#{id}" --url "https://…/{id}"`) |
+| `flint task move <task>... [--to <list>] [--parent <task>\|--outdent] [--top\|--bottom\|--after <task>\|--before <task>]` | Move to another list, under a parent, or within the list |
+| `flint task snooze <task> <time>` (or `--remind <time>`) | A new reminder time |
+| `flint task delete <task>...` | To Trash |
+| `flint list add <name> [--group <group>]`, `list rename <list> <name>`, `list move <list> [--group <group>\|--no-group] [--top\|--bottom\|--after <ref>\|--before <ref>]`, `list duplicate <list>...` (the copy is the first result), `list convert <list> --to tasks\|note`, `list archive-done <list>...`, `list delete <list>...` | Task lists (and notes: a list command works on a note too) |
+| `flint note add <name> [--group <group>] [--text <text\|->]`, `note add --quick [<text>]` | A note (or a quick note) |
+| `flint note append <note> <text>` (or `--text <text\|->`), `note replace <note> --find <passage> --with <text>` (or `--text` for the whole note), `note keep <quick note> <name>`, `note delete <note>...` | Note text and quick notes |
+| `flint group add <name> [--list <list>]...`, `group rename <group> <name>`, `group add-list <group> <list>...`, `group remove-list <group> <list>...`, `group move <group> --top\|--bottom\|--after <ref>\|--before <ref>`, `group delete <group>...` | Sidebar groups (deleting a group keeps its lists) |
+| `flint attach <file> --to <task> [--in <list>]`, `attach <file> --to <note> --note` | Attach a file on this PC's drives (`C:\…` or `C:/…`; not a network share): copied up to 25 MB, linked above; programs and scripts refused |
+| `flint links list`, `links add <short> <url> [--kind <name>=digits\|word]...`, `links edit <index\|short> [--short …] [--url …]`, `links delete <index\|short>` | Link patterns (at most two changing parts, fixed text between them) |
 | `flint status` | On, read-only, paused, limits, version |
 | `flint help agents` | A short guide like this one |
 

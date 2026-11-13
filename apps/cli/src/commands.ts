@@ -575,18 +575,21 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     words: ['task', 'snooze'],
-    usage: 'task snooze <task> <time> [--in <list>]',
+    usage: 'task snooze <task> <time> [--in <list>]   (or --remind <time>)',
     summary: "Move a task's reminder to a new time",
-    options: [O.in],
+    options: [O.in, O.remind],
     examples: [
       'flint task snooze k3f9a2 "tomorrow 9:00"',
       'flint task snooze k3f9a2 "in 2h"',
-      'flint task snooze k3f9a2 2026-11-16T10:00',
+      'flint task snooze k3f9a2 --remind 2026-11-16T10:00',
     ],
     seeAlso: ['flint task edit --help'],
     tool: 'update',
     build: (input) => {
-      const [ref = '', remind = ''] = exactly(input, ['task', 'time']);
+      // Preview 3: `--remind <time>` (as add and edit take it) works too.
+      const flag = str(input, 'remind');
+      const [ref = '', remind = ''] =
+        flag === undefined ? exactly(input, ['task', 'time']) : [...exactly(input, ['task']), flag];
       return updates([defined({ ref, in: str(input, 'in'), remind })]);
     },
   },
