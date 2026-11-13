@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -62,7 +62,7 @@ describe('the .mcpb launcher (found on the 1.8.0 preview)', () => {
 });
 
 describe('setup for the other apps', () => {
-  it('quotes the path in Claude Code’s command, and builds the install links', async () => {
+  it('quotes the path in Claude Code’s command, and builds the install links', () => {
     const paths = installed();
     expect(claudeCodeCommand(paths)).toBe(
       'claude mcp add --scope user flint -- "C:\\Users\\Alex\\AppData\\Local\\Programs\\flint\\resources\\bin\\flint.exe" "mcp"',
@@ -73,6 +73,5 @@ describe('setup for the other apps', () => {
     ) as { command: string; args: string[] };
     expect(config.args).toEqual(['mcp']);
     expect(decodeURIComponent(vscodeLink(paths).split('?')[1] ?? '')).toContain('"type":"stdio"');
-    void readFile;
   });
 });
