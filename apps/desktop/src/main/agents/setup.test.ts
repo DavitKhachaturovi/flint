@@ -1,9 +1,17 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { claudeCodeCommand, cursorLink, launcher, vscodeLink, type SetupPaths } from './setup.js';
+import {
+  claudeCodeCommand,
+  cursorLink,
+  installSkill,
+  launcher,
+  updateInstalledSkill,
+  vscodeLink,
+  type SetupPaths,
+} from './setup.js';
 
 /** AGENT-03 (D-185): what Flint generates to connect apps. */
 
@@ -73,5 +81,36 @@ describe('setup for the other apps', () => {
     ) as { command: string; args: string[] };
     expect(config.args).toEqual(['mcp']);
     expect(decodeURIComponent(vscodeLink(paths).split('?')[1] ?? '')).toContain('"type":"stdio"');
+  });
+});
+
+describe('the skill for Claude Code (AGENT-04)', () => {
+  it('updates a copy Flint installed when its content changed, never one it didn’t install', async () => {
+    const source = join(base, 'source');
+    const home = join(base, 'home');
+    await mkdir(source, { recursive: true });
+    await writeFile(
+      join(source, 'SKILL.md'),
+      '---\nname: flint\nmetadata:\n  version: 1.8.0\n---\nold\n',
+    );
+    await writeFile(join(source, 'reference.md'), 'ref\n');
+    expect(await installSkill(source, home)).toBe('installed');
+    // The same version, new words: the copy follows.
+    await writeFile(
+      join(source, 'SKILL.md'),
+      '---\nname: flint\nmetadata:\n  version: 1.8.0\n---\nnew\n',
+    );
+    expect(await updateInstalledSkill(source, home)).toBe(true);
+    expect(await readFile(join(home, '.claude', 'skills', 'flint', 'SKILL.md'), 'utf8')).toContain(
+      'new',
+    );
+    expect(await updateInstalledSkill(source, home)).toBe(false);
+    // A copy the user put there themselves is left alone.
+    await rm(join(home, '.claude', 'skills', 'flint', '.installed-by-flint'));
+    await writeFile(
+      join(source, 'SKILL.md'),
+      '---\nname: flint\nmetadata:\n  version: 1.8.0\n---\nnewer\n',
+    );
+    expect(await updateInstalledSkill(source, home)).toBe(false);
   });
 });

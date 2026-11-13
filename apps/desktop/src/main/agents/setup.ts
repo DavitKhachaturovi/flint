@@ -209,8 +209,19 @@ export async function installSkill(
 /** AGENT-04: at start, a copy Flint installed is updated when Flint's is newer. */
 export async function updateInstalledSkill(source: string, home = homedir()): Promise<boolean> {
   const current = await installedSkill(home);
-  const bundled = await skillVersion(source);
-  if (!current?.ours || !bundled || current.version === bundled) return false;
+  if (!current?.ours) return false;
+  // By content, not only the version: a fix to the skill within a version reaches the copy too
+  // (found on the 1.8.0 preview).
+  const folder = claudeCodeSkillFolder(home);
+  let same = true;
+  for (const name of ['SKILL.md', 'reference.md']) {
+    const [mine, theirs] = await Promise.all([
+      readFile(join(source, name), 'utf8').catch(() => null),
+      readFile(join(folder, name), 'utf8').catch(() => null),
+    ]);
+    if (mine !== null && mine !== theirs) same = false;
+  }
+  if (same) return false;
   await installSkill(source, home);
   return true;
 }
