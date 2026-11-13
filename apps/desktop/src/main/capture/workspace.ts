@@ -1105,8 +1105,26 @@ export class Workspace {
           ops.push(editTitle(path, change.key, parsed.title));
         if (parsed.priority) ops.push(setPriority(path, change.key, parsed.priority));
         if (parsed.reminder) ops.push(setReminder(path, change.key, parsed.reminder));
+        // D-111's `##list` chip while editing (Davit, 1.8.0 preview: the task stayed where it was,
+        // and a new list was never made): the task moves there on save, one undo step with the edit.
+        const target = parsed.target;
+        const moveTo: Extract<ListChange, { kind: 'moveTo' }>['to'] | null =
+          (target.kind === 'existing' || target.kind === 'close-match') &&
+          target.list.id !== this.listId(list.entry)
+            ? { list: target.list.id }
+            : target.kind === 'new'
+              ? { newList: target.name }
+              : null;
+        if (moveTo && this.exclusive.getStore()?.agent && target.kind !== 'existing')
+          throw new Error('agents never make or guess a list from ##');
         const op = bulk(ops);
-        return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
+        if (!moveTo)
+          return op ? outcome(await this.record(list, op, 'Edited', now), change.key) : null;
+        const start = this.undoStack.length;
+        if (op) await this.record(list, op, 'Edited', now);
+        const moved = await this.moveTo(list, change.key, moveTo, now);
+        if (!this.mergeSince(start, moved?.label ?? 'Edited')) return null;
+        return moved ?? outcome('Edited', change.key);
       }
       case 'body': {
         // TASK-05, D-49: the body as typed; a `- [ ]` line in it becomes a subtask (04 §3).

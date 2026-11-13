@@ -926,26 +926,7 @@ export class AgentApi {
         const target = list;
         // The 1.8.0 preview (D-185 Q6): an agent's ##list never makes a list or picks a near one;
         // an unknown or near name is not_found, with the close lists to choose from.
-        if (shorthand) {
-          const lists = view.lists.map((each) => ({
-            id: each.id,
-            name: each.name,
-            mode: each.kind === 'note' ? ('note' as const) : ('tasks' as const),
-          }));
-          const parsed = parseCapture(title, { now, lists });
-          if (parsed.target.kind === 'new' || parsed.target.kind === 'close-match') {
-            const name = parsed.target.name;
-            const close =
-              parsed.target.kind === 'close-match'
-                ? [asCandidate(view.list(parsed.target.list.id) ?? list)]
-                : suggest(name, view.lists).map(asCandidate);
-            throw fail(
-              'not_found',
-              `No list called "${name}". Agents never make one from ##: make it first (flint list add), give the list with --list, or keep ## as text with --literal.`,
-              { suggestions: close },
-            );
-          }
-        }
+        if (shorthand) checkShorthandList(view, title, now);
         const position = this.taskPosition(view, target, item.position);
         const fields = this.taskFields(item, now);
         return {
@@ -1122,6 +1103,8 @@ export class AgentApi {
     if (title !== undefined && title.trim() === '')
       throw fail('invalid', 'A title can’t be empty.');
     checkText(title, 'title', true);
+    // An edited title's ##list moves the task (D-111): only to an existing visible list.
+    if (shorthand && title !== undefined) checkShorthandList(view, title, this.deps.now());
     checkText(item.body, 'body');
     const now = this.deps.now();
     const fields = this.taskFields(item, now);
@@ -1924,4 +1907,27 @@ export function summarise(changed: readonly Changed[], text: readonly string[]):
  */
 function neutral(problem: string): string {
   return /exists|taken/i.test(problem) ? 'That name isn’t available; choose another.' : problem;
+}
+
+/**
+ * The 1.8.0 preview (D-185 Q6): an agent's ##list (adding or editing) never makes a list or picks
+ * a near one; an unknown or near name is not_found, with the close lists to choose from.
+ */
+function checkShorthandList(view: Visible, title: string, now: Date): void {
+  const lists = view.lists.map((each) => ({
+    id: each.id,
+    name: each.name,
+    mode: each.kind === 'note' ? ('note' as const) : ('tasks' as const),
+  }));
+  const target = parseCapture(title, { now, lists }).target;
+  if (target.kind !== 'new' && target.kind !== 'close-match') return;
+  const close =
+    target.kind === 'close-match'
+      ? view.lists.filter((list) => list.id === target.list.id).map(asCandidate)
+      : suggest(target.name, view.lists).map(asCandidate);
+  throw fail(
+    'not_found',
+    `No list called "${target.name}". Agents never make one from ##: make it first (flint list add), give the list with --list, or keep ## as text with --literal.`,
+    { suggestions: close },
+  );
 }

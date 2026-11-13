@@ -9,6 +9,7 @@ What the app shows in its **What's new** card after an update (APP-15, D-117). N
 - **You stay in charge:** every change an agent makes shows in **Recent agent changes**, where **Undo** puts it back (keeping anything you changed since). Right-click a list, note or group and choose **Hidden from agents** to keep it private from them.
 - **Your notes, your call:** Flint itself sends nothing anywhere; what an agent reads goes to that agent's AI provider. Agents only reach Flint on your PC, and only while this is on.
 - **Shortcuts in one place:** press **?** to see every shortcut, and click one of the four hotkeys that work anywhere in Windows to change it.
+- **Small things:** typing `##List` while editing a task now moves it there when you save (making the list if it's new), and Settings opens where you left it.
 
 ## 1.7.0 (11 Nov 2026)
 

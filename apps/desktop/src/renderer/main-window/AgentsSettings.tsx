@@ -515,26 +515,124 @@ export function HiddenList(props: { readonly view: AgentsSettingsView }): ReactE
   );
 }
 
+/** How many of the newest changes Settings shows; the rest are in the pop-up (Davit, 1.8.0). */
+const IN_SETTINGS = 5;
+
 /**
- * AGENT-07: what agents changed, newest first (the newest 20): who, what, when (Flint's time), and
- * Undo, or a faint "Undone". New entries slide in; an undone one goes faint and Undo crossfades.
+ * AGENT-07: what agents changed, newest first: in Settings the newest 5 (Davit, 1.8.0 preview:
+ * the list made Settings too long) and "Show all…", the pop-up with every change kept.
  */
 export function RecentChanges(props: {
   readonly view: AgentsSettingsView;
   readonly onUndo: (id: string) => void;
 }): ReactElement {
   const { view, onUndo } = props;
-  const fresh = useFresh(view.changes.map((change) => change.id));
+  const [open, setOpen] = useState(false);
+  // The palette's Recent agent changes… opens the pop-up (D-106).
+  useEffect(() => {
+    const show = (): void => setOpen(true);
+    window.addEventListener('flint:agent-changes', show);
+    return () => window.removeEventListener('flint:agent-changes', show);
+  }, []);
+  const more = view.changes.length - IN_SETTINGS;
+  return (
+    <>
+      <ChangeList
+        changes={view.changes.slice(0, IN_SETTINGS)}
+        onUndo={onUndo}
+        label="Recent agent changes"
+      />
+      {more > 0 && (
+        <div className="agents-changes-more">
+          <button type="button" className="trash-action" onClick={() => setOpen(true)}>
+            Show all {view.changes.length}…
+          </button>
+        </div>
+      )}
+      {open && <AgentChangesSheet view={view} onUndo={onUndo} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/**
+ * Every change kept (the last 100 or 7 days), in a card like the `?` sheet's: scrolls on its own;
+ * Esc or a click outside closes it; it fades in and out as the sheet does.
+ */
+function AgentChangesSheet(props: {
+  readonly view: AgentsSettingsView;
+  readonly onUndo: (id: string) => void;
+  readonly onClose: () => void;
+}): ReactElement {
+  const { view, onUndo, onClose } = props;
+  const [leaving, setLeaving] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
+  const close = useCallback((): void => {
+    if (reducedMotion()) onClose();
+    else setLeaving(true);
+  }, [onClose]);
+  useEffect(() => {
+    card.current?.focus();
+    const key = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    };
+    window.addEventListener('keydown', key, { capture: true });
+    return () => window.removeEventListener('keydown', key, { capture: true });
+  }, [close]);
+  return (
+    <div
+      className={leaving ? 'palette-layer leaving' : 'palette-layer'}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+      onAnimationEnd={(event) => {
+        if (leaving && event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={card}
+        className="palette agents-changes-sheet"
+        role="dialog"
+        aria-label="Recent agent changes"
+        tabIndex={-1}
+      >
+        <div className="palette-head">
+          <span className="palette-crumb">Recent agent changes</span>
+          <span className="agents-changes-count">
+            {view.changes.length} · the last 100, or 7 days
+          </span>
+        </div>
+        <div className="agents-changes-scroll">
+          <ChangeList changes={view.changes} onUndo={onUndo} label="All agent changes" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Who, what, when (Flint's time), and Undo, or a faint "Undone". New entries slide in; an undone
+ * one goes faint and Undo crossfades.
+ */
+function ChangeList(props: {
+  readonly changes: AgentsSettingsView['changes'];
+  readonly onUndo: (id: string) => void;
+  readonly label: string;
+}): ReactElement {
+  const { changes, onUndo, label } = props;
+  const fresh = useFresh(changes.map((change) => change.id));
   const now = Date.now();
-  if (view.changes.length === 0)
+  if (changes.length === 0)
     return (
-      <ul className="agents-sub" aria-label="Recent agent changes">
+      <ul className="agents-sub" aria-label={label}>
         <li className="agents-empty">No agent changes yet.</li>
       </ul>
     );
   return (
-    <ul className="agents-sub" aria-label="Recent agent changes">
-      {view.changes.map((change) => (
+    <ul className="agents-sub" aria-label={label}>
+      {changes.map((change) => (
         <li
           key={change.id}
           className={[

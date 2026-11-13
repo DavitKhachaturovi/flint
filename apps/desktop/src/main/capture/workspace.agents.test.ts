@@ -147,3 +147,29 @@ describe('undoing an agent change (AGENT-07)', () => {
     expect((await workspace.trashView()).deleted).toEqual([]);
   });
 });
+
+describe('##list while editing a task (D-111; the 1.8.0 preview)', () => {
+  it('moves the task to the list on save, one undo step with the edit', async () => {
+    const workspace = await open();
+    await workspace.change(
+      'backend',
+      { kind: 'edit', key: 'dddd', text: 'Write the docs ##inbox' },
+      now,
+    );
+    expect(await file('Inbox.md')).toContain('- [ ] Write the docs [id:: dddd]');
+    expect(await file('Backend.md')).not.toContain('dddd');
+    expect(await workspace.undoLast(later)).not.toBeNull();
+    expect(await file('Backend.md')).toBe(BACKEND);
+  });
+
+  it('makes a new list and moves the task there', async () => {
+    const workspace = await open();
+    await workspace.change(
+      'backend',
+      { kind: 'edit', key: 'cccc', text: 'Fix the login loop ##Security' },
+      now,
+    );
+    expect(await file('Security.md')).toContain('Fix the login loop [id:: cccc]');
+    expect(await file('Backend.md')).not.toContain('cccc');
+  });
+});

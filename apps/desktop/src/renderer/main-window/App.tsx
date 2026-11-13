@@ -778,6 +778,8 @@ export function App(): ReactElement {
         setCheatSheet(true);
         return;
       }
+      // A section asked for wins over the remembered place in Settings (1.8.0).
+      if (section) scrollMemory.current.delete(SETTINGS_ID);
       goRef.current({ list: SETTINGS_ID, page: null });
       // D-102: a section asked for (the tray's taken-hotkey warning): brought into view.
       if (section)
@@ -4268,7 +4270,9 @@ export function App(): ReactElement {
   const restored = useRef<string | null>(null);
   useLayoutEffect(() => {
     const root = scroller.current;
-    if (!root || view?.id !== listId) return;
+    // Settings has no list view, but its place is remembered too (Davit, 1.8.0 preview: Settings
+    // came back at the top); it follows the page as its sections arrive (below).
+    if (!root || (view?.id !== listId && listId !== SETTINGS_ID)) return;
     const key = placeKey(listId, page);
     if (restored.current === key) return;
     restored.current = key;
@@ -4501,6 +4505,8 @@ export function App(): ReactElement {
               : (lists.find((list) => list.id === id)?.name ?? '');
   /** D-106: Settings, at a section. */
   const openSettings = (section?: string): void => {
+    // A section asked for wins over the remembered place in Settings (1.8.0).
+    if (section) scrollMemory.current.delete(SETTINGS_ID);
     openList(SETTINGS_ID);
     if (section)
       window.setTimeout(
@@ -4612,6 +4618,16 @@ export function App(): ReactElement {
             },
           ]
         : []),
+      {
+        // 1.8.0: every change kept, in its own pop-up (D-106).
+        id: 'agents:changes',
+        label: 'Recent agent changes…',
+        keywords: `${words} recent changes history undo log`,
+        run: () => {
+          openSettings('agents');
+          window.setTimeout(() => window.dispatchEvent(new Event('flint:agent-changes')), 250);
+        },
+      },
       {
         id: 'agents:claude-desktop',
         label: 'Add to Claude Desktop',

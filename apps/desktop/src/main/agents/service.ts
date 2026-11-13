@@ -189,7 +189,7 @@ export class AgentService {
       problem: this.problem,
       changes: this.changes
         .list(now)
-        .slice(0, 20)
+        .slice(0, 100)
         .map((change) => ({
           id: change.id,
           agent: change.agent,

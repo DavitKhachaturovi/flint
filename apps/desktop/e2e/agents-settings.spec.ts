@@ -377,6 +377,73 @@ test('the shortcuts sheet: Capture’s link, Settings’ search, recording a hot
   await main.locator('.settings-find').fill('');
 });
 
+test('Settings shows the newest 5 agent changes; Show all opens every one in a pop-up (1.8.0)', async () => {
+  for (let index = 0; index < 6; index += 1) {
+    const added = flintCommand([
+      'task',
+      'add',
+      `Batch ${index}`,
+      '--list',
+      'Groceries',
+      '--literal',
+    ]);
+    expect(added.code, added.err || added.out).toBe(0);
+  }
+  await openAgentsSettings();
+  await expect(
+    section().locator('.agents-sub[aria-label="Recent agent changes"] .agents-change'),
+  ).toHaveCount(5);
+  const showAll = section().getByRole('button', { name: /^Show all \d+…$/ });
+  await expect(showAll).toBeVisible();
+  await showAll.click();
+  const sheet = main.locator('.agents-changes-sheet');
+  await expect(sheet).toBeVisible();
+  await expect.poll(() => sheet.locator('.agents-change').count()).toBeGreaterThan(5);
+  await expect(sheet.locator('.agents-change').first().locator('.agents-change-what')).toHaveText(
+    /Batch 5/,
+  );
+  await main.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+});
+
+test('Settings comes back where it was left (1.8.0)', async () => {
+  await openAgentsSettings();
+  // The page's scroller, read once the jump to the section has stopped moving.
+  const top = (): Promise<number> =>
+    main.evaluate(() => Math.round(document.querySelector('.scroller')?.scrollTop ?? -1));
+  let left = -1;
+  await expect
+    .poll(async () => {
+      const now = await top();
+      const still = now === left;
+      left = now;
+      return still;
+    })
+    .toBe(true);
+  expect(left).toBeGreaterThan(100);
+  await nav('Unicorn').click();
+  await expect(main.locator('.list-header h1')).toContainText('Unicorn');
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  await expect(section()).toBeVisible();
+  await expect.poll(top).toBe(left);
+});
+test('##list while editing a task moves it there on save, making the list when new (D-111; 1.8.0)', async () => {
+  await nav('Unicorn').click();
+  const row = main.locator('.row[data-key="t2"]');
+  await expect(row).toBeVisible();
+  await row.click();
+  await main.keyboard.press('Enter');
+  const field = row.locator('[contenteditable="true"], input, textarea').first();
+  await expect(field).toBeFocused();
+  await main.keyboard.press('End');
+  await main.keyboard.type(' ##Errands');
+  await expect(row.locator('.chip.live-list')).toContainText('New list Errands');
+  await main.keyboard.press('Escape');
+  await expect.poll(() => file('Errands.md').catch(() => '')).toContain('Write the notes');
+  await expect.poll(() => file('Unicorn.md')).not.toContain('[id:: t2]');
+  await expect(nav('Errands')).toBeVisible();
+});
+
 test('nothing goes to the network (APP-09)', async () => {
   expect(
     (await app.evaluate(() => (globalThis as unknown as { __flintE2E: Hooks }).__flintE2E))

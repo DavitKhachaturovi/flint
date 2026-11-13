@@ -6064,6 +6064,44 @@ body[data-tour-step='5'] .main .row .pin-hover {
   width: min(780px, 100%);
 }
 
+/* AGENT-07 (1.8.0): every agent change kept, in the `?` sheet's card; its list scrolls. */
+.agents-changes-sheet {
+  width: min(720px, 100%);
+  outline: none;
+}
+
+.agents-changes-count {
+  margin-left: auto;
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+
+.agents-changes-scroll {
+  overflow-y: auto;
+  padding: 6px 10px 12px;
+}
+
+.agents-changes-scroll::-webkit-scrollbar {
+  width: var(--fl-scroll-size);
+}
+
+.agents-changes-scroll::-webkit-scrollbar-thumb {
+  background: var(--fl-scroll-thumb);
+  border-radius: var(--fl-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.agents-changes-scroll .agents-sub {
+  margin: 0;
+}
+
+.agents-changes-more {
+  padding: 0 6px 10px;
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
 .cheat-columns {
   overflow-y: auto;
   padding: 6px 10px 14px;
