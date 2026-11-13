@@ -32,7 +32,15 @@ export interface AgentsSettingsView {
     readonly kind: 'list' | 'note' | 'group';
   }[];
   /** `flint.exe`'s full path, and whether its folder is on the user's PATH (null: unknown). */
-  readonly cli: { readonly path: string; readonly onPath: boolean | null };
+  readonly cli: {
+    readonly path: string;
+    readonly onPath: boolean | null;
+    /**
+     * Why it isn't on the PATH: the value too long (or unreadable) to change safely, or simply
+     * missing (Settings offers Add to PATH); null when it is, or unknown (development builds).
+     */
+    readonly pathProblem: 'too-long' | 'missing' | null;
+  };
   readonly claudeCodeCommand: string;
   /** The skill in `~/.claude/skills/flint`: its version (null: not installed), and whether Flint installed it. */
   readonly skill: {
@@ -56,6 +64,8 @@ export type AgentsAction =
   /** Copy setup (JSON) or Claude Code's command, to the clipboard. */
   | { readonly kind: 'copy'; readonly app: ConnectApp }
   | { readonly kind: 'installSkill' }
+  /** D-185 Q14: puts flint.exe's folder on the user's PATH, as the installer does. */
+  | { readonly kind: 'addToPath' }
   | { readonly kind: 'saveSkill' };
 
 export interface AgentsActionOutcome {

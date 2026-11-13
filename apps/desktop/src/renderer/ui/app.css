@@ -9011,6 +9011,19 @@ body[data-tour-step='5'] .main .row .pin-hover {
   line-height: 1.5;
 }
 
+/* D-185 Q14: a missing PATH entry, with its Add to PATH button and what it did under it. */
+.agents-path-missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  animation: panel-crossfade var(--fl-dur-state) ease;
+}
+
+.agents-path-missing > span {
+  flex: 1 1 320px;
+}
+
 .agents-said {
   font-size: 12.5px;
   line-height: 1.5;

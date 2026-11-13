@@ -168,7 +168,7 @@ import {
   type ReminderActivation,
   type ToastOptions,
 } from './toast.js';
-import { clipboardSequence, VirtualKey } from './win32.js';
+import { announceEnvironmentChange, clipboardSequence, VirtualKey } from './win32.js';
 import { classifyPaste } from '@flint/core/shorthand';
 import { FakeDrive } from '@flint/core/sync';
 import { googleConnection, testConnection } from './sync/connection.js';
@@ -1738,18 +1738,38 @@ async function start(): Promise<void> {
   if (!testDataDirectory())
     void updateInstalledSkill(agentPaths.skillSource).catch(() => undefined);
   // Q14: whether flint.exe's folder made it onto the user's PATH (the installer may skip it).
+  // The 1.8.0 preview: the reason is said as it is (the note blamed length for a missing entry).
+  let cliPathState: AgentsSettingsView['cli']['pathProblem'] = null;
   let cliOnPath: boolean | null = null;
-  if (agentPaths.resources)
-    // By its full path (D-185 security review M5): never a reg.exe from the current folder.
-    execFile(
-      join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'reg.exe'),
-      ['query', 'HKCU\\Environment', '/v', 'Path'],
-      (error, stdout) => {
-        cliOnPath = error
-          ? false
-          : stdout.toLowerCase().includes(join(agentPaths.resources ?? '', 'bin').toLowerCase());
-      },
-    );
+  const checkCliPath = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (!agentPaths.resources) {
+        resolve();
+        return;
+      }
+      // By its full path (D-185 security review M5): never a reg.exe from the current folder.
+      execFile(
+        join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'reg.exe'),
+        ['query', 'HKCU\\Environment', '/v', 'Path'],
+        (error, stdout) => {
+          const line = error
+            ? ''
+            : (stdout.split(/\r?\n/).find((each) => /^\s+path\s+REG_/i.test(each)) ?? '');
+          const value = line.replace(/^\s+\S+\s+REG_\w+\s{4}/, '');
+          cliOnPath = value
+            .toLowerCase()
+            .split(';')
+            .some(
+              (item) =>
+                item.trim().replace(/[\\/]+$/, '') ===
+                join(agentPaths.resources ?? '', 'bin').toLowerCase(),
+            );
+          cliPathState = cliOnPath ? null : value.length >= 8000 ? 'too-long' : 'missing';
+          resolve();
+        },
+      );
+    });
+  void checkCliPath();
   const agentsView = async (): Promise<AgentsSettingsView> => {
     const view = agents.view();
     const summaries = workspace.summaries(new Date());
@@ -1765,7 +1785,7 @@ async function start(): Promise<void> {
         const group = groups.find((each) => each.id === id);
         return group?.kind === 'group' ? [{ id, name: group.name, kind: 'group' } as const] : [];
       }),
-      cli: { path: cliPath(agentPaths), onPath: cliOnPath },
+      cli: { path: cliPath(agentPaths), onPath: cliOnPath, pathProblem: cliPathState },
       claudeCodeCommand: claudeCodeCommand(agentPaths),
       skill: {
         installed: skill?.version ?? null,
@@ -1865,6 +1885,31 @@ async function start(): Promise<void> {
                 );
           await clipboard.writeText(text);
           return { ok: true, message: 'Copied' };
+        }
+        case 'addToPath': {
+          // D-185 Q14: the installer's own step, run on the user's click (installed build only),
+          // then announced to Windows so new terminals see it.
+          if (!agentPaths.resources || hooks) return { ok: false };
+          const added = await new Promise<number>((resolve) => {
+            execFile(
+              join(agentPaths.resources ?? '', 'bin', 'flint.exe'),
+              ['path', 'add'],
+              { windowsHide: true, cwd: join(agentPaths.resources ?? '', 'bin') },
+              (error) => resolve(error ? ((error as { code?: number }).code ?? 1) : 0),
+            );
+          });
+          await checkCliPath();
+          if (cliOnPath) announceEnvironmentChange();
+          if (!mainWindow.isDestroyed()) mainWindow.webContents.send(Channels.mainAgentsChanged);
+          return cliOnPath
+            ? { ok: true, message: 'Added. Terminals you open from now on find flint.' }
+            : {
+                ok: false,
+                message:
+                  added === 4
+                    ? 'Your PATH is too long to change safely; the apps above still work.'
+                    : 'Your PATH couldn’t be changed; the apps above still work.',
+              };
         }
         case 'installSkill': {
           const done = await installSkill(agentPaths.skillSource, skillHome);

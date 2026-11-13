@@ -286,3 +286,29 @@ export function returnFocus(from: bigint, previous: bigint): boolean {
   if (back === 0n || foregroundWindow() === back) return back !== 0n;
   return setForegroundWindow(back);
 }
+
+const sendMessageTimeout = user32.func(
+  'uintptr_t SendMessageTimeoutW(uintptr_t hWnd, uint32 Msg, uintptr_t wParam, str16 lParam, uint32 fuFlags, uint32 uTimeout, _Out_ uintptr_t *lpdwResult)',
+) as (
+  hwnd: Handle,
+  message: number,
+  wParam: number,
+  lParam: string,
+  flags: number,
+  timeout: number,
+  result: bigint[],
+) => bigint;
+
+/**
+ * AGENT-02 (D-185 Q14): tells Windows the user's environment changed (as an installer does), so
+ * terminals opened from now on see a new PATH entry. `WM_SETTINGCHANGE` with "Environment", to
+ * every top-level window, giving up on any that doesn't answer within 5 s.
+ */
+export function announceEnvironmentChange(): void {
+  const HWND_BROADCAST = 0xffffn;
+  const WM_SETTINGCHANGE = 0x001a;
+  const SMTO_ABORTIFHUNG = 0x0002;
+  sendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0, 'Environment', SMTO_ABORTIFHUNG, 5000, [
+    0n,
+  ]);
+}

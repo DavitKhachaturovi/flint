@@ -292,10 +292,27 @@ export function ClientList(props: { readonly view: AgentsSettingsView }): ReactE
           )}
         </ClientRow>
       ))}
-      {view.cli.onPath === false && (
+      {/* D-185 Q14, the 1.8.0 preview: the reason as it is, and a way to fix a missing entry. */}
+      {view.cli.onPath === false && view.cli.pathProblem === 'too-long' && (
         <li className="settings-note agents-path-note">
           The flint command isn’t on your PATH (it was too long to change safely). The apps above
           use its full path, so they work.
+        </li>
+      )}
+      {view.cli.onPath === false && view.cli.pathProblem === 'missing' && (
+        <li className="settings-note agents-path-note agents-path-missing">
+          <span>
+            The flint command isn’t on your PATH yet, so a terminal can’t find it. The apps above
+            use its full path, so they work.
+          </span>
+          <button
+            type="button"
+            className="trash-action"
+            onClick={() => void act('path', { kind: 'addToPath' })}
+          >
+            Add to PATH
+          </button>
+          <SaidLine said={said['path']} onDone={() => clear('path')} />
         </li>
       )}
     </ul>

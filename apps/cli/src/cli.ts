@@ -19,7 +19,7 @@ import { agentsGuide, commandHelp, mcpHelp, nounHelp, topHelp } from './help.js'
 import type { Env } from './locate.js';
 import { COLOURS, PLAIN, renderError, renderResult } from './render.js';
 import type { AgentSession } from './session.js';
-import { runPath } from './path-entry.js';
+import { pathAction, runPath } from './path-entry.js';
 
 /** The process around the CLI (tests give their own). */
 export interface Io {
@@ -82,8 +82,10 @@ export async function runCli(argv: readonly string[], io: Io, deps: CliDeps): Pr
       return await deps.runMcp(choice(parsed, io.env));
     }
     // D-185 Q14: the installer's PATH step (not in the help: it is Flint's own).
+    // `path` isn't a noun, so its action is never a command word: read it from the arguments
+    // (found on the 1.8.0 preview: the installer's `flint path add` did nothing).
     if (first === 'path')
-      return await runPath(second, process.execPath, (line) => io.out(`${line}\n`));
+      return await runPath(pathAction(argv), process.execPath, (line) => io.out(`${line}\n`));
     if (first === 'help') {
       if (second === 'agents') return print(io, agentsGuide());
       if (second !== undefined && verbsOf(second).length > 0) return print(io, nounHelp(second));

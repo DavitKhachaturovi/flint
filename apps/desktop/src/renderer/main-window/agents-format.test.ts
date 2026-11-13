@@ -20,7 +20,7 @@ const view = (patch: Partial<AgentsSettingsView> = {}): AgentsSettingsView => ({
   problem: null,
   changes: [],
   hidden: [],
-  cli: { path: 'C:\\Flint\\resources\\bin\\flint.exe', onPath: true },
+  cli: { path: 'C:\\Flint\\resources\\bin\\flint.exe', onPath: true, pathProblem: null },
   claudeCodeCommand: 'claude mcp add --scope user flint -- flint.exe mcp',
   skill: { installed: null, ours: false, bundled: '1.8.0' },
   ...patch,

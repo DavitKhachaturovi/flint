@@ -90,6 +90,12 @@ export function binFolder(execPath: string): string | null {
   return basename(execPath).toLowerCase() === 'flint.exe' ? dirname(execPath) : null;
 }
 
+/** The action of `flint path <action>`: the word after `path` (options aside). */
+export function pathAction(argv: readonly string[]): string | undefined {
+  const words = argv.filter((word) => !word.startsWith('-'));
+  return words[0] === 'path' ? words[1] : undefined;
+}
+
 /** `flint path add|remove`: exit 0 when done or nothing to do, 4 when a guard left PATH alone. */
 export async function runPath(
   action: string | undefined,

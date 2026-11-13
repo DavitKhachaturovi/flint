@@ -3,6 +3,7 @@ import {
   addEntry,
   binFolder,
   parseRegQuery,
+  pathAction,
   PATH_LIMIT,
   removeEntry,
   sameEntry,
@@ -79,5 +80,15 @@ describe('reading the registry and the exe’s folder', () => {
     expect(sameEntry('', '')).toBe(false);
     expect(binFolder(`${BIN}\\flint.exe`)).toBe(BIN);
     expect(binFolder('C:\\Program Files\\nodejs\\node.exe')).toBeNull();
+  });
+});
+
+describe('the command line reaches the PATH step (found on the 1.8.0 preview)', () => {
+  it('reads the action after `path`, options aside', () => {
+    expect(pathAction(['path', 'add'])).toBe('add');
+    expect(pathAction(['path', 'remove'])).toBe('remove');
+    expect(pathAction(['--no-start', 'path', 'add'])).toBe('add');
+    expect(pathAction(['path'])).toBeUndefined();
+    expect(pathAction(['task', 'add'])).toBeUndefined();
   });
 });
