@@ -14,3 +14,4 @@ dist-bench/
 # D-165: Flint for Android: the generated native project and Expo's caches (expo prebuild).
 apps/android/android/
 apps/android/.expo/
+apps/android/modules/*/android/build/

@@ -227,8 +227,10 @@ Users only sign in with Google; the Cloud project and its client ID are set up o
 
 **A0 status (14 Nov 2026):** `apps/android` exists (Expo SDK 58, the bottom bar, Settings → Sync with Connect Google Drive and the folder check, the sign-in module); it typechecks and its native project generates. Waiting for Davit's setup (Android Studio, USB debugging, the development Android OAuth client: package `app.flintnotes.dev`, SHA-1 in D-165) for the first build on his phone and R-A1.
 
+**R-A1 passed (15 Nov 2026):** on Davit's phone (a Samsung, Android 16), Flint (development) signed in with the Android client and listed `My Drive › Flint (development)` with the lists the desktop's development build had synced (Inbox, a test note). `drive.file` treats the Android and desktop clients of the one Cloud project as the same app, so D-165's sync plan stands. Builds: `apps/android/scripts/run-android.ps1` builds and installs over USB with Android Studio's Java and SDK for that build only; the JavaScript comes from the bundler (`npm run start -w @flint/android`). Next: R-A2, then R-A3.
+
 **Davit's one-time setup (walked through when A0 needs it):**
-1. **Android Studio** (the SDK, platform tools and an emulator) and a JDK on the PC, for local builds.
+1. **Android Studio** (the SDK, platform tools, the newest **CMake** from SDK Manager → SDK Tools → Show Package Details: Android's default 3.22.1 brings ninja 1.10, which fails on Windows' 260-character paths in React Native's C++ code generation; 4.1.2 brings ninja 1.12.1, and the build picks the newest CMake installed) and a JDK on the PC, for local builds.
 2. **USB debugging** on the phone (Developer options), so builds install straight from the PC; or install the APK file by hand.
 3. **Android OAuth clients** in the Flint Cloud project (Clients → Create client → Android): package `app.flintnotes`, the SHA-1 of the debug certificate (one client) and of the release key (another). No secret is involved.
 4. **The release key:** generated once, kept in the repository secrets (`ANDROID_KEYSTORE`, its passwords) and in Davit's own backup, never in the repository.
