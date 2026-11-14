@@ -225,6 +225,8 @@ Users only sign in with Google; the Cloud project and its client ID are set up o
 - **A4, the rest:** sharing to Flint, the app shortcut, search, Export, first use, Settings, the update line.
 - **A5, release 1.0.0:** the release workflow (`android-v*`), the signed APK on GitHub Releases, release notes and What's new for the phone, the site and the privacy policy mention Android (WEB-01). The Play Store later (a personal account's closed test: 12 testers for 14 days).
 
+**A0 status (14 Nov 2026):** `apps/android` exists (Expo SDK 58, the bottom bar, Settings → Sync with Connect Google Drive and the folder check, the sign-in module); it typechecks and its native project generates. Waiting for Davit's setup (Android Studio, USB debugging, the development Android OAuth client: package `app.flintnotes.dev`, SHA-1 in D-165) for the first build on his phone and R-A1.
+
 **Davit's one-time setup (walked through when A0 needs it):**
 1. **Android Studio** (the SDK, platform tools and an emulator) and a JDK on the PC, for local builds.
 2. **USB debugging** on the phone (Developer options), so builds install straight from the PC; or install the APK file by hand.

@@ -1,0 +1,25 @@
+{
+  "name": "@flint/android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flint for Android: the companion app (D-165, docs/02 §13). React Native with Expo; packages/core shared with the desktop.",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "prebuild": "expo prebuild --platform android --no-install",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@flint/core": "0.0.0",
+    "expo": "58.0.23",
+    "expo-constants": "58.0.15",
+    "expo-dev-client": "58.0.18",
+    "react": "19.3.1",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.11.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0"
+  }
+}

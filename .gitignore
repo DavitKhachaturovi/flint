@@ -10,3 +10,7 @@ dist-installer/
 dist-bench/
 # SYNC-01, D-161: the Google client secret for local builds (never committed).
 .env.local
+
+# D-165: Flint for Android: the generated native project and Expo's caches (expo prebuild).
+apps/android/android/
+apps/android/.expo/

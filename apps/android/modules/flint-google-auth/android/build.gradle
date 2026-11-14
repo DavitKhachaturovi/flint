@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.flintnotes'
+version = '0.1.0'
+
+android {
+  namespace "app.flintnotes.googleauth"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // Google's Android authorization API (Identity.getAuthorizationClient): the drive.file scope with
+  // Flint's Android OAuth client; no refresh token or client secret on the phone (docs/05 §8).
+  implementation "com.google.android.gms:play-services-auth:22.0.0"
+}
