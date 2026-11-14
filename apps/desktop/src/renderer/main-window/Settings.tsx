@@ -354,6 +354,33 @@ export function SettingsScreen(props: {
           </button>
         </span>
       </Row>,
+      // SYNC-02 (D-166): the devices that sync with this Drive folder.
+      ...(sync.devices.length > 0
+        ? [
+            <Row
+              key="devices"
+              name="Devices"
+              note={
+                <span className="sync-devices">
+                  {sync.devices.map((entry) => (
+                    <span key={entry.device} className="sync-device">
+                      <span className="sync-device-name">{entry.device}</span>
+                      {' · '}
+                      {entry.app}
+                      {entry.device === sync.device ? ' · this PC' : ''}
+                      {' · '}
+                      {entry.behind
+                        ? "can't sync until it's updated"
+                        : syncedAgo(entry.seen > 0 ? entry.seen : null, syncNow)}
+                    </span>
+                  ))}
+                </span>
+              }
+              filter={filter}
+              words={`${words} devices pc phone android version`}
+            />,
+          ]
+        : []),
       ...(sync.problem
         ? [
             <Row

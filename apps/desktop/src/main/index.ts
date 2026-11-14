@@ -2323,6 +2323,9 @@ async function start(): Promise<void> {
             hidden: () => agents.hidden(),
           }),
           folderName: BUILD === 'installed' ? 'Flint' : 'Flint (development)',
+          // SYNC-02 (D-166): this app in Drive's device list; Update Flint checks for an update.
+          app: { name: 'Flint', version: app.getVersion() },
+          checkForUpdates: () => void updates?.check(),
           items: () =>
             Promise.resolve(
               workspace.syncEntries().map((entry) => ({
@@ -2375,6 +2378,8 @@ async function start(): Promise<void> {
     linked: {},
     device: '',
     connectError: null,
+    devices: [],
+    newer: [],
   };
   ipcMain.handle(Channels.mainSync, (event) =>
     owns(event.sender) && sync ? sync.status() : syncOff,

@@ -460,6 +460,54 @@ test('the palette has Sync now and Choose what syncs…; the sort menu has Synce
   await expect(nav('Reading')).toBeVisible();
 });
 
+test('SYNC-02: Settings → Sync lists the devices that sync with this folder', async () => {
+  await setMeta('compat.json', ['devices', 'PIXEL-9'], {
+    app: 'Flint for Android',
+    version: '1.0.0',
+    sync: 1,
+    seen: new Date(2026, 2, 10, 9, 58).toISOString(),
+  });
+  await syncNow();
+  await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
+  const devices = main.locator('#settings-sync .sync-devices');
+  await expect(devices.locator('.sync-device')).toHaveCount(2);
+  // This PC first.
+  await expect(devices.locator('.sync-device').first()).toContainText('· this PC');
+  await expect(devices.locator('.sync-device').nth(1)).toContainText(
+    'PIXEL-9 · Flint for Android 1.0.0',
+  );
+});
+
+test('SYNC-02: a Drive folder that needs a newer Flint pauses sync with Update Flint', async () => {
+  await setMeta('compat.json', ['sync'], 2);
+  await setMeta('compat.json', ['raisedBy'], {
+    device: 'PIXEL-9',
+    app: 'Flint for Android',
+    version: '1.4.0',
+  });
+  const here = await file('Groceries.md');
+  await writeAsLaptop('Groceries', `${here}- [ ] Batteries [id:: dddddd]\n`);
+  await syncNow();
+  await expect(statusButton()).toHaveAttribute('aria-label', 'Sync needs attention');
+  // Nothing came down while paused.
+  expect(await file('Groceries.md')).toBe(here);
+  await statusButton().click();
+  const popover = main.locator('.sync-popover');
+  await expect(popover).toContainText(
+    'Update Flint to keep syncing. The Flint folder in Drive was updated by Flint for Android 1.4.0 on PIXEL-9.',
+  );
+  await expect(popover.getByRole('button', { name: 'Update Flint' })).toBeVisible();
+  await main.keyboard.press('Escape');
+  await expect(main.locator('#settings-sync')).toContainText(
+    'needs attention · Update Flint to keep syncing',
+  );
+  // Back at a version this Flint reads (as after updating): the change arrives.
+  await setMeta('compat.json', ['sync'], 1);
+  await syncNow();
+  await expect(statusButton()).toHaveAttribute('aria-label', 'Synced with Google Drive');
+  await expect.poll(() => file('Groceries.md')).toContain('Batteries');
+});
+
 test('Disconnect keeps everything here and in Drive', async () => {
   const before = await drive();
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();

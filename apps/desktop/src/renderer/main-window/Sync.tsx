@@ -41,6 +41,8 @@ export const SYNC_OFF: SyncStatusView = {
   linked: {},
   device: '',
   connectError: null,
+  devices: [],
+  newer: [],
 };
 
 /** Sync's status for any component (the sidebar's clouds, headers, the editor's conflict cards). */
@@ -279,7 +281,7 @@ function SyncPopover(props: {
         {syncSummary(status, lists)} {syncSummary(status, lists) === 'Nothing' ? 'syncs' : 'sync'}{' '}
         with Google Drive. Everything else stays on this PC.
       </p>
-      {(status.conflicts.length > 0 || problem) && (
+      {(status.conflicts.length > 0 || status.newer.length > 0 || problem) && (
         <div className="sync-popover-more">
           {status.conflicts.map((conflict) => (
             <button
@@ -290,6 +292,16 @@ function SyncPopover(props: {
             >
               {conflict.count === 1 ? '1 conflict' : `${conflict.count} conflicts`} in{' '}
               {conflict.name}
+            </button>
+          ))}
+          {status.newer.map((item) => (
+            <button
+              key={item.listId}
+              type="button"
+              className="sync-popover-row"
+              onClick={() => onOpen(item.listId)}
+            >
+              {item.name} needs a newer Flint
             </button>
           ))}
           {problem && <ProblemRow problem={problem} />}
@@ -317,6 +329,26 @@ export function ProblemRow(props: {
   readonly problem: NonNullable<SyncStatusView['problem']>;
 }): ReactElement {
   const { problem } = props;
+  if (problem.kind === 'update') {
+    // SYNC-02 (D-166): Drive's folder needs a newer Flint; nothing here changes meanwhile.
+    return (
+      <div className="sync-problem">
+        <span>
+          Update Flint to keep syncing.{' '}
+          {problem.raisedBy
+            ? `The Flint folder in Drive was updated by ${problem.raisedBy}.`
+            : 'The Flint folder in Drive was updated by a newer Flint.'}
+        </span>
+        <button
+          type="button"
+          className="secondary-button small"
+          onClick={() => void act({ kind: 'update-flint' })}
+        >
+          Update Flint
+        </button>
+      </div>
+    );
+  }
   if (problem.kind === 'auth') {
     return (
       <div className="sync-problem">

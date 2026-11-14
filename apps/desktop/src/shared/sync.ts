@@ -20,10 +20,30 @@ export type SyncPhase =
   | 'attention';
 
 export interface SyncProblem {
-  readonly kind: 'auth' | 'quota' | 'folder-gone' | 'error';
+  /** `update` (SYNC-02, D-166): Drive's folder needs a newer Flint; sync waits. */
+  readonly kind: 'auth' | 'quota' | 'folder-gone' | 'error' | 'update';
   readonly message: string;
   /** Drive full: what didn't fit. */
   readonly files?: readonly { readonly name: string; readonly size: number }[];
+  /** `update`: who updated Drive's folder, when known: "Flint for Android 1.4.0 on PIXEL-9". */
+  readonly raisedBy?: string | null;
+}
+
+/** SYNC-02: a device that syncs with this Drive folder (Settings → Sync). */
+export interface SyncDeviceView {
+  readonly device: string;
+  /** `Flint 1.9.0`, `Flint for Android 1.0.0`. */
+  readonly app: string;
+  /** When it last synced (ms; this PC's is its last sync, others' at most an hour old). */
+  readonly seen: number;
+  /** It can't read what Drive's folder needs (its sync version is lower). */
+  readonly behind: boolean;
+}
+
+/** SYNC-02: a synced list or note written by a newer Flint, changed on both sides: it waits. */
+export interface SyncNewerItem {
+  readonly listId: string;
+  readonly name: string;
 }
 
 export interface SyncConflict {
@@ -75,6 +95,10 @@ export interface SyncStatusView {
   readonly device: string;
   /** Why the last Connect failed (Google's words), shown in Settings → Sync until the next try. */
   readonly connectError: string | null;
+  /** SYNC-02: the devices that sync with this Drive folder, this PC first. */
+  readonly devices: readonly SyncDeviceView[];
+  /** SYNC-02: synced items that wait for a newer Flint. */
+  readonly newer: readonly SyncNewerItem[];
 }
 
 /** What Chosen → Everything will do (D-161 Q9), for its question. */
@@ -103,7 +127,9 @@ export type SyncAction =
   /** Open in Drive: the Flint folder, or (`id`) a synced list's or note's file. */
   | { readonly kind: 'open-drive'; readonly id?: string }
   | { readonly kind: 'restore-in-drive' }
-  | { readonly kind: 'new-folder' };
+  | { readonly kind: 'new-folder' }
+  /** SYNC-02: Update Flint (checks for an update, APP-06). */
+  | { readonly kind: 'update-flint' };
 
 /** "2 min ago", "just now", "at 14:02" (the status line, the list header). */
 export function syncedAgo(lastSync: number | null, now: number): string {
@@ -155,6 +181,7 @@ const ACTIONS = new Set([
   'open-drive',
   'restore-in-drive',
   'new-folder',
+  'update-flint',
 ]);
 
 /** What a window sent is one of the actions, with the fields it needs (main checks, D-34). */

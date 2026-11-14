@@ -4,18 +4,23 @@
  * one run at a time; reports its status to the windows. Local data is never changed by a problem.
  */
 import {
+  SYNC_VERSION,
   SyncEngine,
   countConflicts,
   emptyState,
   type Drive,
   type LocalSide,
+  type SyncApp,
+  type SyncDevice,
   type SyncReport,
   type SyncState,
 } from '@flint/core/sync';
 import type {
   SyncAction,
   SyncConflict,
+  SyncDeviceView,
   SyncEverythingPreview,
+  SyncNewerItem,
   SyncPhase,
   SyncProblem,
   SyncStatusView,
@@ -48,6 +53,10 @@ export interface SyncServiceOptions {
   readonly local: LocalSide;
   /** `Flint` (installed) or `Flint (development)` (D-161 Q7). */
   readonly folderName: string;
+  /** SYNC-02: this app and its version, for Drive's device list. */
+  readonly app: SyncApp;
+  /** SYNC-02, Update Flint: checks for an update (APP-06). */
+  readonly checkForUpdates?: () => void;
   /** Lists, notes and groups on this PC, for counts and group membership. */
   readonly items: () => Promise<
     readonly {
@@ -76,6 +85,9 @@ export class SyncService {
   private problem: SyncProblem | null = null;
   private lastReport: SyncReport | null = null;
   private conflicts: SyncConflict[] = [];
+  /** SYNC-02: Drive's devices as last read, and the items that wait for a newer Flint. */
+  private devices: readonly SyncDevice[] = [];
+  private newer: SyncNewerItem[] = [];
   private signing: { cancel(): void } | null = null;
   /** Why the last sign-in failed, for Settings → Sync (cleared by the next try). */
   private connectError: string | null = null;
@@ -125,6 +137,7 @@ export class SyncService {
       bases: this.options.store.bases,
       state: this.state,
       folderName: this.options.folderName,
+      app: this.options.app,
     });
   }
 
@@ -205,6 +218,32 @@ export class SyncService {
         this.options.log(`sync failed: ${report.message ?? ''}`);
         this.retry();
         break;
+      case 'update': {
+        // SYNC-02 (D-166): nothing was read or written; the regular runs keep checking.
+        const by = report.raisedBy;
+        this.phase = 'attention';
+        this.problem = {
+          kind: 'update',
+          message: 'Update Flint to keep syncing',
+          raisedBy: by
+            ? `${by.name} ${by.version}`.trim() + (by.device ? ` on ${by.device}` : '')
+            : null,
+        };
+        if (this.problemLogged !== report.message) {
+          this.problemLogged = report.message ?? '';
+          this.options.log(`sync paused: ${report.message ?? ''}`);
+        }
+        break;
+      }
+    }
+    if (report.status !== 'update') this.problemLogged = '';
+    if (report.devices.length > 0) this.devices = report.devices;
+    if (report.status === 'synced' || report.status === 'quota') {
+      const items = await this.options.items();
+      this.newer = report.newer.map((listId) => ({
+        listId,
+        name: items.find((item) => item.id === listId)?.name ?? listId,
+      }));
     }
     if (report.downloaded.length > 0 || report.uploaded.length > 0) {
       this.options.log(
@@ -220,6 +259,23 @@ export class SyncService {
       this.changeTimer = setTimeout(() => void this.request(), AFTER_CHANGE_MS);
       this.changeTimer.unref?.();
     }
+  }
+
+  /** SYNC-02: the pause last logged, so a run every 3 minutes logs it once. */
+  private problemLogged = '';
+
+  /** SYNC-02: Settings → Sync's devices: this PC first, then the others by when they last synced. */
+  private deviceViews(): SyncDeviceView[] {
+    const device = this.options.local.device;
+    const views = this.devices.map((entry) => ({
+      device: entry.device,
+      app: `${entry.name} ${entry.version}`.trim(),
+      seen: entry.device === device ? (this.state.lastSync ?? entry.seen) : entry.seen,
+      behind: entry.sync < SYNC_VERSION,
+    }));
+    return views.sort((a, b) =>
+      a.device === device ? -1 : b.device === device ? 1 : b.seen - a.seen,
+    );
   }
 
   /** D-181: the reason last logged for running again, and how many runs in a row gave it. */
@@ -292,6 +348,8 @@ export class SyncService {
       linked: this.state.linked,
       device: this.options.local.device,
       connectError: this.connectError,
+      devices: this.account ? this.deviceViews() : [],
+      newer: this.newer,
     };
   }
 
@@ -367,6 +425,9 @@ export class SyncService {
       case 'restore-in-drive':
         this.options.connection.open(this.options.connection.trashUrl);
         return;
+      case 'update-flint':
+        this.options.checkForUpdates?.();
+        return;
       case 'new-folder':
         // Start a new folder: what this PC syncs goes up into a fresh "Flint" folder.
         this.state.folderId = null;
@@ -424,6 +485,8 @@ export class SyncService {
     this.problem = null;
     this.lastReport = null;
     this.conflicts = [];
+    this.devices = [];
+    this.newer = [];
     await this.options.store.forget();
     this.phase = 'disconnected';
     this.emit();

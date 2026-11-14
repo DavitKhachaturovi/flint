@@ -1266,12 +1266,13 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 
 | # | Item | ID · status · milestone | Where |
 |---|---|---|---|
-| 1 | `.flint-sync/compat.json`: the sync version (1) and the device list; created when missing | SYNC-02 · Planned (next desktop release) | 02, 04 §7, D-166 |
-| 2 | A Drive newer than the app: the run stops before reading or writing; "Needs attention · Update Flint to keep syncing" naming the device and app; Update Flint | SYNC-02 · Planned | 02, D-166 |
-| 3 | A synced file newer than the app: never merged or overwritten; downloaded as is, read-only, only that item paused | SYNC-02 · Planned | 02, 04 §3 and §7 |
-| 4 | Unknown fields in the bookkeeping files kept on rewrite (round-trip test); new optional fields don't raise the version | SYNC-02 · Planned | 04 §7, D-166 |
-| 5 | Settings → Sync lists the devices; a warning before an app raises the sync version | SYNC-02 · Planned | 02, D-166 |
-| 6 | Compares what devices can read, never app version numbers; the version stays 1 while 1.5.x is in use | SYNC-02 · Decided | D-166 |
+| 1 | `.flint-sync/compat.json`: the sync version (1) and the device list; created when missing | SYNC-02 · Built (the release after 1.8.0) | 02, 04 §7, D-166 |
+| 2 | A Drive newer than the app: the run stops before reading or writing; "Needs attention · Update Flint to keep syncing" naming the device and app; Update Flint | SYNC-02 · Built | 02, D-166, `e2e/sync.spec.ts` |
+| 3 | A synced file newer than the app: never merged; copied byte for byte when one side changed it, left on both when both did ("needs a newer Flint", the sidebar's cloud) | SYNC-02 · Built | 02, 04 §3 and §7 |
+| 4 | Unknown fields in the bookkeeping files kept on rewrite (groups, task times, compat; engine test); new optional fields don't raise the version | SYNC-02 · Built | 04 §7, D-166 |
+| 5 | Settings → Sync lists the devices (Devices row) | SYNC-02 · Built | 02, D-166, `e2e/sync.spec.ts` |
+| 6 | Compares what devices can read, never app version numbers; the version stays 1 while 1.5.0–1.8.0 are in use | SYNC-02 · Decided | D-166 |
+| 7 | The warning before an app raises the sync version | SYNC-02 · Planned (with the first raise) | 02, D-166 |
 
 ## CE. Flint for Android (11 Nov 2026, D-165, grill Q1–Q8, mockup 14)
 

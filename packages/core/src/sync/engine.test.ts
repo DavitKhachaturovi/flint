@@ -10,6 +10,7 @@ import { SyncEngine } from './engine.js';
 import { conflictTime } from './conflict.js';
 import { emptyState, type SyncMode } from './state.js';
 import type { AgentFlag, BaseStore, LocalGroup, LocalItem, LocalSide, TaskTimes } from './drive.js';
+import { encodeUtf8 } from './utf8.js';
 
 class Pc implements LocalSide {
   readonly device: string;
@@ -39,6 +40,7 @@ class Pc implements LocalSide {
       bases,
       state,
       folderName: 'Flint',
+      app: { name: 'Flint', version: '1.9.0' },
     });
   }
 
@@ -192,6 +194,8 @@ describe('SyncEngine (SYNC-01, D-161)', () => {
 
   it('an idle run only lists the folder', async () => {
     const { drive, laptop } = await twoPcs();
+    // The work PC added itself to compat.json (SYNC-02): read once, then idle.
+    await laptop.sync();
     drive.calls.length = 0;
     await laptop.sync();
     expect(drive.calls).toEqual(['folder', 'list']);
@@ -541,5 +545,121 @@ describe('AI agents across PCs (AGENT-01, AGENT-06, D-185)', () => {
     await laptop.sync();
     await work.sync();
     expect(work.flags['local']).toBeUndefined();
+  });
+});
+
+describe('What each device can read (SYNC-02, D-166)', () => {
+  const meta = (drive: FakeDrive, name: string): Record<string, unknown> =>
+    JSON.parse(drive.contents('meta').get(name) ?? 'null') as Record<string, unknown>;
+  const setMeta = (drive: FakeDrive, name: string, value: unknown): void => {
+    const file = drive.fileNamed(name);
+    if (!file) throw new Error(`no ${name} in Drive`);
+    drive.update(file, encodeUtf8(JSON.stringify(value)), { device: 'PIXEL-9' });
+  };
+  const newerTrip = trip.replace('flint: 1', 'flint: 2') + '\nA line from a newer Flint.\n';
+
+  it('records each device in compat.json, at sync version 1', async () => {
+    const { drive, laptop } = await twoPcs();
+    const compat = meta(drive, 'compat.json');
+    expect(compat['sync']).toBe(1);
+    expect(Object.keys(compat['devices'] as object).sort()).toEqual(['DAVIT-LAPTOP', 'WORK-PC']);
+    expect((compat['devices'] as Record<string, unknown>)['WORK-PC']).toMatchObject({
+      app: 'Flint',
+      version: '1.9.0',
+      sync: 1,
+      seen: '2026-03-10T09:00:00.000Z',
+    });
+    const report = await laptop.sync();
+    expect(report.devices.map((device) => device.device).sort()).toEqual([
+      'DAVIT-LAPTOP',
+      'WORK-PC',
+    ]);
+  });
+
+  it('a Drive raised to a newer sync version pauses: nothing read, merged or written', async () => {
+    const { drive, laptop } = await twoPcs();
+    setMeta(drive, 'compat.json', {
+      ...meta(drive, 'compat.json'),
+      sync: 2,
+      raisedBy: { device: 'PIXEL-9', app: 'Flint for Android', version: '1.4.0' },
+    });
+    laptop.edit('groc', (text) => text + '- [ ] Bread [id:: cccccc]\n');
+    const edited = laptop.text('groc');
+    drive.calls.length = 0;
+    const report = await laptop.sync();
+    expect(report.status).toBe('update');
+    expect(report.driveSync).toBe(2);
+    expect(report.raisedBy).toEqual({
+      device: 'PIXEL-9',
+      name: 'Flint for Android',
+      version: '1.4.0',
+    });
+    expect(drive.calls).toEqual(['folder', 'list', 'read']);
+    expect(drive.contents().get('Groceries')).toBe(groceries);
+    expect(laptop.text('groc')).toBe(edited);
+  });
+
+  it('keeps fields a newer Flint added to the bookkeeping', async () => {
+    const { drive, laptop, work } = await twoPcs();
+    laptop.groupList = [{ id: 'g1', name: 'Personal', lists: ['groc'] }];
+    await laptop.sync();
+    await work.sync();
+    const groups = meta(drive, 'groups.json');
+    setMeta(drive, 'groups.json', {
+      ...groups,
+      future: true,
+      groups: (groups['groups'] as object[]).map((group) => ({ ...group, colour: 'blue' })),
+    });
+    const items = meta(drive, 'items.json') as {
+      items: Record<string, { tasks: Record<string, object> }>;
+    };
+    const groc = items.items['groc'] ?? { tasks: {} };
+    groc.tasks['aaaaaa'] = { ...groc.tasks['aaaaaa'], c: Date.UTC(2026, 2, 9), weight: 3 };
+    setMeta(drive, 'items.json', items);
+    setMeta(drive, 'compat.json', { ...meta(drive, 'compat.json'), future: { a: 1 } });
+    // The laptop rewrites all three: a renamed group, an edited task, an hour later.
+    laptop.clock += 2 * 60 * 60 * 1000;
+    drive.clock = laptop.clock;
+    laptop.groupList = [{ id: 'g1', name: 'Home', lists: ['groc'] }];
+    laptop.edit('groc', (text) => text.replace('Oat milk', 'Oat milk, 2'));
+    laptop.times.set('groc', new Map([['aaaaaa', { t: laptop.clock }]]));
+    expect((await laptop.sync()).status).toBe('synced');
+    const after = meta(drive, 'groups.json');
+    expect(after['future']).toBe(true);
+    expect(after['groups']).toEqual([{ id: 'g1', name: 'Home', lists: ['groc'], colour: 'blue' }]);
+    const task = (meta(drive, 'items.json') as typeof items).items['groc']?.tasks['aaaaaa'];
+    expect(task).toMatchObject({ weight: 3, t: laptop.clock });
+    const compat = meta(drive, 'compat.json');
+    expect(compat['future']).toEqual({ a: 1 });
+    expect((compat['devices'] as Record<string, { seen: string }>)['DAVIT-LAPTOP']?.seen).toBe(
+      new Date(laptop.clock).toISOString(),
+    );
+  });
+
+  it('a file from a newer Flint is copied byte for byte, never merged', async () => {
+    const { drive, laptop, work } = await twoPcs();
+    work.edit('trip', () => newerTrip);
+    await work.sync();
+    expect(drive.contents().get('Trip ideas')).toBe(newerTrip);
+    await laptop.sync();
+    expect(laptop.text('trip')).toBe(newerTrip);
+  });
+
+  it('a file from a newer Flint changed on both sides waits, untouched on both', async () => {
+    const { drive, laptop, work } = await twoPcs();
+    work.edit('trip', () => newerTrip);
+    await work.sync();
+    laptop.edit('trip', (text) => text + 'Pack the boots.\n');
+    const mine = laptop.text('trip');
+    const report = await laptop.sync();
+    expect(report.status).toBe('synced');
+    expect(report.newer).toEqual(['trip']);
+    expect(laptop.text('trip')).toBe(mine);
+    expect(drive.contents().get('Trip ideas')).toBe(newerTrip);
+    // The rest keeps syncing.
+    work.edit('groc', (text) => text + '- [ ] Bread [id:: cccccc]\n');
+    await work.sync();
+    await laptop.sync();
+    expect(laptop.text('groc')).toContain('Bread');
   });
 });

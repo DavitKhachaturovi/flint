@@ -429,6 +429,15 @@ export function formatVersion(document: FlintDocument): number | null {
   return Number.isFinite(version) ? version : null;
 }
 
+/** The highest `flint:` format this code reads and writes (docs/04 §3). */
+export const FORMAT_VERSION = 1;
+
+/** A file written by a newer Flint: opened read-only, never merged or rewritten (04 §3, D-166). */
+export function isNewerFormat(document: FlintDocument): boolean {
+  const version = formatVersion(document);
+  return version !== null && version > FORMAT_VERSION;
+}
+
 /** Every task, top-level and subtasks, in file order, with its parent. */
 export function* allTasks(
   document: FlintDocument,

@@ -208,7 +208,7 @@ Users only sign in with Google; the Cloud project and its client ID are set up o
 
 ## 7. Flint for Android (D-165) and the sync check (D-166)
 
-**First, on the desktop:** SYNC-02 (D-166) ships in the next desktop release, before any phone build syncs: `compat.json`, the pause with "Update Flint to keep syncing", read-only newer files, the device list in Settings → Sync, the round-trip test for unknown bookkeeping fields. Unit tests on the fake Drive (a newer Drive, a newer file, two devices); an end-to-end check of the message.
+**First, on the desktop:** SYNC-02 (D-166) ships in the next desktop release, before any phone build syncs: `compat.json`, the pause with "Update Flint to keep syncing", read-only newer files, the device list in Settings → Sync, the round-trip test for unknown bookkeeping fields. Unit tests on the fake Drive (a newer Drive, a newer file, two devices); an end-to-end check of the message. **Built on `next` (14 Nov 2026), for the release after 1.8.0** (D-166); the warning before a raise waits for the first raise.
 
 **Then the phone, risk first (D-18: production code, no throwaway).** Each risk has a check on Davit's phone; a failed one stops the plan for a decision.
 

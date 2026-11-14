@@ -17,10 +17,42 @@ import {
 } from './drive.js';
 import { mergeLists, type ListVersions } from './merge.js';
 import type { LinkedFile, SyncState, SyncedGroup } from './state.js';
-import { documentLines, parseDocument, type TaskNode } from '../format/document.js';
+import { documentLines, isNewerFormat, parseDocument, type TaskNode } from '../format/document.js';
 import { decodeUtf8, encodeUtf8 } from './utf8.js';
 
-export type SyncStatus = 'synced' | 'offline' | 'auth' | 'quota' | 'folder-gone' | 'error';
+/**
+ * `update` (SYNC-02, D-166): Drive's folder was raised to a sync version this code doesn't know;
+ * nothing was read, merged or written.
+ */
+export type SyncStatus =
+  'synced' | 'offline' | 'auth' | 'quota' | 'folder-gone' | 'error' | 'update';
+
+/** SYNC-02 (D-166): the highest sync version (the layout of Drive's folder) this code handles. */
+export const SYNC_VERSION = 1;
+
+/** A device's own entry is rewritten at most this often when nothing else about it changed. */
+const SEEN_EVERY_MS = 60 * 60 * 1000;
+
+/** The app a device runs, as recorded in `compat.json`. */
+export interface SyncApp {
+  /** `Flint` (Windows) or `Flint for Android`. */
+  readonly name: string;
+  readonly version: string;
+}
+
+/** A device that syncs with this Drive folder (Settings → Sync's devices, SYNC-02). */
+export interface SyncDevice extends SyncApp {
+  readonly device: string;
+  /** The highest sync version it handles. */
+  readonly sync: number;
+  /** When it last synced, as recorded (at most an hour old for a device that syncs). */
+  readonly seen: number;
+}
+
+/** Who raised Drive's folder to its sync version, when known. */
+export interface SyncRaise extends SyncApp {
+  readonly device: string;
+}
 
 export interface RemoteOnlyItem {
   readonly listId: string;
@@ -45,6 +77,16 @@ export interface SyncReport {
   readonly again: boolean;
   /** D-181: why it runs again (a note being typed in, a file Drive changed meanwhile), for the log. */
   readonly againWhy: readonly string[];
+  /** SYNC-02: the devices recorded in Drive's folder, this one included. */
+  readonly devices: readonly SyncDevice[];
+  /** SYNC-02, status `update`: Drive's sync version and who raised it, when known. */
+  readonly driveSync?: number;
+  readonly raisedBy?: SyncRaise | null;
+  /**
+   * SYNC-02: synced lists and notes written by a newer Flint (04 §3) that changed on both sides:
+   * never merged; left as they are on both sides until this PC's Flint is updated.
+   */
+  readonly newer: readonly string[];
   readonly message?: string;
 }
 
@@ -62,6 +104,37 @@ interface RemovedFile {
   flint: 1;
   removed: Record<string, { how: 'deleted' | 'unsynced'; at: number; device: string }>;
 }
+/** SYNC-02 (D-166, docs/04 §7): what Drive's folder needs, and who syncs with it. */
+interface CompatFile {
+  flint: 1;
+  sync: number;
+  raisedBy?: { device: string; app: string; version: string } | null;
+  devices: Record<string, { app: string; version: string; sync: number; seen: string }>;
+}
+
+/** Task-time fields this code knows; any other a newer Flint added is carried along (SYNC-02). */
+const TASK_TIME_KEYS = new Set(['c', 't', 'cb', 'tb']);
+
+function unknownFields(value: object | undefined, known: ReadonlySet<string>): object {
+  if (!value) return {};
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !known.has(key)));
+}
+
+function compatDevices(compat: CompatFile): SyncDevice[] {
+  const out: SyncDevice[] = [];
+  for (const [device, entry] of Object.entries(compat.devices)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const seen = Date.parse(String(entry.seen));
+    out.push({
+      device,
+      name: typeof entry.app === 'string' ? entry.app : 'Flint',
+      version: typeof entry.version === 'string' ? entry.version : '',
+      sync: typeof entry.sync === 'number' && Number.isFinite(entry.sync) ? entry.sync : 1,
+      seen: Number.isNaN(seen) ? 0 : seen,
+    });
+  }
+  return out;
+}
 
 const KEEP_REMOVED_MS = 90 * 24 * 60 * 60 * 1000;
 const encoder = { encode: encodeUtf8 };
@@ -74,6 +147,8 @@ export interface EngineOptions {
   readonly state: SyncState;
   /** The Drive folder's name for a new folder: `Flint`, or `Flint (development)`. */
   readonly folderName: string;
+  /** SYNC-02: this app, for the device list (`Flint 1.9.0`). */
+  readonly app?: SyncApp;
   readonly random?: () => number;
 }
 
@@ -148,6 +223,7 @@ export class SyncEngine {
   private readonly bases: BaseStore;
   readonly state: SyncState;
   private readonly folderName: string;
+  private readonly app: SyncApp;
   private readonly random: (() => number) | undefined;
   /** The bookkeeping files as last read or written, by revision: an idle run reads none. */
   private readonly metaCache = new Map<string, { revision: string; text: string }>();
@@ -158,6 +234,7 @@ export class SyncEngine {
     this.bases = options.bases;
     this.state = options.state;
     this.folderName = options.folderName;
+    this.app = options.app ?? { name: 'Flint', version: '' };
     this.random = options.random;
   }
 
@@ -217,6 +294,8 @@ export class SyncEngine {
       remoteGroups: [],
       again,
       againWhy,
+      devices: [],
+      newer: [],
       ...extra,
     });
     if (this.state.mode === null) return report('synced');
@@ -278,6 +357,7 @@ export class SyncEngine {
     const groupsFileRemote = meta('groups.json');
     const itemsFileRemote = meta('items.json');
     const removedFileRemote = meta('removed.json');
+    const compatFileRemote = meta('compat.json');
     const readMeta = async (file: RemoteFile | undefined): Promise<Uint8Array | null> => {
       if (!file) return null;
       const cached = this.metaCache.get(file.flintId);
@@ -286,6 +366,56 @@ export class SyncEngine {
       this.metaCache.set(file.flintId, { revision: file.revision, text: decoder.decode(content) });
       return content;
     };
+
+    // SYNC-02 (D-166): what Drive's folder needs comes first. A newer sync version stops the run
+    // here: nothing is read, merged or written, on either side.
+    const compatRead = json<Partial<CompatFile> | null>(await readMeta(compatFileRemote), null);
+    const compat: CompatFile = {
+      ...(compatRead && typeof compatRead === 'object' ? compatRead : {}),
+      flint: 1,
+      sync: 1,
+      devices: {},
+    };
+    const driveSync = Number(compatRead?.sync);
+    compat.sync = Number.isFinite(driveSync) && driveSync >= 1 ? driveSync : 1;
+    compat.devices =
+      compatRead?.devices && typeof compatRead.devices === 'object' ? compatRead.devices : {};
+    const raisedBy: SyncRaise | null =
+      compatRead?.raisedBy && typeof compatRead.raisedBy === 'object'
+        ? {
+            device: String(compatRead.raisedBy.device ?? ''),
+            name: String(compatRead.raisedBy.app ?? 'Flint'),
+            version: String(compatRead.raisedBy.version ?? ''),
+          }
+        : null;
+    if (compat.sync > SYNC_VERSION) {
+      return report('update', {
+        devices: compatDevices(compat),
+        driveSync: compat.sync,
+        raisedBy,
+        message: `Drive's folder is at sync version ${compat.sync}; this Flint handles ${SYNC_VERSION}`,
+      });
+    }
+    const compatBefore = compatFileRemote ? JSON.stringify(compatRead) : '';
+    const mineEntry = compat.devices[device];
+    const seenAt = Date.parse(String(mineEntry?.seen ?? ''));
+    if (
+      !mineEntry ||
+      mineEntry.app !== this.app.name ||
+      mineEntry.version !== this.app.version ||
+      mineEntry.sync !== SYNC_VERSION ||
+      Number.isNaN(seenAt) ||
+      now - seenAt >= SEEN_EVERY_MS ||
+      seenAt > now
+    ) {
+      compat.devices[device] = {
+        ...mineEntry,
+        app: this.app.name,
+        version: this.app.version,
+        sync: SYNC_VERSION,
+        seen: new Date(now).toISOString(),
+      };
+    }
     const groupsFile = json<GroupsFile>(await readMeta(groupsFileRemote), { flint: 1, groups: [] });
     const itemsFile = json<ItemsFile>(await readMeta(itemsFileRemote), { flint: 1, items: {} });
     const removedFile = json<RemovedFile>(await readMeta(removedFileRemote), {
@@ -442,6 +572,31 @@ export class SyncEngine {
       texts.set(id, { mine, theirs, file });
     }
 
+    // SYNC-02 (D-166): a list or note written by a newer Flint is never merged. When only one side
+    // changed it is copied to the other byte for byte; when both did, it waits for an update.
+    const copies = new Map<string, string>();
+    const copied: ListVersions[] = [];
+    const newer: string[] = [];
+    for (const version of [...versions]) {
+      const { base, mine, theirs } = version;
+      const tooNew = [base, mine, theirs].some(
+        (text) => text !== null && isNewerFormat(parseDocument(text)),
+      );
+      if (!tooNew) continue;
+      versions.splice(versions.indexOf(version), 1);
+      if (mine !== null && mine === theirs) {
+        copies.set(version.listId, mine);
+      } else if (theirs !== null && (mine === null || mine === base)) {
+        copies.set(version.listId, theirs);
+      } else if (mine !== null && (theirs === null || theirs === base)) {
+        copies.set(version.listId, mine);
+      } else {
+        newer.push(version.listId);
+        continue;
+      }
+      copied.push(version);
+    }
+
     // Merge everything that changed together (tasks can move between lists).
     const remoteTimes = (listId: string): Record<string, TaskTimes> =>
       itemsFile.items[listId]?.tasks ?? {};
@@ -486,9 +641,9 @@ export class SyncEngine {
     for (const entry of merged.trashed) await local.trashTask(entry.listId, blockText(entry.node));
 
     // Text first (D-161 Q8): write here, then to Drive.
-    for (const version of versions) {
+    for (const version of [...versions, ...copied]) {
       const id = version.listId;
-      const text = merged.texts.get(id);
+      const text = copies.get(id) ?? merged.texts.get(id);
       if (text === undefined) continue;
       const known = texts.get(id);
       const mineItem = localById.get(id);
@@ -564,6 +719,9 @@ export class SyncEngine {
         const cb = first?.cb ?? a?.cb ?? b?.cb;
         const tb = (ta >= tt ? a : b)?.tb;
         combined[key] = {
+          // SYNC-02: fields a newer Flint added are carried (Drive's over this PC's).
+          ...unknownFields(a, TASK_TIME_KEYS),
+          ...unknownFields(b, TASK_TIME_KEYS),
           ...(cs.length > 0 ? { c: Math.min(...cs) } : {}),
           ...(t > 0 ? { t } : {}),
           ...(cb !== undefined ? { cb } : {}),
@@ -582,7 +740,7 @@ export class SyncEngine {
       (file) => file.kind === 'attachment' && !state.attachments[file.flintId],
     );
     const touchedLists = new Set([
-      ...versions.map((version) => version.listId),
+      ...[...versions, ...copied].map((version) => version.listId),
       ...state.pending,
       ...(unseen ? Object.keys(state.items) : []),
     ]);
@@ -645,7 +803,8 @@ export class SyncEngine {
         name,
         lists: mergeMembers(b?.lists ?? [], m.lists, t.lists),
       };
-      toWrite.push(merged);
+      // SYNC-02: fields a newer Flint added to Drive's group stay in Drive.
+      toWrite.push({ ...t, ...merged });
       // D-183: applied here only when it differs from the group here (its members as this PC has
       // them; lists it doesn't have can't be in its group). Applying an unchanged group on every
       // run told the workspace something changed, which asked for the next run 5 s later, for ever.
@@ -767,6 +926,7 @@ export class SyncEngine {
     await writeMeta('groups.json', groupsBefore, groupsFile, groupsFileRemote);
     await writeMeta('items.json', itemsBefore, itemsFile, itemsFileRemote);
     await writeMeta('removed.json', removedBefore, removedFile, removedFileRemote);
+    await writeMeta('compat.json', compatBefore, compat, compatFileRemote);
 
     state.lastSync = now;
     const remoteOnly: RemoteOnlyItem[] = [];
@@ -781,6 +941,8 @@ export class SyncEngine {
     return report(out.didNotFit.length > 0 ? 'quota' : 'synced', {
       remoteOnly,
       remoteGroups: groupsFile.groups,
+      devices: compatDevices(compat),
+      newer,
     });
   }
 }

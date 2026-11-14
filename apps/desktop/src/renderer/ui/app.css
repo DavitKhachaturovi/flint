@@ -7976,6 +7976,18 @@ body[data-tour-step='5'] .main .row .pin-hover {
   font-family: var(--fl-font-mono);
 }
 
+/* SYNC-02 (D-166): Settings → Sync's devices, one per line, the name in mono. */
+.sync-devices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-device-name {
+  font-family: var(--fl-font-mono);
+  color: var(--fl-text-primary);
+}
+
 /* The conflict card in a note (D-161 Q5): this PC's lines stay above it; the other version on the
    well with its three buttons. */
 .cm-fl-conflict {

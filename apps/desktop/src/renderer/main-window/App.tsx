@@ -6746,28 +6746,44 @@ type SyncDialogState =
 /** SYNC-01, D-161: the sidebar's Show filter (the sort menu). */
 type SyncFilter = 'all' | 'synced' | 'local';
 
-/** SYNC-01, D-163: unresolved sync conflicts in these lists or notes. */
-function conflictsIn(sync: SyncStatusView, ids: readonly string[]): number {
-  return sync.conflicts
-    .filter((entry) => ids.includes(entry.listId))
-    .reduce((sum, entry) => sum + entry.count, 0);
+/**
+ * SYNC-01, D-163: unresolved sync conflicts in these lists or notes; SYNC-02 (D-166): and how many
+ * of them wait for a newer Flint.
+ */
+function conflictsIn(
+  sync: SyncStatusView,
+  ids: readonly string[],
+): { readonly conflicts: number; readonly newer: number } {
+  return {
+    conflicts: sync.conflicts
+      .filter((entry) => ids.includes(entry.listId))
+      .reduce((sum, entry) => sum + entry.count, 0),
+    newer: sync.newer.filter((entry) => ids.includes(entry.listId)).length,
+  };
 }
 
 /**
  * SYNC-01, D-163: a cloud with "!" after an item's name in the sidebar while it (or, on a group's
- * header, one of its lists) has an unresolved sync conflict. Synced items carry no mark otherwise:
- * the list's header says it syncs, and the Show filter picks synced items out.
+ * header, one of its lists) has an unresolved sync conflict, or (SYNC-02) waits for a newer Flint.
+ * Synced items carry no mark otherwise: the list's header says it syncs, and the Show filter picks
+ * synced items out.
  */
-function NavCloud(props: { readonly conflicts: number }): ReactElement | null {
-  const { conflicts } = props;
-  return conflicts > 0 ? (
-    <span
-      className="nav-cloud"
-      title={conflicts === 1 ? '1 sync conflict' : `${conflicts} sync conflicts`}
-    >
+function NavCloud(props: {
+  readonly attention: { readonly conflicts: number; readonly newer: number };
+}): ReactElement | null {
+  const { conflicts, newer } = props.attention;
+  if (conflicts === 0 && newer === 0) return null;
+  const title = [
+    conflicts === 0 ? '' : conflicts === 1 ? '1 sync conflict' : `${conflicts} sync conflicts`,
+    newer === 0 ? '' : 'Needs a newer Flint to sync',
+  ]
+    .filter((part) => part !== '')
+    .join(' · ');
+  return (
+    <span className="nav-cloud" title={title}>
       <CloudIcon size={13} mark="alert" />
     </span>
-  ) : null;
+  );
 }
 
 /**
@@ -6826,7 +6842,7 @@ function NavGroup(props: {
           <span className="group-name">
             <MorphText text={group.name} />
           </span>
-          <NavCloud conflicts={conflictsIn(sync, group.lists)} />
+          <NavCloud attention={conflictsIn(sync, group.lists)} />
           <span className="nav-count group-count">
             <MorphText text={String(group.lists.length)} />
           </span>
@@ -6898,7 +6914,7 @@ function NavItem(props: {
     >
       <span className={active ? 'tile strong' : 'tile'}>{icon}</span>
       <span className="nav-name">{list.name}</span>
-      <NavCloud conflicts={conflictsIn(sync, [list.id])} />
+      <NavCloud attention={conflictsIn(sync, [list.id])} />
       {list.mode === 'tasks' && <span className="nav-count">{list.open}</span>}
     </button>
   );

@@ -2,6 +2,7 @@ import { dirname, join } from 'node:path';
 import {
   applyOp,
   documentMode,
+  isNewerFormat,
   parseDocument,
   prepareForSave,
   rebase,
@@ -140,8 +141,7 @@ export function tempDirectoryFor(listPath: string): string {
 function readOnlyReason(read: ReadResult, document: FlintDocument): string | null {
   if (read.kind === 'not-utf8') return 'not-utf8';
   if (read.kind === 'unreadable') return `unreadable: ${read.reason}`;
-  const version = Number(document.frontmatter?.flint ?? '1');
-  if (Number.isFinite(version) && version > 1) return 'newer-format';
+  if (isNewerFormat(document)) return 'newer-format';
   if (documentMode(document) === 'unknown') return 'unknown-mode';
   return null;
 }
