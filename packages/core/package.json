@@ -7,42 +7,62 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./format": {
+      "source": "./src/format/index.ts",
       "types": "./dist/format/index.d.ts",
       "default": "./dist/format/index.js"
     },
     "./shorthand": {
+      "source": "./src/shorthand/index.ts",
       "types": "./dist/shorthand/index.d.ts",
       "default": "./dist/shorthand/index.js"
     },
     "./time": {
+      "source": "./src/time/index.ts",
       "types": "./dist/time/index.d.ts",
       "default": "./dist/time/index.js"
     },
     "./model": {
+      "source": "./src/model/index.ts",
       "types": "./dist/model/index.d.ts",
       "default": "./dist/model/index.js"
     },
     "./undo": {
+      "source": "./src/undo/index.ts",
       "types": "./dist/undo/index.d.ts",
       "default": "./dist/undo/index.js"
     },
     "./sync": {
+      "source": "./src/sync/index.ts",
       "types": "./dist/sync/index.d.ts",
       "default": "./dist/sync/index.js"
     },
     "./focus": {
+      "source": "./src/focus/index.ts",
       "types": "./dist/focus/index.d.ts",
       "default": "./dist/focus/index.js"
     },
     "./agents": {
+      "source": "./src/agents/index.ts",
       "types": "./dist/agents/index.d.ts",
       "default": "./dist/agents/index.js"
     },
+    "./links": {
+      "source": "./src/links/index.ts",
+      "types": "./dist/links/index.d.ts",
+      "default": "./dist/links/index.js"
+    },
+    "./markdown": {
+      "source": "./src/markdown/index.ts",
+      "types": "./dist/markdown/index.d.ts",
+      "default": "./dist/markdown/index.js"
+    },
     "./bench": {
+      "source": "./src/bench/index.ts",
       "types": "./dist/bench/index.d.ts",
       "default": "./dist/bench/index.js"
     }
@@ -52,5 +72,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "markdown-it": "15.0.3"
   }
 }
