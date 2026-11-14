@@ -9,6 +9,8 @@ const core = resolve(root, '../../packages/core/src');
 const coreAlias = [
   { find: /^@flint\/core\/(.+)$/, replacement: `${core}/$1/index.ts` },
   { find: /^@flint\/core$/, replacement: `${core}/index.ts` },
+  // D-165: the note editor, shared with the phone, from source too.
+  { find: /^@flint\/editor$/, replacement: resolve(root, '../../packages/editor/src/index.ts') },
 ];
 
 /**

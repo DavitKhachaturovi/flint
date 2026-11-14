@@ -97,7 +97,7 @@ import {
   sessionNumber,
   useFocusTimer,
 } from './Focus.js';
-import { setConflictDevice } from '../editor/conflict-view.js';
+import { setConflictDevice } from '@flint/editor';
 import { setLinkedSync } from '../media/media.js';
 import { syncedAgo, type SyncEverythingPreview, type SyncStatusView } from '../../shared/sync.js';
 import { Triage, type TriageMemory } from './Triage.js';
@@ -109,9 +109,9 @@ import {
 } from './ContextPanel.js';
 import { outline as outlineOf } from '../panel/outline.js';
 import { EditorView as CodeEditorView } from '@codemirror/view';
-import { openFindIn } from '../editor/find.js';
-import { tablePaletteCommands } from '../editor/table-view.js';
-import { flashMatches, matchRanges, type LineMatch } from '../editor/match-flash.js';
+import { openFindIn } from '@flint/editor';
+import { tablePaletteCommands } from '@flint/editor';
+import { flashMatches, matchRanges, type LineMatch } from '@flint/editor';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
 import { ListFind } from './ListFind.js';
 import {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
 import { fuzzyMatch } from '../../shared/fuzzy.js';
-import { litRanges, matchFlashForTests, matchRanges } from './match-flash.js';
+import { litRanges, matchFlashForTests, matchRanges } from '@flint/editor';
 
 /** NAV-01, D-143: what Ctrl+K found in a note's line, lit as find's current match. */
 

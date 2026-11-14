@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { SyntaxNode } from '@lezer/common';
-import { findShortForms, linkTitle, type CompiledPattern } from '../../shared/link-patterns.js';
+import { findShortForms, linkTitle, type CompiledPattern } from '@flint/core/links';
 
 /**
  * The live preview's decisions as plain data (NOTE-01, D-141 Q13): what each part of the markdown

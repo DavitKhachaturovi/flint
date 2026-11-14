@@ -3,7 +3,7 @@
 @import '../selection.css';
 @import '../menu/menu.css';
 @import '../pickers/pickers.css';
-@import '../editor/editor.css';
+@import '../../../../../packages/editor/src/editor.css';
 @import '../highlight/highlight.css';
 
 /* Flint's stylesheet, shared by the main window (M4, mockup 01) and mini mode (D-110, mockup 05):

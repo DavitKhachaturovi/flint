@@ -29,6 +29,11 @@ export default defineConfig({
     alias: [
       { find: /^@flint\/core\/(.+)$/, replacement: core('$1/index.ts') },
       { find: /^@flint\/core$/, replacement: core('index.ts') },
+      // D-165: the note editor shared with the phone.
+      {
+        find: /^@flint\/editor$/,
+        replacement: fileURLToPath(new URL('./packages/editor/src/index.ts', import.meta.url)),
+      },
     ],
   },
   test: {

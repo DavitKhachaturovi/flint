@@ -1,10 +1,22 @@
-import { conflictView } from './conflict-view.js';
+import './host.js';
 import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react';
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockFor, classifyPaste, fencedBlock } from '@flint/core/shorthand';
-import { insertBlock } from './commands.js';
-import { isCellsMarkdown } from './table.js';
+import {
+  conflictView,
+  editorExtensions,
+  fromEditor,
+  insertBlock,
+  isCellsMarkdown,
+  lineEndingOf,
+  previewMode,
+  replaceLink,
+  sourceMode,
+  toEditor,
+  type LineEnding,
+  type PreviewHandlers,
+} from '@flint/editor';
 import {
   announce,
   announceLinked,
@@ -12,10 +24,7 @@ import {
   isVideoLink,
   openAttachment,
 } from '../media/media.js';
-import { replaceLink } from './live-preview.js';
-import { editorExtensions, previewMode, sourceMode, type PreviewHandlers } from './live-preview.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
-import { fromEditor, lineEndingOf, toEditor, type LineEnding } from './line-endings.js';
 
 /**
  * The note editor in React (M5, D-79): notes, and task bodies on their page and inline. It owns its

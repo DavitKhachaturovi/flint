@@ -1,0 +1,14 @@
+{
+  // The note editor: DOM code, type-checked with its tests (tests may use Node to read fixtures).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      "@flint/core": ["../core/src/index.ts"],
+      "@flint/core/*": ["../core/src/*/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

@@ -22,10 +22,10 @@ import {
   keymap,
   type DecorationSet,
 } from '@codemirror/view';
-import { titleHtml } from '../../shared/inline-markdown.js';
-import { durationMs, nudgeElement, reducedMotion } from '../ui/motion.js';
-import { announceConfirm, announceUndo } from '../media/media.js';
-import { openMenu, type MenuEntry } from '../menu/menu.js';
+import { titleHtml } from '@flint/core/markdown';
+import { durationMs, nudgeElement, reducedMotion } from './motion.js';
+import { announceConfirm, announceUndo } from './notices.js';
+import { editorHost, type MenuEntry } from './host.js';
 import {
   addColumn,
   addRow,
@@ -421,7 +421,10 @@ class TableWidget extends WidgetType {
       const target = (event.target as HTMLElement).closest<HTMLElement>('[data-row]');
       const row = target ? Number(target.dataset['row']) : 0;
       const column = target ? Number(target.dataset['column']) : 0;
-      openMenu(menuEntries(view, { table, row, column }), { x: event.clientX, y: event.clientY });
+      editorHost().openMenu(menuEntries(view, { table, row, column }), {
+        x: event.clientX,
+        y: event.clientY,
+      });
     });
     this.fill(wrap, view);
     return wrap;

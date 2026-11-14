@@ -1,7 +1,7 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorState, type ChangeSpec } from '@codemirror/state';
 import { describe, it } from 'vitest';
-import { expectLinear } from '../../../../../packages/core/test/scaling.js';
+import { expectLinear } from '../../core/test/scaling.js';
 import { parseFully } from './preview-checks.js';
 import { NOTE_SYNTAX } from './syntax.js';
 import {
