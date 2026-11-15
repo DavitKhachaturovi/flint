@@ -8,10 +8,11 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 import { Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkDriveFolder, DriveProblem, type DriveFolderCheck } from './drive';
+import { NoteScreen } from './note/NoteScreen';
 import { color, radius, size } from './theme';
 
 type Tab = 'today' | 'inbox' | 'lists';
-type Screen = { readonly tab: Tab } | { readonly settings: true };
+type Screen = { readonly tab: Tab } | { readonly settings: true } | { readonly note: true };
 
 const DRIVE_FOLDER =
   (Constants.expoConfig?.extra?.['driveFolder'] as string | undefined) ?? 'Flint (development)';
@@ -29,6 +30,12 @@ function Main(): ReactElement {
   const insets = useSafeAreaInsets();
   const [screen, setScreen] = useState<Screen>({ tab: 'today' });
   const tab = 'tab' in screen ? screen.tab : 'lists';
+  if ('note' in screen)
+    return (
+      <View style={[styles.window, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <NoteScreen onBack={() => setScreen({ tab: 'lists' })} />
+      </View>
+    );
   return (
     <View style={[styles.window, { paddingTop: insets.top }]}>
       <View style={styles.content}>
@@ -39,7 +46,10 @@ function Main(): ReactElement {
         ) : tab === 'inbox' ? (
           <Empty title="Inbox" line="Captured tasks arrive here in A1." />
         ) : (
-          <ListsScreen onSettings={() => setScreen({ settings: true })} />
+          <ListsScreen
+            onSettings={() => setScreen({ settings: true })}
+            onNote={() => setScreen({ note: true })}
+          />
         )}
       </View>
       <View style={[styles.navbar, { paddingBottom: insets.bottom }]} accessibilityRole="tablist">
@@ -78,11 +88,16 @@ function Empty(props: { readonly title: string; readonly line: string }): ReactE
   );
 }
 
-function ListsScreen(props: { readonly onSettings: () => void }): ReactElement {
+function ListsScreen(props: {
+  readonly onSettings: () => void;
+  readonly onNote: () => void;
+}): ReactElement {
   return (
     <View style={styles.page}>
       <Text style={styles.title}>Lists</Text>
       <Text style={styles.muted}>Your lists and notes arrive here in A1.</Text>
+      {/* R-A2 (docs/06 §7): one note to try the editor with each keyboard. */}
+      <Button label="Keyboard test note" onPress={props.onNote} primary />
       <View style={styles.grow} />
       <Button label="Settings" onPress={props.onSettings} />
     </View>

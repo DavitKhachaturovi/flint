@@ -57,8 +57,18 @@ export default defineConfig(
     },
   },
   {
-    files: ['**/*.js', '**/*.mjs'],
+    files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // D-165: the phone's bundler config, CommonJS that Expo reads: no type information.
+    files: ['**/*.cjs'],
+    languageOptions: {
+      parserOptions: { projectService: false },
+      sourceType: 'commonjs',
+      globals: { __dirname: 'readonly' },
+    },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
     // Plain Node scripts (measurements): Node globals, no type information.

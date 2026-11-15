@@ -14,9 +14,7 @@ if (!commonmarkPath || !gfmPath) {
   process.exit(1);
 }
 const out = (name) =>
-  fileURLToPath(
-    new URL(`../packages/editor/src/fixtures/spec/${name}`, import.meta.url),
-  );
+  fileURLToPath(new URL(`../packages/editor/src/fixtures/spec/${name}`, import.meta.url));
 
 const commonmark = JSON.parse(readFileSync(commonmarkPath, 'utf8')).map((each) => ({
   example: each.example,

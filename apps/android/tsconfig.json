@@ -4,8 +4,13 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // The workspace packages from source, as Metro reads them (metro.config.cjs).
+    "customConditions": ["react-native", "source"]
   },
   "include": ["index.ts", "app.config.ts", "src/**/*.ts", "src/**/*.tsx", "modules/**/*.ts"]
 }
