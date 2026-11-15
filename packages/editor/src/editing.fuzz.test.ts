@@ -11,7 +11,7 @@ import {
   undo,
   undoDepth,
 } from '@codemirror/commands';
-import { deleteMarkupBackward, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
+import { deleteMarkupBackward } from '@codemirror/lang-markdown';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import type { Command } from '@codemirror/view';
 import fc from 'fast-check';
@@ -20,6 +20,7 @@ import { noteState, parseFully, problems } from './preview-checks.js';
 import { buildPreview } from './preview.js';
 import { tablesIn, type ParsedTable } from './table.js';
 import { tables } from './table-view.js';
+import { tightListEnter } from './tight-lists.js';
 
 /**
  * Randomised editing (D-141 Q13): typing, deleting, Enter, Backspace, Tab / Shift+Tab, Alt+↑/↓,
@@ -122,7 +123,8 @@ type Step = Place &
   );
 
 const COMMANDS = {
-  enter: insertNewlineContinueMarkup,
+  // D-165: the editor's own Enter (lists stay tight).
+  enter: tightListEnter,
   backspace: deleteMarkupBackward,
   tab: indentMore,
   shiftTab: indentLess,

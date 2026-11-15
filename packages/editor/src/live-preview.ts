@@ -6,7 +6,7 @@ import {
   indentLess,
   indentMore,
 } from '@codemirror/commands';
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { deleteMarkupBackward, markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import {
@@ -14,6 +14,7 @@ import {
   EditorSelection,
   EditorState,
   Facet,
+  Prec,
   StateEffect,
   type Extension,
   type Range,
@@ -50,6 +51,7 @@ import { keepTextOutOfTables, tables } from './table-view.js';
 import { durationMs, reducedMotion } from './motion.js';
 import { checkSvg } from './check.js';
 import { NOTE_SYNTAX } from './syntax.js';
+import { tightListEnter } from './tight-lists.js';
 
 /**
  * The note editor (M5, NOTE-01, D-49, D-79): CodeMirror with an Obsidian-style live preview. The
@@ -513,7 +515,19 @@ export function editorExtensions(options: EditorOptions): Extension[] {
     EditorView.lineWrapping,
     closeBrackets(),
     // D-84: every language CodeMirror's language data knows, each loaded when a block uses it.
-    markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [...NOTE_SYNTAX] }),
+    // D-165: its own Enter keeps lists tight (tight-lists.ts); Backspace as markdown's.
+    markdown({
+      base: markdownLanguage,
+      codeLanguages: languages,
+      extensions: [...NOTE_SYNTAX],
+      addKeymap: false,
+    }),
+    Prec.high(
+      keymap.of([
+        { key: 'Enter', run: tightListEnter },
+        { key: 'Backspace', run: deleteMarkupBackward },
+      ]),
+    ),
     syntaxHighlighting(flintHighlight),
     keymap.of([
       ...(options.onEscape ? [{ key: 'Escape', run: options.onEscape }] : []),

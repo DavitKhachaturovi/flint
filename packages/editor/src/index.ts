@@ -20,3 +20,4 @@ export * from './slash.js';
 export * from './syntax.js';
 export * from './table-view.js';
 export * from './table.js';
+export * from './tight-lists.js';
