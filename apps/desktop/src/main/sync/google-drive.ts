@@ -434,24 +434,31 @@ export class GoogleDrive implements Drive {
   }
 
   /**
-   * Shares a file with a person as a writer (SPACE-05, D-189 Q5). With a `message`, Drive sends its
-   * own "shared with you" e-mail carrying it; without one it shares silently (a space's second file,
-   * so the person gets one e-mail). Allowed under `drive.file` because Flint made the file.
+   * Shares a file with a person as a writer, silently (SPACE-05, D-190 Q18: Google's own e-mail
+   * shows Flint's link unclickable, R-S1; the inviter sends Flint's ready-made e-mail instead).
+   * Allowed under `drive.file` because Flint made the file. Drive refuses a silent share to an
+   * address with no Google account: that is `NoGoogleAccount`, and nothing was shared (such a person
+   * couldn't pick the files anyway).
    */
-  async shareWith(fileId: string, email: string, message: string | null): Promise<void> {
-    const params = new URLSearchParams({
-      sendNotificationEmail: message === null ? 'false' : 'true',
-      fields: 'id',
-    });
-    if (message !== null) params.set('emailMessage', message);
-    await this.request(
-      `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'user', role: 'writer', emailAddress: email }),
-      },
-    );
+  async shareWith(fileId: string, email: string): Promise<void> {
+    const params = new URLSearchParams({ sendNotificationEmail: 'false', fields: 'id' });
+    try {
+      await this.request(
+        `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?${params.toString()}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'user', role: 'writer', emailAddress: email }),
+        },
+      );
+    } catch (error) {
+      if (
+        error instanceof DriveError &&
+        /no Google Account associated with this email/i.test(error.message)
+      )
+        throw new NoGoogleAccount(email);
+      throw error;
+    }
   }
 
   /** A space file's facts, or `null` when this account can't open it (not picked, gone, trashed). */
@@ -495,6 +502,16 @@ export class GoogleDrive implements Drive {
       content,
     );
     return file.headRevisionId ?? file.md5Checksum ?? '';
+  }
+}
+
+/** An invite to an address with no Google account: Drive shared nothing (SPACE-05, R-S1). */
+export class NoGoogleAccount extends Error {
+  readonly address: string;
+  constructor(address: string) {
+    super(`${address} has no Google account`);
+    this.name = 'NoGoogleAccount';
+    this.address = address;
   }
 }
 

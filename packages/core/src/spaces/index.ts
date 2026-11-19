@@ -4,7 +4,6 @@ export {
   JOIN_PAGE,
   cleanJoinName,
   findJoinAppLink,
-  inviteMessage,
   joinAppLink,
   joinPageLink,
   parseJoinAppLink,
@@ -12,3 +11,10 @@ export {
   type GoogleJoin,
   type JoinRequest,
 } from './join-link.js';
+export {
+  gmailComposeUrl,
+  inviteEmail,
+  isGmailAddress,
+  mailtoUrl,
+  type InviteEmail,
+} from './invite.js';

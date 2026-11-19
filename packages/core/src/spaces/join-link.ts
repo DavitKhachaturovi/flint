@@ -149,13 +149,3 @@ export function findJoinAppLink(argv: readonly string[], scheme: string): JoinRe
   }
   return null;
 }
-
-/**
- * The note in the provider's invite e-mail (SPACE-05): the person's own note, a blank line, and
- * Flint's line. The provider's e-mail is plain text, so the link stands on its own line.
- */
-export function inviteMessage(note: string, request: JoinRequest): string {
-  const line = `Join ${cleanJoinName(request.name)} in Flint: ${joinPageLink(request)}`;
-  const own = note.trim();
-  return own === '' ? line : `${own}\n\n${line}`;
-}

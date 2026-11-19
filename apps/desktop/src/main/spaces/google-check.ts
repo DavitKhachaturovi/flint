@@ -1,15 +1,29 @@
 /**
  * R-S1 and R-S2 (docs/06 §8, D-189, D-190): the first real pieces of shared spaces on Google Drive,
- * production code (D-18) that S3 builds on: making a space's two files and inviting people (Drive
- * sends its own e-mail carrying Flint's join line, D-189 Q5), and joining from the join link through
- * Google's picker (D-189 Q6, D-190 Q8). Until S3's dialogs exist, a development-only command starts
+ * production code (D-18) that S3 builds on: making a space's two files and inviting people (shared
+ * silently, then the inviter's own ready-made e-mail with the join link, D-190 Q18: R-S1 found the
+ * link in Google's own e-mail unclickable), and joining from the join link through Google's picker
+ * (D-189 Q6, D-190 Q8). Until S3's dialogs exist, a development-only command starts
  * the invite and a dialog reports what each step found; the files hold a placeholder until S2's
  * format (04 §9) replaces it.
  */
 import { randomBytes } from 'node:crypto';
-import { inviteMessage, joinPageLink, parseJoinAppLink, type GoogleJoin } from '@flint/core/spaces';
+import {
+  gmailComposeUrl,
+  inviteEmail,
+  isGmailAddress,
+  joinPageLink,
+  mailtoUrl,
+  parseJoinAppLink,
+  type GoogleJoin,
+} from '@flint/core/spaces';
 import { GOOGLE_CLIENT, googleDriveFor } from '../sync/connection.js';
-import { SPACE_FILES_MIME, SPACE_MIME, type GoogleDrive } from '../sync/google-drive.js';
+import {
+  NoGoogleAccount,
+  SPACE_FILES_MIME,
+  SPACE_MIME,
+  type GoogleDrive,
+} from '../sync/google-drive.js';
 import { signIn, type Fetch } from '../sync/oauth.js';
 
 export interface SpacesCheckDeps {
@@ -113,18 +127,43 @@ export async function createAndInvite(deps: SpacesCheckDeps, check: InviteCheck)
       name: check.name,
       development: deps.development,
     };
-    const message = inviteMessage(check.note, request);
+    // Silent shares (D-190 Q18): Google's own e-mail never goes out. An address without a Google
+    // account is refused by Drive before anything is shared with it.
+    const shared: string[] = [];
+    const noAccount: string[] = [];
     for (const person of check.people) {
-      // One e-mail per person: the space file's share carries the note; the second file is silent.
-      await drive.shareWith(ids.spaceFile, person, message);
-      await drive.shareWith(ids.filesFile, person, null);
+      try {
+        await drive.shareWith(ids.spaceFile, person);
+      } catch (error) {
+        if (error instanceof NoGoogleAccount) {
+          noAccount.push(person);
+          continue;
+        }
+        throw error;
+      }
+      await drive.shareWith(ids.filesFile, person);
+      shared.push(person);
     }
     deps.log(
-      `spaces check: made ${check.name} (${spaceId}) in ${account.email}'s ${deps.folderName}, invited ${check.people.length} (${check.people.map((person) => person.replace(/^(.).*@/, '$1…@')).join(', ')}); link ${joinPageLink(request)}`,
+      `spaces check: made ${check.name} (${spaceId}) in ${deps.folderName}, shared with ${shared.length}, ${noAccount.length} without a Google account; link ${joinPageLink(request)}`,
+    );
+    const refused =
+      noAccount.length === 0
+        ? ''
+        : `\n\nNot invited: ${noAccount.join(', ')} ${noAccount.length === 1 ? 'has' : 'have'} no Google account. Everyone in a Google Drive space needs one.`;
+    if (shared.length === 0) {
+      deps.say(`Nobody invited to ${check.name}`, refused.trim());
+      return;
+    }
+    // The inviter's own e-mail, ready to send: Gmail's compose page for a Gmail account, the mail
+    // app otherwise. Flint only opens it; the inviter presses Send.
+    const email = inviteEmail(check.note, request);
+    deps.open(
+      isGmailAddress(account.email) ? gmailComposeUrl(shared, email) : mailtoUrl(shared, email),
     );
     deps.say(
-      `Invite sent: ${check.name}`,
-      `Google Drive sent its "shared with you" e-mail to ${check.people.join(', ')}, with this note:\n\n${message}\n\nOpen that e-mail and click the link (R-S1).`,
+      `Shared ${check.name}: now send the invite`,
+      `${check.name} is shared with ${shared.join(', ')} (Google sent no e-mail). Your invite e-mail is open, ready to send: press Send there.${refused}\n\nThe link, to send another way:\n${joinPageLink(request)}`,
     );
   } catch (error) {
     deps.log(`spaces check: making or inviting failed: ${describe(error)}`);

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanJoinName,
   findJoinAppLink,
-  inviteMessage,
   joinAppLink,
   joinPageLink,
   parseJoinAppLink,
@@ -95,13 +94,6 @@ describe('join links (SPACE-06, D-189 Q6, D-190 Q8)', () => {
     const argv = ['C:\\flint.exe', '--hidden', joinAppLink(home)];
     expect(findJoinAppLink(argv, 'flint')).toEqual(home);
     expect(findJoinAppLink(['C:\\flint.exe'], 'flint')).toBeNull();
-  });
-
-  it('writes the e-mail note: the person’s note, a blank line, then Flint’s line', () => {
-    expect(inviteMessage('  Groceries for the week  ', home)).toBe(
-      `Groceries for the week\n\nJoin Home in Flint: ${joinPageLink(home)}`,
-    );
-    expect(inviteMessage('', home)).toBe(`Join Home in Flint: ${joinPageLink(home)}`);
   });
 
   it('any name round-trips cleaned, and any text is either a valid request or nothing', () => {
