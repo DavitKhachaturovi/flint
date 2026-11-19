@@ -112,25 +112,36 @@ export const main = {
     return invoke(Channels.mainRedo) as Promise<string | null>;
   },
 
-  /** D-79: a pasted image saved to the Flint folder's attachments/; its relative link. */
-  attach(bytes: Uint8Array, type: string): Promise<string | null> {
-    return invoke(Channels.mainAttach, bytes, type) as Promise<string | null>;
+  /**
+   * D-79: a pasted image saved to attachments/; its relative link. SPACE-01: `listId`, the list it
+   * goes into, puts it in that list's space's attachments/ (Personal's when none).
+   */
+  attach(bytes: Uint8Array, type: string, listId?: string | null): Promise<string | null> {
+    return invoke(Channels.mainAttach, bytes, type, listId ?? null) as Promise<string | null>;
   },
   /** NOTE-02, D-82: Insert ▸ Image: the file picker; the picture's relative link, or null. */
-  pickImage(): Promise<string | null> {
-    return invoke(Channels.mainPickImage) as Promise<string | null>;
+  pickImage(listId?: string | null): Promise<string | null> {
+    return invoke(Channels.mainPickImage, listId ?? null) as Promise<string | null>;
   },
   /** D-84: where a dragged or pasted file is on disk (empty for a picture from the clipboard). */
   pathFor(file: File): string {
     return webUtils.getPathForFile(file);
   },
   /** MEDIA-01, MEDIA-03, D-84: a file added: copied into attachments/, or linked when large. */
-  attachFile(path: string): Promise<AttachFileOutcome | null> {
-    return invoke(Channels.mainAttachFile, path) as Promise<AttachFileOutcome | null>;
+  attachFile(path: string, listId?: string | null): Promise<AttachFileOutcome | null> {
+    return invoke(
+      Channels.mainAttachFile,
+      path,
+      listId ?? null,
+    ) as Promise<AttachFileOutcome | null>;
   },
   /** MEDIA-03, D-84: Copy into Flint: the linked file copied into attachments/. */
-  copyIntoFlint(link: string): Promise<AttachFileOutcome | null> {
-    return invoke(Channels.mainCopyIntoFlint, link) as Promise<AttachFileOutcome | null>;
+  copyIntoFlint(link: string, listId?: string | null): Promise<AttachFileOutcome | null> {
+    return invoke(
+      Channels.mainCopyIntoFlint,
+      link,
+      listId ?? null,
+    ) as Promise<AttachFileOutcome | null>;
   },
   attachmentExists(link: string): Promise<boolean> {
     return invoke(Channels.mainAttachmentExists, link) as Promise<boolean>;

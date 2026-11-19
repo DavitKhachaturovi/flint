@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
@@ -316,8 +316,25 @@ function log(message: string): void {
   }
 }
 
-/** The Flint folder, once known: `app://media/…` serves its images (task bodies, D-49). */
-let mediaRoot: string | null = null;
+/**
+ * The folders `app://media/…` serves images from (task bodies, D-49): the Flint folder, then each
+ * space's (SPACE-01); a relative `attachments/…` link is looked for in that order. Flint's own
+ * attachment names carry a time and a random part, so two spaces never hold different files of
+ * one name in practice.
+ */
+let mediaRoots: () => readonly string[] = () => [];
+
+/** The image or video an `app://media/…` request names, in the first folder that has it. */
+function mediaFile(url: string): string | null {
+  let first: string | null = null;
+  for (const root of mediaRoots()) {
+    const file = resolveMediaFile(url, root);
+    if (!file) return null;
+    first ??= file;
+    if (existsSync(file)) return file;
+  }
+  return first;
+}
 
 /**
  * Serves `app://flint/…` from the built renderer folder and nothing else (D-34), and
@@ -329,7 +346,7 @@ function serveRenderer(): void {
   schemes.handle(APP_SCHEME, async (request) => {
     const file =
       resolveRendererFile(request.url, root) ??
-      (mediaRoot ? resolveMediaFile(request.url, mediaRoot) : null) ??
+      mediaFile(request.url) ??
       resolveLinkedFile(request.url);
     if (!file) return new Response('Not found', { status: 404 });
     // D-84: videos (also large linked ones) are streamed, with range requests for seeking.
@@ -455,7 +472,7 @@ async function start(): Promise<void> {
   log(
     `Flint folder ${folder.folder}: ${folder.lists.length} lists, Inbox ${folder.inbox}${folder.inboxCreated ? ' (created)' : ''}`,
   );
-  mediaRoot = folder.folder;
+  mediaRoots = () => [folder.folder];
   // Shown in onboarding and settings in M8 (D-23, D-24); logged until then.
   if (folder.insideOneDrive) {
     log('warning: the Flint folder is inside OneDrive, which v1 does not support (D-24)');
@@ -552,6 +569,27 @@ async function start(): Promise<void> {
   );
   spacesWatcher.sync();
   workspace.onChange(() => spacesWatcher.sync());
+  // SPACE-01: pictures in a space's notes load from its own attachments/ too.
+  mediaRoots = () => workspace.spaceFolders();
+  /**
+   * SPACE-01: the file an attachment link names: a `file:///` link as it is; a relative one in the
+   * first space's folder that has it (Personal's first), else Personal's path (missing).
+   */
+  const attachmentPath = (link: string): string | null => {
+    const roots = workspace.spaceFolders();
+    let first: string | null = null;
+    for (const root of roots) {
+      const path = linkedPath(link, root);
+      if (!path) return null;
+      if (/^file:\/\//i.test(link)) return path;
+      first ??= path;
+      if (existsSync(path)) return path;
+    }
+    return first;
+  };
+  /** SPACE-01: the folder an attachment for a list goes into (its space's), from a window's list ID. */
+  const attachFolder = (listId: unknown): string =>
+    workspace.folderOfList(typeof listId === 'string' ? listId : null);
   // MINI-01, D-109: mini mode, beside the main window and in sync with it (made on first use).
   const mini = createMini({
     url: pageUrl('mini', MINI_HOST),
@@ -997,30 +1035,35 @@ async function start(): Promise<void> {
         return { ok: false, problem: 'Flint could not change the file' } as const;
       });
   });
-  ipcMain.handle(Channels.mainAttach, (event, bytes: unknown, type: unknown) =>
+  // SPACE-01: each attach call may name the list it is for; the file goes to its space's attachments/.
+  ipcMain.handle(Channels.mainAttach, (event, bytes: unknown, type: unknown, listId: unknown) =>
     owns(event.sender) && bytes instanceof Uint8Array && typeof type === 'string'
-      ? workspace.saveImage(bytes, type, new Date()).catch((error: unknown) => {
-          log(`could not save the image: ${String(error)}`);
-          return null;
-        })
+      ? workspace
+          .saveImage(bytes, type, new Date(), typeof listId === 'string' ? listId : null)
+          .catch((error: unknown) => {
+            log(`could not save the image: ${String(error)}`);
+            return null;
+          })
       : null,
   );
   // MEDIA-01, MEDIA-03, D-84: a dragged or pasted file: copied in, or linked when it's large.
-  ipcMain.handle(Channels.mainAttachFile, (event, path: unknown): Promise<AttachOutcome | null> =>
-    owns(event.sender) && typeof path === 'string'
-      ? attachFile(path, folder.folder, new Date())
-      : Promise.resolve(null),
+  ipcMain.handle(
+    Channels.mainAttachFile,
+    (event, path: unknown, listId: unknown): Promise<AttachOutcome | null> =>
+      owns(event.sender) && typeof path === 'string'
+        ? attachFile(path, attachFolder(listId), new Date())
+        : Promise.resolve(null),
   );
   ipcMain.handle(
     Channels.mainCopyIntoFlint,
-    (event, link: unknown): Promise<AttachOutcome | null> =>
+    (event, link: unknown, listId: unknown): Promise<AttachOutcome | null> =>
       owns(event.sender) && typeof link === 'string'
-        ? copyIntoFlint(link, folder.folder, new Date())
+        ? copyIntoFlint(link, attachFolder(listId), new Date())
         : Promise.resolve(null),
   );
   ipcMain.handle(Channels.mainAttachmentExists, async (event, link: unknown) => {
     if (!owns(event.sender) || typeof link !== 'string') return false;
-    const path = linkedPath(link, folder.folder);
+    const path = attachmentPath(link);
     return path
       ? stat(path).then(
           (info) => info.isFile(),
@@ -1035,8 +1078,8 @@ async function start(): Promise<void> {
     if (!owns(event.sender) || typeof source !== 'string') return false;
     if (action !== 'copy' && action !== 'show' && action !== 'open') return false;
     const path = /^app:\/\//i.test(source)
-      ? (resolveMediaFile(source, folder.folder) ?? resolveLinkedFile(source))
-      : linkedPath(source, folder.folder);
+      ? (mediaFile(source) ?? resolveLinkedFile(source))
+      : attachmentPath(source);
     // D-89: Show in folder works for any attachment; copying and opening here, for pictures.
     if (!path || (action !== 'show' && fileKind(path) !== 'image')) return false;
     const exists = await stat(path).then(
@@ -1067,7 +1110,7 @@ async function start(): Promise<void> {
   });
   ipcMain.handle(Channels.mainOpenAttachment, async (event, link: unknown) => {
     if (!owns(event.sender) || typeof link !== 'string') return 'refused';
-    const path = linkedPath(link, folder.folder);
+    const path = attachmentPath(link);
     if (!path) return 'refused';
     const exists = await stat(path).then(
       (info) => info.isFile(),
@@ -1161,7 +1204,7 @@ async function start(): Promise<void> {
     return count;
   });
   // NOTE-02, D-82: Insert ▸ Image: a picture from the file picker, copied into attachments/.
-  ipcMain.handle(Channels.mainPickImage, async (event) => {
+  ipcMain.handle(Channels.mainPickImage, async (event, listId: unknown) => {
     if (!owns(event.sender)) return null;
     const picked = await dialog.showOpenDialog(mainWindow, {
       title: 'Insert image',
@@ -1173,7 +1216,12 @@ async function start(): Promise<void> {
     const type = PICKED_TYPES[extname(file).toLowerCase()];
     if (!type) return null;
     try {
-      return await workspace.saveImage(new Uint8Array(await readFile(file)), type, new Date());
+      return await workspace.saveImage(
+        new Uint8Array(await readFile(file)),
+        type,
+        new Date(),
+        typeof listId === 'string' ? listId : null,
+      );
     } catch (error) {
       log(`could not insert the image: ${String(error)}`);
       return null;

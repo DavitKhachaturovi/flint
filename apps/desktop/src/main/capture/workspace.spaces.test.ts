@@ -255,6 +255,20 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     expect(milk?.home).toEqual({ listId: 'err1', listName: 'Errands' });
   });
 
+  it('a picture added to a space’s list goes to that space’s attachments/, so it travels with it', async () => {
+    const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1', 'note') });
+    const workspace = await open();
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    const link = await workspace.saveImage(png, 'image/png', now, 'gro1');
+    expect(link).toMatch(/^attachments\/.+\.png$/);
+    await readFile(join(space, link ?? ''));
+    expect(await readdir(join(folder, 'attachments')).catch(() => [])).toEqual([]);
+    // Without a list (or for a personal one) it goes to the Flint folder's, as before.
+    const personal = await workspace.saveImage(png, 'image/png', now);
+    await readFile(join(folder, personal ?? ''));
+    expect(workspace.spaceFolders()).toEqual([folder, space]);
+  });
+
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {
     const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
     const workspace = await open();

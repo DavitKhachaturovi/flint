@@ -502,6 +502,19 @@ export class Workspace {
   }
 
   /**
+   * SPACE-01: the folder a list's attachments go to (its space's; the Flint folder for Personal, an
+   * unknown list or none), so a picture added to a space's note travels with the space.
+   */
+  folderOfList(id?: string | null): string {
+    return this.folderOf(id ? this.find(id)?.entry.space : undefined);
+  }
+
+  /** Every space's folder, Personal's first: where a relative `attachments/…` link is looked for. */
+  spaceFolders(): string[] {
+    return this.allSpaces().map((space) => this.folderOf(space));
+  }
+
+  /**
    * New space… "On this PC" (SPACE-05, D-190 Q14): its folder `Spaces/<name>/` with `space.json`,
    * empty. Space names are unique (ignoring case), as group names are (D-79).
    */
@@ -536,14 +549,21 @@ export class Workspace {
     return tempDirectoryFor(join(this.folder, 'x.md'));
   }
 
-  async saveImage(bytes: Uint8Array, type: string, now: Date): Promise<string | null> {
+  async saveImage(
+    bytes: Uint8Array,
+    type: string,
+    now: Date,
+    /** SPACE-01: the list it is pasted into (its space's attachments/); Personal's when none. */
+    listId?: string | null,
+  ): Promise<string | null> {
     const extension = IMAGE_TYPES[type];
     if (!extension || bytes.byteLength > MAX_IMAGE_BYTES) return null;
-    await mkdir(join(this.folder, 'attachments'), { recursive: true });
+    const folder = this.folderOfList(listId);
+    await mkdir(join(folder, 'attachments'), { recursive: true });
     const name = `${stamp(now)}-${generateId(this.isTaken)}.${extension}`;
-    const path = join(this.folder, 'attachments', name);
-    // D-130: the Flint folder's own temporary folder, never one inside attachments/.
-    await writeFileAtomic(path, bytes, { tempDirectory: this.folderTemp });
+    const path = join(folder, 'attachments', name);
+    // D-130: the folder's own temporary folder, never one inside attachments/.
+    await writeFileAtomic(path, bytes, { tempDirectory: tempDirectoryFor(join(folder, 'x.md')) });
     return `attachments/${name}`;
   }
 
