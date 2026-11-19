@@ -378,4 +378,137 @@ export class GoogleDrive implements Drive {
     );
     return about.user?.emailAddress ?? '';
   }
+
+  // ── Spaces (SPACE-05, SPACE-06, D-189, D-190 Q8, 04 §9): a space is two files in the creator's
+  // "Flint spaces" folder, shared by Drive itself (it sends the invite e-mail). With `drive.file`,
+  // a member's Flint can open them only after picking them in Google's picker. ──
+
+  /** The "Flint spaces" folder in My Drive: found by its mark (any of this account's PCs made it). */
+  async spacesFolder(name: string): Promise<string> {
+    const params = new URLSearchParams({
+      q: `mimeType = '${FOLDER_TYPE}' and trashed = false and appProperties has { key='flintSpaces' and value='1' } and name = '${name.replace(/'/g, "\\'")}'`,
+      fields: 'files(id,parents)',
+      spaces: 'drive',
+    });
+    const found =
+      (await this.json<{ files?: ApiFile[] }>(`${DRIVE_API}/files?${params.toString()}`)).files ??
+      [];
+    const existing = found.find((file) => file.parents?.length) ?? found[0];
+    if (existing) return existing.id;
+    const made = await this.json<ApiFile>(`${DRIVE_API}/files?fields=id`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        mimeType: FOLDER_TYPE,
+        parents: ['root'],
+        appProperties: { flintSpaces: '1' },
+      }),
+    });
+    return made.id;
+  }
+
+  /** Makes a space's two files (`<name>.flintspace`, `<name>.flintfiles`) in the spaces folder. */
+  async createSpaceFiles(
+    folderId: string,
+    spaceName: string,
+    spaceId: string,
+    content: { readonly space: Uint8Array; readonly files: Uint8Array },
+    device: string,
+  ): Promise<{ readonly spaceFile: string; readonly filesFile: string }> {
+    const make = (suffix: string, mimeType: string, kind: string, bytes: Uint8Array) =>
+      this.upload(
+        'POST',
+        '',
+        {
+          name: `${spaceName}.${suffix}`,
+          parents: [folderId],
+          mimeType,
+          appProperties: { flintKind: kind, flintSpace: spaceId, device },
+        },
+        bytes,
+      );
+    const space = await make('flintspace', SPACE_MIME, 'space', content.space);
+    const files = await make('flintfiles', SPACE_FILES_MIME, 'space-files', content.files);
+    return { spaceFile: space.id, filesFile: files.id };
+  }
+
+  /**
+   * Shares a file with a person as a writer (SPACE-05, D-189 Q5). With a `message`, Drive sends its
+   * own "shared with you" e-mail carrying it; without one it shares silently (a space's second file,
+   * so the person gets one e-mail). Allowed under `drive.file` because Flint made the file.
+   */
+  async shareWith(fileId: string, email: string, message: string | null): Promise<void> {
+    const params = new URLSearchParams({
+      sendNotificationEmail: message === null ? 'false' : 'true',
+      fields: 'id',
+    });
+    if (message !== null) params.set('emailMessage', message);
+    await this.request(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'user', role: 'writer', emailAddress: email }),
+      },
+    );
+  }
+
+  /** A space file's facts, or `null` when this account can't open it (not picked, gone, trashed). */
+  async spaceFileInfo(fileId: string): Promise<SpaceFileInfo | null> {
+    const fields = 'id,name,mimeType,trashed,headRevisionId,md5Checksum,appProperties,capabilities';
+    try {
+      const file = await this.json<ApiFile & { capabilities?: { canEdit?: boolean } }>(
+        `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=${fields}`,
+      );
+      if (file.trashed) return null;
+      return {
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType ?? '',
+        kind: file.appProperties?.['flintKind'] ?? null,
+        spaceId: file.appProperties?.['flintSpace'] ?? null,
+        revision: file.headRevisionId ?? file.md5Checksum ?? '',
+        canEdit: file.capabilities?.canEdit === true,
+      };
+    } catch (error) {
+      if (error instanceof DriveError && error.problem === 'other' && /\b404\b/.test(error.message))
+        return null;
+      throw error;
+    }
+  }
+
+  /** A space file's bytes. */
+  async readSpaceFile(fileId: string): Promise<Uint8Array> {
+    const response = await this.request(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`,
+    );
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  /** Writes a space file whole; returns its new revision. (The write-gap repair, D-190 Q9, is S2.) */
+  async writeSpaceFile(fileId: string, content: Uint8Array, device: string): Promise<string> {
+    const file = await this.upload(
+      'PATCH',
+      `/${encodeURIComponent(fileId)}`,
+      { appProperties: { device } },
+      content,
+    );
+    return file.headRevisionId ?? file.md5Checksum ?? '';
+  }
+}
+
+export const SPACE_MIME = 'application/vnd.flintnotes.space';
+export const SPACE_FILES_MIME = 'application/vnd.flintnotes.space-files';
+
+export interface SpaceFileInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  /** `space` or `space-files` when Flint made it; anything else isn't a Flint space file. */
+  readonly kind: string | null;
+  readonly spaceId: string | null;
+  readonly revision: string;
+  /** This account may write it (a writer, D-189 Q5). */
+  readonly canEdit: boolean;
 }

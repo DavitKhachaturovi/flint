@@ -41,6 +41,11 @@
       "types": "./dist/sync/index.d.ts",
       "default": "./dist/sync/index.js"
     },
+    "./spaces": {
+      "source": "./src/spaces/index.ts",
+      "types": "./dist/spaces/index.d.ts",
+      "default": "./dist/spaces/index.js"
+    },
     "./focus": {
       "source": "./src/focus/index.ts",
       "types": "./dist/focus/index.d.ts",

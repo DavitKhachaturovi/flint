@@ -21,7 +21,34 @@ export interface Tokens {
   readonly accessToken: string;
   /** When the access token stops working (ms). */
   readonly expires: number;
+  /**
+   * The files picked in Google's picker (SPACE-06, R-S2): `drive.file` can open a file shared with
+   * this account only after it is picked. Present only when the sign-in opened the picker.
+   */
+  readonly picked?: readonly string[];
 }
+
+/**
+ * Google's picker inside the sign-in (SPACE-06, D-189 Q6, docs/05 §5): the authorization URL with
+ * `trigger_onepick`, shown in the default browser like any sign-in, answering with
+ * `picked_file_ids` beside the code. Only the `drive.file` scope is allowed with it (Flint's one).
+ */
+export interface PickOptions {
+  /** Show only these files (the space's two, from its join link). */
+  readonly fileIds?: readonly string[];
+  /** Show only files of these types (Find it in Google Drive: Flint's space files). */
+  readonly mimeTypes?: readonly string[];
+  /** Several files in one Select (both of a space's files, D-190 Q8). */
+  readonly allowMultiple?: boolean;
+  /**
+   * Ask which Google account first (`prompt=select_account consent`): a browser signed in to several
+   * accounts would otherwise pick one by itself, and joining is per account (SPACE-06).
+   */
+  readonly chooseAccount?: boolean;
+}
+
+/** Drive's file IDs: what `picked_file_ids` may hold (anything else is dropped). */
+const PICKED_ID = /^[A-Za-z0-9_-]{10,200}$/;
 
 /** How long a sign-in waits for the browser before giving up. */
 export const SIGN_IN_TIMEOUT_MS = 2 * 60 * 1000;
@@ -52,9 +79,15 @@ export interface SignIn {
 
 /**
  * Opens Google's sign-in in the browser (`open`) and waits for its answer on a loopback listener.
- * `fetch` is sync's own session (the network guard lets it reach Google's token host).
+ * `fetch` is sync's own session (the network guard lets it reach Google's token host). With `pick`,
+ * the sign-in shows Google's picker and the tokens carry the picked files.
  */
-export function signIn(client: Client, open: (url: string) => void, fetch: Fetch): SignIn {
+export function signIn(
+  client: Client,
+  open: (url: string) => void,
+  fetch: Fetch,
+  pick?: PickOptions,
+): SignIn {
   const verifier = base64url(randomBytes(48));
   const challenge = base64url(createHash('sha256').update(verifier).digest());
   const state = base64url(randomBytes(24));
@@ -102,7 +135,15 @@ export function signIn(client: Client, open: (url: string) => void, fetch: Fetch
         );
         return;
       }
-      exchange(client, code, verifier, redirect, fetch).then(resolve, reject);
+      const picked = pick
+        ? (url.searchParams.get('picked_file_ids') ?? '')
+            .split(',')
+            .filter((id) => PICKED_ID.test(id))
+        : undefined;
+      exchange(client, code, verifier, redirect, fetch).then(
+        (tokens) => resolve(picked ? { ...tokens, picked } : tokens),
+        reject,
+      );
     });
     server = listener;
     listener.on('error', (error) => {
@@ -121,9 +162,17 @@ export function signIn(client: Client, open: (url: string) => void, fetch: Fetch
         code_challenge_method: 'S256',
         state,
         access_type: 'offline',
-        // A refresh token every time (a second connection would otherwise get none).
+        // A refresh token every time (a second connection would otherwise get none). The picker
+        // requires it too.
         prompt: 'consent',
       });
+      if (pick) {
+        params.set('trigger_onepick', 'true');
+        if (pick.chooseAccount) params.set('prompt', 'select_account consent');
+        if (pick.allowMultiple) params.set('allow_multiple', 'true');
+        if (pick.fileIds?.length) params.set('file_ids', pick.fileIds.join(','));
+        if (pick.mimeTypes?.length) params.set('mimetypes', pick.mimeTypes.join(','));
+      }
       open(`${AUTH_URL}?${params.toString()}`);
     });
     timer = setTimeout(() => {

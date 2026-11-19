@@ -1617,3 +1617,23 @@ h1 {
     padding: 128px 24px 96px;
   }
 }
+
+/* The join page (SPACE-06, D-189 Q6): opens Flint from a space's invite link. */
+.doc.join .join-line {
+  margin: 20px 0 32px;
+  color: var(--fl-text-secondary);
+}
+
+.doc.join .join-actions {
+  margin: 0 0 40px;
+}
+
+.doc.join .join-actions[hidden] {
+  display: none;
+}
+
+.doc.join .join-fine {
+  margin-top: 28px;
+  font-size: 14px;
+  color: var(--fl-text-muted);
+}

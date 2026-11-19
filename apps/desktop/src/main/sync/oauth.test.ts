@@ -111,6 +111,48 @@ describe('signIn (SYNC-01)', () => {
     await expect(pending.result).rejects.toThrow('invalid_request: client_secret is missing.');
   });
 
+  it("SPACE-06 (R-S2): opens Google's picker for the given files and returns the picked ones", async () => {
+    const { fetch } = tokenEndpoint();
+    const space = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+    const files = '1ZyXwVuTsRqPoNmLkJiHgFeDcBa543210';
+    const pending = signIn(
+      CLIENT,
+      (authUrl) => {
+        const params = new URL(authUrl).searchParams;
+        expect(params.get('trigger_onepick')).toBe('true');
+        expect(params.get('allow_multiple')).toBe('true');
+        expect(params.get('file_ids')).toBe(`${space},${files}`);
+        // Joining is per account: Google asks which one even when the browser has several.
+        expect(params.get('prompt')).toBe('select_account consent');
+        expect(params.get('scope')).toBe('https://www.googleapis.com/auth/drive.file');
+        // Google appends the picked files; anything that isn't a Drive ID is dropped.
+        void browserReturns(
+          `${params.get('redirect_uri') ?? ''}?picked_file_ids=${space},${files},..%2Fbad&code=c&state=${params.get('state') ?? ''}`,
+        );
+      },
+      fetch,
+      { fileIds: [space, files], allowMultiple: true, chooseAccount: true },
+    );
+    expect((await pending.result).picked).toEqual([space, files]);
+  });
+
+  it('a plain sign-in carries no picker parameters and no picked files', async () => {
+    const { fetch } = tokenEndpoint();
+    const pending = signIn(
+      CLIENT,
+      (authUrl) => {
+        const params = new URL(authUrl).searchParams;
+        expect(params.has('trigger_onepick')).toBe(false);
+        expect(params.has('file_ids')).toBe(false);
+        void browserReturns(
+          `${params.get('redirect_uri') ?? ''}?picked_file_ids=1AbCdEfGhIjKlMnOp&code=c&state=${params.get('state') ?? ''}`,
+        );
+      },
+      fetch,
+    );
+    expect((await pending.result).picked).toBeUndefined();
+  });
+
   it('can be cancelled while waiting for the browser', async () => {
     const { fetch } = tokenEndpoint();
     const pending = signIn(CLIENT, () => undefined, fetch);

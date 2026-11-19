@@ -25,6 +25,37 @@ import {
 const CLIENT: Client = { id: GOOGLE_CLIENT_ID, secret: GOOGLE_CLIENT_SECRET };
 import type { SyncConnection } from './service.js';
 
+/** The Desktop client (spaces sign in and pick with the same one, SPACE-06). */
+export const GOOGLE_CLIENT: Client = CLIENT;
+
+/** Whether this build can talk to Google at all (both halves of the client). */
+export const googleAvailable = (): boolean => CLIENT.id !== '' && CLIENT.secret !== '';
+
+/**
+ * The Drive client for one account: `tokens` from a sign-in (used until they expire), refreshed
+ * with its refresh token afterwards. Spaces use it for the account that holds or joins a space.
+ */
+export function googleDriveFor(fetch: Fetch, refreshToken: string, tokens?: Tokens): GoogleDrive {
+  let current: Tokens | null = tokens ?? null;
+  return new GoogleDrive({
+    fetch,
+    token: async (fresh) => {
+      if (!current || fresh || current.expires - Date.now() < 60_000) {
+        try {
+          current = await refresh(CLIENT, refreshToken, fetch);
+        } catch (error) {
+          if (error instanceof AuthExpired) {
+            const { DriveError } = await import('@flint/core/sync');
+            throw new DriveError('auth');
+          }
+          throw error;
+        }
+      }
+      return current.accessToken;
+    },
+  });
+}
+
 /** The real one: Google's sign-in in the browser, the Drive API over `fetch` (sync's session). */
 export function googleConnection(fetch: Fetch, open: (url: string) => void): SyncConnection {
   return {
@@ -38,26 +69,7 @@ export function googleConnection(fetch: Fetch, open: (url: string) => void): Syn
       });
       return { result, cancel: () => pending.cancel() };
     },
-    drive(refreshToken) {
-      let tokens: Tokens | null = null;
-      return new GoogleDrive({
-        fetch,
-        token: async (fresh) => {
-          if (!tokens || fresh || tokens.expires - Date.now() < 60_000) {
-            try {
-              tokens = await refresh(CLIENT, refreshToken, fetch);
-            } catch (error) {
-              if (error instanceof AuthExpired) {
-                const { DriveError } = await import('@flint/core/sync');
-                throw new DriveError('auth');
-              }
-              throw error;
-            }
-          }
-          return tokens.accessToken;
-        },
-      });
-    },
+    drive: (refreshToken) => googleDriveFor(fetch, refreshToken),
     revoke: (refreshToken) => revoke(refreshToken, fetch),
     open,
     folderUrl,

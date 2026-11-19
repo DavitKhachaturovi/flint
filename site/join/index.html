@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Join a space · Flint</title>
+    <meta name="description" content="Opens Flint to join a shared space from an invite." />
+    <meta name="robots" content="noindex" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="icon" href="../assets/flint-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/tokens.css" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <!-- SPACE-06 (D-189 Q6): reads the part after # (never sent to a server) and opens Flint. -->
+    <script src="../assets/join.js" defer></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="nav">
+        <a class="brand" href="../" aria-label="Flint, home">
+          <img src="../assets/flint-icon.svg" alt="" width="46" height="46" />
+          <span>Flint</span>
+        </a>
+      </header>
+
+      <main class="doc join">
+        <p class="label">Invite</p>
+        <h1 id="join-title">Opening Flint…</h1>
+        <p class="join-line" id="join-line">
+          If your browser asks whether to open Flint, choose Open.
+        </p>
+
+        <div class="join-actions" id="join-actions" hidden>
+          <a class="button primary" id="join-open" href="../">Open Flint</a>
+        </div>
+
+        <div class="summary join-get">
+          <p>
+            Don't have Flint yet?
+            <a class="link" href="https://github.com/DavitKhachaturovi/flint/releases/latest"
+              >Download for Windows</a
+            >, then click the link in your invite again.
+          </p>
+        </div>
+
+        <p class="join-fine">
+          Everything after the # in this link stays in your browser: this page loads nothing from
+          anywhere else and sends nothing anywhere.
+        </p>
+      </main>
+
+      <footer class="footer">
+        <span class="footer-copy"
+          ><img src="../assets/flint-icon.svg" alt="" width="28" height="28" />© 2026 Davit
+          Khachaturovi · MIT license</span
+        >
+        <nav aria-label="Footer">
+          <a href="https://github.com/DavitKhachaturovi/flint">GitHub</a>
+          <a href="../privacy/">Privacy</a>
+          <a href="../terms/">Terms</a>
+          <a href="../">Home</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -171,9 +171,18 @@ import {
 import { announceEnvironmentChange, clipboardSequence, VirtualKey } from './win32.js';
 import { classifyPaste } from '@flint/core/shorthand';
 import { FakeDrive } from '@flint/core/sync';
-import { googleConnection, testConnection } from './sync/connection.js';
+import { googleAvailable, googleConnection, testConnection } from './sync/connection.js';
+import { findJoinAppLink } from '@flint/core/spaces';
+import {
+  accessCheck,
+  createAndInvite,
+  joinGoogleSpace,
+  parseAccessCheck,
+  parseInviteCheck,
+  type SpacesCheckDeps,
+} from './spaces/google-check.js';
 import { isSyncRequest, SYNC_SESSION } from './sync/google.js';
-import { WorkspaceSide } from './sync/local.js';
+import { deviceName, WorkspaceSide } from './sync/local.js';
 import { SyncService } from './sync/service.js';
 import { SyncStore } from './sync/store.js';
 import { isSyncAction, type SyncStatusView } from '../shared/sync.js';
@@ -2301,20 +2310,23 @@ async function start(): Promise<void> {
   const syncConnection = syncFake
     ? testConnection(syncFake, openExternal)
     : googleConnection((url, init) => syncSession.fetch(url, init), openExternal);
+  const syncStore = new SyncStore(join(app.getPath('userData'), 'sync'), {
+    encrypt: (text) =>
+      syncHooks || !safeStorage.isEncryptionAvailable()
+        ? Buffer.from(text, 'utf8')
+        : safeStorage.encryptString(text),
+    decrypt: (data) =>
+      syncHooks || !safeStorage.isEncryptionAvailable()
+        ? data.toString('utf8')
+        : safeStorage.decryptString(data),
+  });
+  /** SPACE-06 (R-S1, R-S2): spaces steps under way; sync's session may reach Google meanwhile. */
+  let spacesBusy = 0;
   const sync =
     BUILD === 'bench'
       ? null
       : new SyncService({
-          store: new SyncStore(join(app.getPath('userData'), 'sync'), {
-            encrypt: (text) =>
-              syncHooks || !safeStorage.isEncryptionAvailable()
-                ? Buffer.from(text, 'utf8')
-                : safeStorage.encryptString(text),
-            decrypt: (data) =>
-              syncHooks || !safeStorage.isEncryptionAvailable()
-                ? data.toString('utf8')
-                : safeStorage.decryptString(data),
-          }),
+          store: syncStore,
           connection: syncConnection,
           local: new WorkspaceSide({
             workspace: () => workspace,
@@ -2351,7 +2363,7 @@ async function start(): Promise<void> {
           },
         });
   if (sync) {
-    syncNetworkAllowed = () => sync.networkAllowed();
+    syncNetworkAllowed = () => sync.networkAllowed() || spacesBusy > 0;
     workspace.onChange(() => sync.changed());
     powerMonitor.on('resume', () => sync.wake());
     app.on('before-quit', () => void sync.close());
@@ -2788,6 +2800,46 @@ async function start(): Promise<void> {
     }
     sendTestToast(kind, id);
   };
+  // SPACE-06 (R-S1, R-S2; docs/06 §8, D-190): a join link from an invite e-mail (through the
+  // site's join page) and the development-only spaces checks. Spaces aren't released yet, so only
+  // development builds act on them; an installed Flint logs the link and does nothing.
+  const spacesDeps: SpacesCheckDeps = {
+    fetch: (url, init) => syncSession.fetch(url, init),
+    open: openExternal,
+    account: () => syncStore.readAccount(),
+    folderName: BUILD === 'installed' ? 'Flint spaces' : 'Flint spaces (development)',
+    development: BUILD !== 'installed',
+    device: deviceName(),
+    log,
+    say: (title, detail) => {
+      if (mainWindow.isDestroyed()) return;
+      showMain();
+      void dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Flint',
+        message: title,
+        detail,
+      });
+    },
+    network: (on) => {
+      spacesBusy = Math.max(0, spacesBusy + (on ? 1 : -1));
+    },
+  };
+  const handleSpacesLaunch = (argv: readonly string[]): boolean => {
+    if (!protocol) return false;
+    const join = findJoinAppLink(argv, protocol);
+    const invite = argv.map((argument) => parseInviteCheck(argument, protocol)).find(Boolean);
+    const access = argv.map((argument) => parseAccessCheck(argument, protocol)).find(Boolean);
+    if (!join && !invite && !access) return false;
+    if (BUILD !== 'development' || syncHooks || !googleAvailable()) {
+      log('spaces: a join link or spaces check arrived; spaces are not in this build yet');
+      return true;
+    }
+    if (join) void joinGoogleSpace(spacesDeps, join);
+    else if (invite) void createAndInvite(spacesDeps, invite);
+    else if (access) void accessCheck(spacesDeps, access);
+    return true;
+  };
   const activationOf = (argv: readonly string[]): ReminderActivation | null =>
     protocol ? findActivation(argv, protocol) : null;
   app.on('second-instance', (_event, argv) => {
@@ -2796,13 +2848,16 @@ async function start(): Promise<void> {
     handleActivation(activation);
     const focusLaunch = handleFocusActivation(argv);
     handleDevCommand(argv);
+    const spacesLaunch = handleSpacesLaunch(argv);
     // APP-01, D-68: starting Flint again by hand (Start menu, shortcut) shows its window.
     const devCommand = argv.some((argument) => argument.startsWith(`${protocol}://dev/`));
-    if (!activation && !focusLaunch && !devCommand && !argv.includes('--hidden')) showMain();
+    if (!activation && !focusLaunch && !devCommand && !spacesLaunch && !argv.includes('--hidden'))
+      showMain();
   });
   handleActivation(activationOf(process.argv));
   handleFocusActivation(process.argv);
   handleDevCommand(process.argv);
+  handleSpacesLaunch(process.argv);
 
   // Test hooks are development-only: an installed Flint ignores these variables.
   const devEnv = (name: string): string | undefined =>
