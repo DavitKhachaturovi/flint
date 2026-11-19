@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prepareFlintFolder } from '../storage/flint-folder.js';
+import { SnapshotStore } from '../storage/snapshots.js';
 import { PERSONAL, Workspace } from './workspace.js';
 
 /**
@@ -159,6 +160,73 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     // Undo restores the space's own sidebar file.
     expect(await workspace.undoLast(now)).toBe('Created group Food');
     expect(workspace.sidebar('s-home1').items.some((item) => item.kind === 'group')).toBe(false);
+  });
+
+  it('SPACE-04: a space’s deleted list goes to its own Trash, shows in the one Trash, and comes back to its space', async () => {
+    const space = await seedSpace('Home', 's-home1', {
+      Groceries: `${header('gro1')}- [ ] eggs [id:: t6f6]\n`,
+    });
+    const workspace = await open();
+    expect((await workspace.deleteList('gro1', now)).ok).toBe(true);
+    const [item] = (await workspace.trashView()).deleted;
+    expect(item?.id).toMatch(/^s-home1\|/);
+    expect(item?.from).toBe('Home');
+    expect(item?.title).toBe('Groceries');
+    // Its file is in the space's own Trash, never Personal's.
+    expect((await readdir(join(space, '.flint', 'trash'))).length).toBe(1);
+    expect(await readdir(join(folder, '.flint', 'trash')).catch(() => [])).toEqual([]);
+    // Its IDs stay taken while it is in Trash (D-29).
+    expect(workspace.isTaken('t6f6')).toBe(true);
+    expect((await workspace.trashPreview(item?.id ?? ''))?.tasks.map((task) => task.title)).toEqual(
+      ['eggs'],
+    );
+    expect((await workspace.restoreFromTrash(item?.id ?? '', now))?.listName).toBe('Groceries');
+    await readFile(join(space, 'Groceries.md'), 'utf8');
+    expect(workspace.spaceOfList('gro1')).toBe('s-home1');
+  });
+
+  it('SPACE-04: a space’s deleted task goes to its Trash, named with the space, and comes back to its list', async () => {
+    const space = await seedSpace('Home', 's-home1', {
+      Groceries: `${header('gro1')}- [ ] eggs [id:: t7g7]\n- [ ] milk [id:: t8h8]\n`,
+    });
+    const workspace = await open();
+    await workspace.change('gro1', { kind: 'delete', key: 't7g7' }, now);
+    const [item] = (await workspace.trashView()).deleted;
+    expect(item?.from).toBe('Groceries · Home');
+    expect((await readdir(join(space, '.flint', 'trash'))).length).toBe(1);
+    await workspace.restoreFromTrash(item?.id ?? '', now);
+    expect(await readFile(join(space, 'Groceries.md'), 'utf8')).toContain('eggs');
+  });
+
+  it('Empty Trash empties every space’s; a forged handle names nothing', async () => {
+    await writeFile(join(folder, 'Errands.md'), header('err1'));
+    await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    const workspace = await open();
+    await workspace.deleteList('err1', now);
+    await workspace.deleteList('gro1', now);
+    expect((await workspace.trashView()).deleted).toHaveLength(2);
+    expect(await workspace.restoreFromTrash('s-nope1|2026-10-29-143000-x.md', now)).toBeNull();
+    expect(await workspace.restoreFromTrash('s-home1|../../Inbox.md', now)).toBeNull();
+    expect(await workspace.emptyTrash()).toBe(2);
+    expect((await workspace.trashView()).deleted).toHaveLength(0);
+  });
+
+  it('Restore everything (a snapshot) never writes or deletes a space’s files (D-190 Q20)', async () => {
+    await writeFile(join(folder, 'Work.md'), `${header('wrk1')}- [ ] First [id:: aa11]\n`);
+    const store = new SnapshotStore(folder, join(base, 'snapshots'));
+    const workspace = await open();
+    const old = await store.take(new Date(2026, 9, 29, 9, 0));
+    // A space made after the snapshot: Restore everything would have deleted it.
+    const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    await workspace.fileChanged(join(folder, 'Spaces', 'Home'));
+    await writeFile(join(folder, 'Work.md'), `${header('wrk1')}- [ ] Second [id:: aa11]\n`);
+    expect(await workspace.restoreSnapshot(store, old?.id ?? '', null, now)).toBe(
+      'Restored the whole Flint folder',
+    );
+    expect(await readFile(join(folder, 'Work.md'), 'utf8')).toContain('First');
+    await readFile(join(space, 'Groceries.md'), 'utf8');
+    await readFile(join(space, '.flint', 'space.json'), 'utf8');
+    expect(workspace.spaceOfList('gro1')).toBe('s-home1');
   });
 
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {

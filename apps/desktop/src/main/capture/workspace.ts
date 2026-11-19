@@ -1366,13 +1366,17 @@ export class Workspace {
         const found = findTask(document, change.key);
         if (!found) return null;
         const name = list.entry.id === INBOX_ID ? 'Inbox' : list.entry.name;
+        // SPACE-04: into the Trash of the list's own space.
         const trash = {
-          path: join(trashFolder(this.folder), `${stamp(now)}-task-${change.key}.md`),
+          path: join(
+            trashFolder(this.folderOf(list.entry.space)),
+            `${stamp(now)}-task-${change.key}.md`,
+          ),
           text: trashedTaskText(found.task, { id: this.listId(list.entry), name }, now),
         };
         await this.writeTrash(trash.path, trash.text);
         for (const { task } of allTasks({ ...document, blocks: [found.task] }))
-          this.trashed.add(task.key);
+          this.trashedOf(list.entry.space).add(task.key);
         const label = await this.record(list, deleteTask(path, change.key), 'Deleted', now, {
           trash,
         });
@@ -1515,11 +1519,39 @@ export class Workspace {
     );
   }
 
+  /** Writes a file into a Trash folder (`<folder>/.flint/trash/<name>`): Personal's or a space's. */
   private async writeTrash(path: string, text: string): Promise<void> {
-    await ensureTrashFolder(this.folder);
-    await writeFileAtomic(path, text, {
-      tempDirectory: tempDirectoryFor(join(this.folder, 'x.md')),
-    });
+    const folder = dirname(dirname(dirname(path)));
+    await ensureTrashFolder(folder);
+    await writeFileAtomic(path, text, { tempDirectory: tempDirectoryFor(join(folder, 'x.md')) });
+  }
+
+  /** SPACE-04: the IDs in a space's Trash (Personal's when none): they stay taken (D-29). */
+  private trashedOf(space: string | undefined): Set<string> {
+    const key = this.spaceKey(space);
+    return key === undefined ? this.trashed : (this.others.get(key)?.trashed ?? this.trashed);
+  }
+
+  /** Every space, Personal first (undefined), for the jobs that go through all of them. */
+  private allSpaces(): (string | undefined)[] {
+    return [undefined, ...this.others.keys()];
+  }
+
+  /**
+   * SPACE-04: a Trash item's handle in the one Trash view: its file name for Personal, and
+   * `<space>|<file name>` for a space's (`|` never appears in a Windows file name).
+   */
+  private trashKey(space: string | undefined, name: string): string {
+    return space === undefined ? name : `${space}|${name}`;
+  }
+
+  /** The space and file a Trash handle names; `null` for a handle that names nothing valid. */
+  private fromTrashKey(key: string): { space: string | undefined; path: string } | null {
+    const bar = key.indexOf('|');
+    const space = bar === -1 ? undefined : key.slice(0, bar);
+    if (space !== undefined && !this.others.has(space)) return null;
+    const path = trashPath(this.folderOf(space), bar === -1 ? key : key.slice(bar + 1));
+    return path ? { space, path } : null;
   }
 
   /**
@@ -1646,14 +1678,16 @@ export class Workspace {
       const label = `Deleted ${list.entry.name}`;
       const trashed = async (loaded: Loaded): Promise<UndoEntry> => {
         const original = loaded.entry.path;
+        // SPACE-04: into the Trash of the list's own space.
+        const space = loaded.entry.space;
         const inTrash = join(
-          await ensureTrashFolder(this.folder),
+          await ensureTrashFolder(this.folderOf(space)),
           `${stamp(now)}-${basename(original)}`,
         );
         await rename(original, inTrash);
         this.lists.splice(this.lists.indexOf(loaded), 1);
-        if (loaded.entry.id) this.trashed.add(loaded.entry.id);
-        for (const { task } of allTasks(loaded.file.document)) this.trashed.add(task.key);
+        if (loaded.entry.id) this.trashedOf(space).add(loaded.entry.id);
+        for (const { task } of allTasks(loaded.file.document)) this.trashedOf(space).add(task.key);
         return {
           label,
           run: async () => {
@@ -2412,7 +2446,8 @@ export class Workspace {
           return completion && toDate(completion.value.value).getTime() < cutoff ? [block.key] : [];
         });
         if (keys.length === 0) continue;
-        const folder = join(this.folder, '.flint', 'archive');
+        // SPACE-04: the archive of the list's own space.
+        const folder = join(this.folderOf(list.entry.space), '.flint', 'archive');
         await mkdir(folder, { recursive: true });
         const path = join(folder, `${this.listId(list.entry)}.md`);
         const exists = await readFile(path).then(
@@ -2456,7 +2491,17 @@ export class Workspace {
   async trashView(): Promise<TrashView> {
     const names = new Map(this.listInfos().map((info) => [info.id, info.name]));
     const deleted: TrashItem[] = [];
-    for (const entry of await readTrash(this.folder)) {
+    // SPACE-04: one Trash for every space; a space's items name it.
+    const found: {
+      space: string | undefined;
+      entry: Awaited<ReturnType<typeof readTrash>>[number];
+    }[] = [];
+    for (const space of this.allSpaces())
+      for (const entry of await readTrash(this.folderOf(space))) found.push({ space, entry });
+    found.sort((a, b) => b.entry.at.getTime() - a.entry.at.getTime());
+    for (const { space, entry } of found) {
+      const spaceName = space === undefined ? null : (this.others.get(space)?.name ?? null);
+      const id = this.trashKey(space, entry.name);
       const when = formatLocalDateTime(fromDate(entry.at)).slice(0, 16);
       if (entry.kind === 'task') {
         const task = parseDocument(entry.text).blocks.find(
@@ -2470,26 +2515,32 @@ export class Workspace {
         } catch {
           listName = null;
         }
+        const from = (listId && names.get(listId)) || listName;
         deleted.push({
-          id: entry.name,
+          id,
           kind: 'task',
           title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
-          from: (listId && names.get(listId)) || listName,
+          from: spaceName ? (from ? `${from} · ${spaceName}` : spaceName) : from,
           deleted: when,
         });
       } else {
         deleted.push({
-          id: entry.name,
+          id,
           kind: /^mode:\s*note\s*$/m.test(entry.text) ? 'note' : 'list',
           title: trashedListName(entry.name),
-          from: null,
+          from: spaceName,
           deleted: when,
         });
       }
     }
     const archived: TrashView['archived'][number][] = [];
-    const folder = join(this.folder, '.flint', 'archive');
-    for (const name of (await readdir(folder).catch(() => [])).sort()) {
+    const archives: { folder: string; name: string }[] = [];
+    for (const space of this.allSpaces()) {
+      const folder = join(this.folderOf(space), '.flint', 'archive');
+      for (const name of (await readdir(folder).catch(() => [])).sort())
+        archives.push({ folder, name });
+    }
+    for (const { folder, name } of archives) {
       if (!name.endsWith('.md')) continue;
       const listId = name.slice(0, -3);
       const text = await readFile(join(folder, name), 'utf8').catch(() => '');
@@ -2516,7 +2567,7 @@ export class Workspace {
   /** D-98: a trash item, read-only: its title, its text, its tasks (or a task's subtasks). */
   async trashPreview(name: string): Promise<TrashPreview | null> {
     const item = (await this.trashView()).deleted.find((each) => each.id === name);
-    const path = trashPath(this.folder, name);
+    const path = this.fromTrashKey(name)?.path;
     const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
     if (!item || text === null) return null;
     const document = parseDocument(text);
@@ -2555,7 +2606,8 @@ export class Workspace {
    */
   restoreFromTrash(name: string, now: Date): Promise<RestoredItem | null> {
     return this.serial(async () => {
-      const path = trashPath(this.folder, name);
+      const handle = this.fromTrashKey(name);
+      const path = handle?.path ?? null;
       const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
       if (!path || text === null) return null;
       if (/^trashed:/m.test(text)) {
@@ -2585,8 +2637,10 @@ export class Workspace {
         await unlink(path).catch(() => undefined);
         return { label, listId: this.listId(list.entry), listName: where, key: task.key };
       }
-      const original = trashedListName(name);
-      let target = join(this.folder, `${original}.md`);
+      // SPACE-04: a list or note goes back to the space whose Trash it was in.
+      const home = this.folderOf(handle?.space);
+      const original = trashedListName(basename(path));
+      let target = join(home, `${original}.md`);
       for (
         let count = 1;
         await stat(target).then(
@@ -2595,7 +2649,7 @@ export class Workspace {
         );
         count++
       )
-        target = join(this.folder, `${original} (restored${count > 1 ? ` ${count}` : ''}).md`);
+        target = join(home, `${original} (restored${count > 1 ? ` ${count}` : ''}).md`);
       const label = `Restored ${basename(target, '.md')}`;
       const step = (from: string, to: string): UndoEntry => ({
         label,
@@ -2637,8 +2691,11 @@ export class Workspace {
     await this.meta.load();
     await this.today.load();
     await this.focus.load();
-    this.trashed.clear();
-    for (const id of await trashedIds(this.folder)) this.trashed.add(id);
+    for (const space of this.allSpaces()) {
+      const trashed = this.trashedOf(space);
+      trashed.clear();
+      for (const id of await trashedIds(this.folderOf(space))) trashed.add(id);
+    }
   }
 
   /** DATA-04, D-97: the snapshots, newest first, each with how many lists or notes differ from now. */
@@ -2691,10 +2748,16 @@ export class Workspace {
       if (!safety) return null;
       const label =
         path === null ? 'Restored the whole Flint folder' : `Restored ${path.slice(0, -3)}`;
+      /**
+       * D-190 Q20: Restore everything is the personal space's: files in `Spaces/` are never written
+       * or deleted by it (a space's files may be shared, and old copies would go to other people).
+       */
+      const personal = (file: string): boolean => !file.startsWith(`${SPACES_FOLDER}/`);
       const apply = async (files: Readonly<Record<string, string>>, only: string | null) => {
         const current = await store.current();
         const wanted = only === null ? files : pick(files, only);
         for (const [file, hash] of Object.entries(wanted)) {
+          if (only === null && !personal(file)) continue;
           if (current[file] === hash) continue;
           const content = await store.content(hash);
           if (!content) continue;
@@ -2704,7 +2767,7 @@ export class Workspace {
         }
         if (only === null) {
           for (const file of Object.keys(current))
-            if (files[file] === undefined)
+            if (files[file] === undefined && personal(file))
               await unlink(join(this.folder, ...file.split('/'))).catch(() => undefined);
           await this.reloadAll();
         } else if (files[only] === undefined) {
@@ -2910,15 +2973,23 @@ export class Workspace {
 
   /** D-97: Delete now (gone for good, not undoable); true when it was there. */
   deleteFromTrash(name: string): Promise<boolean> {
-    return this.serial(() => removeFromTrash(this.folder, name));
+    return this.serial(async () => {
+      const handle = this.fromTrashKey(name);
+      return handle
+        ? removeFromTrash(dirname(dirname(dirname(handle.path))), basename(handle.path))
+        : false;
+    });
   }
 
-  /** D-97: Empty Trash; how many went. */
+  /** D-97: Empty Trash (every space's, SPACE-04); how many went. */
   emptyTrash(): Promise<number> {
     return this.serial(async () => {
       let count = 0;
-      for (const entry of await readTrash(this.folder))
-        if (await removeFromTrash(this.folder, entry.name)) count++;
+      for (const space of this.allSpaces()) {
+        const folder = this.folderOf(space);
+        for (const entry of await readTrash(folder))
+          if (await removeFromTrash(folder, entry.name)) count++;
+      }
       return count;
     });
   }
@@ -2929,8 +3000,15 @@ export class Workspace {
    */
   expireTrash(now: Date, orphans: boolean): Promise<{ expired: number; orphans: string[] }> {
     return this.serial(async () => {
-      const expired = await expireTrash(this.folder, now);
-      return { expired, orphans: orphans ? await cleanOrphanAttachments(this.folder, now) : [] };
+      // SPACE-04: every space's Trash and attachments, each in its own folder.
+      let expired = 0;
+      const gone: string[] = [];
+      for (const space of this.allSpaces()) {
+        const folder = this.folderOf(space);
+        expired += await expireTrash(folder, now);
+        if (orphans) gone.push(...(await cleanOrphanAttachments(folder, now)));
+      }
+      return { expired, orphans: gone };
     });
   }
 
@@ -3115,7 +3193,18 @@ export class Workspace {
         ]),
       ),
       sidebar: writeSidebar(this.sidebarFile),
-      trash: new Set(await readdir(trashFolder(this.folder)).catch(() => [])),
+      // SPACE-04: every space's Trash, by handle (`<space>|<name>` for a space's).
+      trash: new Set(
+        (
+          await Promise.all(
+            this.allSpaces().map(async (space) =>
+              (await readdir(trashFolder(this.folderOf(space))).catch(() => [] as string[])).map(
+                (name) => this.trashKey(space, name),
+              ),
+            ),
+          )
+        ).flat(),
+      ),
     };
   }
 
@@ -3257,7 +3346,7 @@ export class Workspace {
         return 'undone';
       }
       case 'taskTrash': {
-        const path = trashPath(this.folder, step.trash);
+        const path = this.fromTrashKey(step.trash)?.path ?? null;
         const text = path ? await readFile(path, 'utf8').catch(() => null) : null;
         if (!path || text === null) return 'nothing';
         const keys = [...allTasks(parseDocument(text))].map(({ task }) => task.key);
