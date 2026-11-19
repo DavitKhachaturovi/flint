@@ -185,6 +185,12 @@ import { listView, taskRow } from '../views.js';
 import { agoLabel, dayLabel, localStamp, parseStamp, TaskMetaFile } from '../task-meta.js';
 import { RECENT_CAPTURES, type PanelTask } from '../up-next.js';
 import { discoverLists, INBOX_ID, type ListEntry } from '../storage/flint-folder.js';
+import {
+  createSpaceFolder,
+  discoverSpaces,
+  SPACES_FOLDER,
+  type SpaceFolder,
+} from '../storage/spaces.js';
 import { ListFile, tempDirectoryFor } from '../storage/list-file.js';
 import {
   cleanOrphanAttachments,
@@ -236,6 +242,30 @@ interface Loaded {
   /** Replaced when the list is renamed (its file moves). */
   file: ListFile;
 }
+
+/**
+ * SPACE-01 (D-190 Q20): what a space other than the personal one keeps on its own, in its folder
+ * (`Spaces/<name>/`): its sidebar (`.flint/sidebar.json`) and the IDs in its Trash. Its lists are
+ * in the workspace's one list of lists (each entry names its space); undo, the write queue, the ID
+ * set and ui-state.json stay single for every space.
+ */
+interface SpaceState {
+  readonly id: string;
+  name: string;
+  readonly folder: string;
+  sidebarFile: SidebarFile;
+  readonly trashed: Set<string>;
+}
+
+/** A space as the rest of the app sees it (SPACE-01): Personal first, then the others by name. */
+export interface SpaceInfo {
+  /** `personal` for the Flint folder itself (core's PERSONAL_SPACE). */
+  readonly id: string;
+  readonly name: string;
+  readonly folder: string;
+}
+
+export const PERSONAL = 'personal';
 
 /** Snooze 10m on a reminder toast (REM-05). */
 const SNOOZE_MS = 10 * 60_000;
@@ -410,11 +440,91 @@ export class Workspace {
     workspace.sidebarFile = readSidebar(
       await readFile(workspace.sidebarPath, 'utf8').catch(() => null),
     );
+    // SPACE-01: every space in Spaces/ (D-190 Q20: one workspace, lists know their space).
+    for (const space of await discoverSpaces(folder)) await workspace.loadSpace(space);
     await workspace.meta.load();
     await workspace.today.load();
     await workspace.focus.load();
     workspace.meta.seen(workspace.taskIds(), new Date());
     return workspace;
+  }
+
+  // ── Spaces (SPACE-01, D-190 Q14, Q20) ──
+
+  /** The spaces other than the personal one, by ID. */
+  private readonly others = new Map<string, SpaceState>();
+
+  /** Loads a space found on disk: its lists join the workspace's, each naming the space. */
+  private async loadSpace(space: SpaceFolder): Promise<void> {
+    if (this.others.has(space.id)) return;
+    const entries = await discoverLists(space.folder, space.id);
+    for (const entry of entries) this.lists.push({ entry, file: await ListFile.open(entry.path) });
+    this.others.set(space.id, {
+      id: space.id,
+      name: space.name,
+      folder: space.folder,
+      sidebarFile: readSidebar(
+        await readFile(join(space.folder, '.flint', 'sidebar.json'), 'utf8').catch(() => null),
+      ),
+      trashed: await trashedIds(space.folder),
+    });
+  }
+
+  /** A space gone from disk (its folder removed or moved away): its lists leave the workspace. */
+  private dropSpace(id: string): void {
+    this.others.delete(id);
+    for (const loaded of [...this.lists])
+      if (loaded.entry.space === id) this.lists.splice(this.lists.indexOf(loaded), 1);
+  }
+
+  /** The spaces: Personal first, then the others by name (SPACE-01, SPACE-03's menu). */
+  spaces(): SpaceInfo[] {
+    const others = [...this.others.values()]
+      .map(({ id, name, folder }) => ({ id, name, folder }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    return [{ id: PERSONAL, name: 'Personal', folder: this.folder }, ...others];
+  }
+
+  /** A space's ID as entries carry it: none for Personal, unknown spaces read as Personal. */
+  private spaceKey(space: string | undefined): string | undefined {
+    return space !== undefined && space !== PERSONAL && this.others.has(space) ? space : undefined;
+  }
+
+  /** The folder a space's files live in (the Flint folder for Personal). */
+  private folderOf(space: string | undefined): string {
+    const key = this.spaceKey(space);
+    return key === undefined ? this.folder : (this.others.get(key)?.folder ?? this.folder);
+  }
+
+  /** The space a list is in, as the rest of the app names it (`personal` for the Flint folder). */
+  spaceOfList(id: string): string {
+    return this.find(id)?.entry.space ?? PERSONAL;
+  }
+
+  /**
+   * New space… "On this PC" (SPACE-05, D-190 Q14): its folder `Spaces/<name>/` with `space.json`,
+   * empty. Space names are unique (ignoring case), as group names are (D-79).
+   */
+  createSpace(
+    rawName: string,
+  ): Promise<{ ok: true; space: SpaceInfo } | { ok: false; problem: string }> {
+    return this.serial(async () => {
+      const name = rawName.replace(/\s+/g, ' ').trim();
+      if (name === '') return { ok: false, problem: 'A space needs a name' };
+      if ([...name].length > 60) return { ok: false, problem: 'That name is too long' };
+      if (
+        name.toLowerCase() === 'personal' ||
+        [...this.others.values()].some((space) => space.name.toLowerCase() === name.toLowerCase())
+      )
+        return { ok: false, problem: 'A space with that name exists' };
+      let id: string;
+      do id = `s-${generateId(() => false)}${generateId(() => false)}`;
+      while (this.others.has(id));
+      const made = await createSpaceFolder(this.folder, name, id);
+      if (!made) return { ok: false, problem: 'That name can’t be used for a space' };
+      await this.loadSpace(made);
+      return { ok: true, space: { id: made.id, name: made.name, folder: made.folder } };
+    });
   }
 
   /**
@@ -478,10 +588,68 @@ export class Workspace {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
   }
 
-  /** The lists the sidebar places (Inbox stays pinned above it), with their file times. */
-  private sidebarLists(): SidebarList[] {
+  /**
+   * SPACE-02 (D-190 Q20): a space's own sort and folded groups, in ui-state.json under
+   * `spaceSidebars.<space id>` (Personal keeps its old keys, `sidebarSort` and `collapsedGroups`).
+   */
+  private spaceSidebar(space: string): { sort: SidebarSort; collapsed: string[] } {
+    const all = this.uiState.spaceSidebars;
+    const own =
+      typeof all === 'object' && all !== null ? (all as Record<string, unknown>)[space] : undefined;
+    const record = typeof own === 'object' && own !== null ? (own as Record<string, unknown>) : {};
+    const sort = record.sort === 'edited' || record.sort === 'created' ? record.sort : 'manual';
+    const collapsed = Array.isArray(record.collapsed)
+      ? record.collapsed.filter((id): id is string => typeof id === 'string')
+      : [];
+    return { sort, collapsed };
+  }
+
+  private sortOf(space: string | undefined): SidebarSort {
+    const key = this.spaceKey(space);
+    return key === undefined ? this.sidebarSort : this.spaceSidebar(key).sort;
+  }
+
+  private collapsedOf(space: string | undefined): string[] {
+    const key = this.spaceKey(space);
+    return key === undefined ? this.collapsedGroups : this.spaceSidebar(key).collapsed;
+  }
+
+  /** Saves a space's sort or folded groups (Personal: its old keys). */
+  private async saveSpaceSidebar(
+    space: string | undefined,
+    change: { sort?: SidebarSort; collapsed?: string[] },
+  ): Promise<void> {
+    const key = this.spaceKey(space);
+    if (key === undefined) {
+      await this.saveUiState({
+        ...(change.sort ? { sidebarSort: change.sort } : {}),
+        ...(change.collapsed ? { collapsedGroups: change.collapsed } : {}),
+      });
+      return;
+    }
+    const all =
+      typeof this.uiState.spaceSidebars === 'object' && this.uiState.spaceSidebars !== null
+        ? (this.uiState.spaceSidebars as Record<string, unknown>)
+        : {};
+    await this.saveUiState({
+      spaceSidebars: { ...all, [key]: { ...this.spaceSidebar(key), ...change } },
+    });
+  }
+
+  /** A space's sidebar file (groups and manual order). */
+  private sidebarFileOf(space: string | undefined): SidebarFile {
+    const key = this.spaceKey(space);
+    return key === undefined
+      ? this.sidebarFile
+      : (this.others.get(key)?.sidebarFile ?? EMPTY_SIDEBAR);
+  }
+
+  /** The lists a space's sidebar places (Inbox stays pinned above it), with their file times. */
+  private sidebarLists(space?: string): SidebarList[] {
+    const key = this.spaceKey(space);
     return (
       this.lists
+        .filter((loaded) => loaded.entry.space === key)
         // NOTE-08, D-99: quick notes have their own section under Inbox until they get a title.
         .filter((loaded) => loaded.entry.id !== INBOX_ID && !this.isQuick(loaded))
         .map(({ entry }) => {
@@ -496,19 +664,20 @@ export class Workspace {
     );
   }
 
-  /** LIST-05, LIST-06, D-73, D-74: the sidebar as shown: groups, order, sort, folded groups. */
-  sidebar(): SidebarView {
+  /** LIST-05, LIST-06, D-73, D-74: a space's sidebar as shown: groups, order, sort, folded groups. */
+  sidebar(space?: string): SidebarView {
+    const sort = this.sortOf(space);
     return {
-      sort: this.sidebarSort,
-      collapsed: this.collapsedGroups,
-      items: arrange(this.sidebarFile, this.sidebarLists(), this.sidebarSort),
+      sort,
+      collapsed: this.collapsedOf(space),
+      items: arrange(this.sidebarFileOf(space), this.sidebarLists(space), sort),
       today: this.todayView(new Date()).open,
     };
   }
 
-  /** AGENT-01: the sidebar in its manual order (what agents' positions are about). */
-  sidebarManual(): SidebarView['items'] {
-    return arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+  /** AGENT-01: a space's sidebar in its manual order (what agents' positions are about). */
+  sidebarManual(space?: string): SidebarView['items'] {
+    return arrange(this.sidebarFileOf(space), this.sidebarLists(space), 'manual');
   }
 
   /**
@@ -520,18 +689,20 @@ export class Workspace {
     now: Date,
     /** AGENT-01: an agent reorders the manual order under any sort (it shows once sorted manually). */
     anySort = false,
+    /** SPACE-02: the space whose sidebar it is (Personal when none). */
+    space?: string,
   ): Promise<SidebarOutcome> {
     return this.serial(async () => {
       void now;
       if (action.kind === 'sort') {
-        await this.saveUiState({ sidebarSort: action.sort });
+        await this.saveSpaceSidebar(space, { sort: action.sort });
         this.notify();
         return { ok: true, label: '' };
       }
       if (action.kind === 'collapse') {
-        const others = this.collapsedGroups.filter((id) => id !== action.id);
-        await this.saveUiState({
-          collapsedGroups: action.collapsed ? [...others, action.id] : others,
+        const others = this.collapsedOf(space).filter((id) => id !== action.id);
+        await this.saveSpaceSidebar(space, {
+          collapsed: action.collapsed ? [...others, action.id] : others,
         });
         this.notify();
         return { ok: true, label: '' };
@@ -539,11 +710,11 @@ export class Workspace {
       // Reordering follows the manual order; under a sort it would be invisible (D-73).
       if (
         (action.kind === 'move' || action.kind === 'step') &&
-        this.sidebarSort !== 'manual' &&
+        this.sortOf(space) !== 'manual' &&
         !anySort
       )
         return { ok: false, problem: 'Switch the sort to Manual to reorder' };
-      const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+      const items = arrange(this.sidebarFileOf(space), this.sidebarLists(space), 'manual');
       const groups = items.filter((item) => item.kind === 'group');
       const nameProblem = (name: string, id?: string): string | null => {
         const trimmed = name.trim();
@@ -590,37 +761,47 @@ export class Workspace {
           break;
       }
       if (!next) return { ok: false, problem: '' };
-      const before = this.sidebarFile;
+      const before = this.sidebarFileOf(space);
       const after = fromItems(next, before.extra);
-      await this.saveSidebar(after);
-      this.remember(this.sidebarStep(label, before, after));
+      await this.saveSidebar(after, space);
+      this.remember(this.sidebarStep(label, before, after, space));
       return { ok: true, label, ...(id ? { id } : {}) };
     });
   }
 
-  /** Undo and redo of a sidebar change: the file as it was, and back. */
-  private sidebarStep(label: string, from: SidebarFile, to: SidebarFile): UndoEntry {
+  /** Undo and redo of a sidebar change: the file as it was, and back (in its own space). */
+  private sidebarStep(
+    label: string,
+    from: SidebarFile,
+    to: SidebarFile,
+    space?: string,
+  ): UndoEntry {
     return {
       label,
       run: async () => {
-        await this.saveSidebar(from);
-        return this.sidebarStep(label, to, from);
+        await this.saveSidebar(from, space);
+        return this.sidebarStep(label, to, from, space);
       },
     };
   }
 
-  private async saveSidebar(file: SidebarFile): Promise<void> {
-    this.sidebarFile = file;
-    await mkdir(join(this.folder, '.flint'), { recursive: true });
-    await writeFileAtomic(this.sidebarPath, writeSidebar(file), {
-      tempDirectory: tempDirectoryFor(this.sidebarPath),
-    });
+  /** Writes a space's `.flint/sidebar.json` (Personal's when none). */
+  private async saveSidebar(file: SidebarFile, space?: string): Promise<void> {
+    const key = this.spaceKey(space);
+    const state = key === undefined ? undefined : this.others.get(key);
+    if (state) state.sidebarFile = file;
+    else this.sidebarFile = file;
+    const path = state ? join(state.folder, '.flint', 'sidebar.json') : this.sidebarPath;
+    await mkdir(dirname(path), { recursive: true });
+    await writeFileAtomic(path, writeSidebar(file), { tempDirectory: tempDirectoryFor(path) });
     this.notify();
   }
 
-  /** D-74: a new list (a duplicate) right below another, in its group if it has one. */
+  /** D-74: a new list (a duplicate) right below another, in its group if it has one (its space). */
   private async placeAfter(id: string, after: string): Promise<void> {
-    const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+    const space = this.find(after)?.entry.space;
+    const file = this.sidebarFileOf(space);
+    const items = arrange(file, this.sidebarLists(space), 'manual');
     const group = items.find((item) => item.kind === 'group' && item.lists.includes(after));
     const index =
       group?.kind === 'group'
@@ -628,10 +809,8 @@ export class Workspace {
         : items.findIndex((item) => item.id === after) + 1;
     if (!group && index === 0) return;
     await this.saveSidebar(
-      fromItems(
-        moveInSidebar(items, id, { group: group?.id ?? null, index }),
-        this.sidebarFile.extra,
-      ),
+      fromItems(moveInSidebar(items, id, { group: group?.id ?? null, index }), file.extra),
+      space,
     );
   }
 
@@ -1321,11 +1500,17 @@ export class Workspace {
   }
 
   /** Another list already has this name, ignoring case, spaces and hyphens (D-25). */
-  private sameName(name: string, except?: Loaded): boolean {
+  /**
+   * A list of that name in the same space (each space is its own folder, so names are unique per
+   * space; SPACE-04 lets two spaces have the same name). Inbox's name is the personal space's.
+   */
+  private sameName(name: string, except?: Loaded, space?: string): boolean {
     const wanted = normalizeListName(name);
+    const key = this.spaceKey(space ?? except?.entry.space);
     return this.lists.some(
       (loaded) =>
         loaded !== except &&
+        loaded.entry.space === key &&
         normalizeListName(loaded.entry.id === INBOX_ID ? 'Inbox' : loaded.entry.name) === wanted,
     );
   }
@@ -1346,35 +1531,37 @@ export class Workspace {
     mode: ListMode,
     group: string,
     now: Date,
+    /** SPACE-02: the space the group is in (Personal when none). */
+    space?: string,
   ): Promise<ListOutcome> {
     const start = this.undoStack.length;
-    const outcome = await this.newList(name, mode, now);
+    const outcome = await this.newList(name, mode, now, space);
     if (!outcome.ok) return outcome;
     await this.serial(async () => {
-      const items = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
+      const items = arrange(this.sidebarFileOf(space), this.sidebarLists(space), 'manual');
       const target = items.find((item) => item.kind === 'group' && item.id === group);
       if (target?.kind !== 'group') return;
-      const before = this.sidebarFile;
+      const before = this.sidebarFileOf(space);
       const after = fromItems(
         moveInSidebar(items, outcome.listId, { group, index: target.lists.length }),
         before.extra,
       );
-      await this.saveSidebar(after);
-      this.remember(this.sidebarStep('Moved', before, after));
+      await this.saveSidebar(after, space);
+      this.remember(this.sidebarStep('Moved', before, after, space));
       this.mergeSince(start, outcome.label);
     });
     return outcome;
   }
 
   /** LIST-01, D-52: a new task list or note from the sidebar's + or Ctrl+Shift+N; undoable. */
-  newList(name: string, mode: ListMode, now: Date): Promise<ListOutcome> {
+  newList(name: string, mode: ListMode, now: Date, space?: string): Promise<ListOutcome> {
     return this.serial(async () => {
       const trimmed = name.trim();
       const problem =
         listNameProblem(trimmed) ??
-        (this.sameName(trimmed) ? 'A list with that name exists' : null);
+        (this.sameName(trimmed, undefined, space) ? 'A list with that name exists' : null);
       if (problem) return { ok: false, problem };
-      const loaded = await this.createList(trimmed, mode);
+      const loaded = await this.createList(trimmed, mode, undefined, undefined, space);
       const id = loaded.entry.id ?? '';
       const label = mode === 'note' ? `Created note ${trimmed}` : `Created list ${trimmed}`;
       const created = (): UndoEntry => ({
@@ -1387,8 +1574,8 @@ export class Workspace {
           return {
             label,
             run: async () => {
-              if (this.find(id) || this.sameName(trimmed)) return null;
-              await this.createList(trimmed, mode, id);
+              if (this.find(id) || this.sameName(trimmed, undefined, space)) return null;
+              await this.createList(trimmed, mode, id, undefined, space);
               return created();
             },
           };
@@ -1432,7 +1619,8 @@ export class Workspace {
   }
 
   private async moveListFile(list: Loaded, name: string): Promise<void> {
-    const path = join(this.folder, `${name}.md`);
+    // In the list's own folder: a space's list renamed stays in its space (SPACE-01).
+    const path = join(dirname(list.entry.path), `${name}.md`);
     // Never overwrite another file; a change of case is the same file on Windows.
     if (path.toLowerCase() !== list.entry.path.toLowerCase()) {
       const exists = await readFile(path).then(
@@ -3089,9 +3277,61 @@ export class Workspace {
     return entry.label;
   }
 
+  /**
+   * SPACE-01: spaces that appeared in `Spaces/` (made by hand, copied in, joined) load; spaces whose
+   * folder or `space.json` went away leave (their files are never touched).
+   */
+  private async refreshSpaces(): Promise<void> {
+    const found = await discoverSpaces(this.folder);
+    for (const id of [...this.others.keys()])
+      if (!found.some((space) => space.id === id)) this.dropSpace(id);
+    for (const space of found) {
+      const known = this.others.get(space.id);
+      if (known && known.folder !== space.folder) this.dropSpace(space.id);
+      if (known) known.name = space.name;
+      await this.loadSpace(space);
+    }
+  }
+
+  /**
+   * Which space a changed path is in: a space's ID, undefined for Personal, or null for `Spaces/`
+   * itself (a space folder added, removed or renamed).
+   */
+  private spaceOfPath(path: string): string | undefined | null {
+    const lower = path.toLowerCase();
+    for (const state of this.others.values()) {
+      const folder = state.folder.toLowerCase();
+      if (lower === folder || lower.startsWith(`${folder}\\`) || lower.startsWith(`${folder}/`))
+        return state.id;
+    }
+    const root = join(this.folder, SPACES_FOLDER).toLowerCase();
+    if (lower === root || lower.startsWith(`${root}\\`) || lower.startsWith(`${root}/`))
+      return null;
+    return undefined;
+  }
+
   private async refresh(path: string): Promise<void> {
-    const entries = await discoverLists(this.folder);
+    const where = this.spaceOfPath(path);
+    if (where === null) {
+      await this.refreshSpaces();
+      return;
+    }
+    const folder = this.folderOf(where);
+    // A space whose folder or space.json went away (deleted, moved): the spaces are read again.
+    if (where !== undefined) {
+      const still = await stat(join(folder, '.flint', 'space.json')).then(
+        () => true,
+        () => false,
+      );
+      if (!still) {
+        await this.refreshSpaces();
+        return;
+      }
+    }
+    const entries = await discoverLists(folder, where);
     for (const loaded of [...this.lists]) {
+      // Only this space's lists are compared with what its folder holds now.
+      if (loaded.entry.space !== where) continue;
       const entry = entries.find((candidate) => candidate.path === loaded.entry.path);
       // D-156: a known list whose file couldn't be read just then (held by another program, or
       // empty while one writes it) keeps its ID and mode: taking the unread entry's turned it into
@@ -3105,6 +3345,7 @@ export class Workspace {
               created: entry.created,
               id: loaded.entry.id,
               mode: loaded.entry.mode,
+              ...(where !== undefined ? { space: where } : {}),
             }
           : entry;
       else this.lists.splice(this.lists.indexOf(loaded), 1);
@@ -3123,7 +3364,14 @@ export class Workspace {
   }
 
   private listId(entry: ListEntry): string {
-    return entry.id ?? `file:${entry.name}`;
+    if (entry.space === undefined) return entry.id ?? `file:${entry.name}`;
+    // SPACE-01 (D-190 Q20): a space's list without Flint's header is named by its space and file,
+    // and so is one whose ID a list loaded before it already has (a file copied in Explorer): list
+    // IDs stay unique across spaces (04 §9). Personal's lists load first, so theirs win.
+    const fallback = `file:${entry.space}/${entry.name}`;
+    if (entry.id === null) return fallback;
+    const first = this.lists.find(({ entry: other }) => other.id === entry.id);
+    return first && first.entry.path !== entry.path ? fallback : entry.id;
   }
 
   /** Lists as the shorthand sees them, Inbox first, with their most-recently-used rank. */
@@ -3166,10 +3414,11 @@ export class Workspace {
     return id;
   }
 
-  /** IDs are unique in the whole Flint folder (D-21, D-29): tasks and lists. */
+  /** IDs are unique in the whole Flint folder (D-21, D-29), its spaces too (04 §9): tasks and lists. */
   isTaken = (id: string): boolean =>
     this.reserved.has(id) ||
     this.trashed.has(id) ||
+    [...this.others.values()].some((space) => space.trashed.has(id)) ||
     this.lists.some(
       ({ entry, file }) =>
         entry.id === id ||
@@ -3199,24 +3448,28 @@ export class Workspace {
     readonly emptyQuick: boolean;
   }[] {
     const groups = arrange(this.sidebarFile, this.sidebarLists(), 'manual');
-    return this.lists
-      .filter(({ entry }) => entry.id !== null && !this.listId(entry).startsWith('file:'))
-      .map((loaded) => {
-        const id = this.listId(loaded.entry);
-        const group = groups.find((item) => item.kind === 'group' && item.lists.includes(id));
-        const text = serializeDocument(loaded.file.document).replace(
-          /^---\r?\n[\s\S]*?\r?\n---\r?\n/,
-          '',
-        );
-        return {
-          id,
-          name: id === INBOX_ID ? 'Inbox' : loaded.entry.name,
-          path: loaded.file.path,
-          mode: loaded.entry.mode === 'note' ? ('note' as const) : ('tasks' as const),
-          group: group?.id ?? null,
-          emptyQuick: this.isQuick(loaded) && text.trim() === '',
-        };
-      });
+    return (
+      this.lists
+        // D-190 Q20: personal sync carries only the personal space's lists, never a space's.
+        .filter(({ entry }) => entry.space === undefined)
+        .filter(({ entry }) => entry.id !== null && !this.listId(entry).startsWith('file:'))
+        .map((loaded) => {
+          const id = this.listId(loaded.entry);
+          const group = groups.find((item) => item.kind === 'group' && item.lists.includes(id));
+          const text = serializeDocument(loaded.file.document).replace(
+            /^---\r?\n[\s\S]*?\r?\n---\r?\n/,
+            '',
+          );
+          return {
+            id,
+            name: id === INBOX_ID ? 'Inbox' : loaded.entry.name,
+            path: loaded.file.path,
+            mode: loaded.entry.mode === 'note' ? ('note' as const) : ('tasks' as const),
+            group: group?.id ?? null,
+            emptyQuick: this.isQuick(loaded) && text.trim() === '',
+          };
+        })
+    );
   }
 
   /** SYNC-01: the sidebar's groups (ID, name, lists in order). */
@@ -3543,8 +3796,11 @@ export class Workspace {
     listId?: string,
     /** The file's text (a duplicate); a new list's header otherwise. */
     text?: string,
+    /** SPACE-01: the space it is made in (Personal when none). */
+    space?: string,
   ): Promise<Loaded> {
-    const path = join(this.folder, `${name}.md`);
+    const key = this.spaceKey(space);
+    const path = join(this.folderOf(key), `${name}.md`);
     const id = listId ?? generateId(this.isTaken);
     // `wx`-like guard: never overwrite a file that appeared since the folder was read.
     try {
@@ -3556,7 +3812,14 @@ export class Workspace {
     await writeFileAtomic(path, text ?? NEW_LIST_HEADER(id, mode), {
       tempDirectory: tempDirectoryFor(path),
     });
-    const entry: ListEntry = { path, name, id, mode, created: Date.now() };
+    const entry: ListEntry = {
+      path,
+      name,
+      id,
+      mode,
+      created: Date.now(),
+      ...(key !== undefined ? { space: key } : {}),
+    };
     const loaded = { entry, file: await ListFile.open(path) };
     this.lists.push(loaded);
     return loaded;

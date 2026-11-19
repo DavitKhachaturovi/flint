@@ -133,7 +133,8 @@ import { searchLists, searchTrash } from './search.js';
 import { compileLinkPatterns, findShortForms, readLinkPatterns } from '../shared/link-patterns.js';
 import { ReminderService } from './reminder-service.js';
 import type { ToastPlan } from './reminders.js';
-import { watchListFolder } from './storage/watcher.js';
+import { watchListFolder, watchSpaces } from './storage/watcher.js';
+import { SPACES_FOLDER } from './storage/spaces.js';
 import { TourFile } from './onboarding.js';
 import { ClipboardGuard } from './clipboard-guard.js';
 import {
@@ -537,6 +538,20 @@ async function start(): Promise<void> {
   watchListFolder(folder.folder, (path) => {
     workspace.fileChanged(path).catch((error: unknown) => log(`reload failed: ${String(error)}`));
   });
+  // SPACE-01 (D-190 Q20): each space's folder and Spaces/ itself, kept in step with the workspace.
+  const spacesWatcher = watchSpaces(
+    join(folder.folder, SPACES_FOLDER),
+    () =>
+      workspace
+        .spaces()
+        .slice(1)
+        .map((space) => space.folder),
+    (path) => {
+      workspace.fileChanged(path).catch((error: unknown) => log(`reload failed: ${String(error)}`));
+    },
+  );
+  spacesWatcher.sync();
+  workspace.onChange(() => spacesWatcher.sync());
   // MINI-01, D-109: mini mode, beside the main window and in sync with it (made on first use).
   const mini = createMini({
     url: pageUrl('mini', MINI_HOST),

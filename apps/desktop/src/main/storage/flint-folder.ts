@@ -25,6 +25,8 @@ export interface ListEntry {
    * one writes it): its `id` and `mode` say nothing, so a list already known keeps its own.
    */
   readonly unsettled?: true;
+  /** SPACE-01 (D-190 Q20): the space it is in; none for the personal space (the Flint folder). */
+  readonly space?: string;
 }
 
 export interface FolderReport {
@@ -38,22 +40,33 @@ export interface FolderReport {
   readonly obsidianVaultRoot: boolean;
 }
 
-/** Lists are the top-level `*.md` files; subfolders and dot-folders never hold lists (D-23). */
-export async function discoverLists(folder: string): Promise<ListEntry[]> {
-  const entries = await readdir(folder, { withFileTypes: true });
+/**
+ * Lists are the top-level `*.md` files; subfolders and dot-folders never hold lists (D-23). With
+ * `space`, the folder is that space's (SPACE-01) and every entry says so; there, `id: inbox` is
+ * ignored (D-190 Q11, Q20: Inbox is only the personal space's, and a space's files may come from
+ * someone else), so such a list counts as one without Flint's header.
+ */
+export async function discoverLists(folder: string, space?: string): Promise<ListEntry[]> {
+  const entries = await readdir(folder, { withFileTypes: true }).catch((error: unknown) => {
+    // A space whose folder went away meanwhile has no lists (the Flint folder itself must exist).
+    if (space !== undefined) return [];
+    throw error;
+  });
   const lists: ListEntry[] = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue;
     const path = join(folder, entry.name);
     const read = await readListFile(path);
     const document = parseDocument(read.kind === 'text' ? read.text : '');
+    const id = document.frontmatter?.id ?? null;
     lists.push({
       path,
       name: entry.name.slice(0, -3),
-      id: document.frontmatter?.id ?? null,
+      id: space !== undefined && id === INBOX_ID ? null : id,
       mode: documentMode(document),
       created: (await stat(path)).birthtimeMs,
       ...(read.kind !== 'text' || read.text === '' ? { unsettled: true as const } : {}),
+      ...(space !== undefined ? { space } : {}),
     });
   }
   return lists;
