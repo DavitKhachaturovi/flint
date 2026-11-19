@@ -902,7 +902,9 @@ export type ListAction =
   /** D-72, D-74: "<name> copy" right below it, new IDs, no reminders. */
   | { readonly kind: 'duplicate'; readonly id: string }
   /** LIST-04, D-22, D-72: a task list becomes a note, or a note a task list. */
-  | { readonly kind: 'convert'; readonly id: string; readonly mode: 'tasks' | 'note' };
+  | { readonly kind: 'convert'; readonly id: string; readonly mode: 'tasks' | 'note' }
+  /** SPACE-07: a list or note moves into another space (`personal` for the Flint folder). */
+  | { readonly kind: 'moveToSpace'; readonly id: string; readonly space: string };
 
 /** LIST-06, D-73: the sidebar's order. */
 export type SidebarSort = 'manual' | 'edited' | 'created';

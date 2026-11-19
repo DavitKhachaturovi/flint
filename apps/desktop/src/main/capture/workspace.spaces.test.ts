@@ -269,6 +269,50 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     expect(workspace.spaceFolders()).toEqual([folder, space]);
   });
 
+  it('SPACE-07: Move to space carries the file and its pictures; the same list; one undo moves it back', async () => {
+    await mkdir(join(folder, 'attachments'), { recursive: true });
+    await writeFile(join(folder, 'attachments', 'shot 1.png'), 'png');
+    await writeFile(
+      join(folder, 'Trip ideas.md'),
+      `${header('trp1')}- [ ] Book the flight [pinned:: true] [id:: tr01]\n    ![](attachments/shot%201.png)\n`,
+    );
+    const space = await seedSpace('Home', 's-home1', {});
+    const workspace = await open();
+    const moved = await workspace.moveToSpace('trp1', 's-home1', now);
+    expect(moved).toEqual({ ok: true, listId: 'trp1', label: 'Moved to Home' });
+    expect(await readFile(join(space, 'Trip ideas.md'), 'utf8')).toContain('[pinned:: true]');
+    await readFile(join(space, 'attachments', 'shot 1.png'));
+    // The original picture stays (another list may use it).
+    await readFile(join(folder, 'attachments', 'shot 1.png'));
+    expect(workspace.spaceOfList('trp1')).toBe('s-home1');
+    const ids = (items: ReturnType<Workspace['sidebar']>['items']) =>
+      items.flatMap((item) => (item.kind === 'group' ? item.lists : [item.id]));
+    expect(ids(workspace.sidebar('s-home1').items)).toContain('trp1');
+    expect(ids(workspace.sidebar().items)).not.toContain('trp1');
+    expect(workspace.syncEntries().map((entry) => entry.id)).not.toContain('trp1');
+    expect(await workspace.undoLast(now)).toBe('Moved to Home');
+    await readFile(join(folder, 'Trip ideas.md'), 'utf8');
+    expect(workspace.spaceOfList('trp1')).toBe(PERSONAL);
+  });
+
+  it('SPACE-07: Inbox and quick notes stay Personal’s; a name the space has is refused', async () => {
+    await writeFile(join(folder, 'Groceries.md'), header('gro9'));
+    await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    const workspace = await open();
+    expect(await workspace.moveToSpace('inbox', 's-home1', now)).toEqual({
+      ok: false,
+      problem: 'Inbox stays in Personal',
+    });
+    expect(await workspace.moveToSpace('gro9', 's-home1', now)).toEqual({
+      ok: false,
+      problem: 'Home has a list named Groceries',
+    });
+    expect(await workspace.moveToSpace('gro9', 's-nope1', now)).toEqual({
+      ok: false,
+      problem: 'That space is gone',
+    });
+  });
+
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {
     const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
     const workspace = await open();

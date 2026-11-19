@@ -1023,7 +1023,10 @@ async function start(): Promise<void> {
               ? workspace.convertList(request.id, request.mode, now)
               : request.kind === 'deleteMany'
                 ? workspace.deleteLists(request.ids, now)
-                : workspace.deleteList(request.id, now);
+                : request.kind === 'moveToSpace'
+                  ? // SPACE-07: into another space on this PC.
+                    workspace.moveToSpace(request.id, String(request.space), now)
+                  : workspace.deleteList(request.id, now);
     return run
       .then((outcome) => {
         // D-122: the walkthrough's step 4: a named list or note, or a quick note given a title.

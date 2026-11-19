@@ -805,14 +805,20 @@ export function App(): ReactElement {
     const order = spacesRef.current.map((each) => each.id);
     const dx = order.indexOf(id) >= order.indexOf(from) ? 12 : -12;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const body = spaceStage.current?.querySelector<HTMLElement>(':scope > .space-body');
+    // A copy still leaving from an earlier switch goes now (a hidden window may hold its timers).
+    for (const old of spaceStage.current?.querySelectorAll(':scope > .space-body.out') ?? [])
+      old.remove();
+    const body = spaceStage.current?.querySelector<HTMLElement>(':scope > .space-body:not(.out)');
     if (body && !reduce) {
       const copy = body.cloneNode(true) as HTMLElement;
       copy.classList.remove('in');
       copy.classList.add('out');
       copy.setAttribute('aria-hidden', 'true');
+      copy.inert = true;
       copy.style.setProperty('--dx', `${-dx}px`);
       copy.addEventListener('animationend', () => copy.remove(), { once: true });
+      // A hidden or covered window may not run animations: the copy goes after its 180 ms anyway.
+      window.setTimeout(() => copy.remove(), 260);
       spaceStage.current?.appendChild(copy);
     }
     setSidebarFocus(null);
@@ -832,6 +838,28 @@ export function App(): ReactElement {
     [lists, spaces],
   );
   const switchFromLetter = useCallback((id: string) => void switchSpace(id, true), [switchSpace]);
+  /**
+   * SPACE-07: a list or note into another space (on this PC; the share dialog for a shared space
+   * comes with S3). Undo moves it back; an open list takes the line along to its new space.
+   */
+  const moveListToSpace = useCallback(
+    async (list: ListSummary, target: string): Promise<void> => {
+      const outcome = await window.flintMain.listAction({
+        kind: 'moveToSpace',
+        id: list.id,
+        space: target,
+      });
+      if (!outcome) return;
+      if (!outcome.ok) {
+        showToast(outcome.problem, false);
+        return;
+      }
+      setTilePop((count) => count + 1);
+      showToast(outcome.label, true);
+      if (list.id === listIdRef.current) void switchSpace(target);
+    },
+    [showToast, switchSpace],
+  );
   // Only when the open list changes (a manual switch must not snap back at the next refresh); a
   // list that only now appears in `lists` (just made) is followed once it does.
   const followed = useRef<string | null>(null);
@@ -3190,6 +3218,20 @@ export function App(): ReactElement {
             },
           ],
         },
+        // SPACE-07 (D-189 Q7): into another space, never by dragging between spaces.
+        ...(spaces.length > 1 && !list.inbox && !list.quick
+          ? [
+              {
+                label: 'Move to space',
+                submenu: spaces
+                  .filter((each) => each.id !== (list.space ?? PERSONAL_SPACE))
+                  .map((each) => ({
+                    label: each.name,
+                    action: () => void moveListToSpace(list, each.id),
+                  })),
+              },
+            ]
+          : []),
         ...(inGroup
           ? [
               {
@@ -4921,6 +4963,19 @@ export function App(): ReactElement {
           run: () => void switchSpace(each.id),
         })),
       { id: 'space:new', label: 'New space…', keywords: 'spaces', run: () => setNewSpace(true) },
+      // SPACE-07 (D-106): the open list or note into another space.
+      ...(() => {
+        const open = lists.find((list) => list.id === listId);
+        if (!open || open.inbox || open.quick || spaces.length < 2) return [];
+        return spaces
+          .filter((each) => each.id !== (open.space ?? PERSONAL_SPACE))
+          .map((each) => ({
+            id: `space:move:${each.id}`,
+            label: `Move “${open.name}” to ${each.name}`,
+            keywords: 'space move',
+            run: () => void moveListToSpace(open, each.id),
+          }));
+      })(),
       // TASK-18, D-151: the list's folder for Give to Claude.
       ...(view?.mode === 'tasks' && view.id !== TODAY_ID && view.id !== FOCUS_ID
         ? [
@@ -5935,7 +5990,9 @@ export function App(): ReactElement {
               )}
               {/* SPACE-05: a new space, empty until a list is made or moved into it. */}
               {space !== PERSONAL_SPACE && sidebarItems.length === 0 && !naming && (
-                <p className="empty-space">Nothing here yet. Make a list or note with +.</p>
+                <p className="empty-space">
+                  Nothing here yet. Move a list here from its menu, or make one with +.
+                </p>
               )}
             </div>
           </div>

@@ -1703,6 +1703,77 @@ export class Workspace {
   }
 
   /**
+   * SPACE-07 (D-189 Q7, between spaces on this PC): a list or note moves into another space: its
+   * file goes to that space's folder (the same list: its ID, tasks, pins and reminders stay), the
+   * pictures and files it links are copied into that space's `attachments/` so they travel with it,
+   * and it shows at the end of that space's sidebar. One undo step moves it back. Inbox and quick
+   * notes stay Personal's; a name the target space already has is refused, never overwritten.
+   */
+  moveToSpace(id: string, target: string, now: Date): Promise<ListOutcome> {
+    return this.serial(async () => {
+      void now;
+      const list = this.find(id);
+      if (!list) return { ok: false, problem: 'That list is gone' };
+      if (list.entry.id === INBOX_ID) return { ok: false, problem: 'Inbox stays in Personal' };
+      if (this.isQuick(list)) return { ok: false, problem: 'Keep it as a note first' };
+      if (list.entry.id === null)
+        return { ok: false, problem: 'Edit it once in Flint first, so it has its own ID' };
+      const to = this.spaceKey(target);
+      if (target !== PERSONAL && to === undefined)
+        return { ok: false, problem: 'That space is gone' };
+      const from = list.entry.space;
+      if (to === from) return { ok: true, listId: id, label: '' };
+      const spaceName = to === undefined ? 'Personal' : (this.others.get(to)?.name ?? 'the space');
+      if (this.sameName(list.entry.name, list, to))
+        return { ok: false, problem: `${spaceName} has a list named ${list.entry.name}` };
+      // The pictures and files it links, copied along (the originals stay: other lists may use them).
+      const text = serializeDocument(list.file.document);
+      const fromFolder = this.folderOf(from);
+      const toFolder = this.folderOf(to);
+      for (const match of text.matchAll(/attachments\/([^\s)"'<>\]]+)/g)) {
+        let name: string;
+        try {
+          name = decodeURIComponent(match[1] ?? '');
+        } catch {
+          continue;
+        }
+        if (name === '' || name !== basename(name)) continue;
+        const source = join(fromFolder, 'attachments', name);
+        const copy = join(toFolder, 'attachments', name);
+        const present = await stat(copy).then(
+          () => true,
+          () => false,
+        );
+        if (present) continue;
+        await mkdir(join(toFolder, 'attachments'), { recursive: true });
+        await copyFile(source, copy).catch(() => undefined);
+      }
+      const move = async (loaded: Loaded, space: string | undefined): Promise<void> => {
+        const path = join(this.folderOf(space), basename(loaded.entry.path));
+        await rename(loaded.entry.path, path);
+        const { space: _old, ...rest } = loaded.entry;
+        void _old;
+        loaded.entry = { ...rest, path, ...(space !== undefined ? { space } : {}) };
+        loaded.file = await ListFile.open(path);
+      };
+      await move(list, to);
+      const label = `Moved to ${spaceName}`;
+      const step = (back: string | undefined, forth: string | undefined): UndoEntry => ({
+        label,
+        run: async () => {
+          const current = this.find(id);
+          if (!current || current.entry.space !== forth) return null;
+          if (this.sameName(current.entry.name, current, back)) return null;
+          await move(current, back);
+          return step(forth, back);
+        },
+      });
+      this.remember(step(from, to));
+      return { ok: true, listId: id, label };
+    });
+  }
+
+  /**
    * LIST-01, D-55: the list's file moves to Trash storage with its deletion time (D-50); Undo
    * moves it back. Inbox can't be deleted (LIST-03).
    */

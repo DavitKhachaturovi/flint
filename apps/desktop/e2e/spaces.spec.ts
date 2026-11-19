@@ -68,7 +68,9 @@ test.beforeAll(async () => {
     window.setBounds({ x: -6000, y: 0, width: 1300, height: 760 });
     window.showInactive();
   });
-  await expect(main.locator('.nav', { hasText: 'Errands' })).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+  ).toBeVisible();
 });
 
 test.afterAll(async () => {
@@ -104,7 +106,9 @@ test('New space from Ctrl+Shift+S: its folder, the line and the switcher appear 
   expect(json.name).toBe('Home');
   expect(json.id).toMatch(/^s-[a-z0-9]+$/);
   // Personal's lists are not under the line now.
-  await expect(main.locator('.nav', { hasText: 'Errands' })).toHaveCount(0);
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+  ).toHaveCount(0);
 });
 
 test('a list made in a space lives in its folder (SPACE-02)', async () => {
@@ -114,7 +118,9 @@ test('a list made in a space lives in its folder (SPACE-02)', async () => {
   await expect(name).toBeFocused();
   await name.fill('Groceries');
   await name.press('Enter');
-  await expect(main.locator('.nav', { hasText: 'Groceries' })).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+  ).toBeVisible();
   await expect
     .poll(() => readFile(join(flint, 'Spaces', 'Home', 'Groceries.md'), 'utf8').catch(() => ''))
     .toContain('mode: tasks');
@@ -126,17 +132,25 @@ test('1–9 in the space menu switch the sidebar; Today and Inbox stay above the
   await main.keyboard.press('1');
   await expect(main.locator('.space-menu')).toHaveCount(0);
   await expect(switcherName()).toHaveText('Personal');
-  await expect(main.locator('.nav', { hasText: 'Errands' })).toBeVisible();
-  await expect(main.locator('.nav', { hasText: 'Groceries' })).toHaveCount(0);
-  await expect(main.locator('.nav', { hasText: 'Today' })).toBeVisible();
-  await expect(main.locator('.nav', { hasText: 'Inbox' })).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+  ).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+  ).toHaveCount(0);
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }),
+  ).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Inbox' }),
+  ).toBeVisible();
 });
 
 test('Today’s chip of a space’s list carries its letter; its click switches the sidebar (SPACE-03)', async () => {
   const groceries = join(flint, 'Spaces', 'Home', 'Groceries.md');
   const text = await readFile(groceries, 'utf8');
   await writeFile(groceries, `${text.trimEnd()}\n- [ ] Eggs [pinned:: true] [id:: eg01]\n`);
-  await main.locator('.nav', { hasText: 'Today' }).click();
+  await main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }).click();
   const chip = main.locator('.chip.home-list', { hasText: 'Groceries' });
   await expect(chip).toBeVisible();
   const letter = chip.locator('.mm');
@@ -145,16 +159,43 @@ test('Today’s chip of a space’s list carries its letter; its click switches 
   await expect(switcherName()).toHaveText('Home');
   // The page stays on Today: its chip is still there, the list didn't open.
   await expect(chip).toBeVisible();
-  await expect(main.locator('.nav', { hasText: 'Groceries' })).toBeVisible();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+  ).toBeVisible();
 });
 
 test('a list of another space opened from Today switches the line to its space (SPACE-02)', async () => {
   await main.keyboard.press('Control+Shift+S');
   await main.keyboard.press('1');
   await expect(switcherName()).toHaveText('Personal');
-  await main.locator('.nav', { hasText: 'Today' }).click();
+  await main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }).click();
   await main
     .locator('.chip.home-list', { hasText: 'Groceries' })
     .click({ position: { x: 40, y: 6 } });
   await expect(switcherName()).toHaveText('Home');
+});
+
+test('Move to space: a list goes into another space from its menu; Undo brings it back (SPACE-07)', async () => {
+  await main.keyboard.press('Control+Shift+S');
+  await main.keyboard.press('1');
+  await expect(switcherName()).toHaveText('Personal');
+  await main
+    .locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' })
+    .click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Move to space', { exact: true }).hover();
+  await main.locator('.fl-submenu').getByText('Home').click();
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+  ).toHaveCount(0);
+  await expect
+    .poll(() => readFile(join(flint, 'Spaces', 'Home', 'Errands.md'), 'utf8').catch(() => ''))
+    .toContain('Post the letter');
+  // Undo (Ctrl+Z) moves it back into Personal.
+  await main.keyboard.press('Control+Z');
+  await expect(
+    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+  ).toBeVisible();
+  await expect
+    .poll(() => readFile(join(flint, 'Errands.md'), 'utf8').catch(() => ''))
+    .toContain('Post the letter');
 });
