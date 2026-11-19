@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spaces — Flint mockup (D-189: concept 1 chosen)</title>
+<!-- Tokens and fonts from the repository itself: no network request (APP-09, D-60). -->
+<link rel="stylesheet" href="../tokens.css">
+<style>
+@font-face{font-family:'Onest';src:url('../../../apps/desktop/src/renderer/fonts/Onest-Variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block}
+@font-face{font-family:'Geist Mono';src:url('../../../apps/desktop/src/renderer/fonts/GeistMono-Variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block}
+@font-face{font-family:'FiraGO';src:url('../../../apps/desktop/src/renderer/fonts/FiraGO-Regular.woff2') format('woff2');font-weight:400;unicode-range:U+10A0-10FF,U+1C90-1CBF,U+2D00-2D2F}
+
+/* ── The page around the window (not the app) ───────────────────────────── */
+body{margin:0;background:color-mix(in srgb,var(--fl-ground-window),black 45%);font-family:var(--fl-font-ui);color:var(--fl-text-primary);font-size:14px}
+.stage{width:1600px;margin:0 auto;padding-bottom:40px}
+.stage *{box-sizing:border-box}
+:where(.stage button){font:inherit;color:inherit;background:none;border:0;padding:0;cursor:default}
+.switcher{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0 4px}
+.switcher .line{display:flex;align-items:flex-start;gap:12px;max-width:1560px}
+.switcher .lab{flex:0 0 64px;padding-top:9px;text-align:right;font-size:12.5px;color:var(--fl-text-muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:12px;background:var(--fl-ground-card);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.tabs button{height:28px;padding:0 10px;border-radius:9px;color:var(--fl-text-muted);font-size:12.5px;white-space:nowrap;transition:background-color var(--fl-dur-fast),color var(--fl-dur-fast)}
+.tabs button:hover{color:var(--fl-text-primary)}
+.tabs button.on{background:var(--fl-strong-bg);color:var(--fl-strong-fg);font-weight:500}
+.tabs button .pick{margin-left:6px;font-family:var(--fl-font-mono);font-size:10px;letter-spacing:.04em;opacity:.7}
+.sim{height:28px;padding:0 12px;border-radius:9px;font-size:12.5px;color:var(--fl-text-secondary);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.sim:hover{color:var(--fl-text-primary);background:var(--fl-ground-hover)}
+.caption{min-height:46px;display:flex;align-items:center;justify-content:center;padding:6px 80px;font-size:12.5px;line-height:1.5;color:var(--fl-text-muted);text-align:center}
+.caption b{color:var(--fl-text-primary);font-weight:500}
+.notes{margin:18px 0 0;padding:22px 26px;border-radius:var(--fl-radius-card);background:var(--fl-ground-card);box-shadow:var(--fl-shadow-card);display:grid;grid-template-columns:1fr 1fr;gap:6px 44px;font-size:12.5px;line-height:1.6;color:var(--fl-text-secondary)}
+.notes h2{grid-column:1/-1;margin:0 0 4px;font-size:16px;font-weight:600;color:var(--fl-text-highlight)}
+.notes h3{margin:12px 0 4px;font-size:11px;font-weight:400;letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.notes p{margin:0 0 6px}
+.notes ul{margin:0;padding-left:16px}
+.notes li{margin:3px 0}
+.notes b{color:var(--fl-text-primary);font-weight:500}
+.notes code{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-primary)}
+.notes .full{grid-column:1/-1}
+
+/* ── The window ─────────────────────────────────────────────────────────── */
+.win{position:relative;width:1600px;height:1020px;display:flex;overflow:hidden;background:var(--fl-ground-window);border-radius:8px;box-shadow:0 0 0 1px var(--fl-edge-card)}
+.caps{position:absolute;right:0;top:0;height:40px;display:flex;align-items:center;color:var(--fl-text-faint);z-index:4}
+.caps span{width:46px;display:flex;justify-content:center}
+.tbtns{position:absolute;right:146px;top:6px;display:flex;gap:4px;z-index:4}
+.tbtns span{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--fl-text-faint)}
+
+/* Sidebar (app.css .sidebar, .nav, .tile, .nav-group, .sidebar-foot) */
+.sidebar{flex:0 0 236px;display:flex;flex-direction:column;gap:3px;padding:14px 12px;background:var(--fl-ground-sidebar);border-right:1px solid var(--fl-edge-divider);position:relative;overflow:hidden}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 20px;font-weight:600;font-size:17px;letter-spacing:-.01em;color:var(--fl-text-primary)}
+.brand img{width:34px;height:34px;display:block}
+.brand .search{margin-left:auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--fl-text-faint)}
+.nav{position:relative;display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px 7px 7px;border-radius:var(--fl-radius-row);text-align:left;font-size:14px;transition:background-color var(--fl-dur-fast),box-shadow var(--fl-dur-fast)}
+.nav:hover{background:var(--fl-ground-hover)}
+.nav.on{background:var(--fl-ground-float);box-shadow:var(--fl-shadow-selected)}
+.nav.on .nav-name{color:var(--fl-text-highlight);font-weight:500}
+.nav.on .tile{background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:var(--fl-shadow-strong-tile)}
+.nav.ctx{background:var(--fl-ground-hover);box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}
+.nav-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fl-text-heading-soft)}
+.nav-count{font-family:var(--fl-font-mono);font-size:var(--fl-size-meta);color:var(--fl-text-faint)}
+.nav.quick .nav-name,.nav.quick .tile{color:var(--fl-text-muted)}
+.tile{width:26px;height:26px;flex:0 0 auto;border-radius:var(--fl-radius-tile);display:flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-heading-soft)}
+.tile svg{display:block}
+.cl{display:flex;color:var(--fl-text-secondary);position:relative}
+.section-label{display:flex;align-items:center;gap:4px;padding:20px 2px 6px 10px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.section-label .grow{flex:1}
+.nav-group{margin:2px 0;padding:3px;border-radius:14px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-divider),inset 0 1px 0 color-mix(in srgb,var(--fl-text-highlight) 3%,transparent)}
+.nav-group-head{display:flex;align-items:center;gap:6px;width:100%;padding:7px 10px 3px 6px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.nav-group-head .g{flex:1}
+.nav-group-head .nav-count{letter-spacing:0}
+.nav-group-head .chev{display:flex;transform:rotate(90deg);color:var(--fl-text-faint)}
+.nav-group .nav{padding-left:15px}
+.sidebar-foot{margin-top:auto;display:flex;gap:6px;padding-top:12px;position:relative;background:var(--fl-ground-sidebar)}
+.sidebar-foot::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:32px;background:linear-gradient(to bottom,transparent,var(--fl-ground-sidebar));pointer-events:none}
+.sidebar-foot .nav{flex:1 1 0;height:36px;justify-content:center;gap:6px;padding:0 8px;border-radius:12px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-card)}
+.sidebar-foot .nav.on{background:var(--fl-ground-float);box-shadow:0 0 0 1px var(--fl-edge-float),var(--fl-shadow-selected)}
+.sidebar-foot .nav.on .tile{background:var(--fl-ground-tile);color:var(--fl-text-highlight);box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}
+.sidebar-foot .tile{width:22px;height:22px}
+.sidebar-foot .nav-name{flex:0 1 auto;font-size:13px}
+
+/* ── New: the space line and the space switcher (Proposed) ──────────────── */
+.space-line{height:1px;flex:0 0 auto;margin:14px 4px 8px;background:var(--fl-edge-divider)}
+.space-head{display:flex;align-items:center;gap:2px;min-height:34px;animation:none}
+.space-head.morph .space-btn > *{animation:sh-in var(--fl-dur-state) ease}
+@keyframes sh-in{from{opacity:0;transform:translateY(2px)}}
+.space-btn{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;height:34px;padding:0 8px 0 4px;border-radius:10px;text-align:left;transition:background-color var(--fl-dur-fast),box-shadow var(--fl-dur-fast)}
+.space-btn:hover{background:var(--fl-ground-hover)}
+.space-btn.open{background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}
+.stile{width:22px;height:22px;flex:0 0 auto;border-radius:7px;display:flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-primary);font-size:11.5px;font-weight:600;line-height:1}
+.stile.l{width:30px;height:30px;border-radius:9px;font-size:14px}
+.stile.xl{width:38px;height:38px;border-radius:11px;font-size:16px}
+.stile.tpop,.space-head .space-btn > .stile.tpop{animation:tile-pop var(--fl-dur-state) var(--fl-ease-press)}
+@keyframes tile-pop{40%{transform:scale(1.12)}}
+.space-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:var(--fl-text-primary)}
+.space-chev{position:relative;display:flex;color:var(--fl-text-faint)}
+.att-dot{position:absolute;right:-6px;top:-3px;width:5px;height:5px;border-radius:50%;background:var(--fl-overdue-dot)}
+.tool{position:relative;width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--fl-text-secondary)}
+.tool:hover{background:var(--fl-ground-hover);color:var(--fl-text-primary)}
+.tool .att-dot{right:2px;top:4px}
+.people{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 4px;padding:4px 8px 4px 6px;border-radius:9px;text-align:left;font-size:12px;color:var(--fl-text-muted);transition:background-color var(--fl-dur-fast),color var(--fl-dur-fast)}
+.people:hover,.people.open{background:var(--fl-ground-hover);color:var(--fl-text-secondary)}
+.people.gone{color:var(--fl-text-faint)}
+.people-slot{overflow:hidden}
+.people-slot.in{animation:fold-in var(--fl-dur-state) ease}
+@keyframes fold-in{from{opacity:0;max-height:0}to{max-height:40px}}
+.discs{display:flex;flex:0 0 auto}
+.disc{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;background:var(--fl-ground-tile);box-shadow:0 0 0 1.5px var(--fl-ground-sidebar),inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-secondary)}
+.disc + .disc{margin-left:-4px}
+.disc.l{width:26px;height:26px;font-size:11.5px;box-shadow:inset 0 0 0 1px var(--fl-edge-chip)}
+.disc.you{background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:none}
+.space-stage{position:relative;display:flex;flex-direction:column}
+.space-body{display:flex;flex-direction:column;gap:3px}
+.space-body.out{position:absolute;top:0;left:0;right:0;pointer-events:none;animation:sb-out 180ms ease forwards}
+.space-body.in{animation:sb-in var(--fl-dur-page) cubic-bezier(.2,.9,.3,1)}
+@keyframes sb-out{to{opacity:0;transform:translateX(var(--dx))}}
+@keyframes sb-in{from{opacity:0;transform:translateX(var(--dx))}}
+.empty-space{padding:10px 10px 4px;font-size:12.5px;line-height:1.5;color:var(--fl-text-faint)}
+.fl-flash{animation:fl-flash 1100ms ease-out}
+@keyframes fl-flash{0%,35%{background:var(--fl-ground-tile)}}
+.mm{width:15px;height:15px;flex:0 0 auto;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:var(--fl-ground-float);box-shadow:inset 0 0 0 1px var(--fl-edge-float);font-family:var(--fl-font-ui);font-size:9px;font-weight:600;line-height:1;color:var(--fl-text-primary)}
+.mm{transition:background-color var(--fl-dur-fast),color var(--fl-dur-fast),box-shadow var(--fl-dur-fast)}
+.main .mm[data-sp]:hover{background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:var(--fl-shadow-strong-tile)}
+.mm.press{animation:mm-press var(--fl-dur-state) var(--fl-ease-press)}
+@keyframes mm-press{30%{transform:scale(.82)}}
+.tip{position:absolute;z-index:90;pointer-events:none;display:flex;flex-direction:column;gap:2px;padding:6px 9px;border-radius:8px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:12px;color:var(--fl-text-primary);white-space:nowrap;animation:tip-fade var(--fl-dur-fast) ease-out}
+.tip .k{font-size:11px;color:var(--fl-text-muted)}
+@keyframes tip-fade{from{opacity:0;transform:translateY(2px)}}
+.kc{min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font-family:var(--fl-font-mono);font-size:10.5px;color:var(--fl-text-secondary)}
+
+/* Main area */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.titlebar{flex:0 0 40px}
+.scroller{flex:1;min-height:0;overflow:hidden}
+.pair{display:flex;justify-content:center;align-items:flex-start;gap:28px;padding:8px 24px 0}
+.content{flex:0 0 820px;display:flex;flex-direction:column;gap:16px}
+.content.in{animation:page-in var(--fl-dur-page) cubic-bezier(.2,.9,.3,1)}
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}}
+.tcol{flex:0 0 440px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--fl-ground-card);border-radius:var(--fl-radius-card);box-shadow:var(--fl-shadow-card)}
+.lhead{display:flex;flex-direction:column;gap:6px;padding:0 4px 2px}
+.ltitle{margin:0;font-size:var(--fl-size-title);font-weight:700;letter-spacing:-.025em;color:var(--fl-text-heading-soft);line-height:1.2}
+.ltitle b{color:var(--fl-text-highlight);font-weight:700}
+.lsub{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--fl-text-secondary)}
+.lsub .cl{color:var(--fl-text-secondary)}
+.composer{display:flex;align-items:center;gap:12px;padding:12px 12px 12px 18px}
+.composer .ph{flex:1;font-size:14px;color:var(--fl-text-faint)}
+.composer .tools{display:flex;gap:4px;color:var(--fl-text-muted)}
+.composer .tools span{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.send{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-muted)}
+.rows{padding:6px;display:flex;flex-direction:column;gap:2px}
+.row{position:relative;display:flex;align-items:center;gap:12px;min-height:42px;padding:9px 12px 9px 16px;border-radius:var(--fl-radius-row);font-size:var(--fl-size-body);color:var(--fl-text-body)}
+.row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.done{color:var(--fl-text-faint)}
+.row.sel{background:var(--fl-ground-float);box-shadow:var(--fl-shadow-selected)}
+.stripe{position:absolute;left:3px;top:11px;bottom:11px;border-radius:3px}
+.stripe.h{width:var(--fl-pri-high-width);background:var(--fl-pri-high-color)}
+.stripe.m{width:var(--fl-pri-med-width);background:var(--fl-pri-med-color)}
+.stripe.l{width:var(--fl-pri-low-width);background:var(--fl-pri-low-color)}
+.check{width:20px;height:20px;flex:0 0 auto;border-radius:var(--fl-radius-check);border:1.5px solid var(--fl-checkbox-border)}
+.check.done{display:flex;align-items:center;justify-content:center;border:0;background:var(--fl-accent);color:var(--fl-strong-fg)}
+.ind{display:flex;align-items:center;gap:8px;color:var(--fl-text-muted);font-family:var(--fl-font-mono);font-size:12px;white-space:nowrap}
+.ind .p{display:flex;color:var(--fl-text-faint)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:var(--fl-radius-check);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-secondary);white-space:nowrap;flex:0 0 auto}
+.chip.s{height:22px;padding:0 7px;font-size:11px}
+.slabel{padding:14px 18px 4px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.completed{display:flex;align-items:center;gap:8px;padding:12px 18px;font-size:13px;color:var(--fl-text-muted)}
+
+/* Today (mockup 12) */
+.greet{font-size:var(--fl-size-greeting);font-weight:700;letter-spacing:-.03em;line-height:1.12;color:var(--fl-text-heading-soft)}
+.greet b{color:var(--fl-text-highlight);font-weight:700}
+.dateline{display:flex;align-items:center;gap:14px;font-size:13.5px;color:var(--fl-text-secondary)}
+.track{width:240px;height:6px;border-radius:var(--fl-radius-pill);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);overflow:hidden}
+.track i{display:block;height:100%;background:var(--fl-strong-bg);border-radius:var(--fl-radius-pill)}
+.mono{font-family:var(--fl-font-mono)}
+.rgrid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:12px}
+.rem{padding:14px 16px;border-radius:16px;background:var(--fl-ground-card);box-shadow:var(--fl-shadow-card-close);display:flex;flex-direction:column;gap:8px;min-width:0}
+.rem.next{background:var(--fl-ground-float);box-shadow:var(--fl-shadow-card-hover)}
+.rem .top{display:flex;align-items:center;gap:10px}
+.rem .tm{font-family:var(--fl-font-mono);font-size:16px;color:var(--fl-text-primary)}
+.rem.next .tm{font-size:20px;color:var(--fl-text-highlight)}
+.rem .cd{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-faint)}
+.rem .rt{font-size:14px;color:var(--fl-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rem.next .rt{font-size:15px;font-weight:500;color:var(--fl-text-highlight)}
+.tile.strong{background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:var(--fl-shadow-strong-tile)}
+.tile.b{width:30px;height:30px;border-radius:9px}
+.tl{padding:6px 18px 14px}
+.hr{position:relative;height:30px;display:flex;align-items:flex-start;gap:12px}
+.hr .t{width:40px;font-family:var(--fl-font-mono);font-size:11px;color:var(--fl-text-faint);transform:translateY(-7px)}
+.hr .l{flex:1;border-top:1px solid var(--fl-edge-divider)}
+.ev{position:absolute;left:52px;right:0;top:-2px;display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:8px;font-size:12.5px;background:var(--fl-ground-tile);color:var(--fl-text-primary);z-index:1}
+.ev.next{background:var(--fl-ground-float);box-shadow:0 0 0 1px var(--fl-edge-float);color:var(--fl-text-highlight)}
+.ev .x{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.now{position:absolute;left:44px;right:0;height:1.5px;background:var(--fl-text-highlight);z-index:2}
+.now span{position:absolute;left:-44px;top:-9px;height:18px;padding:0 6px;border-radius:var(--fl-radius-pill);background:var(--fl-strong-bg);color:var(--fl-strong-fg);font-family:var(--fl-font-mono);font-size:10.5px;display:flex;align-items:center}
+.urow{display:flex;align-items:center;gap:10px;padding:7px 18px;font-size:13.5px;color:var(--fl-text-body)}
+.urow .x{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.primary-button{height:34px;padding:0 16px;border-radius:var(--fl-radius-button);background:var(--fl-strong-bg);box-shadow:var(--fl-shadow-primary-button);color:var(--fl-strong-fg);font-weight:500;font-size:13.5px;white-space:nowrap}
+.primary-button:hover{background:var(--fl-text-highlight)}
+.secondary-button{height:32px;padding:0 12px;border-radius:var(--fl-radius-button);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-primary);font-size:13px;white-space:nowrap}
+.secondary-button:hover{background:var(--fl-ground-float);box-shadow:inset 0 0 0 1px var(--fl-edge-float)}
+.quiet-button{height:32px;padding:0 12px;border-radius:var(--fl-radius-button);color:var(--fl-text-secondary);font-size:13px;white-space:nowrap}
+.quiet-button:hover{background:var(--fl-ground-tile);color:var(--fl-text-primary)}
+
+/* Note (mockup 13's conflict card) */
+.note{padding:28px 32px;display:flex;flex-direction:column;gap:12px;line-height:1.7}
+.note h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--fl-text-highlight);line-height:1.2}
+.note h2{margin:8px 0 0;font-size:18px;font-weight:600;color:var(--fl-text-primary)}
+.note p{margin:0;font-size:var(--fl-size-note);color:var(--fl-text-body)}
+.cchip{height:22px;padding:0 9px;border-radius:7px;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-primary);font-size:12px;display:inline-flex;align-items:center;margin-left:8px}
+.conflict{border-radius:12px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-card);padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px}
+.conflict .h{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fl-text-secondary)}
+.conflict .b{display:flex;gap:8px;margin-top:4px}
+.notice{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:16px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.notice .tx{flex:1;display:flex;flex-direction:column;gap:4px}
+.notice .t1{font-size:14px;font-weight:600;color:var(--fl-text-highlight)}
+.notice .t2{font-size:13px;line-height:1.55;color:var(--fl-text-secondary)}
+.notice .b{display:flex;gap:8px;margin-top:8px}
+
+/* Settings (app.css .settings-*) */
+.settings-section{display:flex;flex-direction:column;padding:14px 18px 8px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:56px;padding:10px 0;border-top:1px solid var(--fl-edge-divider)}
+.settings-row.first{border-top:0}
+.settings-text{min-width:0;display:flex;flex-direction:column;gap:3px}
+.settings-name{font-size:14px;color:var(--fl-text-body)}
+.settings-note{font-size:12.5px;line-height:1.5;color:var(--fl-text-muted)}
+.settings-lead{display:flex;align-items:center;gap:12px;min-width:0}
+.settings-control{flex:0 0 auto;display:flex;align-items:center;gap:6px}
+.panel-label{font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+
+/* Menus, popovers, dialogs, toast */
+.fl-menu{position:absolute;z-index:30;min-width:236px;padding:5px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:13px;animation:menu-in var(--fl-dur-base) ease-out;transform-origin:top left}
+@keyframes menu-in{from{opacity:0;transform:scale(.98)}}
+.fl-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:8px;color:var(--fl-text-primary);text-align:left}
+.fl-menu-item .grow{flex:1}
+.fl-menu-item:hover,.fl-menu-item.active{background:var(--fl-ground-tile)}
+.fl-menu-item .hint{color:var(--fl-text-faint)}
+.fl-menu-item.muted{color:var(--fl-text-secondary)}
+.fl-menu-divider{height:1px;margin:5px 6px;background:var(--fl-edge-float)}
+.fl-menu-label{display:flex;justify-content:space-between;align-items:center;padding:7px 10px 5px;font-size:var(--fl-size-label);letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.fl-menu-label .k{letter-spacing:0;text-transform:none;font-family:var(--fl-font-mono);font-size:10.5px}
+.sm-row{display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border-radius:9px;text-align:left}
+.sm-row:hover,.sm-row.active{background:var(--fl-ground-tile)}
+.sm-row .stile{width:28px;height:28px;border-radius:8px;font-size:13px}
+.sm-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sm-name{font-size:13.5px;color:var(--fl-text-primary)}
+.sm-sub{font-size:11.5px;color:var(--fl-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sm-state{display:flex;align-items:center;gap:8px;color:var(--fl-text-secondary)}
+.sm-state .c{position:relative;display:flex}
+.sm-state .c .att-dot{right:-2px;top:0}
+.sm-cur{display:flex;color:var(--fl-text-secondary);width:14px}
+.pop{position:absolute;z-index:30;width:304px;padding:14px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);display:flex;flex-direction:column;gap:12px;animation:menu-in var(--fl-dur-base) ease-out;transform-origin:top left}
+.pop .hd{display:flex;align-items:center;gap:10px}
+.pop .hd .tx{display:flex;flex-direction:column;min-width:0}
+.pop .t1{font-size:14px;font-weight:600;color:var(--fl-text-highlight)}
+.pop .t2{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-faint)}
+.pop .st{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fl-text-secondary)}
+.pop .sep{height:1px;background:var(--fl-edge-float)}
+.pop .person{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fl-text-primary)}
+.pop .person .e{font-family:var(--fl-font-mono);font-size:11px;color:var(--fl-text-faint)}
+.pop .legend{display:flex;flex-direction:column;gap:5px}
+.pop .legend span{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--fl-text-secondary)}
+.pop .foot{display:flex;justify-content:space-between;align-items:center}
+.dim{position:absolute;inset:0;z-index:40;background:var(--fl-spotlight-dim);animation:dim-in var(--fl-dur-base) ease}
+@keyframes dim-in{from{opacity:0}}
+.dialog{position:absolute;z-index:41;left:50%;top:132px;width:500px;transform:translateX(-50%);padding:22px;border-radius:var(--fl-radius-card);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);display:flex;flex-direction:column;gap:14px;animation:dlg-in var(--fl-dur-base) cubic-bezier(.2,.9,.3,1)}
+@keyframes dlg-in{from{opacity:0;transform:translate(-50%,6px) scale(.985)}}
+.dialog .hd{display:flex;align-items:center;gap:12px}
+.dt{font-size:16px;font-weight:600;line-height:1.35;color:var(--fl-text-highlight)}
+.dsub{font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-faint)}
+.dp{margin:0;font-size:13px;line-height:1.55;color:var(--fl-text-secondary)}
+.dp b{color:var(--fl-text-primary);font-weight:500}
+.dlabel{font-size:12.5px;font-weight:500;color:var(--fl-text-primary)}
+.well{display:flex;flex-direction:column;gap:9px;padding:12px 14px;border-radius:11px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-divider)}
+.fact{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--fl-text-primary)}
+.fact .i{display:flex;padding-top:2px;color:var(--fl-text-secondary)}
+.actions{display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.actions .left{margin-right:auto;font-size:12px;color:var(--fl-text-faint)}
+.field{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:38px;padding:6px 10px;border-radius:10px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font-size:13.5px;color:var(--fl-text-primary)}
+.field.focus{box-shadow:inset 0 0 0 1px var(--fl-accent)}
+.field .ph{color:var(--fl-text-faint)}
+.field .caret{width:1.5px;height:16px;background:var(--fl-accent);margin-left:-3px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.echip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 6px 0 8px;border-radius:var(--fl-radius-check);background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-primary)}
+.echip .x{display:flex;color:var(--fl-text-faint)}
+.opts{display:flex;gap:10px}
+.opt{flex:1;border-radius:14px;padding:14px;background:var(--fl-ground-card);box-shadow:inset 0 0 0 1px var(--fl-edge-float);display:flex;flex-direction:column;gap:8px}
+.opt.on{background:var(--fl-ground-hover);box-shadow:inset 0 0 0 1.5px var(--fl-accent)}
+.opt .o1{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;color:var(--fl-text-primary)}
+.opt .o2{font-size:12.5px;line-height:1.5;color:var(--fl-text-muted)}
+.radio{width:16px;height:16px;flex:0 0 auto;border-radius:50%;border:1.5px solid var(--fl-checkbox-border);display:flex;align-items:center;justify-content:center}
+.radio.on{border-color:var(--fl-strong-bg)}
+.radio.on::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--fl-strong-bg)}
+.mrow{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px;color:var(--fl-text-primary)}
+.mrow .e{font-family:var(--fl-font-mono);font-size:11px;color:var(--fl-text-faint)}
+.mrow .r{margin-left:auto;font-size:12px;color:var(--fl-text-muted)}
+.toast{position:absolute;left:50%;bottom:28px;z-index:60;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 8px 8px 8px;border-radius:16px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);color:var(--fl-text-primary);white-space:nowrap;font-size:13.5px;animation:rise var(--fl-dur-base) var(--fl-ease-spring)}
+.toast .tile{width:28px;height:28px}
+.toast .faint{color:var(--fl-text-muted)}
+@keyframes rise{from{opacity:0;transform:translate(-50%,10px)}}
+
+/* The capture popup (mockup 02) over the window */
+.cap{position:absolute;z-index:45;left:50%;top:96px;width:680px;transform:translateX(-50%);border-radius:var(--fl-radius-popup);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);padding:14px 18px 12px;display:flex;flex-direction:column;gap:12px;animation:dlg-in var(--fl-dur-fast) ease-out}
+.cap .grip{align-self:center;width:32px;height:4px;border-radius:var(--fl-radius-pill);background:var(--fl-edge-chip);margin-top:-4px}
+.cap .in{font-size:var(--fl-size-capture);color:var(--fl-text-primary);display:flex;align-items:center;gap:0}
+.cap .in .tok{color:var(--fl-text-highlight);background:var(--fl-selection);border-radius:4px;padding:0 2px}
+.cap .chips{display:flex;gap:6px}
+.cap .bar{display:flex;align-items:center;gap:6px;color:var(--fl-text-muted)}
+.cap .bar .tb{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.cap .bar .hint{margin-left:12px;font-size:11.5px;color:var(--fl-text-faint)}
+.cap .bar .to{margin-left:auto;font-family:var(--fl-font-mono);font-size:11.5px;color:var(--fl-text-secondary);display:flex;align-items:center;gap:6px}
+.cap .bar .send{width:34px;height:34px;background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:var(--fl-shadow-primary-button)}
+.ac{position:absolute;z-index:46;width:360px;padding:5px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);animation:menu-in var(--fl-dur-base) ease-out}
+.ac-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;font-size:13.5px;color:var(--fl-text-primary)}
+.ac-row.active{background:var(--fl-ground-tile)}
+.ac-row .grow{flex:1}
+.ac-row .sp{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fl-text-muted)}
+.ac-row.new{color:var(--fl-text-secondary)}
+.ac-row b{font-weight:600;color:var(--fl-text-highlight)}
+
+/* Mini mode (mockup 05, D-110) */
+.mini{position:absolute;z-index:45;width:364px;border-radius:var(--fl-radius-popup);background:var(--fl-ground-card);box-shadow:var(--fl-shadow-desktop);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;animation:dlg-in2 var(--fl-dur-base) ease-out}
+@keyframes dlg-in2{from{opacity:0;transform:translateY(6px)}}
+.mini .grip{align-self:center;width:32px;height:4px;border-radius:var(--fl-radius-pill);background:var(--fl-edge-chip)}
+.mini .mh{display:flex;align-items:center;gap:6px}
+.seg{display:flex;padding:3px;border-radius:11px;background:var(--fl-ground-window);box-shadow:inset 0 0 0 1px var(--fl-edge-card)}
+.seg span{height:26px;padding:0 10px;border-radius:8px;display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--fl-text-muted);white-space:nowrap}
+.seg span.on{background:var(--fl-ground-hover);color:var(--fl-text-highlight);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--fl-text-highlight) 6%,transparent)}
+.mini .mt{margin-left:auto;display:flex;gap:2px;color:var(--fl-text-faint)}
+.mini .mt span{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.mrowc{position:relative;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border-radius:10px;font-size:13px;color:var(--fl-text-body)}
+.mrowc .check{width:17px;height:17px;border-radius:6px}
+.mrowc .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrowc .stripe{top:9px;bottom:9px}
+.mrem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-card-hover)}
+.mrem .tile{width:28px;height:28px}
+.mcomp{display:flex;align-items:center;gap:8px;height:38px;padding:0 4px 0 12px;border-radius:12px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-card);font-size:13px;color:var(--fl-text-faint)}
+.mcomp .send{width:30px;height:30px;margin-left:auto}
+.picker{position:absolute;z-index:47;width:300px;padding:6px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);display:flex;flex-direction:column;gap:1px;animation:menu-in var(--fl-dur-base) ease-out}
+.picker .search{height:32px;margin:0 0 4px;padding:0 10px;border-radius:9px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fl-text-faint)}
+.picker .pl{padding:8px 10px 3px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint);display:flex;align-items:center;gap:6px}
+.picker .pr{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;font-size:13px;color:var(--fl-text-primary)}
+.picker .pr.cur{color:var(--fl-text-muted)}
+.picker .pr .grow{flex:1}
+.picker .pr .tile{width:22px;height:22px;border-radius:7px}
+
+/* ── Concept 2: the space rail ──────────────────────────────────────────── */
+.rail{flex:0 0 64px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0 14px;background:var(--fl-ground-window);border-right:1px solid var(--fl-edge-divider)}
+.rtile{position:relative;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);color:var(--fl-text-secondary);font-size:15px;font-weight:600}
+.rtile.on{background:var(--fl-ground-float);box-shadow:var(--fl-shadow-selected);color:var(--fl-text-highlight)}
+.rtile.on::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:4px;border-radius:0 4px 4px 0;background:var(--fl-text-highlight)}
+.rtile .att-dot{right:-2px;top:-2px;width:8px;height:8px;box-shadow:0 0 0 2px var(--fl-ground-window)}
+.rdiv{width:24px;height:1px;background:var(--fl-edge-chip);margin:2px 0}
+.rtile.add{margin-top:auto;background:transparent;box-shadow:inset 0 0 0 1px var(--fl-edge-card);color:var(--fl-text-muted)}
+.shead{display:flex;align-items:center;gap:8px;padding:0 2px 0 6px;min-height:34px}
+.shead .space-name{flex:1}
+
+/* Concept 3: the drag into a shared group card */
+.nav-group.ring{box-shadow:0 0 0 1.5px var(--fl-text-highlight)}
+.ghost{position:absolute;z-index:20;width:200px;display:flex;align-items:center;gap:10px;padding:7px 10px 7px 7px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:14px;color:var(--fl-text-highlight)}
+.droptip{position:absolute;z-index:21;padding:8px 10px;border-radius:10px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:12px;line-height:1.45;color:var(--fl-text-secondary);width:228px}
+.droptip b{color:var(--fl-text-highlight);font-weight:500}
+
+/* Concept 4: one long sidebar */
+.sbody-scroll{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:3px}
+.sect-head{display:flex;align-items:center;gap:8px;min-height:34px;margin-top:10px;padding:0 2px 0 4px}
+.sect-head .space-name{flex:1}
+
+/* ── The phone (mockup 14, 09 §12) ──────────────────────────────────────── */
+.phones{flex:1;display:flex;justify-content:center;align-items:center;gap:44px;background:color-mix(in srgb,var(--fl-ground-window),black 30%)}
+.phonewrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.phonewrap .cap2{font-size:12.5px;color:var(--fl-text-muted)}
+.phn{position:relative;width:412px;height:915px;overflow:hidden;border-radius:34px;background:var(--fl-ground-window);box-shadow:0 0 0 1px var(--fl-edge-float),0 0 0 7px color-mix(in srgb,var(--fl-ground-window),black 40%),0 0 0 8px var(--fl-edge-card)}
+.phn .status{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-family:var(--fl-font-mono);font-size:12px;color:var(--fl-text-secondary)}
+.phn .hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 8px 4px 16px}
+.phn .h1{display:flex;align-items:center;gap:10px;font-size:28px;font-weight:700;letter-spacing:-.025em;color:var(--fl-text-highlight)}
+.phn .hb{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--fl-text-secondary)}
+.phn .who{display:flex;align-items:center;gap:8px;padding:0 20px 14px;font-size:13px;color:var(--fl-text-muted)}
+.phn .who .disc{width:22px;height:22px;font-size:10.5px;box-shadow:0 0 0 1.5px var(--fl-ground-window),inset 0 0 0 1px var(--fl-edge-chip)}
+.phn .psearch{margin:0 16px 14px;height:48px;border-radius:14px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-card);display:flex;align-items:center;gap:12px;padding:0 16px;color:var(--fl-text-muted);font-size:15.5px}
+.phn .pitem{display:flex;align-items:center;gap:14px;height:56px;padding:0 16px;margin:0 12px;border-radius:12px;font-size:16px;color:var(--fl-text-body)}
+.phn .pitem .tile{width:32px;height:32px;border-radius:9px}
+.phn .pitem .grow{flex:1}
+.phn .pitem .nav-count{font-size:13px}
+.phn .pgroup{margin:4px 12px 10px;padding:4px;border-radius:18px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-divider)}
+.phn .pgroup .pitem{margin:0}
+.phn .plabel{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-muted)}
+.phn .navbar{position:absolute;left:0;right:0;bottom:0;height:80px;background:var(--fl-ground-sidebar);border-top:1px solid var(--fl-edge-divider);display:flex;justify-content:space-around;align-items:center;padding:0 8px 6px}
+.phn .tab{display:flex;flex-direction:column;align-items:center;gap:4px;width:96px;font-size:12.5px;color:var(--fl-text-secondary)}
+.phn .pill{width:60px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.phn .tab.on{color:var(--fl-text-highlight);font-weight:500}
+.phn .tab.on .pill{background:var(--fl-strong-bg);color:var(--fl-strong-fg)}
+.phn .fab{position:absolute;right:18px;bottom:98px;width:60px;height:60px;border-radius:18px;background:var(--fl-strong-bg);color:var(--fl-strong-fg);box-shadow:var(--fl-shadow-primary-button);display:flex;align-items:center;justify-content:center}
+.phn .scrim{position:absolute;inset:0;background:var(--fl-spotlight-dim)}
+.phn .sheet{position:absolute;left:0;right:0;bottom:0;border-radius:22px 22px 0 0;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);padding:10px 12px 30px;display:flex;flex-direction:column;gap:2px}
+.phn .handle{align-self:center;width:36px;height:4px;border-radius:var(--fl-radius-pill);background:var(--fl-edge-chip);margin-bottom:12px}
+.phn .st{padding:0 12px 10px;font-size:20px;font-weight:600;color:var(--fl-text-highlight)}
+.phn .srow{display:flex;align-items:center;gap:14px;min-height:64px;padding:8px 12px;border-radius:14px}
+.phn .srow.on{background:var(--fl-ground-tile)}
+.phn .srow .stile{width:38px;height:38px;border-radius:11px;font-size:16px}
+.phn .srow .tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.phn .srow .n{font-size:16px;color:var(--fl-text-primary)}
+.phn .srow .s{font-size:13px;color:var(--fl-text-muted)}
+.phn .sdiv{height:1px;margin:8px 12px;background:var(--fl-edge-float)}
+.phn .act{display:flex;align-items:center;gap:14px;height:52px;padding:0 12px;font-size:15.5px;color:var(--fl-text-secondary)}
+.phn .act .tile{width:38px;height:38px;border-radius:11px}
+.phn .greet2{padding:6px 20px 4px;font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.15;color:var(--fl-text-heading-soft)}
+.phn .greet2 b{color:var(--fl-text-highlight)}
+.phn .dl{padding:6px 20px 16px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--fl-text-secondary)}
+.phn .pcard{margin:0 16px 14px;border-radius:var(--fl-radius-card);background:var(--fl-ground-card);box-shadow:var(--fl-shadow-card)}
+.phn .prow{position:relative;display:flex;gap:14px;padding:14px 16px 14px 20px;border-top:1px solid var(--fl-edge-divider)}
+.phn .prow:first-of-type{border-top:0}
+.phn .prow .check{width:24px;height:24px;border-radius:8px;margin-top:1px}
+.phn .prow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.phn .prow .n{font-size:16px;color:var(--fl-text-body)}
+.phn .prow .m{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fl-text-muted)}
+.phn .prow .stripe{left:4px;top:16px;bottom:16px}
+.phn .plab{padding:14px 20px 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--fl-text-faint)}
+.phn .nextc{margin:0 16px 14px;padding:14px 16px;border-radius:18px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-card-hover);display:flex;gap:12px;align-items:center}
+
+/* The invite e-mail and flintnotes.app/join (schematic: the provider's e-mail and a browser, never drawn as any real product) */
+.desk{flex:1;display:flex;align-items:center;justify-content:center;gap:32px;background:color-mix(in srgb,var(--fl-ground-window),black 30%)}
+.pane{display:flex;flex-direction:column;gap:10px}
+.steplab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fl-text-muted)}
+.mailwin{width:600px;height:660px;border-radius:12px;background:var(--fl-ground-card);box-shadow:var(--fl-shadow-card);padding:26px 28px;display:flex;flex-direction:column;gap:16px}
+.mfrom{display:flex;align-items:center;gap:12px;font-size:13px}
+.msubj{font-size:20px;font-weight:600;color:var(--fl-text-highlight)}
+.gbar{display:block;height:9px;border-radius:5px;background:var(--fl-ground-tile)}
+.mnote{position:relative;margin-top:22px;padding:14px 16px;border-radius:12px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-card);font-size:14px;line-height:1.6;color:var(--fl-text-body);outline:1.5px dashed var(--fl-accent);outline-offset:5px}
+.mnote a{color:var(--fl-text-highlight);text-decoration:underline;text-underline-offset:3px;word-break:break-all}
+.mtag{position:absolute;top:-30px;left:0;font-size:11.5px;color:var(--fl-accent)}
+.mbtn{align-self:flex-start;height:36px;padding:0 20px;border-radius:8px;background:var(--fl-ground-tile);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);display:flex;align-items:center;font-size:13.5px;color:var(--fl-text-secondary)}
+.browser{width:760px;height:660px;border-radius:12px;overflow:hidden;background:var(--fl-ground-window);box-shadow:var(--fl-shadow-float);display:flex;flex-direction:column}
+.bbar{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--fl-ground-sidebar);border-bottom:1px solid var(--fl-edge-divider)}
+.addr{flex:1;height:28px;border-radius:14px;background:var(--fl-ground-well);box-shadow:inset 0 0 0 1px var(--fl-edge-chip);display:flex;align-items:center;padding:0 12px;font-family:var(--fl-font-mono);font-size:12px;color:var(--fl-text-secondary)}
+.bpage{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:0 40px}
+.bprompt{position:absolute;top:10px;left:96px;width:360px;padding:14px 16px;border-radius:12px;background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);text-align:left;display:flex;flex-direction:column;gap:9px;font-size:13px;z-index:2;animation:menu-in var(--fl-dur-base) ease-out}
+.bnote{font-size:11px;color:var(--fl-text-faint)}
+.cbx{width:16px;height:16px;flex:0 0 auto;border-radius:5px;box-shadow:inset 0 0 0 1.5px var(--fl-checkbox-border)}
+
+/* Motion: the move into a shared space (a copy of the row flies to the switcher's tile) */
+.flyer{position:absolute;z-index:70;pointer-events:none;display:flex;align-items:center;gap:10px;padding:7px 10px 7px 7px;border-radius:var(--fl-radius-row);background:var(--fl-ground-float);box-shadow:var(--fl-shadow-float);font-size:14px;color:var(--fl-text-highlight);white-space:nowrap}
+@media (prefers-reduced-motion: reduce){.space-body.out{display:none}.flyer{display:none}}
+.stage [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="stage">
+
+<div class="switcher">
+<div class="line"><span class="lab">Concept</span><div class="tabs" id="ctabs"></div></div>
+<div class="line"><span class="lab">State</span><div class="tabs" id="stabs"></div><button class="sim" id="sim" hidden></button></div>
+</div>
+<div class="caption" id="caption"></div>
+
+<div class="win" id="win"></div>
+
+<div class="notes" id="notes"></div>
+
+</div>
+<script>
+/* Spaces (a proposal): one file, a state switcher, the real tokens. Example names only (Alex, Sam, Nino, Unicorn, Home, acme, example.com). */
+var $ = function(id){ return document.getElementById(id); };
+function reduced(){ return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+/* ---------- Icons: 24-unit line icons, the app's own paths where it has them ---------- */
+var P = {
+  today:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/>',
+  focus:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2h5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  list:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>',
+  note:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  sort:'<path d="M4 7h16M7 12h10M10 17h4"/>',
+  settings:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  trash:'<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14M10 11v6M14 11v6"/>',
+  chev:'<path d="m9 6 6 6-6 6"/>',
+  chevDown:'<path d="m6 9 6 6 6-6"/>',
+  cloud:'<path d="M7 18.5a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 10Z"/>',
+  ck:'<path d="m9.85 13.5 2 2 3.5-3.5"/>',
+  arrow:'<path d="M12.6 10v5m-2-2 2 2 2-2"/>',
+  slash:'<path d="M4 4l16 16"/>',
+  alert:'<path d="M12.6 9v3.5M12.6 15.5v.01"/>',
+  user:'<circle cx="12" cy="8.2" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  people:'<circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M15.6 5.3a3.3 3.3 0 0 1 0 6.4M18 14.3a6.2 6.2 0 0 1 3.2 5.7"/>',
+  pc:'<rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/>',
+  pin:'<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/>',
+  join:'<path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/>',
+  link:'<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><path d="M8 12h8"/>',
+  conflict:'<path d="M7 4v13M7 17l-3-3M7 17l3-3M17 20V7M17 7l-3 3M17 7l3 3"/>',
+  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  hash:'<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3.5 17 5-5 4 4 2.5-2.5 5.5 5.5"/><circle cx="15.5" cy="9" r="1.5"/>',
+  check:'<path d="m5 12 5 5 9-10"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  send:'<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
+  panel:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/>',
+  mini:'<rect x="3" y="4" width="18" height="16" rx="3"/><rect x="12" y="7" width="6" height="5" rx="1.5"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  arrowLeft:'<path d="M19 12H5m6-6-6 6 6 6"/>',
+  dots:'<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>'
+};
+function ic(n, s, w){ return '<svg width="' + (s || 14) + '" height="' + (s || 14) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + P[n] + '</svg>'; }
+function cl(mark, s, w){ return '<svg width="' + (s || 14) + '" height="' + (s || 14) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 1.9) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + P.cloud + (mark ? P[mark] : '') + '</svg>'; }
+function caps(){ return '<div class="caps" aria-hidden="true"><span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2"/></svg></span><span><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span></div><div class="tbtns" aria-hidden="true"><span title="Mini mode">' + ic('mini', 15, 1.9) + '</span><span title="Side panel (Ctrl+\\)">' + ic('panel', 15, 1.9) + '</span></div>'; }
+
+/* ---------- Example data ---------- */
+var SP = {
+  p: {id:'p', name:'Personal', glyph:true, mono:'', with:[], prov:'Google Drive', where:'Only you · your devices and this PC', acct:'you@example.com'},
+  h: {id:'h', name:'Home', mono:'H', with:['Sam'], prov:'Google Drive', where:'in your Drive', acct:'you@example.com'},
+  u: {id:'u', name:'Unicorn', mono:'U', with:['Alex','Nino'], prov:'OneDrive', where:'in Alex’s OneDrive', acct:'you@acme.example.com', conflict:true}
+};
+var ORDER = ['p','h','u'];
+var ITEMS = {
+  p: [ {l:'backend', name:'Backend', n:9}, {l:'infra', name:'Infra', n:4},
+       {g:'Side projects', kids:[{l:'website', name:'Website', n:3}, {l:'flintideas', name:'Flint ideas', note:true}]},
+       {l:'reading', name:'Reading', n:2}, {l:'sprint', name:'Sprint planning', note:true}, {l:'trip', name:'Trip ideas', n:5}, {l:'watch', name:'Watch list', n:7} ],
+  h: [ {l:'groceries', name:'Groceries', n:4}, {l:'chores', name:'Chores', n:3}, {l:'gifts', name:'Gifts', n:2}, {l:'flat', name:'Flat repairs', note:true} ],
+  u: [ {l:'unicorn', name:'Unicorn', n:8}, {g:'Release', kids:[{l:'checklist', name:'Release checklist', n:6}, {l:'bugs', name:'Bugs', n:11}]},
+       {l:'standup', name:'Standup notes', note:true}, {l:'design', name:'Design review', note:true, conflict:true} ]
+};
+var LAST = {p:'backend', h:'groceries', u:'design'};
+function names(a){ return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+function stile(s, cls){ return '<span class="stile ' + (cls || '') + '">' + (s.glyph ? ic('user', cls === 'xl' ? 19 : cls === 'l' ? 16 : 13, 2) : s.mono) + '</span>'; }
+/* A shared space's letter: the full name on hover everywhere; in the main window a click switches the sidebar to that space. */
+function spName(id){ var s = SP[id]; return s.name + (s.with.length ? ' · with ' + names(s.with) : ''); }
+function mm(id){ return id === 'p' ? '' : '<span class="mm" data-sp="' + id + '" aria-label="' + spName(id) + '">' + SP[id].mono + '</span>'; }
+function discs(list){ return '<span class="discs">' + list.map(function(n){ return '<span class="disc">' + n[0] + '</span>'; }).join('') + '</span>'; }
+
+/* ---------- Sidebar pieces ---------- */
+function brand(){ return '<div class="brand"><img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo">Flint<span class="search" title="Search or run a command (Ctrl+K)">' + ic('search', 15) + '</span></div>'; }
+function nav(icon, name, count, on){ return '<button class="nav' + (on ? ' on' : '') + '"><span class="tile">' + ic(icon) + '</span><span class="nav-name">' + name + '</span>' + (count ? '<span class="nav-count">' + count + '</span>' : '') + '</button>'; }
+function navItem(it, open, o){
+  o = o || {};
+  var c = it.conflict && !o.removed && !o.fresh ? '<span class="cl" title="1 sync conflict">' + cl('alert', 13, 2) + '</span>' : '';
+  var cls = 'nav' + (open === it.l ? ' on' : '') + (o.ctx === it.l ? ' ctx' : '') + (it.flash ? ' fl-flash' : '');
+  return '<button class="' + cls + '" id="nav-' + it.l + '" data-l="' + it.l + '"><span class="tile">' + ic(it.note ? 'note' : 'list') + '</span><span class="nav-name">' + it.name + '</span>' + c + (it.n ? '<span class="nav-count">' + it.n + '</span>' : '') + '</button>';
+}
+function groupCard(g, open, o, head){
+  return '<div class="nav-group' + (g.ring ? ' ring' : '') + '" id="' + (g.id || '') + '"><div class="nav-group-head"><span class="chev">' + ic('chev', 10, 2.6) + '</span><span class="g">' + g.g + '</span>' + (head || '<span class="nav-count">' + g.kids.length + '</span>') + '</div>' + g.kids.map(function(k){ return k.gap ? '<div id="drop-gap" style="height:40px"></div>' : navItem(k, open, o); }).join('') + '</div>';
+}
+function itemsOf(space, o){
+  var list = ITEMS[space].map(function(x){ return x; });
+  if (o.moved && space === 'p') list = list.filter(function(x){ return x.l !== 'trip'; });
+  if (o.moved && space === 'h') list = list.concat([{l:'trip', name:'Trip ideas', n:5, flash:o.flash}]);
+  return list;
+}
+function items(space, open, o){ o = o || {}; return itemsOf(space, o).map(function(it){ return it.g ? groupCard(it, open, o) : navItem(it, open, o); }).join(''); }
+function foot(open){ return '<div class="sidebar-foot"><button class="nav' + (open === 'settings' ? ' on' : '') + '"><span class="tile">' + ic('settings') + '</span><span class="nav-name">Settings</span></button><button class="nav"><span class="tile">' + ic('trash') + '</span><span class="nav-name">Trash</span><span class="nav-count">3</span></button></div>'; }
+function attention(except){ return ORDER.some(function(id){ return id !== except && SP[id].conflict && S.joined.indexOf(id) >= 0; }); }
+function spaceHead(s, o){
+  var mark = o.removed ? 'slash' : o.syncing ? 'arrow' : s.conflict && !o.fresh ? 'alert' : 'ck';
+  var title = {slash:'Not syncing', arrow:'Syncing…', alert:'Needs attention: 1 conflict', ck:'Synced · just now'}[mark];
+  return '<button class="space-btn' + (o.menu ? ' open' : '') + '" id="space-btn" title="Switch space (Ctrl+Shift+S)">' + stile(s) + '<span class="space-name">' + s.name + '</span><span class="space-chev">' + ic('chevDown', 12, 2.4) + (attention(s.id) && !o.noDot ? '<i class="att-dot" title="Another space needs attention"></i>' : '') + '</span></button>' +
+    '<span class="tool" title="' + title + '">' + cl(mark, 16) + (mark === 'alert' ? '<i class="att-dot"></i>' : '') + '</span><span class="tool" title="Sort">' + ic('sort') + '</span><span class="tool" title="New list or note in ' + s.name + '">' + ic('plus') + '</span>';
+}
+function peopleLine(s, o){
+  if (!s.with.length) return '';
+  if (o.removed) return '<button class="people gone">' + ic('people', 14, 1.9) + '<span>No longer shared with you</span></button>';
+  return '<button class="people' + (o.peopleOpen ? ' open' : '') + '" id="people">' + discs(s.with) + '<span>With ' + names(s.with) + '</span></button>';
+}
+function sideC1(o){
+  var s = SP[o.space];
+  return brand() + nav('today', 'Today', 6, o.open === 'today') + nav('inbox', 'Inbox', 12, o.open === 'inbox') + nav('focus', 'Focus', 3, o.open === 'focus') +
+    '<button class="nav quick"><span class="tile">' + ic('plus') + '</span><span class="nav-name">Quick note</span></button>' +
+    '<div class="space-line" title="Above the line: yours, in every space. Below it: the space you chose."></div>' +
+    '<div class="space-head" id="space-head">' + spaceHead(s, o) + '</div>' +
+    '<div class="people-slot" id="people-slot">' + peopleLine(s, o) + '</div>' +
+    '<div class="space-stage" id="space-stage"><div class="space-body">' + items(o.space, o.open, o) + '</div></div>' + foot(o.open);
+}
+
+/* ---------- Pages ---------- */
+function row(t, pri, ind, extra){ extra = extra || ''; var done = extra.indexOf('done') >= 0;
+  return '<div class="row ' + extra + '">' + (pri ? '<span class="stripe ' + pri + '"></span>' : '') + (done ? '<span class="check done">' + ic('check', 12, 3) + '</span>' : '<span class="check"></span>') + '<span class="t">' + t + '</span>' + (ind ? '<span class="ind">' + ind + '</span>' : '') + '</div>'; }
+var PIN = '<span class="p" title="Pinned (yours)">' + ic('pin', 13, 2) + '</span>';
+function bell(t){ return '<span class="p">' + ic('bell', 13, 2) + '</span>' + t; }
+function composer(ph){ return '<div class="card composer"><span class="ph">' + ph + '</span><span class="tools"><span>' + ic('flag', 15, 1.9) + '</span><span>' + ic('hash', 15, 1.9) + '</span><span>' + ic('bell', 15, 1.9) + '</span></span><span class="send">' + ic('send', 14, 2.2) + '</span></div>'; }
+function head(title, open, sub){ return '<div class="lhead"><h1 class="ltitle">' + title + (open != null ? '<b> · ' + open + ' open</b>' : '') + '</h1>' + (sub ? '<div class="lsub">' + sub + '</div>' : '') + '</div>'; }
+function sharedSub(sid, extra){ return '<span class="cl">' + ic('people', 15, 1.9) + '</span>Shared in ' + SP[sid].name + ' with ' + names(SP[sid].with) + ' · ' + (extra || 'synced just now'); }
+var SYNCED = '<span class="cl">' + cl('', 14, 2) + '</span>Synced with Google Drive · 2 min ago';
+
+var PAGES = {
+  backend: function(){ return head('Backend', 9, SYNCED) + composer('Add a task to Backend…') +
+    '<div class="card rows">' + row('Fix token refresh in the gateway', 'h', PIN) + row('Retry policy for the payments webhook', 'm', bell('15:00')) + row('Remove the old health endpoint') + row('Add tracing to the import job', 'l') + row('Write the migration for user settings') + row('Cache the feature flags per tenant', 'm') + row('Rotate the service principal secret', '', bell('Fri 10:00')) + '</div>' +
+    '<div class="card completed">' + ic('chev', 11, 2.4) + 'Completed · 14</div>'; },
+  groceries: function(){ return head('Groceries', 4, sharedSub('h')) + composer('Add a task to Groceries…') +
+    '<div class="card rows">' + row('Oat milk, eggs, coffee beans') + row('Birthday present for Alex', 'm', PIN) + row('Light bulbs (E27, warm)') + row('Pick up the dry cleaning', '', bell('Sat 11:00')) + '</div>' +
+    '<div class="card completed">' + ic('chev', 11, 2.4) + 'Completed · 6</div>'; },
+  tripP: function(){ return head('Trip ideas', 5, SYNCED) + composer('Add a task to Trip ideas…') + tripRows(); },
+  tripH: function(){ return head('Trip ideas', 5, sharedSub('h', '<span class="cl">' + cl('arrow', 14) + '</span>sharing…')) + composer('Add a task to Trip ideas…') + tripRows(); },
+  design: function(){ return '<div class="card note"><h1>Design review</h1><div class="lsub">' + sharedSub('u') + '<span class="cchip">1 conflict</span></div>' +
+    '<h2>Sidebar spacing</h2><p>Group cards keep 3 px inside; the label row keeps its 11 px caps. Lists inside a group step in by 8 px.</p>' +
+    '<div class="conflict"><span class="h">' + ic('conflict', 14) + 'Also changed by Nino · 10 Mar 09:52</span><p>Group cards keep 4 px inside; the label row keeps its 11 px caps. Lists inside a group step in by 8 px.</p><div class="b"><button class="secondary-button">Use Nino’s</button><button class="secondary-button">Keep mine</button><button class="quiet-button">Keep both</button></div></div>' +
+    '<h2>Empty states</h2><p>One calm line and at most one hint. No illustrations.</p><h2>Open questions</h2><p>Does the release checklist need its own group, or is one group enough for now?</p></div>'; },
+  unicorn: function(){ return head('Unicorn', 8, sharedSub('u')) + composer('Add a task to Unicorn…') +
+    '<div class="card rows">' + row('Ship the onboarding checklist', 'h') + row('Fix the flaky import test', 'm') + row('Update the API docs for v2') + row('Draft the release notes', 'l') + row('Check the error budget before the release') + '</div>'; },
+  unicornRemoved: function(){ return head('Unicorn', 8, '<span class="cl">' + cl('slash', 14) + '</span>Not syncing · no longer shared with you') +
+    '<div class="notice"><span class="stile xl">U</span><div class="tx"><span class="t1">Alex stopped sharing Unicorn with you</span><span class="t2">On 9 Mar. Your copy stays on this PC as it was and no longer syncs; nothing in it was deleted. Until you choose, it stays here as its own space.</span><div class="b"><button class="primary-button">Move its lists to Personal</button><button class="secondary-button">Remove from this PC</button></div></div></div>' +
+    '<div class="card rows">' + row('Ship the onboarding checklist', 'h') + row('Fix the flaky import test', 'm', PIN) + row('Update the API docs for v2') + row('Draft the release notes', 'l') + row('Check the error budget before the release') + '</div>'; },
+  today: function(){ return todayMain(); },
+  settings: function(){ return settingsPage(); }
+};
+function tripRows(){ return '<div class="card rows">' + row('Book the guesthouse above Stepantsminda', 'm', PIN) + row('Ask Alex which lens they used for the valley shots') + row('Check the pass is open in early April', '', bell('Fri 10:00')) + row('Rent a car with winter tyres') + row('Pack the drone batteries', 'l') + '</div>'; }
+
+function todayMain(){
+  return '<div class="lhead" style="gap:12px"><div class="greet">Good morning. <b>Five tasks</b> are pinned.</div><div class="dateline">Tuesday, 10 March<span class="track"><i style="width:29%"></i></span><span class="mono" style="font-size:12px">2 of 7 done</span></div></div>' +
+  '<div class="rgrid">' +
+    '<div class="rem next"><div class="top"><span class="tile strong b">' + ic('bell', 15) + '</span><span class="panel-label">Next</span><span class="tm">10:30</span><span class="cd">in 10 min</span></div><span class="rt">Send the demo link to Alex</span><span><span class="chip s">' + mm('u') + 'Bugs</span></span></div>' +
+    '<div class="rem"><div class="top"><span class="tm">14:00</span><span class="cd">in 3 h 40 min</span></div><span class="rt">Call the plumber</span><span><span class="chip s">' + mm('h') + 'Chores</span></span></div>' +
+    '<div class="rem"><div class="top"><span class="tm">16:30</span><span class="cd">in 6 h 10 min</span></div><span class="rt">Deploy the hotfix</span><span><span class="chip s">Backend</span></span></div>' +
+  '</div>' + composer('Add a task to today…') +
+  '<div class="card"><div class="slabel">Pinned</div><div class="rows" style="padding-top:2px">' +
+    row('Fix token refresh in the gateway', 'h', PIN + '<span class="chip">Backend</span>') +
+    row('Review Nino’s release notes', 'm', PIN + '<span class="chip" title="Release checklist · in Unicorn, shared with Alex and Nino">' + mm('u') + 'Release checklist</span>') +
+    row('Birthday present for Alex', 'm', PIN + '<span class="chip" title="Groceries · in Home, shared with Sam">' + mm('h') + 'Groceries</span>') +
+    row('Renew the TLS certificate on staging', '', PIN + '<span class="chip">Infra</span>') +
+    row('Order the new mattress', '', PIN + '<span class="chip">' + mm('h') + 'Chores</span>') +
+    row('Water the plants', '', '<span style="color:var(--fl-text-faint)">done 08:40</span><span class="chip">' + mm('h') + 'Chores</span>', 'done') +
+  '</div></div>';
+}
+function todayCol(){
+  var hr = function(t, ev){ return '<div class="hr"><span class="t">' + t + '</span><span class="l"></span>' + (ev || '') + '</div>'; };
+  return '<div class="card"><div class="slabel">Timeline</div><div class="tl">' +
+    hr('09:00') + hr('', '<span class="now" style="top:10px"><span>10:20</span></span>') + hr('10:30', '<span class="ev next">' + mm('u') + '<span class="x">Send the demo link to Alex</span></span>') + hr('12:00') + hr('14:00', '<span class="ev">' + mm('h') + '<span class="x">Call the plumber</span></span>') + hr('16:00') + hr('16:30', '<span class="ev"><span class="x">Deploy the hotfix</span></span>') + hr('18:00') +
+  '</div></div>' +
+  '<div class="card" style="padding-bottom:8px"><div class="slabel">Done today · 2</div>' +
+    '<div class="urow"><span class="x">Water the plants</span><span class="chip s">' + mm('h') + 'Chores</span><span class="mono" style="font-size:11.5px;color:var(--fl-text-faint)">08:40</span></div>' +
+    '<div class="urow"><span class="x">Merge the cache fix</span><span class="chip s">Backend</span><span class="mono" style="font-size:11.5px;color:var(--fl-text-faint)">09:55</span></div></div>' +
+  '<div class="card" style="padding-bottom:14px"><div class="slabel">Captured today · 2</div>' +
+    '<div class="urow"><span class="x">Ask Sam about the parking permit</span><span class="chip s">Inbox</span></div>' +
+    '<div class="urow"><span class="x">Flaky test in the import job</span><span class="chip s">Inbox</span></div>' +
+    '<div style="padding:8px 18px 0"><button class="primary-button">Sort Inbox · 2</button></div></div>';
+}
+function settingsPage(){
+  var r = function(lead, name, note, ctl, first){ return '<div class="settings-row' + (first ? ' first' : '') + '"><div class="settings-lead">' + lead + '<div class="settings-text"><span class="settings-name">' + name + '</span><span class="settings-note">' + note + '</span></div></div><div class="settings-control">' + ctl + '</div></div>'; };
+  return '<div class="lhead"><h1 class="ltitle" style="color:var(--fl-text-heading-soft)">Settings</h1></div>' +
+  '<div class="card settings-section"><span class="panel-label" style="padding-bottom:6px">Spaces</span>' +
+    r(stile(SP.p, 'l'), 'Personal', 'Only you. 6 lists and notes sync to your devices through Google Drive; 3 stay on this PC.', '<button class="secondary-button">Sync settings…</button>', true) +
+    r(stile(SP.h, 'l'), 'Home', 'With Sam · Google Drive, in your Drive (you@example.com) · 4 lists and notes', '<button class="secondary-button">Invite…</button><button class="quiet-button">Leave…</button>') +
+    r(stile(SP.u, 'l'), 'Unicorn', 'With Alex and Nino · Microsoft OneDrive, in Alex’s OneDrive (you@acme.example.com) · 5 lists and notes', '<button class="secondary-button">Invite…</button><button class="quiet-button">Leave…</button>') +
+    r('<span class="tile b">' + ic('plus', 15) + '</span>', 'Add a space', 'Make a shared space and invite people. To join one, click the link in its invite e-mail; if it can’t be clicked, paste it here.', '<button class="secondary-button">New shared space…</button><button class="secondary-button">Join with a link…</button>') +
+  '</div>' +
+  '<div class="card settings-section"><span class="panel-label" style="padding-bottom:6px">Accounts</span>' +
+    r('<span class="disc you l">Y</span>', 'Google · you@example.com', 'Personal sync, Home', '<button class="quiet-button">Disconnect…</button>', true) +
+    r('<span class="disc you l">Y</span>', 'Microsoft · you@acme.example.com', 'Unicorn', '<button class="quiet-button">Disconnect…</button>') +
+    r('<span class="tile b">' + ic('plus', 15) + '</span>', 'Add an account', 'A space lives with one provider; everyone in it needs an account there.', '<button class="secondary-button">Add…</button>') +
+  '</div>' +
+  '<div class="card settings-section"><span class="panel-label" style="padding-bottom:6px">Where your things are</span>' +
+    r('<span class="tile b">' + ic('people', 15, 1.9) + '</span>', 'Shared with people', 'Home (Sam) and Unicorn (Alex and Nino). Everything in a shared space.', '', true) +
+    r('<span class="tile b">' + cl('', 15) + '</span>', 'Your devices', '6 personal lists and notes, through your Google Drive.', '') +
+    r('<span class="tile b">' + ic('pc', 15, 1.9) + '</span>', 'Only this PC', '3 personal lists and notes, your quick notes, Focus and Today’s order.', '') +
+  '</div>';
+}
+
+/* ---------- Overlays ---------- */
+function spaceMenu(){
+  var rowH = function(id, i){ var s = SP[id]; var sub = id === 'p' ? 'Only you · your devices' : 'With ' + names(s.with) + ' · ' + s.prov;
+    if (s.conflict) sub = 'With ' + names(s.with) + ' · 1 conflict';
+    return '<button class="sm-row" data-space="' + id + '">' + stile(s) + '<span class="sm-txt"><span class="sm-name">' + s.name + '</span><span class="sm-sub">' + sub + '</span></span><span class="sm-state"><span class="sm-cur" title="The space you are in">' + (id === S.space ? ic('check', 13, 2.6) : '') + '</span><span class="c">' + cl(s.conflict ? 'alert' : 'ck', 14) + (s.conflict ? '<i class="att-dot"></i>' : '') + '</span><span class="kc">' + (i + 1) + '</span></span></button>'; };
+  return '<div class="fl-menu" id="space-menu" style="width:318px"><div class="fl-menu-label">Spaces<span class="k">Ctrl+Shift+S</span></div>' +
+    S.joined.map(rowH).join('') + '<div class="fl-menu-divider"></div>' +
+    '<button class="fl-menu-item">' + ic('plus', 14) + '<span class="grow">New shared space…</span></button>' +
+    '<button class="fl-menu-item muted">' + ic('settings', 14) + '<span class="grow">Spaces in Settings</span></button></div>';
+}
+function moveMenu(){
+  return '<div class="fl-menu" id="ctx-menu"><div class="fl-menu-item">Rename</div><div class="fl-menu-item">Duplicate</div><div class="fl-menu-item">Move to group<span class="grow"></span><span class="hint">' + ic('chev', 11, 2.4) + '</span></div>' +
+    '<div class="fl-menu-item active" id="ctx-move">Move to space<span class="grow"></span><span class="hint">' + ic('chev', 11, 2.4) + '</span></div>' +
+    '<div class="fl-menu-item">' + cl('', 14) + '<span class="grow">Sync with Google Drive</span><span class="hint">' + ic('check', 13, 2.6) + '</span></div><div class="fl-menu-item">Convert to note</div><div class="fl-menu-divider"></div><div class="fl-menu-item">Delete</div></div>' +
+    '<div class="fl-menu" id="ctx-sub" style="width:280px">' +
+      '<button class="sm-row active">' + stile(SP.h) + '<span class="sm-txt"><span class="sm-name">Home</span><span class="sm-sub">Shares it with Sam</span></span></button>' +
+      '<button class="sm-row">' + stile(SP.u) + '<span class="sm-txt"><span class="sm-name">Unicorn</span><span class="sm-sub">Shares it with Alex and Nino</span></span></button>' +
+      '<div class="fl-menu-divider"></div><button class="fl-menu-item">' + ic('plus', 14) + '<span class="grow">New shared space…</span></button></div>';
+}
+function shareDialog(){
+  return '<div class="dim"></div><div class="dialog" style="width:500px"><div class="hd">' + stile(SP.h, 'xl') + '<div><div class="dt">Share “Trip ideas” with Sam?</div><div class="dsub">Moves it into Home · Google Drive</div></div></div>' +
+    '<div class="well">' +
+      '<div class="fact"><span class="i">' + ic('people', 15, 1.9) + '</span><span>Sam can see, change and delete its 5 tasks, and gets its 2 pictures (4.1 MB).</span></div>' +
+      '<div class="fact"><span class="i">' + ic('pin', 15) + '</span><span>Your pins and reminders in it stay yours: Sam doesn’t see them.</span></div>' +
+      '<div class="fact"><span class="i">' + cl('', 15) + '</span><span>Your other devices get it through Home from now on.</span></div>' +
+    '</div>' +
+    '<div class="actions"><span class="left">Undo works until its toast goes: nothing is shared before that.</span><button class="quiet-button">Cancel</button><button class="primary-button" id="do-share">Move and share</button></div></div>';
+}
+function movedToast(){ return '<div class="toast" id="toast"><span class="tile strong">' + ic('check', 14, 2.6) + '</span><span>Trip ideas is shared with Sam <span class="faint">· in Home</span></span><button class="quiet-button" style="color:var(--fl-text-highlight)">Undo</button></div>'; }
+function newDialog(){
+  return '<div class="dim"></div><div class="dialog" style="width:540px"><div class="dt">New shared space</div>' +
+    '<div class="dlabel">Name</div><div class="field focus">Trip crew<span class="caret"></span></div>' +
+    '<div class="dlabel">Where it lives</div><div class="opts">' +
+      '<div class="opt on"><div class="o1"><span class="radio on"></span>Google Drive</div><div class="o2 mono" style="font-size:11.5px">you@example.com</div></div>' +
+      '<div class="opt"><div class="o1"><span class="radio"></span>Microsoft OneDrive</div><div class="o2 mono" style="font-size:11.5px">you@acme.example.com</div></div></div>' +
+    '<div class="dlabel">People</div><div class="field"><span class="echip">nino@example.com<span class="x">' + ic('x', 11, 2.4) + '</span></span><span class="echip">sam@example.com<span class="x">' + ic('x', 11, 2.4) + '</span></span><span class="ph">Add an e-mail address</span></div>' +
+    '<p class="dp">Flint makes one file for <b>Trip crew</b> in your Google Drive and shares it with them. They need a Google account; Google e-mails them, and one click on the link in that e-mail opens Flint and joins. Everyone in a space can add, change and delete.</p>' +
+    '<div class="actions"><button class="quiet-button">Cancel</button><button class="primary-button">Create and invite</button></div></div>';
+}
+function inviteDialog(){
+  return '<div class="dim"></div><div class="dialog"><div class="hd">' + stile(SP.h, 'xl') + '<div><div class="dt">Invite people to Home</div><div class="dsub">Google Drive · Home’s file is in your Drive</div></div></div>' +
+    '<div class="dlabel">People</div><div class="field"><span class="echip">alex@example.com<span class="x">' + ic('x', 11, 2.4) + '</span></span><span class="ph">Add an e-mail address</span></div>' +
+    '<div class="dlabel">Note <span style="font-weight:400;color:var(--fl-text-faint)">(optional, in the e-mail)</span></div><div class="field focus" style="min-height:58px;align-items:flex-start">Here’s our shared Home space for groceries and chores.<span class="caret" style="margin-left:2px;margin-top:2px"></span></div>' +
+    '<div class="panel-label" style="padding-top:4px">In Home now</div>' +
+    '<div><div class="mrow"><span class="disc you l">Y</span>You<span class="e">you@example.com</span><span class="r">its file is in your Drive</span></div>' +
+    '<div class="mrow"><span class="disc l">S</span>Sam<span class="e">sam@example.com</span><span class="r">joined 2 Mar</span></div></div>' +
+    '<div class="well"><div class="fact"><span class="i">' + ic('mail', 15, 1.9) + '</span><span>Google Drive sends its own “shared with you” e-mail, with your note and one line from Flint: <span style="color:var(--fl-text-secondary)">“Join Home in Flint: <span class="mono" style="font-size:11.5px">https://flintnotes.app/join#g=…</span>”</span>. One click on it opens Flint and joins. Flint sends no e-mail of its own.</span></div>' +
+    '<div class="fact"><span class="i">' + ic('people', 15, 1.9) + '</span><span>Alex needs a Google account for that address. Pins and reminders stay each person’s own.</span></div></div>' +
+    '<div class="actions"><button class="quiet-button">Cancel</button><button class="primary-button">Send invite</button></div></div>';
+}
+function joinDialog(){
+  return '<div class="dim"></div><div class="dialog" style="width:540px"><div class="dt">Join with an invite link</div>' +
+    '<p class="dp">For when the link in the e-mail can’t be clicked. Paste it here; Flint filled it in because it was already copied.</p>' +
+    '<div class="field focus" style="font-family:var(--fl-font-mono);font-size:12px">https://1drv.ms/f/c/acme-unicorn…<span class="caret" style="margin-left:2px"></span></div>' +
+    '<div class="well" style="flex-direction:row;align-items:center;gap:12px;animation:sh-in var(--fl-dur-state) ease">' + cl('ck', 18) + '<div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--fl-text-primary)">A OneDrive link</span><span class="mono" style="font-size:11.5px;color:var(--fl-text-faint)">opens with you@acme.example.com</span></div><span style="font-size:12px;color:var(--fl-text-secondary)">Use another account</span></div>' +
+    '<div class="actions"><span class="left">No link? <span style="color:var(--fl-text-secondary)">Find it in Google Drive</span></span><button class="quiet-button">Cancel</button><button class="primary-button">Continue</button></div></div>';
+}
+function googleWaiting(){
+  return '<div class="dim"></div><div class="dialog" style="width:480px"><span class="panel-label" style="display:flex;align-items:center;gap:6px">' + ic('link', 12, 2) + 'From the invite link in your e-mail</span><div class="hd"><span class="stile xl">T</span><div><div class="dt">Joining Trip crew</div><div class="dsub">Google Drive · as the link says; Flint checks it once it can open it</div></div></div>' +
+    '<div class="well"><div class="fact"><span class="i">' + cl('arrow', 16) + '</span><span>Google’s picker is open in your browser, showing only this space. <b style="font-weight:500">Click Select there</b> and Flint joins: Google lets Flint open a file someone shared with you only after you pick it.</span></div>' +
+    '<div class="fact"><span class="i">' + ic('user', 15) + '</span><span>No Google account in Flint yet? The same step connects it.</span></div></div>' +
+    '<div class="actions"><span class="left">Waiting for Google…</span><button class="quiet-button">Show the browser</button><button class="secondary-button">Cancel</button></div></div>';
+}
+function joinedToast(){ return '<div class="toast" id="toast"><span class="tile strong">' + ic('check', 14, 2.6) + '</span><span>Joined Unicorn <span class="faint">· with Alex and Nino</span></span><button class="quiet-button" style="color:var(--fl-text-highlight)">Leave</button></div>'; }
+function emailAndPage(){
+  var g = function(w){ return '<span class="gbar" style="width:' + w + '"></span>'; };
+  return '<div class="desk">' +
+    '<div class="pane"><span class="steplab"><span class="kc">1</span>The invite e-mail: the provider’s own, drawn schematically</span><div class="mailwin">' +
+      '<div class="mfrom"><span class="disc l">A</span><div style="flex:1;display:flex;flex-direction:column"><span style="color:var(--fl-text-primary);font-weight:500">Alex</span><span class="mono" style="font-size:11px;color:var(--fl-text-faint)">via OneDrive · to you@acme.example.com</span></div><span class="mono" style="font-size:11.5px;color:var(--fl-text-faint)">10:12</span></div>' +
+      '<div class="msubj">Alex shared “Unicorn” with you</div>' + g('82%') + g('64%') +
+      '<div class="mnote"><span class="mtag">Your note, then Flint’s line</span><p style="margin:0 0 10px">Our team space for the 2.0 release: the bugs, the checklist and the review notes.</p><p style="margin:0">Join Unicorn in Flint: <a id="join-link">https://flintnotes.app/join#m=aHR0cHM6Ly8xZHJ2Lm1zL2YvYy9hY21l…</a></p></div>' +
+      g('48%') + '<span class="mbtn">Open</span><span style="font-size:11.5px;color:var(--fl-text-faint);margin-top:-6px">The provider’s button opens the file in OneDrive in the browser, which can’t show a Flint space.</span>' +
+    '</div></div>' +
+    '<div class="pane"><span class="steplab"><span class="kc">2</span>One click later: flintnotes.app/join in your browser</span><div class="browser"><div class="bbar"><span style="display:flex;color:var(--fl-text-faint)">' + ic('arrowLeft', 15) + '</span><span class="addr">flintnotes.app/join#m=aHR0cHM6Ly8xZHJ2…</span></div>' +
+      '<div class="bpage"><div class="bprompt"><span style="font-weight:600;color:var(--fl-text-highlight)">Open Flint?</span><span style="color:var(--fl-text-secondary);font-size:12.5px">flintnotes.app wants to open this app.</span><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fl-text-secondary)"><span class="cbx"></span>Always allow flintnotes.app to open links of this type</span><span style="display:flex;justify-content:flex-end;gap:8px"><button class="primary-button" style="height:30px;font-size:12.5px">Open Flint</button><button class="quiet-button">Cancel</button></span><span class="bnote">Your browser’s own question, the first time (schematic)</span></div>' +
+        '<img src="../../../assets/icon/flint-icon-512.svg" alt="Flint logo" style="width:64px;height:64px;margin-top:236px">' +
+        '<div style="font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--fl-text-heading-soft)">Opening Flint to join <span style="color:var(--fl-text-highlight)">Unicorn</span></div>' +
+        '<p style="margin:0;max-width:460px;font-size:14px;line-height:1.6;color:var(--fl-text-secondary)">Alex invited you. If your browser asks, choose <b style="color:var(--fl-text-primary);font-weight:500">Open Flint</b>; tick “Always allow” and next time it opens by itself.</p>' +
+        '<button class="primary-button">Open Flint</button>' +
+        '<span style="font-size:13px;color:var(--fl-text-muted)">Don’t have Flint yet? <span style="color:var(--fl-text-primary)">Download for Windows</span> · <span style="color:var(--fl-text-primary)">Flint for Android</span></span>' +
+        '<span style="position:absolute;bottom:20px;left:40px;right:40px;font-size:11.5px;line-height:1.5;color:var(--fl-text-faint)">Everything after the # in this link stays in your browser: this page loads nothing else and sends nothing anywhere.</span>' +
+      '</div></div></div>' +
+  '</div>';
+}
+function joinConfirm(){
+  return '<div class="dim"></div><div class="dialog"><span class="panel-label" style="display:flex;align-items:center;gap:6px">' + ic('link', 12, 2) + 'From the invite link in your e-mail</span><div class="hd">' + stile(SP.u, 'xl') + '<div><div class="dt">Join Unicorn?</div><div class="dsub">Microsoft OneDrive · Alex’s OneDrive · you@acme.example.com</div></div></div>' +
+    '<p class="dp">Alex shared it with Nino and you: <b>3 lists, 2 notes and 1 group</b>, 3.2 MB.</p>' +
+    '<div class="well">' +
+      '<div class="fact"><span class="i">' + ic('folder', 15, 1.9) + '</span><span>It’s kept in your Flint folder, in <span class="mono" style="font-size:12px">Spaces\\Unicorn</span>, as plain markdown.</span></div>' +
+      '<div class="fact"><span class="i">' + ic('people', 15, 1.9) + '</span><span>Alex, Nino and you can all add, change and delete.</span></div>' +
+      '<div class="fact"><span class="i">' + ic('pin', 15) + '</span><span>Your pins and reminders in it stay yours.</span></div>' +
+    '</div><div class="actions"><button class="quiet-button">Cancel</button><button class="primary-button">Join</button></div></div>';
+}
+function infoPop(){
+  return '<div class="pop" id="info-pop"><div class="hd">' + stile(SP.h, 'l') + '<div class="tx"><span class="t1">Home</span><span class="t2">Google Drive · in your Drive</span></div></div>' +
+    '<div class="st">' + cl('ck', 15) + 'Synced · just now</div><div class="sep"></div><span class="panel-label">People</span>' +
+    '<div class="person"><span class="disc you l">Y</span><span style="flex:1">You</span><span class="e">you@example.com</span></div>' +
+    '<div class="person"><span class="disc l">S</span><span style="flex:1">Sam</span><span class="e">sam@example.com</span></div>' +
+    '<div class="foot"><button class="secondary-button">Invite people…</button><button class="quiet-button">Space settings…</button></div>' +
+    '<div class="sep"></div><div class="legend"><span class="panel-label" style="font-size:10px">Other states</span>' +
+      '<span>' + cl('arrow', 14) + 'Syncing…</span><span>' + cl('slash', 14) + 'Offline · changes sync when you’re back</span>' +
+      '<span style="color:var(--fl-text-primary)"><span style="position:relative;display:flex">' + cl('alert', 14) + '<i class="att-dot" style="right:-2px;top:0"></i></span>Needs attention · sign in to Google again</span>' +
+      '<span>' + ic('people', 14, 1.9) + 'Sam’s Flint needs an update to sync Home</span></div></div>';
+}
+function capturePopup(){
+  return '<div class="cap" id="cap"><span class="grip"></span><div class="chips"><span class="chip"><span class="stripe h" style="position:static;width:3px;height:12px"></span>High</span></div>' +
+    '<div class="in">buy oat milk and the cake for Alex !h <span class="tok" id="tok">##gro</span><span class="caret" style="width:1.5px;height:22px;background:var(--fl-accent);margin-left:1px;animation:blink 1.1s steps(1) infinite"></span></div>' +
+    '<div class="bar"><span class="tb">' + ic('flag', 16, 1.9) + '</span><span class="tb">' + ic('hash', 16, 1.9) + '</span><span class="tb">' + ic('bell', 16, 1.9) + '</span><span class="tb">' + ic('plus', 16, 2) + '</span><span class="hint">Enter saves · Esc keeps draft · Shift+Esc discards</span><span class="to">to Inbox</span><span class="send">' + ic('send', 15, 2.2) + '</span></div></div>' +
+    '<div class="ac" id="ac">' +
+      '<div class="ac-row active">' + ic('hash', 14, 1.9) + '<span class="grow"><b>Gro</b>ceries</span><span class="sp">Home ' + mm('h') + '</span></div>' +
+      '<div class="ac-row">' + ic('hash', 14, 1.9) + '<span class="grow"><b>Gro</b>wth experiments</span><span class="sp">' + mm('u') + '</span></div>' +
+      '<div class="ac-row">' + ic('hash', 14, 1.9) + '<span class="grow"><b>Gro</b>und floor repairs</span></div>' +
+      '<div class="fl-menu-divider"></div><div class="ac-row new">' + ic('plus', 14) + '<span class="grow">New list “gro”</span><span class="sp">in Personal</span></div></div>';
+}
+function miniCards(){
+  var r = function(t, pri, chip){ return '<div class="mrowc">' + (pri ? '<span class="stripe ' + pri + '"></span>' : '') + '<span class="check"></span><span class="t">' + t + '</span>' + (chip || '') + '</div>'; };
+  var head = function(tabs){ return '<span class="grip"></span><div class="mh"><div class="seg">' + tabs + '</div><span class="mt"><span>' + ic('dots', 14) + '</span><span>' + ic('pin', 13) + '</span><span>' + ic('x', 13, 2.2) + '</span></span></div>'; };
+  return '<div class="dim" title="Mini mode floats over your other apps"></div><div class="mini" id="mini-a" style="right:430px;top:70px">' + head('<span class="on">Today</span><span>Inbox</span><span>Note</span>') +
+    '<div class="mrem"><span class="tile strong">' + ic('bell', 14) + '</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span class="mono" style="font-size:11.5px;color:var(--fl-text-muted)">10:30 · in 10 min</span><span style="font-size:14px;color:var(--fl-text-highlight);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Send the demo link to Alex</span></div><span class="chip s">' + mm('u') + 'Bugs</span></div>' +
+    r('Fix token refresh in the gateway', 'h', '<span class="chip s">Backend</span>') + r('Review Nino’s release notes', 'm', '<span class="chip s">' + mm('u') + 'Release ch…</span>') + r('Birthday present for Alex', 'm', '<span class="chip s">' + mm('h') + 'Groceries</span>') + r('Renew the TLS certificate', '', '<span class="chip s">Infra</span>') +
+    '<div class="mcomp">Add a task to today…<span class="send">' + ic('send', 13, 2.2) + '</span></div></div>' +
+    '<div class="mini" id="mini-b" style="right:40px;top:70px">' + head('<span>Today</span><span class="on">Groceries ' + ic('chevDown', 11, 2.4) + '</span><span>Note</span>') +
+    r('Oat milk, eggs, coffee beans') + r('Birthday present for Alex', 'm') + r('Light bulbs (E27, warm)') +
+    '<div class="mcomp">Add to Groceries…<span class="send">' + ic('send', 13, 2.2) + '</span></div></div>' +
+    '<div class="picker" id="mini-picker" style="right:72px;top:132px"><div class="search">' + ic('search', 13) + 'Show a list…</div>' +
+      '<div class="pr"><span class="tile">' + ic('inbox', 12) + '</span><span class="grow">Inbox</span></div><div class="pr"><span class="tile">' + ic('focus', 12) + '</span><span class="grow">Focus</span></div>' +
+      [['Backend'], ['Bugs', 'u'], ['Chores', 'h'], ['Infra'], ['Release checklist', 'u'], ['Gifts', 'h'], ['Reading']].map(function(r){ return '<div class="pr"><span class="tile">' + ic('list', 12) + '</span><span class="grow">' + r[0] + '</span>' + (r[1] ? mm(r[1]) : '') + '</div>'; }).join('') + '</div>';
+}
+
+/* ---------- The phone ---------- */
+function phoneBar(on){ var t = function(k, icon, label){ return '<button class="tab' + (on === k ? ' on' : '') + '"><span class="pill">' + ic(icon, 20, 1.9) + '</span>' + label + '</button>'; }; return '<nav class="navbar">' + t('today', 'today', 'Today') + t('inbox', 'inbox', 'Inbox · 12') + t('lists', 'list', 'Lists') + '</nav>'; }
+function phStatus(){ return '<div class="status"><span>10:20</span><span>5G · 82%</span></div>'; }
+function pItem(icon, name, n, extra){ return '<div class="pitem"><span class="tile">' + ic(icon, 16) + '</span><span class="grow">' + name + '</span>' + (extra || '') + (n ? '<span class="nav-count">' + n + '</span>' : '') + '</div>'; }
+function phones(){
+  var lists = '<div class="phn">' + phStatus() + '<div class="hdr"><span class="h1">' + stile(SP.h, 'l') + 'Home<span style="display:flex;color:var(--fl-text-faint)">' + ic('chevDown', 18, 2.4) + '</span></span><span style="display:flex"><span class="hb">' + ic('plus', 22) + '</span><span class="hb">' + ic('sort', 21, 1.9) + '</span></span></div>' +
+    '<div class="who">' + discs(['Sam']) + 'With Sam · synced just now</div>' +
+    '<div class="psearch">' + ic('search', 19, 1.9) + 'Search lists, notes and tasks</div>' +
+    pItem('list', 'Groceries', 4) + pItem('list', 'Chores', 3) + pItem('list', 'Gifts', 2) + pItem('note', 'Flat repairs') +
+    '<div style="position:absolute;left:16px;right:16px;bottom:96px;display:flex;gap:10px"><div class="pitem" style="flex:1;margin:0;justify-content:center;height:48px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-card);border-radius:14px;font-size:15px;color:var(--fl-text-secondary)">' + ic('settings', 18, 1.9) + 'Settings</div><div class="pitem" style="flex:1;margin:0;justify-content:center;height:48px;background:var(--fl-ground-card);box-shadow:0 0 0 1px var(--fl-edge-card);border-radius:14px;font-size:15px;color:var(--fl-text-secondary)">' + ic('trash', 18, 1.9) + 'Trash <span class="nav-count">3</span></div></div>' +
+    phoneBar('lists') + '</div>';
+  var sheet = '<div class="phn">' + phStatus() + '<div class="hdr"><span class="h1">' + stile(SP.p, 'l') + 'Personal<span style="display:flex;color:var(--fl-text-faint)">' + ic('chevDown', 18, 2.4) + '</span></span><span style="display:flex"><span class="hb">' + ic('plus', 22) + '</span><span class="hb">' + ic('sort', 21, 1.9) + '</span></span></div>' +
+    '<div class="psearch">' + ic('search', 19, 1.9) + 'Search lists, notes and tasks</div>' + pItem('list', 'Backend', 9) + pItem('list', 'Infra', 4) + pItem('list', 'Reading', 2) + pItem('list', 'Trip ideas', 5) +
+    phoneBar('lists') + '<div class="scrim"></div><div class="sheet"><span class="handle"></span><div class="st">Spaces</div>' +
+      '<div class="srow on">' + stile(SP.p) + '<div class="tx"><span class="n">Personal</span><span class="s">Only you · your devices</span></div><span style="color:var(--fl-text-secondary);display:flex">' + ic('check', 18, 2.4) + '</span></div>' +
+      '<div class="srow">' + stile(SP.h) + '<div class="tx"><span class="n">Home</span><span class="s">With Sam · Google Drive</span></div></div>' +
+      '<div class="srow">' + stile(SP.u) + '<div class="tx"><span class="n">Unicorn</span><span class="s">With Alex and Nino · 1 conflict</span></div><span style="position:relative;display:flex;color:var(--fl-text-secondary)">' + cl('alert', 20) + '<i class="att-dot" style="right:-2px;top:1px"></i></span></div>' +
+      '<div class="sdiv"></div><div class="act"><span class="tile">' + ic('plus', 18) + '</span>New shared space</div></div></div>';
+  var today = '<div class="phn">' + phStatus() + '<div class="hdr" style="padding-bottom:0"><span></span><span class="hb">' + ic('search', 21, 1.9) + '</span></div><div class="greet2">Good morning. <b>Five tasks</b> are pinned.</div>' +
+    '<div class="dl">Tue 10 Mar<span class="track" style="width:130px"><i style="width:29%"></i></span><span class="mono" style="font-size:12px">2 of 7</span></div>' +
+    '<div class="nextc"><span class="tile strong b">' + ic('bell', 15) + '</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span class="mono" style="font-size:12px;color:var(--fl-text-muted)">NEXT · 10:30 · in 10 min</span><span style="font-size:16px;font-weight:500;color:var(--fl-text-highlight)">Send the demo link to Alex</span><span style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fl-text-muted)">' + mm('u') + 'Bugs</span></div></div>' +
+    '<div class="plab">Pinned</div><div class="pcard">' +
+      '<div class="prow"><span class="stripe h"></span><span class="check"></span><div class="tx"><span class="n">Fix token refresh in the gateway</span><span class="m">Backend</span></div></div>' +
+      '<div class="prow"><span class="stripe m"></span><span class="check"></span><div class="tx"><span class="n">Review Nino’s release notes</span><span class="m">' + mm('u') + 'Release checklist</span></div></div>' +
+      '<div class="prow"><span class="stripe m"></span><span class="check"></span><div class="tx"><span class="n">Birthday present for Alex</span><span class="m">' + mm('h') + 'Groceries</span></div></div>' +
+      '<div class="prow"><span class="check"></span><div class="tx"><span class="n">Order the new mattress</span><span class="m">' + mm('h') + 'Chores</span></div></div></div>' +
+    '<span class="fab">' + ic('plus', 26, 2.2) + '</span>' + phoneBar('today') + '</div>';
+  return '<div class="phones"><div class="phonewrap">' + lists + '<span class="cap2">Lists in a shared space</span></div><div class="phonewrap">' + sheet + '<span class="cap2">Switching: the spaces sheet</span></div><div class="phonewrap">' + today + '<span class="cap2">Today, every space</span></div></div>';
+}
+
+/* ---------- The other concepts' sidebars ---------- */
+function sideRail(){
+  return '<div class="rail"><button class="rtile" title="Personal">' + ic('user', 18, 2) + '</button><span class="rdiv"></span><button class="rtile on" title="Home · with Sam">H</button><button class="rtile" title="Unicorn · with Alex and Nino · 1 conflict">U<i class="att-dot"></i></button><button class="rtile add" title="New or join a shared space">' + ic('plus', 18) + '</button></div>' +
+    '<aside class="sidebar">' + brand() + nav('today', 'Today', 6) + nav('inbox', 'Inbox', 12) + nav('focus', 'Focus', 3) + '<button class="nav quick"><span class="tile">' + ic('plus') + '</span><span class="nav-name">Quick note</span></button>' +
+    '<div class="space-line"></div><div class="shead"><span class="space-name">Home</span><span class="tool">' + cl('ck', 16) + '</span><span class="tool">' + ic('sort') + '</span><span class="tool">' + ic('plus') + '</span></div>' + peopleLine(SP.h, {}) +
+    items('h', 'groceries') + foot() + '</aside>';
+}
+function sideGroups(){
+  var home = {g:'Home', id:'g-home', ring:true, kids:[ITEMS.h[0], {gap:true}].concat(ITEMS.h.slice(1))};
+  var uni = {g:'Unicorn', kids:[{l:'unicorn', name:'Unicorn', n:8}, {l:'checklist', name:'Release checklist', n:6}, {l:'design', name:'Design review', note:true, conflict:true}]};
+  var side = {g:'Side projects', kids:[{l:'website', name:'Website', n:3}, {l:'flintideas', name:'Flint ideas', note:true}]};
+  return '<aside class="sidebar">' + brand() + nav('today', 'Today', 6) + nav('inbox', 'Inbox', 12) + nav('focus', 'Focus', 3) + '<button class="nav quick"><span class="tile">' + ic('plus') + '</span><span class="nav-name">Quick note</span></button>' +
+    '<div class="section-label"><span class="grow">Lists</span><span class="tool">' + cl('ck', 16) + '</span><span class="tool">' + ic('sort') + '</span><span class="tool">' + ic('plus') + '</span></div>' +
+    navItem({l:'backend', name:'Backend', n:9}) + navItem({l:'infra', name:'Infra', n:4}) +
+    groupCard(home, 'groceries', {}, '<span style="letter-spacing:0;text-transform:none;font-size:11.5px;color:var(--fl-text-primary)">Drop to share with Sam</span>') +
+    groupCard(uni, '', {}, discs(['Alex', 'Nino'])) +
+    groupCard(side, '', {}, '<span class="cl" title="Syncs to your devices">' + cl('', 13, 2) + '</span>') +
+    navItem({l:'reading', name:'Reading', n:2}) + '<div id="trip-gap" style="height:38px"></div>' + navItem({l:'watch', name:'Watch list', n:7}) + foot() + '</aside>';
+}
+function sideLong(){
+  var sect = function(id, extra){ var s = SP[id]; return '<div class="sect-head">' + stile(s) + '<span class="space-name">' + s.name + '</span>' + (s.with.length ? discs(s.with) : '') + '<span class="tool">' + cl(s.conflict ? 'alert' : 'ck', 16) + (s.conflict ? '<i class="att-dot"></i>' : '') + '</span><span class="tool">' + ic('plus') + '</span></div>'; };
+  return '<aside class="sidebar">' + brand() + nav('today', 'Today', 6) + nav('inbox', 'Inbox', 12) + nav('focus', 'Focus', 3) + '<button class="nav quick"><span class="tile">' + ic('plus') + '</span><span class="nav-name">Quick note</span></button>' +
+    '<div class="sbody-scroll">' + sect('p') + items('p', '') + sect('h') + items('h', 'groceries') + sect('u') + items('u', '') + '</div>' + foot() + '</aside>';
+}
+
+/* ---------- Concepts and states ---------- */
+var CONCEPTS = [
+  {id:'line', label:'1 · The space line', pick:true},
+  {id:'rail', label:'2 · Space rail'},
+  {id:'groups', label:'3 · Spaces are groups'},
+  {id:'long', label:'4 · One long sidebar'}
+];
+var LIVE = 'Live: click the space’s name (or press <b>Ctrl+Shift+S</b>, then <b>1</b>, <b>2</b> or <b>3</b>) to switch and see the motion.';
+var STATES = {
+  line: [
+    {id:'personal', label:'Personal', side:{space:'p', open:'backend'}, page:'backend', live:true,
+     cap:'Your own space. Above the line, Today, Inbox, Focus and Quick note are yours in every space; below it, the Lists label has become the space’s name. The dot by the chevron: another space needs attention (Unicorn has a conflict). ' + LIVE},
+    {id:'shared', label:'A shared space', side:{space:'h', open:'groceries'}, page:'groceries', live:true,
+     cap:'Home, shared with Sam. Who is in it is said once, under its name; its rows carry no marks. Every list in it says so under its title. Pins and reminders here are yours only (the pin on “Birthday present for Alex”, the reminder on the dry cleaning). ' + LIVE},
+    {id:'switch', label:'Switching', side:{space:'p', open:'backend', menu:true}, page:'backend', over:'spaceMenu', live:true,
+     cap:'The space menu: each space with who it’s shared with, its sync state and its key. <b>Ctrl+Shift+S</b> opens it anywhere in the window, <b>1–9</b> pick, Ctrl+K has “Switch to Home”. Try the rows: only what is under the line changes.'},
+    {id:'today', label:'Today, every space', side:{space:'p', open:'today'}, page:'today', col:true, live:true,
+     cap:'Today shows every space, as it always has. A list from a shared space carries its space’s letter; personal lists carry none. <b>Hover a letter</b> for the space’s full name; <b>click it</b> to switch the sidebar to that space (try it: Today stays open). The rest of the chip opens the list, as today. The pins are yours: Sam’s pins in Groceries don’t show here.'},
+    {id:'capture', label:'Capture with ##', side:{space:'p', open:'today'}, page:'today', col:true, over:'capture',
+     cap:'The capture popup still decides nothing: no ## means your Inbox. ## finds lists in every space, each shared one with its space’s letter on the right (hover for the name); the row the keyboard is on also spells it out, so you know before Enter that the task will be shared. A new list from capture is always made in Personal. With the same name in two spaces both show, and Personal wins a tie.'},
+    {id:'movemenu', label:'Move · menu', side:{space:'p', open:'trip', ctx:'trip'}, page:'tripP', over:'moveMenu',
+     cap:'Moving a list into a shared space is “Move to space” in its right-click menu (and Ctrl+K: Move “Trip ideas” to space…). The submenu says what it will do: “Shares it with Sam”. There is no drag between spaces, so sharing is never one slip of the mouse.'},
+    {id:'share', label:'Move · share?', side:{space:'p', open:'trip', ctx:'trip'}, page:'tripP', over:'shareDialog',
+     cap:'The one question Flint asks, because sharing can’t really be taken back once others have it. Its title names the people, not the space. What travels (5 tasks, 2 pictures), what stays yours (pins, reminders) and your other devices are said once.'},
+    {id:'moved', label:'Moved', side:{space:'h', open:'trip', moved:true, flash:true, syncing:true}, page:'tripH', over:'movedToast', sim:'Replay the move',
+     cap:'Trip ideas was open, so the line followed it into Home, where the row lights up once. The upload waits until the toast goes, so <b>Undo</b> really unshares. Press “Replay the move” to see the row travel to the space’s tile.'},
+    {id:'new', label:'New shared space', side:{space:'p', open:'backend'}, page:'backend', over:'newDialog',
+     cap:'From the space menu, the + menu, Settings or Ctrl+K. A name, where it lives (one provider per space: the accounts you have connected) and people. It appears in the menu and the sidebar switches to it, empty: “Move a list here from its menu, or make one with +”.'},
+    {id:'invite', label:'Invite', side:{space:'h', open:'groceries'}, page:'groceries', over:'inviteDialog',
+     cap:'Inviting is the provider’s own sharing, asked for by Flint: Google Drive (permissions.create) or OneDrive (invite) adds the person to the space’s file and sends the e-mail itself. The e-mail and its button are the provider’s; Flint only writes the note, whose last line is the join link. No roles: everyone in a space can add, change and delete. Whose Drive holds the file is said, because it matters when someone leaves.'},
+    {id:'email', label:'Invite e-mail → join link', email:true,
+     cap:'One click in the e-mail. Mail apps drop flint:// links (Gmail removes them), so Flint’s line is an ordinary https link to a page on flintnotes.app, the existing static site. The page hands it to Flint as flint://join; the space’s ID sits after the #, which browsers never send to a server, so the site never learns which space. The first time, the browser asks “Open Flint?” (tick Always). No Flint yet? The page offers the download. On Android the same link can open Flint for Android directly (an App Link).'},
+    {id:'joinok', label:'Join · OneDrive', side:{space:'p', open:'backend', joined:['p','h']}, page:'backend', over:'joinConfirm',
+     cap:'Flint comes to the front with one question, built from what it can check (a OneDrive link can be read before joining): the space, who shared it, its size, where it goes. A link from an e-mail never joins by itself: it is outside content, so one confirmation stays. Join, and the sidebar switches to the new space.'},
+    {id:'joingoogle', label:'Join · Google', side:{space:'p', open:'backend', joined:['p','h']}, page:'backend', over:'googleWaiting',
+     cap:'For a Google space the one confirmation is Google’s own: drive.file can’t open a file shared with you until you pick it, so Flint opens Google’s picker in your browser filtered to this one file (its file_ids option) and waits. Select there, and Flint joins. With no Google account in Flint yet, the same step connects it. What the link says is shown as the link says it until Flint can check.'},
+    {id:'joined', label:'Joined', side:{space:'u', open:'unicorn', fresh:true, newSpace:true}, page:'unicorn', over:'joinedToast',
+     cap:'Joined: the space appears in the menu, the sidebar switches to it (its tile pops, its lists slide in) and the toast says who it’s shared with, with Leave in case it was a mistake. From the e-mail to here: the link, Open Flint (once), Join or Select.'},
+    {id:'join', label:'Join · paste a link', side:{space:'p', open:'backend', joined:['p','h']}, page:'backend', over:'joinDialog',
+     cap:'The fallback, no longer in the space menu: Ctrl+K “Join with an invite link…” and Settings → Spaces, for a forwarded e-mail, another PC, or a mail app that breaks links. No “which provider?” question: Flint reads it from the link (drive.google.com, or 1drv.ms / onedrive / sharepoint) and picks the matching account. “Find it in Google Drive” opens the picker filtered to Flint spaces; OneDrive needs the link.'},
+    {id:'info', label:'People & sync', side:{space:'h', open:'groceries', peopleOpen:true}, page:'groceries', over:'infoPop',
+     cap:'A click on “With Sam” opens the space’s card: its sync state, whose Drive it is in, the people and Invite. The “Other states” block is a legend, as in mockup 13: the real card shows only the current state.'},
+    {id:'conflict', label:'Conflict', side:{space:'u', open:'design'}, page:'design',
+     cap:'In a shared space a conflict names the person, not the PC: “Also changed by Nino”, with Use Nino’s / Keep mine / Keep both (D-161 Q5’s card). The row and the space’s cloud show “!”; from any other space the dot by the switcher’s chevron says “look here”.'},
+    {id:'removed', label:'Removed', side:{space:'u', open:'unicorn', removed:true}, page:'unicornRemoved',
+     cap:'When the owner stops sharing (or removes you), nothing is deleted: the space stays on this PC as it was, stops syncing, and asks once what to do with it.'},
+    {id:'settings', label:'Settings', side:{space:'p', open:'settings'}, page:'settings',
+     cap:'Settings → Spaces and Accounts: one place that answers “where are my things”: shared with people, your devices, only this PC. Several accounts can be connected; a space lives with one of them.'},
+    {id:'mini', label:'Mini mode', side:{space:'p', open:'today'}, page:'today', col:true, over:'mini',
+     cap:'Mini’s Today covers every space, with the same letters in the chips. Its list picker keeps MINI-03’s order (Inbox, Focus, then by recent use) with a shared list’s letter on the right, as everywhere; hover a letter for the space’s name. Its Inbox is your Inbox.'},
+    {id:'phone', label:'Phone', phone:true,
+     cap:'The phone keeps its three tabs. On Lists the title is the switcher: a tap opens the spaces sheet. Today and Inbox don’t change with it; Today’s rows carry the space’s letter.'}
+  ],
+  rail: [ {id:'rail', label:'Home chosen', railSide:true, page:'groceries',
+     cap:'A rail of space tiles at the window’s edge, shown from the second space on. Fast by mouse, with a dot per space; but it reads as Slack or Discord, where everything switches, while Today and Inbox here don’t.'} ],
+  groups: [ {id:'groups', label:'Dragging into Home', groupSide:true, page:'groceries',
+     cap:'Davit’s first idea, taken literally: a shared space is a group card, its people in the header. One concept instead of two, but a drag between two cards now shares a list: the outline and “Drop to share with Sam” are the only warning.'} ],
+  long: [ {id:'long', label:'Three spaces', longSide:true, page:'groceries',
+     cap:'Every space is a section of one sidebar. Nothing is hidden and there is no mode, but the sidebar grows with each space, scrolls, and has three + buttons and two kinds of collapsible header.'} ]
+};
+
+/* ---------- Notes under the window ---------- */
+var NOTES = {
+  line: '<h2>1 · The space line <span style="font-weight:400;color:var(--fl-text-muted)">(chosen by Davit, D-189: build these components exactly)</span></h2>' +
+    '<div><h3>Idea</h3><p>Everything that is <b>yours</b> (Today, Inbox, Focus, quick notes, reminders, pins, search) sits above a hairline and never changes. Below it, the “Lists” label becomes the <b>space switcher</b>: the space’s lists, notes and groups. Switching changes only what is under the line; opening a list from another space (Today’s chip, Ctrl+K, Back) moves the line with it, so the sidebar always shows the open list’s space. A shared space says who is in it once, under its name; rows carry no marks.</p>' +
+    '<h3>Why it fits</h3><ul><li>Capture keeps zero decisions: no ## always means your Inbox (principles 1, 2).</li><li>One sidebar, one Today; groups stay what they are, one level inside each space (D-73).</li><li>Marks scale with stakes: shared with people is said loudly and once (space, list header, chips); your devices vs this PC stays as quiet as D-163 made it.</li><li>Someone with one space sees no change: the label reads “Lists” until a second space exists.</li></ul>' +
+    '<h3>Costs</h3><ul><li>Lists of the other spaces are one switch away (Ctrl+K still finds everything).</li><li>The row under the line is busier than the old label: the tile, the name, the cloud, sort and +.</li><li>A new rule to learn: what is above the line never switches.</li></ul></div>' +
+    '<div><h3>Today, capture, mini, phone</h3><ul><li><b>Today</b> and the Timeline cover every space; a shared list’s chip carries its space’s letter. No per-space Today.</li><li><b>Joining</b> is one click on the link in the invite e-mail (flintnotes.app/join, the space’s ID after the #), then Open Flint (once) and one confirmation: Flint’s Join for OneDrive, Google’s Select for Google. “Join with an invite link” stays as the fallback in Ctrl+K and Settings.</li><li><b>The letter</b> is the same everywhere (chips, ## menu, mini’s picker): on the right, the full name on hover; in the main window a click switches the sidebar to that space, with the switch motion and a pop on the switcher’s tile.</li><li><b>Capture</b> goes to your Inbox; ## reaches any space and the chip names it; a new list from capture is made in Personal.</li><li><b>Mini</b>: Today across spaces, Inbox is yours, the list picker grouped by space.</li><li><b>Phone</b>: the Lists tab’s title is the switcher (a sheet); Today and Inbox stay.</li><li><b>Search, Focus, reminders, Trash</b> cover every space; each result or row names a shared space.</li></ul>' +
+    '<h3>Motion (03 §5, D-75, D-89)</h3><ul><li><b>Switching:</b> under the line the rows slide 12 px out and the new space’s slide 12 px in from the other side, toward the space’s place in the menu (<code>--fl-dur-page</code>, the page curve); the tile and name crossfade; nothing above the line moves. A second switch retargets mid-way.</li><li><b>The menu</b> opens as menus do; the people line folds in and out.</li><li><b>A new space</b> eases into the menu, then the sidebar switches to it and its tile pops once (<code>--fl-ease-press</code>).</li><li><b>Moving into a shared space:</b> the row lifts and travels to the space’s tile (spring), the tile pops, the rows close up (FLIP); the line follows if the list was open, and the row flashes there. Undo flies it back.</li><li>All instant under reduce-motion; none of it waits for input.</li></ul></div>' +
+    '<div class="full"><h3>The open question (A, B or C)</h3><p><b>A, with three additions.</b> (1) The sidebar follows the open list’s space. (2) Capture never picks or makes a shared target by itself: no ## means Inbox, a new list from ## is personal, and a shared target always shows its space before Enter. (3) Everything that is about <i>you</i> spans every space: Today, reminders, Focus, search, mini, Trash. <b>Not B:</b> the popup is used on calls without looking at the main window, so “the current space’s Inbox” would put a private thought in a colleague’s Inbox; and a split Today hides pins and reminders (principle 8). <b>Not C:</b> Today is one place for the day; a per-space Today is a mode in which tasks hide. If people ask, a filter in Today’s ⋯ can come later.</p></div>',
+  rail: '<h2>2 · Space rail</h2><div><h3>Idea</h3><p>A narrow rail of space tiles at the window’s left edge (shown from the second space), the sidebar showing the chosen space under Today, Inbox and Focus.</p><h3>Why it fits</h3><ul><li>The fastest switching by mouse, and a dot per space for its state.</li><li>Scales to many spaces.</li></ul></div><div><h3>Costs</h3><ul><li>64 px of permanent chrome and a second column of tiles beside the sidebar’s.</li><li>Looks like Slack or Discord, where everything switches (option B), so Today and Inbox staying put surprises.</li><li>Mini and the phone can’t have a rail, so each device works differently.</li></ul><h3>Today, capture, mini, phone</h3><p>As in 1. The phone would need the sheet anyway.</p></div>',
+  groups: '<h2>3 · Spaces are groups (Davit’s first idea)</h2><div><h3>Idea</h3><p>No switching: a shared space is a group card, its people in its header; personal groups show their level there too (the cloud for your devices). One organizing concept instead of two.</p><h3>Why it fits</h3><ul><li>One thing to learn; levels shown once per card, no row marks.</li><li>No mode, nothing hidden.</li></ul></div><div><h3>Costs</h3><ul><li><b>A drag between two cards shares or unshares a list:</b> the accidental share the brief wants to rule out is one slip away.</li><li>Groups become heavy (a folder on disk, a sync target, people, an account); D-73 made them deliberately light.</li><li>Personal groups and their per-item sync (D-161, D-163) would have to change.</li><li>The sidebar is no shorter, which was the reason for the idea.</li></ul></div>',
+  long: '<h2>4 · One long sidebar</h2><div><h3>Idea</h3><p>Each space is a titled section of one sidebar (Personal first), its groups inside; collapse a space to hide it.</p><h3>Why it fits</h3><ul><li>No mode; continues D-161’s “one sidebar with everything on this PC”.</li></ul></div><div><h3>Costs</h3><ul><li>The clutter Davit wants to avoid grows with every space; the sidebar scrolls.</li><li>Two kinds of collapsible header (space, group) to tell apart.</li><li>A + per space.</li></ul></div>'
+};
+
+/* ---------- Rendering ---------- */
+var S = {concept:'line', state:'personal', space:'p', open:'backend', joined:['p','h','u'], opts:{}};
+function render(){
+  var st = STATES[S.concept].filter(function(x){ return x.id === S.state; })[0];
+  $('ctabs').innerHTML = CONCEPTS.map(function(c){ return '<button data-c="' + c.id + '" class="' + (c.id === S.concept ? 'on' : '') + '">' + c.label + (c.pick ? '<span class="pick">CHOSEN</span>' : '') + '</button>'; }).join('');
+  $('stabs').innerHTML = STATES[S.concept].map(function(x){ return '<button data-s="' + x.id + '" class="' + (x.id === S.state ? 'on' : '') + '">' + x.label + '</button>'; }).join('');
+  $('caption').innerHTML = st.cap;
+  $('notes').innerHTML = NOTES[S.concept];
+  var sim = $('sim'); sim.hidden = !st.sim; sim.textContent = st.sim || '';
+  var win = $('win');
+  if (st.phone) { win.innerHTML = phones(); return; }
+  if (st.email) { win.innerHTML = emailAndPage(); return; }
+  var side;
+  if (st.railSide) side = sideRail();
+  else if (st.groupSide) side = sideGroups();
+  else if (st.longSide) side = sideLong();
+  else {
+    var o = st.side; S.space = o.space; S.open = o.open; S.joined = o.joined || ['p','h','u']; S.opts = o;
+    side = '<aside class="sidebar" id="sidebar">' + sideC1(o) + '</aside>';
+  }
+  win.innerHTML = caps() + side + '<main class="main"><div class="titlebar"></div><div class="scroller"><div class="pair"><div class="content" id="content">' + PAGES[st.page]() + '</div>' + (st.col ? '<div class="tcol">' + todayCol() + '</div>' : '') + '</div></div></main>' + overlay(st.over) + (st.groupSide ? dragGhost() : '');
+  place(st);
+}
+function overlay(kind){
+  if (!kind) return '';
+  return {googleWaiting:googleWaiting, joinedToast:joinedToast, spaceMenu:spaceMenu, moveMenu:moveMenu, shareDialog:shareDialog, movedToast:movedToast, newDialog:newDialog, inviteDialog:inviteDialog, joinDialog:joinDialog, joinConfirm:joinConfirm, infoPop:infoPop, capture:capturePopup, mini:miniCards}[kind]();
+}
+function dragGhost(){ return '<div class="ghost" id="ghost"><span class="tile">' + ic('list') + '</span>Trip ideas</div><div class="droptip" id="droptip">Dropped here, <b>Trip ideas</b> is shared with Sam. In this concept that is the only warning.</div>'; }
+function rel(el){ var r = el.getBoundingClientRect(), w = $('win').getBoundingClientRect(); return {x:r.left - w.left, y:r.top - w.top, w:r.width, h:r.height}; }
+function place(st){
+  var m;
+  if ((m = $('space-menu'))) { var b = rel($('space-btn')); m.style.left = (b.x - 2) + 'px'; m.style.top = (b.y + b.h + 6) + 'px'; }
+  if ((m = $('ctx-menu'))) { var n = rel($('nav-trip')); m.style.left = (n.x + 150) + 'px'; m.style.top = (n.y + 18) + 'px';
+    var mv = rel($('ctx-move')), sub = $('ctx-sub'); sub.style.left = (mv.x + mv.w + 9) + 'px'; sub.style.top = (mv.y - 5) + 'px'; }
+  if ((m = $('info-pop'))) { var p = rel($('people')); m.style.left = (p.x) + 'px'; m.style.top = (p.y + p.h + 6) + 'px'; }
+  if ((m = $('ac'))) { var t = rel($('tok')), cp = rel($('cap')); m.style.left = (t.x - 4) + 'px'; m.style.top = (cp.y + cp.h + 8) + 'px'; }
+  if ((m = $('ghost'))) { var g = rel($('g-home')), gp = rel($('drop-gap')); m.style.left = (g.x + 14) + 'px'; m.style.top = (gp.y + 1) + 'px';
+    var tip = $('droptip'); tip.style.left = (g.x + g.w + 14) + 'px'; tip.style.top = (g.y + 4) + 'px'; }
+  if (st.side && st.side.menu) { var btn = $('space-btn'); if (btn) btn.classList.add('open'); }
+  if (st.side && st.side.newSpace && !reduced()) { // a space just joined: its tile pops, its lists slide in
+    $('space-btn').querySelector('.stile').classList.add('tpop');
+    var body = $('space-stage').querySelector('.space-body'); body.style.setProperty('--dx', '12px'); body.classList.add('in');
+  }
+}
+
+/* ---------- Live: switching spaces (concept 1) ---------- */
+function liveState(){ var st = STATES[S.concept].filter(function(x){ return x.id === S.state; })[0]; return S.concept === 'line' && st && st.live; }
+function openMenu(){
+  if (!liveState() || $('space-menu')) return;
+  $('win').insertAdjacentHTML('beforeend', spaceMenu());
+  $('space-btn').classList.add('open'); place({});
+}
+function closeMenu(){
+  var m = $('space-menu'); if (!m) return;
+  var b = $('space-btn'); if (b) b.classList.remove('open');
+  if (reduced()) { m.remove(); return; }
+  m.style.transition = 'opacity 120ms ease'; m.style.opacity = '0'; setTimeout(function(){ m.remove(); }, 120);
+}
+function switchTo(id, keepMenu){
+  if (!keepMenu) closeMenu();
+  if (id === S.space) return;
+  var dir = ORDER.indexOf(id) > ORDER.indexOf(S.space) ? 1 : -1;
+  var wasList = ['today','inbox','focus','settings'].indexOf(S.open) < 0;
+  S.space = id;
+  if (wasList) S.open = LAST[id];
+  var o = {space:id, open:S.open};
+  var hd = $('space-head'); hd.innerHTML = spaceHead(SP[id], o); hd.classList.remove('morph'); void hd.offsetWidth; hd.classList.add('morph');
+  var ps = $('people-slot'); ps.innerHTML = peopleLine(SP[id], o); ps.classList.remove('in'); void ps.offsetWidth; if (SP[id].with.length) ps.classList.add('in');
+  var stage = $('space-stage'), old = stage.querySelector('.space-body:not(.out)');
+  var neu = document.createElement('div'); neu.className = 'space-body'; neu.innerHTML = items(id, S.open, o);
+  stage.querySelectorAll('.space-body.out').forEach(function(x){ x.remove(); });
+  if (reduced()) { old.replaceWith(neu); }
+  else {
+    old.style.setProperty('--dx', (-12 * dir) + 'px'); old.classList.add('out');
+    neu.style.setProperty('--dx', (12 * dir) + 'px'); neu.classList.add('in');
+    stage.appendChild(neu); setTimeout(function(){ old.remove(); }, 200);
+  }
+  if (wasList) {
+    var pageKey = {backend:'backend', groceries:'groceries', design:'design'}[S.open];
+    var c = $('content'); c.innerHTML = PAGES[pageKey](); c.classList.remove('in'); void c.offsetWidth; c.classList.add('in');
+  }
+}
+
+/* ---------- Live: the move into Home, replayed ---------- */
+function replayMove(){
+  var win = $('win');
+  S.state = 'moved';
+  // Back to the moment before: Personal, Trip ideas open.
+  var o = {space:'p', open:'trip'};
+  $('sidebar').innerHTML = sideC1(o); S.space = 'p';
+  var c = $('content'); c.innerHTML = PAGES.tripP();
+  var t = $('toast'); if (t) t.remove();
+  var fromEl = $('nav-trip'), from = rel(fromEl), to = rel($('space-btn').querySelector('.stile'));
+  if (reduced()) { finishMove(); return; }
+  var fly = document.createElement('div'); fly.className = 'flyer'; fly.innerHTML = '<span class="tile">' + ic('list') + '</span>Trip ideas';
+  fly.style.left = from.x + 'px'; fly.style.top = from.y + 'px'; fly.style.width = from.w + 'px'; win.appendChild(fly);
+  fromEl.style.visibility = 'hidden';
+  // The rows below close up (FLIP-like height fold).
+  fromEl.animate([{height: from.h + 'px', marginTop:'0px'}, {height:'0px', marginTop:'-3px', paddingTop:'0px', paddingBottom:'0px'}], {duration:260, delay:120, easing:'cubic-bezier(.2,.9,.3,1)', fill:'forwards'});
+  fly.animate([
+    {transform:'translate(0,0) scale(1)', opacity:1},
+    {transform:'translate(0,-6px) scale(1.02)', opacity:1, offset:.15},
+    {transform:'translate(' + (to.x - from.x - 6) + 'px,' + (to.y - from.y - 6) + 'px) scale(.4)', opacity:.0}
+  ], {duration:440, easing:'cubic-bezier(.2,.9,.3,1.05)', fill:'forwards'}).onfinish = function(){
+    fly.remove();
+    var tile = $('space-btn').querySelector('.stile'); tile.classList.add('tpop');
+    setTimeout(finishMove, 160);
+  };
+}
+function finishMove(){
+  S.space = 'h';
+  var o = {space:'h', open:'trip', moved:true, flash:true, syncing:true};
+  var hd = $('space-head'); hd.innerHTML = spaceHead(SP.h, o); hd.classList.remove('morph'); void hd.offsetWidth; hd.classList.add('morph');
+  var ps = $('people-slot'); ps.innerHTML = peopleLine(SP.h, o); ps.classList.remove('in'); void ps.offsetWidth; ps.classList.add('in');
+  var stage = $('space-stage'), old = stage.querySelector('.space-body');
+  var neu = document.createElement('div'); neu.className = 'space-body'; neu.innerHTML = items('h', 'trip', o);
+  if (reduced()) old.replaceWith(neu); else { old.style.setProperty('--dx', '-12px'); old.classList.add('out'); neu.style.setProperty('--dx', '12px'); neu.classList.add('in'); stage.appendChild(neu); setTimeout(function(){ old.remove(); }, 200); }
+  var c = $('content'); c.innerHTML = PAGES.tripH(); c.classList.remove('in'); void c.offsetWidth; c.classList.add('in');
+  $('win').insertAdjacentHTML('beforeend', movedToast());
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', function(e){
+  var c = e.target.closest('[data-c]'); if (c) { S.concept = c.dataset.c; S.state = STATES[S.concept][0].id; render(); return; }
+  var s = e.target.closest('[data-s]'); if (s) { S.state = s.dataset.s; render(); return; }
+  if (e.target.closest('#sim')) { replayMove(); return; }
+  var row = e.target.closest('[data-space]'); if (row && $('space-menu')) { switchTo(row.dataset.space); return; }
+  var letter = e.target.closest('.mm[data-sp]');
+  if (letter && letter.closest('.main') && S.concept === 'line' && $('space-stage')) {
+    hideTip();
+    if (!reduced()) { letter.classList.remove('press'); void letter.offsetWidth; letter.classList.add('press'); }
+    switchTo(letter.dataset.sp);
+    var t = $('space-btn').querySelector('.stile'); t.classList.remove('tpop'); void t.offsetWidth; if (!reduced()) t.classList.add('tpop');
+    return;
+  }
+  if (e.target.closest('#space-btn')) { if ($('space-menu')) closeMenu(); else openMenu(); return; }
+  if ($('space-menu') && !e.target.closest('#space-menu') && liveState()) closeMenu();
+});
+document.addEventListener('keydown', function(e){
+  if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) { e.preventDefault(); if ($('space-menu')) closeMenu(); else openMenu(); return; }
+  if ($('space-menu') && liveState()) {
+    if (e.key === 'Escape') { closeMenu(); return; }
+    var i = parseInt(e.key, 10); if (i >= 1 && i <= S.joined.length) { switchTo(S.joined[i - 1]); }
+  }
+});
+/* The letter's tooltip: the space's full name; in the main window also what a click does. */
+var tipTimer = null;
+function hideTip(){ clearTimeout(tipTimer); var t = $('tip'); if (t) t.remove(); }
+document.addEventListener('mouseover', function(e){
+  var l = e.target.closest('.mm[data-sp]'); if (!l || l.contains(e.relatedTarget)) return;
+  hideTip();
+  tipTimer = setTimeout(function(){
+    var r = rel(l), click = l.closest('.main') && S.concept === 'line' && $('space-stage');
+    var tip = document.createElement('div'); tip.className = 'tip'; tip.id = 'tip';
+    tip.innerHTML = '<span>' + spName(l.dataset.sp) + '</span>' + (click ? '<span class="k">Click to switch to ' + SP[l.dataset.sp].name + '</span>' : '');
+    $('win').appendChild(tip);
+    tip.style.left = Math.max(8, r.x + r.w / 2 - tip.offsetWidth / 2) + 'px'; tip.style.top = (r.y - tip.offsetHeight - 8) + 'px';
+  }, 250);
+});
+document.addEventListener('mouseout', function(e){ var l = e.target.closest('.mm[data-sp]'); if (l && !l.contains(e.relatedTarget)) hideTip(); });
+/* For scripts/render-mockups.mjs: setMode('personal') (a state's id, unique across concepts) or setMode('line:personal'). */
+function setMode(id){
+  var parts = id.split(':');
+  if (parts.length === 1) { for (var c in STATES) { if (STATES[c].some(function(x){ return x.id === id; })) { S.concept = c; S.state = id; render(); return; } } if (!STATES[id]) throw new Error('unknown state ' + id); }
+  S.concept = parts[0]; S.state = parts[1] || STATES[S.concept][0].id; render();
+}
+render();
+</script>
+</body>
+</html>

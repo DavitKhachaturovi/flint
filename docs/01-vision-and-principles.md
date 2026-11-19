@@ -30,7 +30,7 @@ These principles decide every ambiguous case. When a feature request conflicts w
 4. **UI/UX comfort over information density.** Don't dump information on the user. Show what matters; hide the rest until asked for. Calm, uncluttered, beautiful.
 5. **Meaning without reading.** Status like priority is shown visually (color + a second cue), not as extra text that clutters rows.
 6. **Keyboard-first, mouse-friendly.** Every action is reachable from the keyboard; everything also works with mouse and drag-and-drop.
-7. **Your files, your machine.** Data is plain markdown in a folder the user chooses. No server, no account, no telemetry. "Your notes never leave your machine." **D-161:** unless the user turns on Google Drive sync for something: then that, and only that, goes to their own Google Drive; the local folder stays the source of truth. **D-165, the phone:** Android doesn't let an app write safely to a folder the user picks, so Flint for Android keeps the same plain markdown in its own app storage, with Export (a copy to a folder the user picks) and sync as the ways out; Android's automatic backup stays off so nothing reaches Google unasked.
+7. **Your files, your machine.** Data is plain markdown in a folder the user chooses. No server, no account, no telemetry. "Your notes never leave your machine." **D-161:** unless the user turns on Google Drive sync for something: then that, and only that, goes to their own Google Drive; the local folder stays the source of truth. **D-189:** a **shared space** goes to the account that holds it and to the people in it, nowhere else, and only what the user put in it; still no Flint server. **D-165, the phone:** Android doesn't let an app write safely to a folder the user picks, so Flint for Android keeps the same plain markdown in its own app storage, with Export (a copy to a folder the user picks) and sync as the ways out; Android's automatic backup stays off so nothing reaches Google unasked.
 8. **Never lose a thought.** Drafts persist, writes are atomic, deletes go to trash, everything is undoable, missed reminders are surfaced.
 9. **Snappy and smooth.** Instant response (< 100 ms for anything the user waits on), short spring animations, nothing slower than ~150 ms.
 10. **Respect the user's system.** Reduce-motion, accessibility (color-blind-safe priority), focus, monitor setup. (Following the system light/dark theme comes with light mode, Later; v1 is dark only, D-17.)
@@ -40,7 +40,7 @@ These principles decide every ambiguous case. When a feature request conflicts w
 These are deliberately excluded. Every one of them will sound reasonable when requested; this list is what keeps Flint from becoming the tool it is escaping. Changing anything here requires an explicit entry in the [Decision Log](07-decision-log.md).
 
 **Project-management features (never):**
-- Assignees, owners, or any multi-user workflow.
+- Assignees, owners, or any multi-user workflow. (**D-189:** shared spaces share files, nothing more: everyone in a space can add, change and delete; no roles, assignees, comments, activity feed or presence.)
 - Statuses beyond done / not done (no "In progress", "Review", etc.).
 - Due-date calendars, Gantt charts, calendar views.
 - Comments or discussion threads.
@@ -55,7 +55,7 @@ These are deliberately excluded. Every one of them will sound reasonable when re
 - **Time features beyond lightweight reminders/snooze**: reminders are the ceiling (see REM-*). **One exception (D-170):** Focus (FOCUS-*), a Pomodoro timer with an alarm sound, and nothing more: no reports, no time logged against tasks, no history kept per task.
 
 **Not in v1 (may be revisited later):**
-- ~~**Syncing of any kind** (OneDrive, cloud, server).~~ **D-161 (1.5.0):** opt-in **Google Drive sync** of chosen lists and notes (SYNC-01), through the user's own Drive with no Flint server; still not: a Flint server or account, folder-sync services for the Flint folder (OneDrive, Dropbox), sharing with other people, iCloud. OneDrive through Microsoft Graph stays Later.
+- ~~**Syncing of any kind** (OneDrive, cloud, server).~~ **D-161 (1.5.0):** opt-in **Google Drive sync** of chosen lists and notes (SYNC-01), through the user's own Drive with no Flint server; still not: a Flint server or account, folder-sync services for the Flint folder (OneDrive, Dropbox), ~~sharing with other people~~, iCloud. OneDrive through Microsoft Graph stays Later. **D-189:** sharing with other people through **shared spaces** (SPACE-*), each one file in a member's Google Drive (OneDrive later), within the boundary above.
 - **Integrations** with other apps (planned later, through the CLI and the shared packages; see 05 §7). **D-185 (1.8.0):** AI agents (MCP clients and the `flint` command) can use Flint through its own agent API on this PC, off by default (02 §11). Other app integrations stay Later.
 
 **Considered and not selected** (ideas raised during design that were *not* chosen; do not implement without a new decision):

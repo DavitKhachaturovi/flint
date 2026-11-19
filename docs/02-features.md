@@ -26,6 +26,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-52 (M4, daily-use bug):** rows render a title's inline markdown (bold, italic, inline code, strikethrough, links) instead of showing the raw syntax (e.g. `**Recover from crashes silently.**`). The raw markdown shows only while the title is being edited. A link opens in the default browser when clicked (the only place with a hand cursor, UI-01).
 
 ### LIST-03 — Inbox (v1)
+- **D-189:** Inbox exists only in the personal space; captures without `##` land there whatever space the sidebar shows (SPACE-04).
 - A built-in task list named **Inbox** always exists and cannot be deleted.
 - It is the default target for every capture (CAP-02).
 - **Proposed (D-23):** Inbox is identified by the reserved frontmatter `id: inbox`, always displays as "Inbox", is pinned at the top, and cannot be renamed in Flint. If no list has that id at startup, Flint adopts `Inbox.md` if it exists, otherwise creates it.
@@ -41,6 +42,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - **D-72 (pulled into M4):** "Convert to note" / "Convert to task list" in the right-click menu of lists and notes (built in M4 step 7; Inbox stays a task list).
 
 ### LIST-05 — Sidebar groups (v1, D-73)
+- **D-189 (spaces):** groups live inside a space, one level, as below (SPACE-01). A list moves to another space only through Move to space (SPACE-07), never by dragging.
 - **One level** of collapsible groups in the sidebar, each holding task lists and notes. No nesting.
 - Groups are **not folders**: the list files stay flat in the Flint folder (04 §2). Membership and order live in `.flint/sidebar.json` (user data, travels with the folder); which groups are collapsed is machine UI state (`ui-state.json`).
 - **+** and the sidebar's right-click menu offer **New group**. Groups can be renamed and deleted; deleting a group keeps its lists, which move out of the group (undoable).
@@ -114,6 +116,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - Reminder chips show the resolved absolute time (e.g. bell icon + `Tomorrow 10:00`).
 
 ### CAP-05 — List autocomplete on `##`, new lists from capture (v1, D-25)
+- **D-189:** `##` finds task lists in every space; a shared list shows its space's letter on the right (the keyboard's row also its name), and a new list from `##` is always made in Personal (SPACE-04).
 - Typing `##` shows a fuzzy autocomplete of existing **task list** names.
 - An unknown list name must **never fail silently**. Before Enter, the popup shows a small card with what will happen:
   - **Close match** (an existing task list whose name starts with the token, 2+ characters, or is within edit distance 2, or 1 for names of 4 characters or fewer): `Unicorn · Enter · New list "unis" · Tab`. **Enter** takes the close match (D-40: the first Enter accepts it, the token takes the list's spelling, and the next Enter saves). **Tab** switches the choice to creating the new list (the card then reads `New list "unis" · Enter`). When several lists match the prefix, the most recently used one is offered; sidebar order only breaks exact ties.
@@ -330,6 +333,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 ## 4. Today
 
 ### TODAY-01 — Pinned tasks and the Today view (v1, D-85)
+- **D-189:** Today shows your pins from every space; your pins in a shared list are yours alone (SPACE-09); a shared list's chip carries its space's letter, whose click switches the sidebar to that space (SPACE-03).
 - **D-170 (1.6.0):** Today's "Focus · pinned" section is renamed **Pinned**; **Focus** is now the timer page (FOCUS-01), a different thing from pinning.
 - **D-122 (0.8.17):** an open task's row shows a faint pin on hover where a pinned task's pin is; a click pins it (the pin settles in with a pop). Main-window rows; mini keeps P and the menu.
 - **D-86:** a click on a pin (on a row, in Up next, the panel's Pin chip) unpins the task.
@@ -654,6 +658,7 @@ Interaction details (keys, visuals, motion) live in [03](03-ux-and-design-langua
 - No palette command: mini's own actions have none (Open a note…, the pin; D-122), and the main window has no selection in another app to capture.
 
 ### MINI-03 — The list tab shows any task list (v1, 1.4.0, D-158)
+- **D-189:** the picker lists task lists of every space in its order below, a shared list with its space's letter on the right (hover: the space's name), no space titles (SPACE-04).
 - Mini mode's second tab reads the name of the task list it shows, **Inbox** by default, with a small chevron. A click on the tab while another tab is active switches to it; a click while it is the active tab, or on the chevron at any time, opens the **list picker** (CAP-11's: a search field, every task list most recently used first, D-25), with Inbox in it to come back, the list shown left out, no "New list" row (a list to show, not a place to send to), notes left out (the Note tab has them). Ctrl+2 only switches.
 - The choice is kept in mini's state file (`mini-state.json`, beside its tab and note); a list that is gone falls back to Inbox. Choosing a list here doesn't count as a recent use for `##list` and Move (only moves and captures do, D-25).
 - The composer adds to the chosen list ("Add to <list>…"), the keys, drag, Alt+↑/↓, the right-click menu and Open behave as on Inbox; its open top-level tasks are shown; "<list> is empty." when there are none. A new name fades in (D-89); the rows arrive as a page does.
@@ -847,6 +852,7 @@ Settings live in app data, not in the Flint folder (04). They include at least:
 ---
 
 ### SYNC-01 — Google Drive sync (1.5.0, D-161; was Later in D-78)
+**D-189:** this is the **personal space's** sync, unchanged; shared spaces sync with other people by SPACE-* (04 §9).
 Opt-in sync of chosen lists, notes and groups between your PCs through **your own Google Drive**. Look and wording: `design/mockups/13-google-drive-sync.html` (eight states). OneDrive (Microsoft Graph) stays Later; no iCloud.
 
 **Principles**
@@ -911,6 +917,7 @@ Future-proofing for devices on different versions (separate desktop and phone ve
 - **Shipped before the phone (D-166):** desktop 1.5.0 to 1.8.0 have no check; the sync version stays 1 while they are in use.
 
 ### WEB-01 — The website, flintnotes.app (1.5.0, D-162)
+- **D-189:** a page **`/join/`** for spaces' invite links (SPACE-06): it reads the part after `#` in the browser and opens `flint://join`; nothing else is loaded or sent. Later also `/.well-known/assetlinks.json` for Android's App Link (SPACE-11).
 - A small static site at **https://flintnotes.app** (Davit's domain), in the repository's `site/` folder, published by GitHub Pages. Three pages:
   - **Home (`/`):** a hero with the app icon, the headline and **Download for Windows** (the latest installer on GitHub Releases); real screenshots of Flint on neutral sample data (never Davit's notes); the features worth showing (capture from anywhere, task lists and notes, Today, mini mode, Google Drive sync); the privacy promise; a footer with GitHub, release notes and the MIT license.
   - **Privacy (`/privacy/`):** the policy Google's consent screen links to, in the app's own words (APP-09): notes stay on the PC unless synced; synced items go only to the user's own Google Drive, with access only to files Flint created; no Flint server, no telemetry, no accounts; how to disconnect and revoke access; contact `flintnotes.support@gmail.com`.
@@ -1081,6 +1088,7 @@ A **companion** app: capture, Today, lists and notes, reminders and sync on the 
 **Not on the phone:** mini mode, Give to Claude (TASK-18), global hotkeys and capture-selection, the context panel, the right-click and slash menus, the Ctrl+K palette (MOB-11 finds, it doesn't run commands: the phone's exception to D-106), a home-screen widget.
 
 ### MOB-01 — Navigation: Today · Inbox · Lists (D-165 Q7)
+- **D-189:** the Lists screen's title is the space switcher, with the Spaces sheet (SPACE-11).
 - A bottom bar with **Today**, **Inbox** (its open count) and **Lists**; the selected tab's icon sits in a light pill. The app opens on the last tab used.
 - **Lists** is the PC's sidebar as a screen: a search field at the top (MOB-11), groups (collapsible), lists and notes with their counts, quick notes, then **Settings** and **Trash** (with its count) at the bottom; + in the header makes a new list or note (LIST-01, NOTE-08); the sort button holds Synced only / Local only while connected (SYNC-01).
 - A list or note opens as its own screen; Android's back gesture returns.
@@ -1191,3 +1199,80 @@ A Pomodoro timer with its own small list of tasks, the **sprint**: a separate li
 - Focus chosen: the tab reads **Focus**; a compact timer card (the mode, a click switches it; the digits, white while focus runs, `--fl-accent` in a break, never inverted; Start / Pause and Skip; a thin progress line), the sprint's rows with "1/4", the composer "Add to Focus…" (Inbox and the sprint); Space, Alt+↑/↓, drag and the right-click menu as on Inbox; Shift+Space starts and pauses.
 - While a session runs and another tab is in view, the tab reads **"Focus 12:34"** (mono; no task name). **D-171:** built as mockup 15 shows it, minutes and seconds, ticking each second; D-170's "by the minute" is raised with Davit (open). The choice is kept in `mini-state.json` as any list's.
 - **D-171:** mini's header has a **⋯** with **Focus settings…** (opens them in the main window), as in mockup 15. **D-179 (Davit):** only while the list tab shows Focus and is in view; it opens its place and fades in, and goes, as Reset size does.
+
+---
+
+## 15. Spaces (D-189)
+
+Sharing lists and notes with other people, without live co-editing: a shared space is file sync between its members' devices, tasks merging by ID and notes as text (SYNC-01's merges). Look, wording and motion: `design/mockups/18-spaces.html`, concept 1 "The space line" (its 21 states are the spec; screenshots `design/screenshots/18-spaces-<state>.png`; the measurements in 09 §8). Details are Proposed unless D-189 records them as Davit's. **Google Drive first**; OneDrive is designed in and built later (as D-78's OneDrive for personal sync). Data: 04 §9; architecture: 05 §5; risks and milestones: 06 §8. Boundary (D-189, 01's non-goals): shared files only; everyone in a space can add, change and delete; no roles, assignees, comments, activity feed or presence.
+
+### SPACE-01 — Spaces: the personal space and shared spaces (D-189)
+- A **space** is a set of lists, notes and groups with its own sync target. The Flint folder is the **personal space**, called **Personal** (its per-item Google Drive sync to your own devices, SYNC-01, is unchanged). Each **shared space** syncs with other people through one provider account (Davit's decisions 1, 2, 5).
+- A list or note belongs to exactly one space. **Groups** (LIST-05) live inside a space, one level, as today; spaces never nest and are not groups.
+- **Yours, not a space's:** Inbox (only in the personal space), quick notes (NOTE-08), Focus's sprint (FOCUS-02), Today's order and pins, reminders.
+- Someone with only the personal space sees no change: the sidebar's label reads **Lists** until a second space exists (Proposed).
+- Palette (D-106): Switch space…, Switch to "<space>", New shared space…, Invite people to "<space>"…, Join with an invite link…, Move "<list>" to space…, Space settings, Leave "<space>"….
+
+### SPACE-02 — The space line in the sidebar (mockup 18: "Personal", "A shared space")
+- A **hairline** under Quick note (and its Quick notes) divides the sidebar: **above** it Today, Inbox, Focus and Quick note, the same in every space; **below** it the space's lists, notes and groups. Settings and Trash stay at the foot.
+- The **space switcher** takes the "Lists" label's place: the space's tile (Personal a person glyph, a shared space its first letter), its name and a chevron, then the sync cloud (this space's state, SYNC-01's marks), sort (LIST-06, per space) and **+** (a new list or note in this space). A white dot by the chevron when **another** space needs attention (a conflict, sign in again): D-163's "look here".
+- A shared space says **who is in it once**, under its name: the people's discs and "With Sam" (a click opens SPACE-08's card). **Rows never carry marks.**
+- Every list or note of a shared space says so under its title: "Shared in Home with Sam · synced just now" (in place of SYNC-01's "Synced with Google Drive · …").
+- **The sidebar follows the open list:** opening a list of another space (a Today chip, Ctrl+K, Back / Forward, a toast's Go to) switches the line to its space (D-189 Q2).
+- The switcher row stays at the top of the sidebar's list area while it scrolls (Proposed).
+
+### SPACE-03 — Switching spaces and the space's letter (mockup 18: "Switching", "Today, every space")
+- A click on the switcher opens the **space menu** (the floating menu): the label "Spaces" with "Ctrl+Shift+S"; a row per space with its tile, name, who it is shared with and its provider ("Only you · your devices", "With Sam · Google Drive", "With Alex and Nino · 1 conflict"), a check on the current space, its sync cloud and its number keycap; then **New shared space…** and **Spaces in Settings**. No Join item (SPACE-06).
+- **Keys:** **Ctrl+Shift+S** opens it anywhere in the main window; **1–9** pick; ↑/↓ and Enter as in menus (D-76: nothing highlighted when it opens); Esc closes.
+- **Switching changes only what is under the line.** When the open page is a list of the old space, the new space's last opened list opens (Proposed); Today, Inbox, Focus, Settings and Trash stay open.
+- **The letter (Davit, D-189 Q4):** a row from a shared space shown outside the sidebar carries its space's first letter **on the right**, inside its list chip before the name (Today's rows, reminder cards, the Timeline's events, Done and Captured today), in the `##` menu, in mini's list picker. Personal lists carry none. **Hover** (250 ms) shows a tooltip with the space's name and people ("Home · with Sam"); in the main window it adds "Click to switch to Home", and **a click switches the sidebar to that space** (the page stays; the letter presses in and the switcher's tile pops). The rest of the chip opens the list as D-93 says. In mini and the capture popup the letter only shows its tooltip (another window's sidebar would switch out of sight).
+- **Motion (D-89, 03 §5):** under the line the old rows slide 12 px out and fade while the new space's slide 12 px in from the other side (toward the space's place in the menu); the switcher's tile, name and chevron crossfade; the people line folds in or out; nothing above the line moves; a second switch retargets mid-way. Off under reduce-motion.
+
+### SPACE-04 — What spans every space (D-189 Q2, A with three additions)
+- **Today** (TODAY-*), its Timeline, the reminder cards and the Overdue card, **reminders** (REM-*), **Focus** (FOCUS-*), **search and Ctrl+K**, **mini mode's Today**, **Trash** (DATA-02, one view; a shared item names its space): every space. A row from a shared space carries its space's letter.
+- **Capture (CAP-01, CAP-02):** with no `##` a capture goes to **your Inbox**, always; there is no current space for capture. `##` (CAP-03, CAP-05) finds task lists in every space: the menu shows a shared list's letter on the right, and the row the keyboard is on also spells the space's name ("Home H"), so you know before Enter that the task will be shared. **A new list from `##` is always made in Personal.** The same name in two spaces: both show and Personal wins an exact tie (Proposed). The same in the main window's composer, mini's composer and an agent's `##` (AGENT-02).
+- **Mini mode (MINI-01, MINI-03):** Today across spaces with the same letters; Inbox is yours; the list picker keeps MINI-03's order (Inbox, Focus, then by recent use) with a shared list's letter on the right and no space titles.
+- *Not selected:* a per-space Today (C) and capture into the current space's Inbox (B).
+
+### SPACE-05 — Making a shared space and inviting people (mockup 18: "New shared space", "Invite")
+- **New shared space…** (the space menu, the + menu, Settings → Spaces, Ctrl+K): a dialog with **Name**, **Where it lives** (one option card per connected account's provider, the address under it: "Google Drive · you@example.com"; Add an account… when none fits), **People** (e-mail chips) and **Create and invite**. The space appears in the menu, the sidebar switches to it, empty: "Nothing here yet. Move a list here from its menu, or make one with +."
+- **Invite people…** (SPACE-08's card, Settings → Spaces, Ctrl+K): **People** (chips), **Note** (optional, it goes in the e-mail), who is in the space now ("You · its file is in your Drive", "Sam · joined 2 Mar") and **Send invite**. The dialog says plainly: the provider sends its own "shared with you" e-mail with your note and Flint's join link; Flint sends no e-mail; the person needs an account at that provider for that address.
+- **The provider sends the e-mail (D-189 Q5):** Google Drive `permissions.create` (`type: user`, `role: writer`, `sendNotificationEmail` on, `emailMessage` = the note, a blank line, Flint's line); OneDrive `invite` (`sendInvitation`, `message`, `roles: ["write"]`, `requireSignIn`). **Flint's line:** "Join <space> in Flint: https://flintnotes.app/join#…" (SPACE-06).
+- No roles: everyone can add, change and delete. Whose Drive holds the space's file is said (it matters when someone leaves). **Remove from space** in Space settings removes that person's permission; their copy stays with them (Proposed).
+
+### SPACE-06 — Joining with one click (D-189 Q6; mockup 18: "Invite e-mail → join link", "Join · OneDrive", "Join · Google", "Joined", "Join · paste a link")
+- **The e-mail's link** (Flint's line in the note) opens `https://flintnotes.app/join#<provider>=<reference>&n=<space name>` in the browser. The page (WEB-01, static, no analytics, nothing else loaded) reads the part after `#` (never sent to a server) and opens **`flint://join?…`** (`flint-dev://` when the link says it came from a development build). It shows "Opening Flint to join <space>", **Open Flint** (in case the browser's prompt was dismissed), "Don't have Flint yet? Download for Windows · Flint for Android" and, at its foot, "Everything after the # in this link stays in your browser: this page loads nothing else and sends nothing anywhere." The first time, the browser asks "Open Flint?" (its "Always allow" makes the next link open Flint straight away).
+- **Flint comes to the front with one confirmation:**
+  - **OneDrive:** a dialog headed "From the invite link in your e-mail": the space's tile, "Join Unicorn?", the provider, whose OneDrive and your account; what it holds ("Alex shared it with Nino and you: 3 lists, 2 notes and 1 group, 3.2 MB"); where it goes ("in your Flint folder, in Spaces\Unicorn, as plain markdown"), that everyone can add, change and delete, that your pins and reminders stay yours; **Cancel / Join**. Its facts are read from the link before joining.
+  - **Google:** `drive.file` can't open a file shared with you until you pick it, so Flint opens **Google's picker** in the browser filtered to that one file (`file_ids`), and shows a dialog: "Joining Trip crew" (as the link says; Flint checks it once it can open the file), "Google's picker is open in your browser, showing only this space. Click Select there and Flint joins", "No Google account in Flint yet? The same step connects it", **Show the browser / Cancel**. **Select** in the picker is the confirmation.
+- **Joined:** the space appears in the menu, the sidebar switches to it (its tile pops, its lists slide in), its first list opens, and a toast says "Joined Unicorn · with Alex and Nino" with **Leave**.
+- **The link is outside content:** it never joins by itself; Flint accepts only `join` with a reference of the expected shape, and checks after access that the file is a Flint space (04 §9) before anything is written.
+- **The fallback (Davit: no Join in the space menu):** **Join with an invite link…** in Ctrl+K and Settings → Spaces, for a forwarded e-mail, another PC or a mail app that breaks links. One field, "Paste the link from the invite e-mail", filled in when a link is already on the clipboard (read once when the dialog opens). Flint reads the provider from the link (`flintnotes.app/join#…`, `drive.google.com`, `1drv.ms`, `onedrive.live.com`, `*.sharepoint.com`) and the matching account ("A OneDrive link · opens with you@acme.example.com", Use another account), or asks to connect one. "No link? **Find it in Google Drive**" opens the picker filtered to Flint's space files. OneDrive needs the link.
+- Joining is per account: your other Flint devices signed in to the same account can open the space without another invite; the list of joined spaces travels with personal sync when it is on (Proposed).
+
+### SPACE-07 — Moving a list into or out of a shared space (D-189 Q7; mockup 18: "Move · menu", "Move · share?", "Moved")
+- **Move to space ▸** in a list's or note's right-click menu (and Ctrl+K "Move "<list>" to space…"): the other spaces with what it will do ("Home · Shares it with Sam"), then New shared space…. **Never by dragging** between spaces.
+- Into a shared space, one dialog, titled with the people: **"Share “Trip ideas” with Sam?"** ("Moves it into Home · Google Drive"), and in a well: "Sam can see, change and delete its 5 tasks, and gets its 2 pictures (4.1 MB)", "Your pins and reminders in it stay yours: Sam doesn't see them", "Your other devices get it through Home from now on"; at the left "Undo works until its toast goes: nothing is shared before that"; **Cancel / Move and share**.
+- After: the toast "Trip ideas is shared with Sam · in Home" with **Undo**. **The upload waits until the toast is gone** (about 8 s), so Undo really unshares. If the list was open the line follows it into the space; its header line reads "Shared in Home with Sam · sharing…" until the first upload.
+- Out of a shared space (Move to space ▸ Personal): "Take “Groceries” out of Home?" with **Move out** (it becomes your personal list and goes to the others' Trash) or **Copy to Personal** (Proposed).
+- A task moved into a shared list (Move to, `##` while editing) is shared too: its toast names the space ("Moved to Groceries · Home") with Undo, under the same upload wait (Proposed).
+- **Motion:** the row lifts and travels to the switcher's tile, the rows below close up, the tile pops; the line then follows to the target space where the row lights up once; Undo flies it back (09 §8).
+
+### SPACE-08 — People, sync state and conflicts (mockup 18: "People & sync", "Conflict", "Removed")
+- A click on the people line opens the space's **card** (the floating popover): the tile, the name, "Google Drive · in your Drive"; the sync state ("Synced · just now"; Syncing…; Offline · changes sync when you're back; Needs attention · sign in to Google again; "Sam's Flint needs an update to sync Home", SYNC-02); **People** (you first: disc, name, address); **Invite people…** and **Space settings…**. It shows only the current state (the mockup's "Other states" block is a legend, as in mockup 13).
+- **Conflicts** use SYNC-01's card and rules, but **name the person**, not the PC: "Also changed by Nino · 10 Mar 09:52" with **Use Nino's / Keep mine / Keep both**; the note's "1 conflict" chip, the row's "!" cloud, the space's cloud and, from any other space, the switcher's dot.
+- **When the owner stops sharing or removes you:** nothing is deleted. The space stays on this PC as it was and stops syncing; its people line reads "No longer shared with you", its lists "Not syncing · no longer shared with you", and a notice on its open list: "Alex stopped sharing Unicorn with you · On 9 Mar. Your copy stays on this PC as it was and no longer syncs; nothing in it was deleted. Until you choose, it stays here as its own space." with **Move its lists to Personal** and **Remove from this PC** (to Trash).
+- **Leave "<space>"…** (Space settings, Ctrl+K) asks the same two choices; the space's file and the others are not touched (Proposed).
+
+### SPACE-09 — Personal fields stay personal (Davit's decision 3)
+- In a shared space your **pins** (`pinned`), **reminders** (`reminder`) and **muting** (`muted`) are yours alone: others never see them and theirs never reach you. **Shared:** titles, bodies, completion, priority, subtasks and order. Today shows your pins from every space; a reminder you set on a shared task rings only on your devices.
+- How the files keep them apart: 04 §9. A file-format matter: a review round, round-trip and fuzz tests (CLAUDE.md).
+
+### SPACE-10 — Settings: Spaces and Accounts (mockup 18: "Settings")
+- **Spaces** (a settings card): Personal ("Only you. 6 lists and notes sync to your devices through Google Drive; 3 stay on this PC." · Sync settings…); each shared space ("With Sam · Google Drive, in your Drive (you@example.com) · 4 lists and notes" · Invite… · Leave…); **Add a space** ("Make a shared space and invite people. To join one, click the link in its invite e-mail; if it can't be clicked, paste it here." · New shared space… · Join with a link…).
+- **Accounts** (Davit's decision 5): one row per connected account ("Google · you@example.com · Personal sync, Home", "Microsoft · you@acme.example.com · Unicorn", Disconnect…), **Add an account** ("A space lives with one provider; everyone in it needs an account there."). SYNC-01's Settings → Sync stays the personal space's sync.
+- **Where your things are:** Shared with people (the spaces and their people), Your devices (personal items synced), Only this PC (personal items not synced, quick notes, Focus and Today's order).
+
+### SPACE-11 — Spaces on the phone (MOB-01, MOB-13; mockup 18: "Phone")
+- The **Lists** tab's title is the switcher: the space's tile, its name (28 / 700) and a chevron; a shared space's people line under it ("With Sam · synced just now"). A tap opens the **Spaces sheet**: a row per space (tile, name, "With Sam · Google Drive", a check on the current one, the "!" cloud on one that needs attention), then **New shared space**. No Join row: the join link opens Flint for Android directly (an Android App Link for `flintnotes.app/join`, `assetlinks.json` on the site), then Google's picker (`PICKER_FILE_IDS`) or OneDrive's Join dialog as on the PC.
+- **Today** and **Inbox** don't change with the space; a Today row from a shared space shows its space's letter in its meta line. Capture as SPACE-04.

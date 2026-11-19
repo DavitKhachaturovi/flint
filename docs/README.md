@@ -47,4 +47,6 @@ These documents are the **single source of truth** for Flint v1. If code and doc
 | **Capture popup** | The Spotlight-style window opened by the global hotkey. |
 | **Mini mode** | A small always-on-top floating window showing only Today or Inbox. |
 | **Flint folder** | The user-configurable folder on disk where all lists and attachments live. |
+| **Space** | A set of lists, notes and groups with its own sync target (D-189). The Flint folder is the **personal space**; each **shared space** (`Spaces/<name>/`) syncs with other people. |
+| **Space line** | The hairline in the sidebar: above it what is yours in every space (Today, Inbox, Focus, Quick note), below it the space switcher and the space's lists (SPACE-02). |
 | **Navigate state / Edit state** | The two keyboard states of a list (see 03). |

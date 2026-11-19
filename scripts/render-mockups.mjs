@@ -46,6 +46,36 @@ const SCREENS = {
       'mlabel',
     ],
   },
+  // D-189: spaces, concept 1's states; only the window (`selector`), not the mockup's switcher.
+  18: {
+    file: '18-spaces',
+    width: 1600,
+    height: 1300,
+    selector: '#win',
+    states: [
+      'personal',
+      'shared',
+      'switch',
+      'today',
+      'capture',
+      'movemenu',
+      'share',
+      'moved',
+      'new',
+      'invite',
+      'email',
+      'joinok',
+      'joingoogle',
+      'joined',
+      'join',
+      'info',
+      'conflict',
+      'removed',
+      'settings',
+      'mini',
+      'phone',
+    ],
+  },
 };
 
 const args = process.argv.slice(2);
@@ -72,7 +102,7 @@ try {
       // Let entry animations (≤ 150 ms, docs/09 §9) finish.
       await page.waitForTimeout(400);
       const path = join(out, `${screen.file}${state ? `-${state}` : ''}.png`);
-      await page.screenshot({ path });
+      await (screen.selector ? page.locator(screen.selector) : page).screenshot({ path });
       console.log(`rendered ${path}`);
     }
     await page.close();

@@ -1377,3 +1377,41 @@ Every item of Davit's first feedback batch, with its ID, status and milestone.
 | 21 | The `?` sheet as the place to view and change shortcuts: the four global hotkeys editable, Settings' one row, Capture's link row, search opening the sheet | NAV-02, APP-08 · Decided (1.8.0) | 02, D-186 |
 | 22 | Every shortcut rebindable | APP-17 · Later | 02, 06 §3, D-186 |
 | 23 | Tests against temporary Flint folders only (unit, the CLI and MCP against a running Flint, end to end), never Davit's data | AGENT-* · Decided | 06, D-185 |
+
+## CI. Spaces: sharing with other people (19 Nov 2026, D-189, mockup 18 concept 1)
+
+| # | Item | ID · status · milestone | Where |
+|---|---|---|---|
+| 1 | A space: lists, notes and groups with its own sync target; the Flint folder is the personal space ("Personal", SYNC-01 unchanged); shared spaces sync with other people; one provider per space | SPACE-01 · Decided (Davit's decisions 1, 2) · S1 | 02 §15, D-189 |
+| 2 | The boundary: shared files only, everyone edits; no roles, assignees, comments, activity feed or presence; 01's non-goals and principle 7 updated | SPACE-01 · Decided | 01, D-189 |
+| 3 | Inbox only in the personal space; quick notes, Focus's sprint, Today's order and pins, reminders are yours | SPACE-01, SPACE-04 · Decided (Q2) · S1 | 02 §15, 04 §9 |
+| 4 | "Lists" stays the label until a second space exists | SPACE-01 · Proposed · S1 | 02 §15 |
+| 5 | The space line: the hairline, the switcher in the Lists label's place (tile, name, chevron, cloud, sort, +), the attention dot, the people line; rows never marked | SPACE-02 · Decided (Q1, Q3) · S1 | 02 §15, 09 §8, mockup 18 |
+| 6 | A shared list's header line "Shared in Home with Sam · synced just now" | SPACE-02 · Decided (Q3) · S1 | 02 §15, 09 §8 |
+| 7 | The sidebar follows the open list's space | SPACE-02 · Decided (Q2) · S1 | 02 §15 |
+| 8 | The space menu (rows with people, provider, check, cloud, keycap; New shared space…; Spaces in Settings; no Join); Ctrl+Shift+S, 1–9; the palette's commands | SPACE-03, SPACE-01 · Proposed keys · S1 | 02 §15, 03 §3, 09 §8 |
+| 9 | Switching changes only what is under the line; the new space's last list opens when a list was open | SPACE-03 · Decided / Proposed · S1 | 02 §15 |
+| 10 | The space's letter on the right everywhere outside the sidebar (chips, Timeline, Done and Captured, `##` menu, mini's picker), never space titles; hover shows the name; in the main window a click switches the sidebar with motion | SPACE-03 · Decided (Davit, Q4) · S1 | 02 §15, 09 §8, mockup 18 |
+| 11 | The `##` menu's keyboard row also spells the space's name | SPACE-04 · Decided (Q4) · S1 | 02 §15 |
+| 12 | Today, Timeline, reminders, Focus, search, mini's Today and Trash across every space; no per-space Today, no current space for capture | SPACE-04 · Decided (Q2: A with three additions) · S1 | 02 §15, D-189 |
+| 13 | Capture: no `##` means your Inbox; `##` finds lists in every space; a new list from `##` is always personal; Personal wins an exact tie | SPACE-04, CAP-05 · Decided / Proposed tie · S1 | 02 §15 |
+| 14 | Mini: Today across spaces, Inbox yours, the list picker in MINI-03's order with letters | SPACE-04, MINI-03 · Decided (Davit) · S1 | 02 §15 |
+| 15 | New shared space dialog (name, where it lives, people) | SPACE-05 · Proposed · S3 | 02 §15, 09 §8 |
+| 16 | Invite: People, Note, members, Send invite; the provider sends the e-mail (`permissions.create`, Graph `invite`); Flint sends no e-mail | SPACE-05 · Decided (Q5) · S3 | 02 §15, 05 §5, D-189 |
+| 17 | Flint's line in the note: "Join <space> in Flint: https://flintnotes.app/join#…"; the static join page opening `flint://join`; the `#` part never sent | SPACE-06, WEB-01 · Decided (Davit, Q6) · S3, R-S1 | 02 §15, 05 §5, 09 §8 |
+| 18 | One confirmation: Flint's Join for OneDrive, Google's picker filtered to the file for Google; never joins by itself; the link checked as outside content | SPACE-06 · Decided (Q6) · S3, R-S2 | 02 §15, 05 §5 |
+| 19 | Joined: the menu, the sidebar switching, the toast with Leave | SPACE-06 · Proposed · S3 | 02 §15, mockup 18 |
+| 20 | Join leaves the space menu; "Join with an invite link…" in Ctrl+K and Settings, the provider read from the link, the clipboard prefill, Find it in Google Drive | SPACE-06 · Decided (Davit) · S3 | 02 §15 |
+| 21 | Move to space (right-click, palette), never by drag; the share dialog naming the people; the upload waiting for the toast so Undo unshares; moving out asks | SPACE-07 · Decided (Q7) / Proposed out · S1, S3 | 02 §15, 03, 04 §9 |
+| 22 | The people card with the sync state and the legend's states; Invite people…; Space settings… | SPACE-08 · Proposed · S3 | 02 §15, 09 §8 |
+| 23 | Conflicts name the person ("Also changed by Nino"); the callout's person part | SPACE-08 · Proposed · S2 | 02 §15, 04 §9 |
+| 24 | Removed from a space or left: kept, not syncing, Move its lists to Personal / Remove from this PC | SPACE-08 · Proposed · S2 | 02 §15 |
+| 25 | Personal fields (pinned, reminder, muted) stripped from the shared copy and re-applied by task ID; a review round, round-trip and fuzz tests | SPACE-09 · Decided (Davit's decision 3) / Proposed mechanism · S2 | 02 §15, 04 §9, 05 §5 |
+| 26 | `Spaces/<name>/` with `.flint/space.json`; other subfolders never spaces; task IDs unique across spaces; today.json and focus.json in the personal space | SPACE-01 · Decided (decision 4) / Proposed details · S1 | 04 §2, §9 |
+| 27 | The space's file: one `.flintspace` (MIME `application/vnd.flintnotes.space`), a zip with the shared copies, attachments and bookkeeping, written whole with the revision check | SPACE-* · Decided (decision 2) / Proposed format · S2 | 04 §9, 05 §5 |
+| 28 | Attachments in a space's file | Q-23 · Open (Proposed default) · R-S3 | 06 §4, §8 |
+| 29 | Several accounts, `accounts\` in app data; Settings → Spaces, Accounts, Where your things are | SPACE-10 · Decided (decision 5) / Proposed · S3 | 02 §15, 04 §9 |
+| 30 | The phone: the Lists title as switcher, the Spaces sheet, the letter in Today's meta line, the App Link | SPACE-11 · Proposed · S4 | 02 §15, 09 §8 |
+| 31 | Motion: switching, the tile's pop, the move's flight, the fold of the people line, the letter's press and tooltip; off under reduce-motion | SPACE-02, SPACE-03, SPACE-07 · Decided (D-89) · S1 | 03 §5, 09 §8 |
+| 32 | Risk first: R-S1 the link in real e-mails, R-S2 the picker for one file, R-S3 the file's size, R-S4 OneDrive | SPACE-* · To do | 06 §8 |
+| 33 | Mockup 18 as the spec (concept 1's 21 states and their screenshots); concepts 2–4 kept for the record | SPACE-* · Decided (Davit) | 09 §10, D-189 |

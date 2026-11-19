@@ -31,6 +31,7 @@ The task-line format (§3) uses the established **Dataview inline-field conventi
     agents.json                 ← AGENT-06 (D-185): the lists, notes and groups hidden from AI agents: { "flint": 1, "hidden": { "<list or group ID>": "<ISO time of the change>" }, "shown": { … } } (Proposed format; `shown` keeps un-hiding times for sync's later-change rule)
     archive/                    ← auto-archived completed tasks, one task list per list: `<list ID>.md` (TASK-06, D-88)
     trash/                      ← deleted lists and tasks, with deletion time (DATA-02)
+  Spaces/                       ← D-189: shared spaces, each a folder with this layout and `.flint/space.json` (§9)
 ```
 
 App data (not in the Flint folder):
@@ -59,7 +60,7 @@ App data (not in the Flint folder):
 
 - File names are the list names, sanitized for Windows (illegal characters replaced). Renaming a list renames its file.
 - Each list also has a stable `id` in its frontmatter, so renames don't break references.
-- **Which files are lists (D-23):** the top-level `*.md` files only. Subfolders and dot-folders (`.obsidian/`, `.git/`, `.flint/`, `attachments/`) never contain lists.
+- **Which files are lists (D-23):** the top-level `*.md` files only. Subfolders and dot-folders (`.obsidian/`, `.git/`, `.flint/`, `attachments/`) never contain lists. **D-189:** except a space's folder, `Spaces/<name>/` with `.flint/space.json`, whose top-level `*.md` files are that space's lists and notes (§9).
 - The daily-use feedback of 31 Oct 2026 (D-52 to D-63) changes nothing in the file format: inline markdown in titles, page view, overdue reminders and the sidebar order are display or app-data matters. Deleted lists go to Trash storage like deleted tasks (D-50, D-55).
 - **Files Flint didn't create (D-23):** a file without Flint frontmatter (or without `mode`) is shown as a note. Flint adds `flint`, `id` and `mode` only when it next saves that file because the user edited it in Flint; other frontmatter keys are preserved byte-for-byte.
 - **Inbox (D-23, Proposed):** the list with the reserved `id: inbox`. If no list has it at startup, Flint adopts `Inbox.md` if it exists, otherwise creates it.
@@ -304,3 +305,47 @@ My Drive/Flint/                 ← found by its Drive ID, so renaming or moving
 - **Uninstalling deletes all of it** (Android's rule for private storage). First use and Settings say so; Export and sync are the ways to keep a copy.
 - **Export (MOB-12):** copies the Flint folder (without temp files) into a folder the user picks with Android's picker, as plain files; a one-off copy, so Android's slower document access doesn't matter.
 - **No snapshots** on the phone in the first version (DATA-04 stays a PC feature; Proposed). Synced items have their PCs' snapshots and Drive's history.
+
+## 9. Spaces (SPACE-*, D-189; Proposed unless D-189 records it)
+
+### On disk
+```
+<Flint folder>/                 ← the personal space, as §2 (Inbox, its lists, attachments/, .flint/)
+  Spaces/
+    Home/                       ← a shared space: the layout of a Flint folder, one level (Davit's decision 4)
+      Groceries.md
+      Flat repairs.md
+      attachments/
+      .flint/
+        space.json              ← { "flint": 1, "id": "s-k3f9", "name": "Home" }: what makes this folder a space
+        sidebar.json            ← this space's groups and manual order (§3's format)
+        meta.json, archive/, trash/   ← as §2, for this space's lists
+```
+- **A folder is a space only with `.flint/space.json`.** A `Spaces` folder the user already had, or a subfolder of it without that file, is never read as a space (it stays outside Flint, as any subfolder does, D-23). Inside a space folder D-23's rules hold: its top-level `*.md` files are its lists and notes; no folders inside a space.
+- The folder is named after the space (sanitized for Windows like list files) and renamed with it; Flint finds a space by its `id`, never by the folder's name.
+- **Yours, in the personal space's `.flint/`:** `today.json` (Today's order and pin days, across spaces) and `focus.json` (the sprint, across spaces) keep task IDs from any space. There is no Inbox in a shared space.
+- **Task IDs** stay unique across the whole Flint folder, spaces included (D-29's rule); joining or merging a space whose IDs collide with yours re-IDs the incoming tasks as D-161 Q2 does. A list moved between spaces keeps its ID and its tasks' IDs.
+- Snapshots (DATA-04), Export (DATA-05) and changing the Flint folder (DATA-07) carry `Spaces/` with the rest. The file watcher watches it like the top level.
+
+### Personal fields in shared lists (SPACE-09, Davit's decision 3)
+- **In your local file** a shared list's task lines carry **your** `pinned`, `reminder` and `muted` fields as any list does (§3), so Today, reminders, Obsidian and agents see them as usual.
+- **The shared copy never has them.** Before a shared list goes up, those three fields are taken out of every line (the canonical writer's order otherwise unchanged); the space's merge base (below) is a shared copy too. After a merge, **your** fields are put back on the merged lines by task ID (a task that is gone loses them; a new task from someone else has none). Every other field, known or unknown, is shared.
+- Converting a shared list to a note and back, and moving it out of the space, keep your fields in your file. Moving a list **into** a shared space uploads it without them.
+- **A file-format change in all but name:** a review round (CLAUDE.md) and round-trip and fuzz tests over the split (strip, merge, re-apply) are part of the work: a task's shared part must never change by being stripped and re-applied, and your fields must never reach the shared copy.
+
+### The space's file with its provider (Davit's decision 2)
+- **One file per space** in the creator's account, `<Space name>.flintspace` in a "Flint spaces" folder of their Drive (OneDrive the same), with the MIME type `application/vnd.flintnotes.space` so Google's picker can show only Flint spaces (`mimetypes`). With `drive.file` this one picked file is all a member's Flint can open (picking a folder doesn't give its files), which is why a space is one file.
+- **Contents (Proposed):** a zip of the space's list and note files (shared copies, above) and its attachments, with `space.json` and the space's sync bookkeeping in the shape of §7's `.flint-sync` files: `items.json` (per task `created`, `lastTouched`, and who changed it last), `groups.json`, `removed.json`, `compat.json` (SYNC-02's sync version; its `devices` keyed by device, each also with the person's display name), and `people.json` (each member's display name and address as the provider reports them, for "With Sam" and conflict callouts).
+- **Written whole** with the provider's revision check (Drive's `headRevisionId`, OneDrive's eTag with `If-Match`): read, merge, write again when someone else wrote meanwhile (§7's rule). Merged per file by §7's rules against the space's own merge base.
+- **Conflict callouts name the person:** `> [!conflict] Also changed by Nino on NINO-LAPTOP, 10 Mar 09:52 (the 1 line above is ALEX-PC's)`; the card reads "Also changed by Nino" (SPACE-08). A reader that doesn't know the person part still finds the device name.
+- **Open (06 §4, Q-23):** attachments make the one file large, and every change rewrites it whole.
+
+### On each PC (app data, never in the Flint folder)
+```
+%APPDATA%\Flint\
+  accounts\<account id>.bin      ← each connected account's refresh token and address, safeStorage (several, Davit's decision 5); sync\account.bin moves here
+  spaces\<space id>\state.json   ← the provider and account, the space file's ID and last revision, whose Drive it is in, the last sync time and status, removed or left
+  spaces\<space id>\base\        ← the last synced shared copies: the space's merge base
+```
+- The upload of a list just moved into a shared space waits until its undo toast is gone (SPACE-07): the move is held in `state.json` as pending and dropped by Undo.
+- Losing `base\` turns the next merge into a first meeting (§7), never lost data; losing `state.json` is like joining again (the join link or Join with an invite link).

@@ -149,6 +149,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | Interface size (UI-12) | Ctrl+= (Ctrl++) / Ctrl+− / Ctrl+0, remembered per display | Decided (D-81) |
 | Hide / show the context panel (NAV-07) | Ctrl+\, remembered per display | Decided (D-83) |
 | Google Drive sync (SYNC-01) | No shortcut: Ctrl+K has Sync now, Sync settings, Choose what syncs…, Connect Google Drive and, for the open list or note, Sync "<name>" with Google Drive / Stop syncing "<name>"… (D-106) | Decided (D-161) |
+| Switch space (SPACE-03) | Ctrl+Shift+S opens the space menu, then 1–9 (or ↑/↓ and Enter); a click on a space's letter switches to it; Ctrl+K "Switch to "<space>"" | Decided (D-189); keys Proposed |
 | Paste from clipboard history (NAV-08) | Ctrl+Shift+H in the main window: a picker; Enter inserts, Shift+Enter captures as a task, Ctrl+C copies | Decided (D-128) |
 
 ### All text fields
@@ -168,6 +169,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 | In a table (NOTE-10, also in task bodies) | Tab / Shift+Tab next / previous cell (Tab in the last cell adds a row); Enter the cell below (adds a row on the last); Shift+Enter nudges; ↑ / ↓ rows, and in and out of the table; ← / → across cell edges; Esc leaves the table; Backspace on the blank line right under a table goes into the end of its last cell, the text unchanged (D-144, Proposed); a drag across cells, Shift+click or Shift+arrows (from the text's edge) select cells, Esc or a plain click / arrow clears them; with cells selected, Ctrl+C copies them (tab-separated and as a markdown table), Delete / Backspace clears them (Undo toast), Ctrl+X does both; Ctrl+V of tab-separated text fills cells from the active one (D-144, Proposed) | Built (1.2.0; D-141 grill Q9, D-144) |
 
 ### Mouse
+- **D-189:** a list never drags into another space; Move to space ▸ (right-click, Ctrl+K) is the way, with its one dialog when it shares the list (SPACE-07).
 - Drag rows to reorder, locked to the vertical axis and the list's bounds (D-54); lists in the sidebar reorder the same way. Rows are not dragged onto sidebar lists (D-64); moving is the right-click menu, the list picker, the action bar and Ctrl+K.
 - Click a task to select it (its title too), click it again or double-click to edit (D-89, §2); click the check to complete.
 - Right-click empty sidebar space for the **+** menu: New task list, New note, New group (D-69, D-73). Only the title-bar strip at the top drags the window.
@@ -261,6 +263,7 @@ Details of the Navigate/Edit model and the composer, built in M4 (**Proposed**, 
 - **Respect OS reduce-motion** (APP-12): when the OS asks for reduced motion, spring and completion animations are disabled; state changes become instant.
 - **Google Drive sync (SYNC-01, D-161):** the status button's cloud crossfades between its marks (~200 ms); while syncing, the arrow eases down and fades in a loop only while a run lasts (stopped under reduce-motion: a still arrow), never at idle; the popover, the setup, Choose and stop dialogs open and close as menus and dialogs do; an item's conflict cloud fades in when a conflict appears (D-163: synced items carry no cloud); a timeline row's "+N" badge fades in and moves with its row as events do (and eases aside when the now pill reaches it, D-167), its menu opens as menus do (D-163); a remote change that adds or removes rows animates them as local ones do; the conflict card fades and collapses when resolved; "No longer synced" fades in under the title.
 - **AI agents' changes (AGENT-07, D-185):** move as the user's own changes do, plus one `fl-flash` on each changed row on screen (at most 20 per change); never a focus change, scroll, selection change or list switch; none under reduce-motion.
+- **Spaces (SPACE-03, SPACE-06, SPACE-07, D-189; mockup 18, values in 09 §8):** switching: under the space line the old rows fade and slide 12 px out while the new space's slide 12 px in from the other side (toward the space's place in the menu, `--fl-dur-page`); the switcher's tile, name and chevron crossfade; the people line folds; nothing above the line moves; a second switch retargets. A click on a space's letter presses it and pops the switcher's tile as the sidebar switches. A list moved into a shared space travels as a lifted copy to the switcher's tile, the rows close up, the tile pops, the line follows and the row lights up once; Undo flies it back. A new or joined space: its tile pops and its lists slide in. The letter's tooltip fades in after 250 ms. All off under reduce-motion.
 - No decorative motion (no idle animations, no bouncing icons).
 
 ---
