@@ -50,7 +50,7 @@ describe('space.json (SPACE-01)', () => {
         (id, rawName) => {
           const name = cleanSpaceName(rawName);
           fc.pre(name !== null);
-          const space = { id, name: name as string, extra: {} };
+          const space = { id, name: name, extra: {} };
           expect(readSpaceFile(writeSpaceFile(space))).toEqual(space);
         },
       ),
