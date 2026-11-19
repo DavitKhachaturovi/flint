@@ -12,6 +12,15 @@ export {
   type JoinRequest,
 } from './join-link.js';
 export {
+  PERSONAL_SPACE,
+  SPACE_ID,
+  SPACE_NAME_MAX,
+  cleanSpaceName,
+  readSpaceFile,
+  writeSpaceFile,
+  type SpaceFile,
+} from './space-file.js';
+export {
   gmailComposeUrl,
   inviteEmail,
   isGmailAddress,
