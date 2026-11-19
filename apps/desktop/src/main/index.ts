@@ -961,8 +961,19 @@ async function start(): Promise<void> {
     const run =
       request.kind === 'new'
         ? request.group
-          ? workspace.newListInGroup(request.name, request.mode, request.group, now)
-          : workspace.newList(request.name, request.mode, now)
+          ? workspace.newListInGroup(
+              request.name,
+              request.mode,
+              request.group,
+              now,
+              typeof request.space === 'string' ? request.space : undefined,
+            )
+          : workspace.newList(
+              request.name,
+              request.mode,
+              now,
+              typeof request.space === 'string' ? request.space : undefined,
+            )
         : request.kind === 'rename'
           ? // NOTE-08, D-99: renaming a quick note gives it its title (a normal note).
             workspace.summaries(now).some((list) => list.id === request.id && list.quick)
@@ -1168,13 +1179,36 @@ async function start(): Promise<void> {
       return null;
     }
   });
-  ipcMain.handle(Channels.mainSidebar, (event) =>
-    owns(event.sender) ? workspace.sidebar() : null,
+  /** SPACE-02: a space's ID from a window (Personal for anything else). */
+  const spaceArg = (space: unknown): string | undefined =>
+    typeof space === 'string' && space !== 'personal' ? space : undefined;
+  ipcMain.handle(Channels.mainSidebar, (event, space: unknown) =>
+    owns(event.sender) ? workspace.sidebar(spaceArg(space)) : null,
   );
-  ipcMain.handle(Channels.mainSidebarAction, (event, action: unknown) => {
+  // SPACE-01, SPACE-05 (D-190 Q14): the spaces, and a new one "On this PC".
+  ipcMain.handle(Channels.mainSpaces, (event) =>
+    owns(event.sender)
+      ? workspace.spaces().map((space) => ({
+          id: space.id,
+          name: space.name,
+          kind: space.id === 'personal' ? ('personal' as const) : ('local' as const),
+        }))
+      : null,
+  );
+  ipcMain.handle(Channels.mainNewSpace, async (event, name: unknown) => {
+    if (!owns(event.sender) || typeof name !== 'string') return null;
+    const made = await workspace.createSpace(name).catch((error: unknown) => {
+      log(`new space failed: ${String(error)}`);
+      return { ok: false, problem: 'Flint could not make the space' } as const;
+    });
+    return made.ok
+      ? { ok: true, space: { id: made.space.id, name: made.space.name, kind: 'local' as const } }
+      : made;
+  });
+  ipcMain.handle(Channels.mainSidebarAction, (event, action: unknown, space: unknown) => {
     if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
     return workspace
-      .sidebarAction(action as SidebarAction, new Date())
+      .sidebarAction(action as SidebarAction, new Date(), false, spaceArg(space))
       .then((outcome) => {
         // D-122: step 4: a new group.
         if (outcome.ok && (action as SidebarAction).kind === 'newGroup') tourEvent('made');

@@ -46,6 +46,9 @@ export const Channels = {
   /** Main window → main: the sidebar's groups and order, and changes to them (LIST-05, LIST-06). */
   mainSidebar: 'main:sidebar',
   mainSidebarAction: 'main:sidebar-action',
+  /** Main window → main: the spaces, and a new one "On this PC" (SPACE-01, SPACE-05). */
+  mainSpaces: 'main:spaces',
+  mainNewSpace: 'main:new-space',
 
   mainChange: 'main:change',
   mainReserveId: 'main:reserve-id',
@@ -393,6 +396,17 @@ export interface ListSummary {
   readonly quick?: { readonly label: string; readonly at: number };
   /** D-122: a note's (or quick note's) creation time, ms: mini's Open a note… lists newest first. */
   readonly made?: number;
+  /** SPACE-01 (D-190 Q20): the space it is in; none for the personal space. */
+  readonly space?: string;
+}
+
+/** SPACE-01, SPACE-03: a space as the windows see it (Personal first, then the others by name). */
+export interface SpaceView {
+  /** `personal` for the Flint folder itself. */
+  readonly id: string;
+  readonly name: string;
+  /** SPACE-01 (D-190 Q14): Personal, or a space on this PC (Your devices / With people come in S3). */
+  readonly kind: 'personal' | 'local';
 }
 
 /** A task as a row (TASK-01..06). */
@@ -426,8 +440,15 @@ export interface TaskRow {
   readonly createdAt?: string;
   /** TODAY-01, D-85: pinned (the Today view in M6). */
   readonly pinned?: boolean;
-  /** TODAY-01 (M6): in Today, the task's home list, shown subtly on its row. */
-  readonly home?: { readonly listId: string; readonly listName: string };
+  /**
+   * TODAY-01 (M6): in Today, the task's home list, shown subtly on its row; SPACE-03 (D-189 Q4):
+   * with its space when that isn't Personal (the letter on the chip, its name on hover).
+   */
+  readonly home?: {
+    readonly listId: string;
+    readonly listName: string;
+    readonly space?: { readonly id: string; readonly name: string };
+  };
 }
 
 /**
@@ -871,6 +892,8 @@ export type ListAction =
       readonly mode: 'tasks' | 'note';
       /** D-98: made inside this sidebar group (its right-click menu). */
       readonly group?: string;
+      /** SPACE-02: made in this space (the sidebar's current one); Personal when none. */
+      readonly space?: string;
     }
   | { readonly kind: 'rename'; readonly id: string; readonly name: string }
   | { readonly kind: 'delete'; readonly id: string }

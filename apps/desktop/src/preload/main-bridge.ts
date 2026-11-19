@@ -32,6 +32,7 @@ import {
   type SidebarAction,
   type SidebarOutcome,
   type SidebarView,
+  type SpaceView,
   type RestoredItem,
   type Appearance,
   type FolderChange,
@@ -455,11 +456,24 @@ export const main = {
     return invoke(Channels.mainLinkPatterns) as Promise<readonly LinkPattern[]>;
   },
   /** LIST-05, LIST-06: the sidebar's groups and order. */
-  sidebar(): Promise<SidebarView | null> {
-    return invoke(Channels.mainSidebar) as Promise<SidebarView | null>;
+  /** SPACE-02: a space's sidebar (Personal's when none). */
+  sidebar(space?: string): Promise<SidebarView | null> {
+    return invoke(Channels.mainSidebar, space) as Promise<SidebarView | null>;
   },
-  sidebarAction(action: SidebarAction): Promise<SidebarOutcome | null> {
-    return invoke(Channels.mainSidebarAction, action) as Promise<SidebarOutcome | null>;
+  sidebarAction(action: SidebarAction, space?: string): Promise<SidebarOutcome | null> {
+    return invoke(Channels.mainSidebarAction, action, space) as Promise<SidebarOutcome | null>;
+  },
+  /** SPACE-01: the spaces, Personal first. */
+  spaces(): Promise<readonly SpaceView[] | null> {
+    return invoke(Channels.mainSpaces) as Promise<readonly SpaceView[] | null>;
+  },
+  /** SPACE-05 (D-190 Q14): a new space "On this PC". */
+  newSpace(
+    name: string,
+  ): Promise<{ ok: true; space: SpaceView } | { ok: false; problem: string } | null> {
+    return invoke(Channels.mainNewSpace, name) as Promise<
+      { ok: true; space: SpaceView } | { ok: false; problem: string } | null
+    >;
   },
   /** LIST-01: new, rename or delete a list or note. */
   listAction(action: ListAction): Promise<ListActionOutcome | null> {

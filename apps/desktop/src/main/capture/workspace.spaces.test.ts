@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { prepareFlintFolder } from '../storage/flint-folder.js';
 import { SnapshotStore } from '../storage/snapshots.js';
 import { PERSONAL, Workspace } from './workspace.js';
+import { TODAY_ID } from '../../shared/ipc.js';
 
 /**
  * SPACE-01, SPACE-02 (D-190 Q14, Q20): one workspace whose lists know their space. The personal
@@ -227,6 +228,31 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     await readFile(join(space, 'Groceries.md'), 'utf8');
     await readFile(join(space, '.flint', 'space.json'), 'utf8');
     expect(workspace.spaceOfList('gro1')).toBe('s-home1');
+  });
+
+  it('SPACE-03: summaries name a list’s space; Today’s rows carry it for the letter (Personal’s carry none)', async () => {
+    await writeFile(
+      join(folder, 'Errands.md'),
+      `${header('err1')}- [ ] milk [pinned:: true] [id:: p1p1]\n`,
+    );
+    await seedSpace('Home', 's-home1', {
+      Groceries: `${header('gro1')}- [ ] eggs [pinned:: true] [id:: p2p2]\n`,
+    });
+    const workspace = await open();
+    const summaries = workspace.summaries(now);
+    expect(summaries.find((list) => list.id === 'gro1')?.space).toBe('s-home1');
+    expect(summaries.find((list) => list.id === 'err1')?.space).toBeUndefined();
+    const rows = (workspace.view(TODAY_ID, now)?.items ?? []).flatMap((item) =>
+      item.kind === 'task' ? [item.task] : [],
+    );
+    const eggs = rows.find((row) => row.key === 'p2p2');
+    const milk = rows.find((row) => row.key === 'p1p1');
+    expect(eggs?.home).toEqual({
+      listId: 'gro1',
+      listName: 'Groceries',
+      space: { id: 's-home1', name: 'Home' },
+    });
+    expect(milk?.home).toEqual({ listId: 'err1', listName: 'Errands' });
   });
 
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {

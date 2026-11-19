@@ -889,8 +889,24 @@ export class Workspace {
         ...(info.recentRank === undefined ? {} : { recentRank: info.recentRank }),
         ...(quick && { quick }),
         ...(info.mode === 'note' && loaded && { made: this.madeAt(loaded) }),
+        ...(loaded?.entry.space !== undefined && { space: loaded.entry.space }),
       };
     });
+  }
+
+  /**
+   * TODAY-01, SPACE-03 (D-189 Q4): a row's home list as Today, Focus and the reminder cards show it,
+   * with its space when that isn't Personal (the letter on its chip, the name on hover).
+   */
+  private homeOf(
+    listId: string,
+    listName: string,
+    space: string | undefined,
+  ): NonNullable<TaskRow['home']> {
+    const state = space === undefined ? undefined : this.others.get(space);
+    return state
+      ? { listId, listName, space: { id: state.id, name: state.name } }
+      : { listId, listName };
   }
 
   /** D-115, D-122: when a note was made: when Flint first saw it, else the file's own time. */
@@ -1844,15 +1860,18 @@ export class Workspace {
     const counted = new Map<string, boolean>();
     const two = (value: number): string => String(value).padStart(2, '0');
     const clock = (when: Date): string => `${two(when.getHours())}:${two(when.getMinutes())}`;
-    const order = arrange(this.sidebarFile, this.sidebarLists(), this.sidebarSort).flatMap(
-      (item) => (item.kind === 'group' ? item.lists : [item.id]),
+    // SPACE-04: every space's lists, in their sidebars' order (Personal's first, then by space).
+    const order = this.allSpaces().flatMap((space) =>
+      arrange(this.sidebarFileOf(space), this.sidebarLists(space), this.sortOf(space)).flatMap(
+        (item) => (item.kind === 'group' ? item.lists : [item.id]),
+      ),
     );
     const labels = new Map<string, TodayEntry>();
     let inbox = { id: INBOX_ID, open: 0 };
     for (const { entry, file } of this.lists) {
       if (entry.mode === 'note') continue;
       const listId = this.listId(entry);
-      const home = { listId, listName: names.get(listId) ?? entry.name };
+      const home = this.homeOf(listId, names.get(listId) ?? entry.name, entry.space);
       const listRank = entry.id === INBOX_ID ? -1 : order.indexOf(listId);
       let openHere = 0;
       for (const { task, parent } of allTasks(file.document)) {
@@ -2111,7 +2130,7 @@ export class Workspace {
       if (!here) continue;
       const row: TaskRow = {
         ...taskRow(here.task, now, (key) => this.meta.get(key)),
-        home: { listId: here.listId, listName: here.listName },
+        home: this.homeOf(here.listId, here.listName, this.find(here.listId)?.entry.space),
       };
       entries[id] = { estimate, count };
       if (row.done && this.focusCheckToBottom) doneRows.push(row);
