@@ -822,6 +822,16 @@ export function App(): ReactElement {
   }, []);
   // SPACE-02 (D-189 Q2): the sidebar follows the open list: a list of another space (from Today,
   // Ctrl+K, Back) switches the line to its space. Inbox and quick notes are above the line.
+  /** SPACE-03: a list's space when it isn't Personal, for the letter on rows outside the sidebar. */
+  const spaceFor = useCallback(
+    (id: string): { readonly id: string; readonly name: string } | undefined => {
+      const its = lists.find((list) => list.id === id)?.space;
+      const found = its ? spaces.find((each) => each.id === its) : undefined;
+      return found ? { id: found.id, name: found.name } : undefined;
+    },
+    [lists, spaces],
+  );
+  const switchFromLetter = useCallback((id: string) => void switchSpace(id, true), [switchSpace]);
   // Only when the open list changes (a manual switch must not snap back at the next refresh); a
   // list that only now appears in `lists` (just made) is followed once it does.
   const followed = useRef<string | null>(null);
@@ -5518,6 +5528,8 @@ export function App(): ReactElement {
   });
   const panelHandlers: PanelHandlers = {
     onHide: togglePanel,
+    spaceFor,
+    onSpace: switchFromLetter,
     onBack: todayDetailsRow
       ? () => setTodayDismissed(todayDetailsRow.key)
       : panelBack
@@ -6212,10 +6224,14 @@ export function App(): ReactElement {
                       onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
                       onDone={completeOverdue}
                       onSnooze={snoozeOverdue}
+                      spaceFor={spaceFor}
+                      onSpace={switchFromLetter}
                     />
                     <ReminderCards
                       reminders={view.today?.reminders ?? []}
                       onOpen={(reminder) => openFromToday(reminder.key, reminder.listId)}
+                      spaceFor={spaceFor}
+                      onSpace={switchFromLetter}
                     />
                   </>
                 )}
@@ -6488,6 +6504,7 @@ export function App(): ReactElement {
                         onOpen={openFromToday}
                         onMoveReminder={moveReminder}
                         onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
+                        spaceFor={spaceFor}
                       />
                     )}
 
@@ -6634,6 +6651,7 @@ export function App(): ReactElement {
                   onOpen={openFromToday}
                   onMoveReminder={moveReminder}
                   onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
+                  spaceFor={spaceFor}
                 />
               )}
             </div>

@@ -13,6 +13,13 @@ import { useScrollsWhenTaller } from '../ui/scrolls.js';
 import { parseAt, untilLabel, useNow, usePresence } from '../ui/presence.js';
 import { dayPart } from './greeting.js';
 import { openMenu } from '../menu/menu.js';
+import { SpaceLetter } from '../ui/SpaceLetter.js';
+
+/** SPACE-03: a list's space (its ID and name) when it isn't Personal. */
+export interface SpaceRef {
+  readonly id: string;
+  readonly name: string;
+}
 
 /**
  * The Today view's own parts (TODAY-01, TODAY-02, TODAY-03; M6, D-89, D-92; mockups 03 and 12):
@@ -200,8 +207,12 @@ export function OverdueCard(props: {
   readonly onOpen: (reminder: TodayReminder) => void;
   readonly onDone: (reminder: TodayReminder) => void;
   readonly onSnooze: (reminder: TodayReminder, anchor: DOMRect) => void;
+  /** SPACE-03: a list's space when it isn't Personal (the letter before its name). */
+  readonly spaceFor?: (listId: string) => SpaceRef | undefined;
+  readonly onSpace?: (space: string) => void;
 }): ReactElement | null {
-  const { overdue, reminders, called, onCalled, onOpen, onDone, onSnooze } = props;
+  const { overdue, reminders, called, onCalled, onOpen, onDone, onSnooze, spaceFor, onSpace } =
+    props;
   const now = useNow(1000);
   const [open, toggle, setOpen] = useFold('overdue');
   // Today's reminders become overdue as the clock passes them, before the list says so.
@@ -275,6 +286,10 @@ export function OverdueCard(props: {
                   </span>
                   <span className="overdue-title">{item.title}</span>
                   <span className="overdue-meta">
+                    {(() => {
+                      const space = spaceFor?.(item.listId);
+                      return space ? <SpaceLetter space={space} onSwitch={onSpace} /> : null;
+                    })()}
                     {item.listName} · {overdueWhen(item.at, now)}
                   </span>
                 </button>
@@ -312,8 +327,11 @@ const CARDS = 3;
 export function ReminderCards(props: {
   readonly reminders: readonly TodayReminder[];
   readonly onOpen: (reminder: TodayReminder) => void;
+  /** SPACE-03: a list's space when it isn't Personal (the chip's letter), and the letter's click. */
+  readonly spaceFor?: (listId: string) => SpaceRef | undefined;
+  readonly onSpace?: (space: string) => void;
 }): ReactElement | null {
-  const { reminders, onOpen } = props;
+  const { reminders, onOpen, spaceFor, onSpace } = props;
   const now = useNow(1000);
   const [more, setMore] = useState(false);
   const coming = reminders.filter((reminder) => isComing(reminder, now));
@@ -351,6 +369,10 @@ export function ReminderCards(props: {
               <span className="reminder-card-foot">
                 <span className="chip reminder-card-list" title={reminder.listName}>
                   <HashIcon size={11} />
+                  {(() => {
+                    const space = spaceFor?.(reminder.listId);
+                    return space ? <SpaceLetter space={space} onSwitch={onSpace} /> : null;
+                  })()}
                   <span className="reminder-card-list-name">{reminder.listName}</span>
                 </span>
                 <span className="reminder-card-until">{untilLabel(reminder.at, now, !first)}</span>
@@ -797,8 +819,9 @@ function Entries(props: {
   readonly entries: readonly TodayEntry[];
   readonly kind: 'done' | 'captured';
   readonly onOpen: (entry: TodayEntry) => void;
+  readonly spaceFor?: ((listId: string) => SpaceRef | undefined) | undefined;
 }): ReactElement {
-  const { entries: items, kind, onOpen } = props;
+  const { entries: items, kind, onOpen, spaceFor } = props;
   const { entries, gone } = usePresence(items, (entry) => entry.key);
   return (
     <div className="today-entries">
@@ -820,6 +843,12 @@ function Entries(props: {
           )}
           <span className="today-entry-title">{item.title}</span>
           <span className="today-entry-meta">
+            {/* SPACE-03: a captured task in another space's list carries its letter. */}
+            {kind === 'captured' &&
+              (() => {
+                const space = spaceFor?.(item.listId);
+                return space ? <SpaceLetter space={space} /> : null;
+              })()}
             {kind === 'captured' ? `${item.listName} · ${item.time}` : item.time}
           </span>
         </button>
@@ -840,8 +869,10 @@ export function TodayColumn(props: {
   readonly onOpen: (key: string, listId: string) => void;
   readonly onMoveReminder: (reminder: TodayReminder, minutes: number) => void;
   readonly onSortInbox: () => void;
+  /** SPACE-03: a list's space when it isn't Personal (Captured today's letter). */
+  readonly spaceFor?: (listId: string) => SpaceRef | undefined;
 }): ReactElement | null {
-  const { extras, stacked, onOpen, onMoveReminder, onSortInbox } = props;
+  const { extras, stacked, onOpen, onMoveReminder, onSortInbox, spaceFor } = props;
   const now = useNow(1000);
   const column = useRef<HTMLElement>(null);
   useScrollsWhenTaller(column);
@@ -878,6 +909,7 @@ export function TodayColumn(props: {
         entries={extras.captured}
         kind="captured"
         onOpen={(entry) => onOpen(entry.key, entry.listId)}
+        spaceFor={spaceFor}
       />
       {extras.inbox.open > 0 && (
         <div className="today-sort-inbox">

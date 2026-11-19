@@ -18,6 +18,7 @@ import { openMenu } from '../menu/menu.js';
 import { panelExtras, type Attachment, type Reference } from '../panel/extras.js';
 import { outline as outlineOf, type Outline, type OutlineBlock } from '../panel/outline.js';
 import { BodyBlock, LiveNotes, type ShowImage } from './Body.js';
+import { SpaceLetter } from '../ui/SpaceLetter.js';
 import {
   BackIcon,
   BellIcon,
@@ -67,6 +68,11 @@ export type FactKind = 'open' | 'code' | 'images' | 'links';
 
 export interface PanelHandlers {
   readonly onHide: () => void;
+  /** SPACE-03: a list's space when it isn't Personal (Up next's letter), and the letter's click. */
+  readonly spaceFor?: (
+    listId: string,
+  ) => { readonly id: string; readonly name: string } | undefined;
+  readonly onSpace?: (space: string) => void;
   /** TODAY-01, D-86: the Pin chip pins or unpins; a pin in Up next unpins its task. */
   readonly onPin: (task: TaskRow, pinned: boolean) => void;
   readonly onUnpin: (item: UpNextItem) => void;
@@ -936,7 +942,13 @@ function UpNextRow(props: {
         )}
         {item.when}
       </span>
-      <span className="panel-item-list">{item.listName}</span>
+      <span className="panel-item-list">
+        {(() => {
+          const space = handlers.spaceFor?.(item.listId);
+          return space ? <SpaceLetter space={space} onSwitch={handlers.onSpace} /> : null;
+        })()}
+        {item.listName}
+      </span>
     </button>
   );
 }

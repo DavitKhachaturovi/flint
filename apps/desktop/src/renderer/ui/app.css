@@ -9574,6 +9574,13 @@ body[data-tour-step='5'] .main .row .pin-hover {
   align-items: center;
   gap: 6px;
 }
+/* In a line of text (the Overdue card's, Captured today's), the chip's 6 px gap before the name. */
+.overdue-meta .mm,
+.today-entry-meta .mm,
+.panel-item-list .mm {
+  margin-right: 6px;
+  vertical-align: -3px;
+}
 .space-tip {
   position: fixed;
   z-index: 90;
