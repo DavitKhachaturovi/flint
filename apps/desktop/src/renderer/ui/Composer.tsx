@@ -44,6 +44,7 @@ import { imageMenuItems, showInViewer } from '../media/media.js';
 import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText, type InertText } from '../main-window/inert-text.js';
+import { attachTarget } from '../attach-target.js';
 
 let seq = 0;
 
@@ -125,7 +126,9 @@ export function Composer(props: {
       event.preventDefault();
       void image
         .arrayBuffer()
-        .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
+        .then((buffer) =>
+          window.flintMain.attach(new Uint8Array(buffer), image.type, attachTarget()),
+        )
         .then((link) => {
           if (link) setPasted((current) => [...current, { kind: 'image', link, id: ++seq }]);
         });

@@ -6,6 +6,7 @@
 import { setEditorHost } from '@flint/editor';
 import { fileMenuItems, imageMenuItems, mediaElement, onCopyIntoFlint } from '../media/media.js';
 import { openMenu } from '../menu/menu.js';
+import { attachTarget } from '../attach-target.js';
 
 setEditorHost({
   openMenu: (entries, at) => openMenu(entries, at),
@@ -13,5 +14,5 @@ setEditorHost({
   imageMenuItems,
   fileMenuItems,
   onCopyIntoFlint,
-  copyIntoFlint: (link) => window.flintMain.copyIntoFlint(link),
+  copyIntoFlint: (link) => window.flintMain.copyIntoFlint(link, attachTarget()),
 });

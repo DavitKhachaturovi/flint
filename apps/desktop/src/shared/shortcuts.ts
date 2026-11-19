@@ -42,6 +42,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Ctrl+N', action: 'New task in the open list' },
       { keys: 'Ctrl+Shift+N', action: 'New list or note' },
+      { keys: 'Ctrl+Shift+S', action: 'Switch space' },
       { keys: 'Ctrl+Shift+J', action: 'Quick note' },
       { keys: 'Ctrl+Shift+H', action: 'Paste from clipboard history' },
       { keys: 'Ctrl+F', action: 'Find in the list or note' },

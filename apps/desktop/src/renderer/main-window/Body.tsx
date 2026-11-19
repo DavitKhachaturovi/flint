@@ -16,6 +16,7 @@ import {
   relink,
 } from '../media/media.js';
 import { COPY_ICON, copyWithFeedback } from '../media/copy.js';
+import { attachTarget } from '../attach-target.js';
 
 const TRASH_ICON =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path></svg>';
@@ -230,7 +231,7 @@ function BodyView(props: {
                   {
                     label: 'Copy into Flint',
                     action: () =>
-                      void window.flintMain.copyIntoFlint(link).then((outcome) => {
+                      void window.flintMain.copyIntoFlint(link, attachTarget()).then((outcome) => {
                         if (outcome?.ok) onRelink(relink(latest.current.body, link, outcome.link));
                         else if (outcome) announce(outcome.problem);
                       }),

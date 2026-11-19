@@ -25,6 +25,7 @@ import {
   openAttachment,
 } from '../media/media.js';
 import { durationMs, reducedMotion } from '../ui/motion.js';
+import { attachTarget } from '../attach-target.js';
 
 /**
  * The note editor in React (M5, D-79): notes, and task bodies on their page and inline. It owns its
@@ -116,7 +117,7 @@ export function MarkdownEditor(props: {
             onPaste: (event, target) => paste(event, target),
             // NOTE-02, NOTE-03 (D-82): the formatting menus, in the main window's terms.
             commands: () => ({
-              pickImage: () => window.flintMain.pickImage(),
+              pickImage: () => window.flintMain.pickImage(attachTarget()),
               monospace: latest.current.monospace,
               source: latest.current.source,
               edit: (command) => window.flintMain.edit(command),
@@ -273,7 +274,7 @@ function paste(event: ClipboardEvent, view: EditorView): boolean {
     event.preventDefault();
     void image
       .arrayBuffer()
-      .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
+      .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type, attachTarget()))
       .then((link) => {
         if (link) insertBlock(view, `![](${link})`);
       });
@@ -309,7 +310,7 @@ async function addFiles(view: EditorView, files: readonly File[]): Promise<void>
   for (const file of files) {
     const path = window.flintMain.pathFor(file);
     if (path === '') continue;
-    const outcome = await window.flintMain.attachFile(path);
+    const outcome = await window.flintMain.attachFile(path, attachTarget());
     if (!outcome) continue;
     if (!outcome.ok) {
       announce(outcome.problem);

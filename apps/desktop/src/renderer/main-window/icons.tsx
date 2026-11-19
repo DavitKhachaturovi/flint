@@ -96,6 +96,17 @@ export const CheckIcon = ({ size = 12 }: IconProps): ReactElement =>
 export const ChevronIcon = ({ size = 14 }: IconProps): ReactElement =>
   svg(size, <path d="m9 6 6 6-6 6" />);
 
+/** SPACE-02 (09 §8): the space switcher's chevron, pointing down. */
+export const ChevronDownIcon = ({ size = 12 }: IconProps): ReactElement =>
+  svg(size, <path d="m6 9 6 6 6-6" />, 2.4);
+
+/** SPACE-02 (09 §8): Personal's tile: a person (a circle r 3.6 at 12, 8.2 and the shoulders). */
+export const PersonIcon = ({ size = 13 }: IconProps): ReactElement =>
+  svg(size, [
+    <circle key="a" cx="12" cy="8.2" r="3.6" />,
+    <path key="b" d="M5 20a7 7 0 0 1 14 0" />,
+  ]);
+
 export const FlagIcon = ({ size = 15 }: IconProps): ReactElement =>
   svg(size, <path d="M5 21V4M5 4h11l-2 4 2 4H5" />, 1.9);
 

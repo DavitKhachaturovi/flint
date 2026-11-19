@@ -155,8 +155,8 @@ function stateLine(status: SyncStatusView): { title: string; detail: string } {
   }
 }
 
-/** A floating layer that closes on a click outside or Esc (the popover). */
-function useDismiss(ref: React.RefObject<HTMLElement | null>, onClose: () => void): void {
+/** A floating layer that closes on a click outside or Esc (the popover; SPACE-03's menu too). */
+export function useDismiss(ref: React.RefObject<HTMLElement | null>, onClose: () => void): void {
   useEffect(() => {
     const down = (event: MouseEvent): void => {
       if (ref.current && !ref.current.contains(event.target as Node)) onClose();

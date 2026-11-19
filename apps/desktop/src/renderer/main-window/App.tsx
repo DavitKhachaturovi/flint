@@ -87,6 +87,10 @@ import {
 } from './Sync.js';
 import { CloudIcon, FocusIcon, MoreIcon, SettingsIcon as GearIcon } from './icons.js';
 import { FOCUS_ID, type FocusAction } from '../../shared/focus.js';
+import { NewSpaceDialog, PERSONAL_SPACE, SpaceHead, SpaceMenu } from './Spaces.js';
+import { attachTarget, setAttachTarget } from '../attach-target.js';
+import { createPortal } from 'react-dom';
+import type { SpaceView } from '../../shared/ipc.js';
 import {
   FocusActiveLine,
   FocusCount,
@@ -448,8 +452,25 @@ function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
 
 export function App(): ReactElement {
   const [lists, setLists] = useState<readonly ListSummary[]>([]);
-  /** LIST-05, LIST-06: the sidebar's groups, order, sort and folded groups. */
+  /** LIST-05, LIST-06: the sidebar's groups, order, sort and folded groups (the current space's). */
   const [sidebarView, setSidebarView] = useState<SidebarView | null>(null);
+  /**
+   * SPACE-01, SPACE-02: the spaces (Personal first) and the one under the space line. With only
+   * Personal the sidebar looks as it always did ("Lists", no line, SPACE-01).
+   */
+  const [spaces, setSpaces] = useState<readonly SpaceView[]>([]);
+  const [space, setSpaceState] = useState<string>(PERSONAL_SPACE);
+  const spaceRef = useRef(space);
+  spaceRef.current = space;
+  /** SPACE-03: the space menu, open under the switcher; New space's dialog; the tile's pop. */
+  const [spaceMenu, setSpaceMenu] = useState<DOMRect | null>(null);
+  const [newSpace, setNewSpace] = useState(false);
+  const [tilePop, setTilePop] = useState(0);
+  /** SPACE-03's motion: the direction the lists slide on a switch (from the spaces' order). */
+  const [spaceSlide, setSpaceSlide] = useState<{
+    readonly key: number;
+    readonly dx: number;
+  } | null>(null);
   /**
    * D-79: the list or group picked in the sidebar while the keyboard is there (Alt+↑/↓ moves it);
    * null when the keyboard is in the task list.
@@ -713,15 +734,24 @@ export function App(): ReactElement {
     async (then?: () => void): Promise<void> => {
       const seq = ++refreshSeq.current;
       if (then) refreshThens.current.push(then);
-      const [nextLists, nextView, nextSidebar, nextTrash, nextSprint] = await Promise.all([
-        window.flintMain.lists(),
-        window.flintMain.view(listId),
-        window.flintMain.sidebar(),
-        window.flintMain.trash(),
-        // FOCUS-02: the sprint, for Send to / Remove from Focus and the sidebar's count.
-        listId === FOCUS_ID ? Promise.resolve(null) : window.flintMain.view(FOCUS_ID),
-      ]);
+      const [nextLists, nextView, nextSidebar, nextTrash, nextSprint, nextSpaces] =
+        await Promise.all([
+          window.flintMain.lists(),
+          window.flintMain.view(listId),
+          // SPACE-02: the sidebar of the space under the line.
+          window.flintMain.sidebar(space),
+          window.flintMain.trash(),
+          // FOCUS-02: the sprint, for Send to / Remove from Focus and the sidebar's count.
+          listId === FOCUS_ID ? Promise.resolve(null) : window.flintMain.view(FOCUS_ID),
+          window.flintMain.spaces(),
+        ]);
       if (seq !== refreshSeq.current) return;
+      setSpaces(nextSpaces ?? []);
+      // A space gone meanwhile (removed on disk): the line goes back to Personal.
+      if (space !== PERSONAL_SPACE && !(nextSpaces ?? []).some((each) => each.id === space)) {
+        setSpaceState(PERSONAL_SPACE);
+        return;
+      }
       const thens = refreshThens.current;
       refreshThens.current = [];
       setTrash(nextTrash);
@@ -738,7 +768,7 @@ export function App(): ReactElement {
       setSidebarView(nextSidebar);
       for (const each of thens) each();
     },
-    [listId, motion],
+    [listId, motion, space],
   );
 
   useEffect(() => {
@@ -754,6 +784,62 @@ export function App(): ReactElement {
     [motion],
   );
   useLayoutEffect(() => motion.play(), [lists, sidebarView, naming, motion]);
+
+  const spacesRef = useRef(spaces);
+  spacesRef.current = spaces;
+  /** The space's lists under the line (SPACE-03's switch slides them). */
+  const spaceStage = useRef<HTMLDivElement>(null);
+  /** SPACE-03 (Proposed): the list last opened in each space, opened again when switching back. */
+  const lastInSpace = useRef(new Map<string, string>());
+  /**
+   * SPACE-03: switches the sidebar to a space. The new space's sidebar is read first, so its rows
+   * arrive together: the old ones leave as a copy sliding away while the new slide in from the
+   * other side (the direction from the spaces' order). `pop`: a letter's click pops the tile.
+   */
+  const switchSpace = useCallback(async (id: string, pop = false): Promise<void> => {
+    const from = spaceRef.current;
+    if (pop) setTilePop((count) => count + 1);
+    if (id === from) return;
+    const next = await window.flintMain.sidebar(id);
+    if (!next) return;
+    const order = spacesRef.current.map((each) => each.id);
+    const dx = order.indexOf(id) >= order.indexOf(from) ? 12 : -12;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const body = spaceStage.current?.querySelector<HTMLElement>(':scope > .space-body');
+    if (body && !reduce) {
+      const copy = body.cloneNode(true) as HTMLElement;
+      copy.classList.remove('in');
+      copy.classList.add('out');
+      copy.setAttribute('aria-hidden', 'true');
+      copy.style.setProperty('--dx', `${-dx}px`);
+      copy.addEventListener('animationend', () => copy.remove(), { once: true });
+      spaceStage.current?.appendChild(copy);
+    }
+    setSidebarFocus(null);
+    setSidebarView(next);
+    setSpaceSlide((now) => ({ key: (now?.key ?? 0) + 1, dx }));
+    setSpaceState(id);
+  }, []);
+  // SPACE-02 (D-189 Q2): the sidebar follows the open list: a list of another space (from Today,
+  // Ctrl+K, Back) switches the line to its space. Inbox and quick notes are above the line.
+  // Only when the open list changes (a manual switch must not snap back at the next refresh); a
+  // list that only now appears in `lists` (just made) is followed once it does.
+  const followed = useRef<string | null>(null);
+  // A new open list (Today and back to the same list too) is followed again.
+  useEffect(() => {
+    followed.current = null;
+  }, [listId]);
+  useEffect(() => {
+    const open = lists.find((list) => list.id === listId);
+    // SPACE-01: a picture or file added now goes to the open list's space (none for Today, Focus).
+    setAttachTarget(open ? open.id : null);
+    if (!open || followed.current === listId) return;
+    followed.current = listId;
+    if (open.inbox || open.quick) return;
+    const its = open.space ?? PERSONAL_SPACE;
+    lastInSpace.current.set(its, open.id);
+    if (its !== spaceRef.current) void switchSpace(its);
+  }, [listId, lists, switchSpace]);
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -1938,7 +2024,7 @@ export function App(): ReactElement {
    */
   const copyLinkedIn = useCallback(
     async (notice: LinkedNotice & { id: number }): Promise<void> => {
-      const outcome = await window.flintMain.copyIntoFlint(notice.link);
+      const outcome = await window.flintMain.copyIntoFlint(notice.link, attachTarget());
       if (!outcome?.ok) {
         if (outcome) showToast(outcome.problem, false);
         return;
@@ -2328,18 +2414,23 @@ export function App(): ReactElement {
   /** NOTE-08, D-99: a quick note's right-click menu: a title, keep it, a group, delete. */
   const quickMenu = useCallback(
     (list: ListSummary, at: Point): void => {
-      const groups = (sidebarView?.items ?? []).filter(
-        (item): item is SidebarGroup => item.kind === 'group',
-      );
+      // SPACE-01: quick notes are the personal space's: its groups only, while it is shown.
+      const groups =
+        space === PERSONAL_SPACE
+          ? (sidebarView?.items ?? []).filter((item): item is SidebarGroup => item.kind === 'group')
+          : [];
       const keep = (group: string | null): void =>
         void window.flintMain.keepQuickNote(list.id).then(async (outcome) => {
           if (!outcome?.ok) return;
           if (group)
-            await window.flintMain.sidebarAction({
-              kind: 'move',
-              id: list.id,
-              to: { group, index: Number.MAX_SAFE_INTEGER },
-            });
+            await window.flintMain.sidebarAction(
+              {
+                kind: 'move',
+                id: list.id,
+                to: { group, index: Number.MAX_SAFE_INTEGER },
+              },
+              PERSONAL_SPACE,
+            );
           showToast(outcome.label, true);
         });
       openMenu(
@@ -2376,7 +2467,7 @@ export function App(): ReactElement {
         at,
       );
     },
-    [sidebarView, showToast],
+    [sidebarView, showToast, space],
   );
 
   /** D-99: the opened comparison, in the panel or as a page. */
@@ -2722,7 +2813,8 @@ export function App(): ReactElement {
   /** LIST-05, LIST-06: a change to the sidebar; a problem shows in the toast. */
   const sidebarChange = useCallback(
     async (action: SidebarAction): Promise<SidebarOutcome | null> => {
-      const outcome = await window.flintMain.sidebarAction(action);
+      // SPACE-02: the sidebar shown is the current space's.
+      const outcome = await window.flintMain.sidebarAction(action, spaceRef.current);
       if (outcome && !outcome.ok && outcome.problem) showToast(outcome.problem, false);
       return outcome;
     },
@@ -2865,6 +2957,7 @@ export function App(): ReactElement {
             naming.kind === 'newGroup'
               ? { kind: 'newGroup', name }
               : { kind: 'renameGroup', id: naming.id, name },
+            spaceRef.current,
           );
           if (!outcome) return;
           if (!outcome.ok) return refuse(outcome.problem);
@@ -2883,7 +2976,14 @@ export function App(): ReactElement {
         }
         const outcome = await window.flintMain.listAction(
           naming.kind === 'new'
-            ? { kind: 'new', name, mode: naming.mode, ...(naming.group && { group: naming.group }) }
+            ? {
+                kind: 'new',
+                name,
+                mode: naming.mode,
+                ...(naming.group && { group: naming.group }),
+                // SPACE-02: made in the space under the line.
+                ...(spaceRef.current !== PERSONAL_SPACE && { space: spaceRef.current }),
+              }
             : { kind: 'rename', id: naming.id, name },
         );
         if (!outcome) return;
@@ -3249,6 +3349,15 @@ export function App(): ReactElement {
         event.preventDefault();
         const box = addButton.current?.getBoundingClientRect();
         newListMenu(box ? { x: box.left, y: box.bottom + 4 } : { x: 24, y: 120 });
+        return;
+      }
+      // SPACE-03: Ctrl+Shift+S opens the space menu anywhere in the window (1–9 pick there).
+      if (key === 's' && event.ctrlKey && event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        const anchor =
+          document.querySelector('.space-btn') ?? document.querySelector('.lists-label');
+        const box = anchor?.getBoundingClientRect() ?? new DOMRect(16, 140, 200, 30);
+        setSpaceMenu((open) => (open ? null : box));
         return;
       }
       // Ctrl+N works anywhere in the window (docs/03 §2, Q-08 default).
@@ -3955,6 +4064,8 @@ export function App(): ReactElement {
     onHome: (task) => {
       if (task.home) reveal(task.home.listId, task.key);
     },
+    // SPACE-03 (D-189 Q4): the letter switches the sidebar to its space, the page staying.
+    onSpace: (id) => void switchSpace(id, true),
   };
   const saveBody = (key: string, body: string): void => {
     setEditingBody(null);
@@ -4215,7 +4326,9 @@ export function App(): ReactElement {
         event.preventDefault();
         void image
           .arrayBuffer()
-          .then((buffer) => window.flintMain.attach(new Uint8Array(buffer), image.type))
+          .then((buffer) =>
+            window.flintMain.attach(new Uint8Array(buffer), image.type, attachTarget()),
+          )
           .then((link) => {
             if (link) append(`![](${link})`);
           });
@@ -4777,6 +4890,27 @@ export function App(): ReactElement {
       { id: 'new:note', label: 'New note', run: () => setNaming({ kind: 'new', mode: 'note' }) },
       { id: 'new:group', label: 'New group', run: () => setNaming({ kind: 'newGroup' }) },
       { id: 'new:quick', label: 'Quick note', hint: 'Ctrl+Shift+J', run: () => newQuickNote() },
+      // SPACE-01, SPACE-03, SPACE-05 (D-106): the spaces' commands.
+      {
+        id: 'space:switch',
+        label: 'Switch space…',
+        hint: 'Ctrl+Shift+S',
+        keywords: 'spaces',
+        run: () => {
+          const anchor =
+            document.querySelector('.space-btn') ?? document.querySelector('.lists-label');
+          setSpaceMenu(anchor?.getBoundingClientRect() ?? new DOMRect(16, 140, 200, 30));
+        },
+      },
+      ...spaces
+        .filter((each) => each.id !== space)
+        .map((each) => ({
+          id: `space:${each.id}`,
+          label: `Switch to “${each.name}”`,
+          keywords: 'space',
+          run: () => void switchSpace(each.id),
+        })),
+      { id: 'space:new', label: 'New space…', keywords: 'spaces', run: () => setNewSpace(true) },
       // TASK-18, D-151: the list's folder for Give to Claude.
       ...(view?.mode === 'tasks' && view.id !== TODAY_ID && view.id !== FOCUS_ID
         ? [
@@ -5646,109 +5780,153 @@ export function App(): ReactElement {
               )}
             </div>
           )}
-          <div className="section-label lists-label">
-            <span>Lists</span>
-            {sync.phase !== 'unavailable' && (
-              <SyncButton
-                status={sync}
-                lists={lists}
-                onSettings={() => openSettings('sync')}
-                onOpen={(id) => openList(id)}
-              />
-            )}
-            <button
-              type="button"
-              className="sort-lists"
-              aria-label="Sort lists"
-              title={`Sort: ${SORT_LABELS[sidebarView?.sort ?? 'manual']}`}
-              onClick={(event) => {
-                const box = event.currentTarget.getBoundingClientRect();
-                sortMenu({ x: box.left, y: box.bottom + 4 });
-              }}
-            >
-              <SortIcon />
-            </button>
-            <button
-              ref={addButton}
-              type="button"
-              className="add-list"
-              aria-label="New list or note"
-              title="New list or note (Ctrl+Shift+N)"
-              onClick={(event) => {
-                const box = event.currentTarget.getBoundingClientRect();
-                newListMenu({ x: box.left, y: box.bottom + 4 });
-              }}
-            >
-              <PlusIcon />
-            </button>
-          </div>
-          {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
-          {naming?.kind === 'newGroup' && (
-            <div className="naming-group" data-flip="naming:group">
-              {groupNameField('', 'new-group')}
-            </div>
-          )}
-          {sidebarItems.map((item) => {
-            if (item.kind === 'list') {
-              const list = listById.get(item.id);
-              if (list && !shownByFilter(list.id)) return null;
-              return list ? navList(list) : null;
-            }
-            if (syncFilter !== 'all' && isConnected(sync) && !item.lists.some(shownByFilter))
-              return null;
-            const collapsed = sidebarView?.collapsed.includes(item.id) ?? false;
-            return (
-              <NavGroup
-                key={item.id}
-                group={item}
-                collapsed={collapsed}
-                focused={sidebarFocus === item.id}
-                header={
-                  naming?.kind === 'renameGroup' && naming.id === item.id
-                    ? groupNameField(item.name, `rename-${item.id}`)
-                    : null
-                }
-                onToggle={() => toggleGroup(item.id)}
-                onMenu={(at) => groupMenu(item, at)}
-                onRename={() => {
-                  setNamingProblem(null);
-                  setNaming({ kind: 'renameGroup', id: item.id, name: item.name });
-                }}
-              >
-                {item.lists.map((id) => {
-                  const list = listById.get(id);
-                  return list ? navList(list) : null;
-                })}
-                {/* D-98: a new list or note named right where it will be, at the end of the group. */}
-                {naming?.kind === 'new' && naming.group === item.id && (
-                  <NameField
-                    flip="naming:list"
-                    key={`new-${naming.mode}-${item.id}`}
-                    initial=""
-                    placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
-                    icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-                    problem={namingProblem}
-                    onSubmit={(name) => void submitName(name)}
-                    onLeave={(name) => void submitName(name, true)}
-                    onCancel={() => setNaming(null)}
+          {(() => {
+            // SPACE-02: one set of tools for "Lists" (only Personal) and for the space switcher.
+            const tools = (
+              <>
+                {/* SYNC-01's cloud is the personal space's sync (spaces get theirs in S3). */}
+                {sync.phase !== 'unavailable' && space === PERSONAL_SPACE && (
+                  <SyncButton
+                    status={sync}
+                    lists={lists}
+                    onSettings={() => openSettings('sync')}
+                    onOpen={(id) => openList(id)}
                   />
                 )}
-              </NavGroup>
+                <button
+                  type="button"
+                  className="sort-lists"
+                  aria-label="Sort lists"
+                  title={`Sort: ${SORT_LABELS[sidebarView?.sort ?? 'manual']}`}
+                  onClick={(event) => {
+                    const box = event.currentTarget.getBoundingClientRect();
+                    sortMenu({ x: box.left, y: box.bottom + 4 });
+                  }}
+                >
+                  <SortIcon />
+                </button>
+                <button
+                  ref={addButton}
+                  type="button"
+                  className="add-list"
+                  aria-label="New list or note"
+                  title="New list or note (Ctrl+Shift+N)"
+                  onClick={(event) => {
+                    const box = event.currentTarget.getBoundingClientRect();
+                    newListMenu({ x: box.left, y: box.bottom + 4 });
+                  }}
+                >
+                  <PlusIcon />
+                </button>
+              </>
             );
-          })}
-          {naming?.kind === 'new' && !naming.group && (
-            <NameField
-              flip="naming:list"
-              key={`new-${naming.mode}`}
-              initial=""
-              placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
-              icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
-              problem={namingProblem}
-              onSubmit={(name) => void submitName(name)}
-              onLeave={(name) => void submitName(name, true)}
-              onCancel={() => setNaming(null)}
-            />
-          )}
+            const current = spaces.find((each) => each.id === space);
+            // SPACE-01: with only Personal, "Lists" as always; with a second space, the line and
+            // the switcher (mockup 18 concept 1).
+            return spaces.length > 1 && current ? (
+              <>
+                <div
+                  className="space-line"
+                  title="Above the line: yours, in every space. Below it: the space you chose."
+                />
+                <SpaceHead
+                  key={`head-${tilePop}`}
+                  space={current}
+                  menuOpen={spaceMenu !== null}
+                  pop={tilePop > 0}
+                  onMenu={(at) => setSpaceMenu(spaceMenu ? null : at)}
+                >
+                  {tools}
+                </SpaceHead>
+              </>
+            ) : (
+              <div className="section-label lists-label">
+                <span>Lists</span>
+                {tools}
+              </div>
+            );
+          })()}
+          <div className="space-stage" ref={spaceStage}>
+            <div
+              className={spaceSlide ? 'space-body in' : 'space-body'}
+              key={spaceSlide?.key ?? 0}
+              style={
+                spaceSlide ? ({ '--dx': `${spaceSlide.dx}px` } as React.CSSProperties) : undefined
+              }
+            >
+              {/* D-80: a new group starts at the top of Lists, its name field ready (mockup 10). */}
+              {naming?.kind === 'newGroup' && (
+                <div className="naming-group" data-flip="naming:group">
+                  {groupNameField('', 'new-group')}
+                </div>
+              )}
+              {sidebarItems.map((item) => {
+                if (item.kind === 'list') {
+                  const list = listById.get(item.id);
+                  if (list && !shownByFilter(list.id)) return null;
+                  return list ? navList(list) : null;
+                }
+                if (syncFilter !== 'all' && isConnected(sync) && !item.lists.some(shownByFilter))
+                  return null;
+                const collapsed = sidebarView?.collapsed.includes(item.id) ?? false;
+                return (
+                  <NavGroup
+                    key={item.id}
+                    group={item}
+                    collapsed={collapsed}
+                    focused={sidebarFocus === item.id}
+                    header={
+                      naming?.kind === 'renameGroup' && naming.id === item.id
+                        ? groupNameField(item.name, `rename-${item.id}`)
+                        : null
+                    }
+                    onToggle={() => toggleGroup(item.id)}
+                    onMenu={(at) => groupMenu(item, at)}
+                    onRename={() => {
+                      setNamingProblem(null);
+                      setNaming({ kind: 'renameGroup', id: item.id, name: item.name });
+                    }}
+                  >
+                    {item.lists.map((id) => {
+                      const list = listById.get(id);
+                      return list ? navList(list) : null;
+                    })}
+                    {/* D-98: a new list or note named right where it will be, at the end of the group. */}
+                    {naming?.kind === 'new' && naming.group === item.id && (
+                      <NameField
+                        flip="naming:list"
+                        key={`new-${naming.mode}-${item.id}`}
+                        initial=""
+                        placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+                        icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+                        problem={namingProblem}
+                        onSubmit={(name) => void submitName(name)}
+                        onLeave={(name) => void submitName(name, true)}
+                        onCancel={() => setNaming(null)}
+                      />
+                    )}
+                  </NavGroup>
+                );
+              })}
+              {naming?.kind === 'new' && !naming.group && (
+                <NameField
+                  flip="naming:list"
+                  key={`new-${naming.mode}`}
+                  initial=""
+                  placeholder={naming.mode === 'note' ? 'Note name' : 'List name'}
+                  icon={naming.mode === 'note' ? <NoteIcon /> : <ListIcon />}
+                  problem={namingProblem}
+                  onSubmit={(name) => void submitName(name)}
+                  onLeave={(name) => void submitName(name, true)}
+                  onCancel={() => setNaming(null)}
+                />
+              )}
+              {/* SPACE-05: a new space, empty until a list is made or moved into it. */}
+              {space !== PERSONAL_SPACE && sidebarItems.length === 0 && !naming && (
+                <p className="empty-space">Nothing here yet. Make a list or note with +.</p>
+              )}
+            </div>
+          </div>
           {/* DATA-02, D-97: Trash, quiet, at the bottom, with what is in it. */}
           {/* D-103: room for the fade above the foot, so the last list isn't dimmed at the end. */}
           <div className="sidebar-foot-space" aria-hidden="true" />
@@ -6683,6 +6861,39 @@ export function App(): ReactElement {
             className={marked.size > 1 ? 'above-bar' : ''}
             onHide={hideToast}
             onUndo={() => void undo().then(hideToast)}
+          />
+        )}
+        {/* SPACE-03, SPACE-05: the space menu under the switcher, and New space. */}
+        {spaceMenu &&
+          createPortal(
+            <SpaceMenu
+              at={spaceMenu}
+              spaces={spaces}
+              current={space}
+              onPick={(id) => {
+                setSpaceMenu(null);
+                void switchSpace(id);
+              }}
+              onNew={() => {
+                setSpaceMenu(null);
+                setNewSpace(true);
+              }}
+              onClose={() => setSpaceMenu(null)}
+            />,
+            document.body,
+          )}
+        {newSpace && (
+          <NewSpaceDialog
+            onClose={() => setNewSpace(false)}
+            onCreate={async (name) => {
+              const made = await window.flintMain.newSpace(name);
+              if (!made) return 'Flint could not make the space';
+              if (!made.ok) return made.problem;
+              await refresh();
+              await switchSpace(made.space.id, true);
+              showToast(`Made ${made.space.name}`, true);
+              return null;
+            }}
           />
         )}
         {/* SYNC-01, D-161: sync's dialogs. */}

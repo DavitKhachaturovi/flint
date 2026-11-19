@@ -20,6 +20,7 @@ import {
 import type { Ghost } from './ghosts.js';
 import { parseCapture, type ListInfo } from '@flint/core/shorthand';
 import { usePresence } from './presence.js';
+import { SpaceLetter } from './SpaceLetter.js';
 
 export interface Point {
   readonly x: number;
@@ -93,6 +94,8 @@ export interface RowHandlers {
   readonly onImages: (task: TaskRow) => void;
   /** D-93: Today's list chip opens the task's own list, the task selected there. */
   readonly onHome: (task: TaskRow) => void;
+  /** SPACE-03: the chip's space letter switches the sidebar to that space (the main window). */
+  readonly onSpace?: (space: string) => void;
   /**
    * D-111: the lists the shorthand knows, and the list the rows are in, so the row being edited
    * shows its typed `!h`, `@15:00` and `##list` at once (the stripe, the time, a list chip).
@@ -469,6 +472,8 @@ export function Row(
               props.onHome(task);
             }}
           >
+            {/* SPACE-03 (D-189 Q4): a list of another space carries its letter. */}
+            {task.home.space && <SpaceLetter space={task.home.space} onSwitch={props.onSpace} />}
             {task.home.listName}
           </button>
         )}

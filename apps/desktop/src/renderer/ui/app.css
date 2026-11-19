@@ -9274,3 +9274,385 @@ body[data-tour-step='5'] .main .row .pin-hover {
   padding: 0 6px;
   font-size: 10.5px;
 }
+
+/* ── Spaces (SPACE-02, SPACE-03, SPACE-05; D-189, mockup 18 concept 1, docs/09 §8) ── */
+/* The space line: above it yours in every space; below it the space you chose. */
+.space-line {
+  height: 1px;
+  flex: 0 0 auto;
+  margin: 14px 4px 8px;
+  background: var(--fl-edge-divider);
+}
+.space-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+}
+.space-btn {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px 0 4px;
+  border-radius: 10px;
+  text-align: left;
+  transition:
+    background-color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+.space-btn:hover {
+  background: var(--fl-ground-hover);
+}
+.space-btn.open {
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+}
+.space-btn-parts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* A switch: the tile, name and chevron rise 2 px and fade in. */
+.space-btn-parts > * {
+  animation: space-head-in var(--fl-dur-state) ease;
+}
+@keyframes space-head-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+.stile {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+}
+.stile.menu {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.stile.xl {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 16px;
+}
+.stile.tpop {
+  animation: space-tile-pop var(--fl-dur-state) var(--fl-ease-press);
+}
+@keyframes space-tile-pop {
+  40% {
+    transform: scale(1.12);
+  }
+}
+.space-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fl-text-primary);
+}
+.space-chev {
+  position: relative;
+  display: flex;
+  color: var(--fl-text-faint);
+}
+.space-head .sort-lists,
+.space-head .add-list,
+.space-head .sync-button {
+  flex: 0 0 auto;
+}
+/* The space's lists: a switch slides the old ones 12 px away and the new ones in from the other side. */
+.space-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+/* The sidebar's own row gap (3 px), so the wrapper changes nothing with only Personal. */
+.space-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.space-body.in {
+  animation: space-body-in var(--fl-dur-page) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.space-body.out {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  animation: space-body-out 180ms ease forwards;
+}
+@keyframes space-body-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--dx, 12px));
+  }
+}
+@keyframes space-body-out {
+  to {
+    opacity: 0;
+    transform: translateX(var(--dx, -12px));
+  }
+}
+.empty-space {
+  padding: 10px 10px 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fl-text-faint);
+}
+/* The space menu (SPACE-03): the floating menu, 318 px, under the switcher. */
+.space-menu {
+  position: fixed;
+  z-index: 60;
+  width: 318px;
+  padding: 5px;
+  border-radius: var(--fl-radius-row);
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-size: 13px;
+  outline: none;
+  transform-origin: top left;
+  animation: space-menu-in var(--fl-dur-base) ease-out;
+}
+@keyframes space-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.space-menu-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px 5px;
+  font-size: var(--fl-size-label);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-faint);
+}
+.space-menu-label .k {
+  letter-spacing: 0;
+  text-transform: none;
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+}
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 9px;
+  text-align: left;
+}
+.sm-row.active {
+  background: var(--fl-ground-tile);
+}
+.sm-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sm-name {
+  font-size: 13.5px;
+  color: var(--fl-text-primary);
+}
+.sm-sub {
+  font-size: 11.5px;
+  color: var(--fl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sm-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fl-text-secondary);
+}
+.sm-cur {
+  display: flex;
+  width: 14px;
+  color: var(--fl-text-secondary);
+}
+.kc {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fl-ground-tile);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  font-family: var(--fl-font-mono);
+  font-size: 10.5px;
+  color: var(--fl-text-secondary);
+}
+.space-menu-divider {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--fl-edge-float);
+}
+.space-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--fl-text-primary);
+  text-align: left;
+}
+.space-menu-item .grow {
+  flex: 1;
+}
+.space-menu-item.active {
+  background: var(--fl-ground-tile);
+}
+/* The letter (SPACE-03, D-189 Q4): a row from a space other than Personal, outside the sidebar. */
+.mm {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fl-ground-float);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+  font-family: var(--fl-font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fl-text-primary);
+  transition:
+    background-color var(--fl-dur-fast),
+    color var(--fl-dur-fast),
+    box-shadow var(--fl-dur-fast);
+}
+.mm.switch {
+  cursor: pointer;
+}
+.mm.switch:hover {
+  background: var(--fl-strong-bg);
+  color: var(--fl-strong-fg);
+  box-shadow: var(--fl-shadow-strong-tile);
+}
+.mm.press {
+  animation: space-letter-press var(--fl-dur-state) var(--fl-ease-press);
+}
+@keyframes space-letter-press {
+  30% {
+    transform: scale(0.82);
+  }
+}
+.chip.home-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.space-tip {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  font-size: 12px;
+  color: var(--fl-text-primary);
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  animation: space-tip-in var(--fl-dur-fast) ease-out;
+}
+.space-tip .k {
+  font-size: 11px;
+  color: var(--fl-text-muted);
+}
+@keyframes space-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% + 2px));
+  }
+}
+/* New space (SPACE-05): the dialog's head, text and field (09 §8 dialogs). */
+.space-dialog {
+  width: 540px;
+}
+.space-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.space-dialog-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.space-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fl-text-highlight);
+}
+.space-dialog-sub {
+  font-family: var(--fl-font-mono);
+  font-size: 11.5px;
+  color: var(--fl-text-faint);
+}
+.space-dialog-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fl-text-secondary);
+}
+.space-field-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fl-text-primary);
+}
+.space-field {
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background: var(--fl-ground-well);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-chip);
+  color: var(--fl-text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  caret-color: var(--fl-accent);
+}
+.space-field:focus {
+  box-shadow: inset 0 0 0 1.5px var(--fl-accent);
+}
+.space-field-problem {
+  font-size: 12px;
+  color: var(--fl-text-highlight);
+}
