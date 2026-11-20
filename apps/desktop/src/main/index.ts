@@ -27,6 +27,7 @@ import {
   epochNow,
   type ListAction,
   type SidebarAction,
+  type ListActionOutcome as ListOutcome,
   type ListChange,
   type ListView,
   type PopupNotice,
@@ -992,6 +993,21 @@ async function start(): Promise<void> {
     if (hooks) hooks.opened.push(href);
     else void shell.openExternal(href);
   });
+  /**
+   * SPACE-07 (D-190): a list leaving Personal for a space leaves personal Google Drive sync as
+   * "Stop syncing on this PC" (SYNC-01): its file in Drive and the other devices' copies stay. A
+   * synced list that simply disappeared from Personal would read as deleted, and go to Drive's
+   * trash and every other device's Trash. Back in Personal it stays unsynced until turned on again.
+   */
+  const moveToSpaceKeepingSync = async (
+    id: string,
+    target: string,
+    now: Date,
+  ): Promise<ListOutcome> => {
+    if (sync && target !== 'personal' && workspace.spaceOfList(id) === 'personal')
+      await sync.act({ kind: 'stop', id, everywhere: false });
+    return workspace.moveToSpace(id, target, now);
+  };
   ipcMain.handle(Channels.mainListAction, (event, action: unknown) => {
     if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
     const request = action as ListAction;
@@ -1024,8 +1040,7 @@ async function start(): Promise<void> {
               : request.kind === 'deleteMany'
                 ? workspace.deleteLists(request.ids, now)
                 : request.kind === 'moveToSpace'
-                  ? // SPACE-07: into another space on this PC.
-                    workspace.moveToSpace(request.id, String(request.space), now)
+                  ? moveToSpaceKeepingSync(request.id, String(request.space), now)
                   : workspace.deleteList(request.id, now);
     return run
       .then((outcome) => {

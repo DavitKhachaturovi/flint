@@ -508,6 +508,52 @@ test('SYNC-02: a Drive folder that needs a newer Flint pauses sync with Update F
   await expect.poll(() => file('Groceries.md')).toContain('Batteries');
 });
 
+test('SPACE-07 (D-190): a synced list moved into a space stops syncing here; Drive and the other PCs keep it', async () => {
+  await writeFile(join(flint, 'Packing.md'), `${head('pack')}- [ ] Passport [id:: pppppp]\n`);
+  await expect(nav('Packing')).toBeVisible();
+  await syncMenu('Packing');
+  await syncNow();
+  expect(Object.keys(await drive())).toContain('Packing');
+  type Bridge = {
+    flintMain: {
+      newSpace(name: string): Promise<{ ok: boolean; space?: { id: string } } | null>;
+      listAction(action: object): Promise<{ ok: boolean } | null>;
+    };
+  };
+  const space = await main.evaluate(async () => {
+    const made = await (window as unknown as Bridge).flintMain.newSpace('Home');
+    return made?.space?.id ?? '';
+  });
+  expect(space).toMatch(/^s-/);
+  const moved = await main.evaluate(
+    (id) =>
+      (window as unknown as Bridge).flintMain.listAction({
+        kind: 'moveToSpace',
+        id: 'pack',
+        space: id,
+      }),
+    space,
+  );
+  expect(moved?.ok).toBe(true);
+  await syncNow();
+  // Still in Drive (not trashed), and never recorded as deleted for the other PCs.
+  expect(Object.keys(await drive())).toContain('Packing');
+  const removed = await app.evaluate(() => {
+    type File = { name: string };
+    const fake = (
+      globalThis as unknown as {
+        __flintE2E: {
+          syncDrive: { fileNamed(name: string): File | undefined; read(file: File): Uint8Array };
+        };
+      }
+    ).__flintE2E.syncDrive;
+    const file = fake.fileNamed('removed.json');
+    return file ? new TextDecoder().decode(fake.read(file)) : '';
+  });
+  expect(removed).not.toContain('"pack"');
+  expect(await readFile(join(flint, 'Spaces', 'Home', 'Packing.md'), 'utf8')).toContain('Passport');
+});
+
 test('Disconnect keeps everything here and in Drive', async () => {
   const before = await drive();
   await main.locator('.sidebar-foot .nav', { hasText: 'Settings' }).click();
