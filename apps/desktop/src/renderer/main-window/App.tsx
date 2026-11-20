@@ -452,16 +452,31 @@ function visibleRows(view: ListView | null, completedOpen: boolean): TaskRow[] {
 
 export function App(): ReactElement {
   const [lists, setLists] = useState<readonly ListSummary[]>([]);
-  /** LIST-05, LIST-06: the sidebar's groups, order, sort and folded groups (the current space's). */
-  const [sidebarView, setSidebarView] = useState<SidebarView | null>(null);
   /**
-   * SPACE-01, SPACE-02: the spaces (Personal first) and the one under the space line. With only
-   * Personal the sidebar looks as it always did ("Lists", no line, SPACE-01).
+   * SPACE-01, SPACE-02: the spaces (Personal first) and the one under the space line (D-190 Q21:
+   * the switcher always shows, Personal's too).
    */
   const [spaces, setSpaces] = useState<readonly SpaceView[]>([]);
   const [space, setSpaceState] = useState<string>(PERSONAL_SPACE);
   const spaceRef = useRef(space);
   spaceRef.current = space;
+  /**
+   * LIST-05, LIST-06: every space's sidebar (groups, order, sort, folded groups), kept ready
+   * (D-190 Q21: a switch asks for nothing); `sidebarView` is the current space's.
+   */
+  const [sidebars, setSidebars] = useState<Readonly<Record<string, SidebarView>>>({});
+  const sidebarsRef = useRef(sidebars);
+  sidebarsRef.current = sidebars;
+  const sidebarView: SidebarView | null = sidebars[space] ?? sidebars[PERSONAL_SPACE] ?? null;
+  /** The current space's sidebar changed here before the main process answers (a group folds). */
+  const setSidebarView = useCallback(
+    (update: (current: SidebarView | null) => SidebarView | null): void =>
+      setSidebars((all) => {
+        const next = update(all[spaceRef.current] ?? null);
+        return next ? { ...all, [spaceRef.current]: next } : all;
+      }),
+    [],
+  );
   /** SPACE-03: the space menu, open under the switcher; New space's dialog; the tile's pop. */
   const [spaceMenu, setSpaceMenu] = useState<DOMRect | null>(null);
   const [newSpace, setNewSpace] = useState(false);
@@ -734,12 +749,12 @@ export function App(): ReactElement {
     async (then?: () => void): Promise<void> => {
       const seq = ++refreshSeq.current;
       if (then) refreshThens.current.push(then);
-      const [nextLists, nextView, nextSidebar, nextTrash, nextSprint, nextSpaces] =
+      const [nextLists, nextView, nextSidebars, nextTrash, nextSprint, nextSpaces] =
         await Promise.all([
           window.flintMain.lists(),
           window.flintMain.view(listId),
-          // SPACE-02: the sidebar of the space under the line.
-          window.flintMain.sidebar(space),
+          // SPACE-03 (D-190 Q21): every space's sidebar, kept ready: a switch asks for nothing.
+          window.flintMain.sidebars(),
           window.flintMain.trash(),
           // FOCUS-02: the sprint, for Send to / Remove from Focus and the sidebar's count.
           listId === FOCUS_ID ? Promise.resolve(null) : window.flintMain.view(FOCUS_ID),
@@ -748,10 +763,13 @@ export function App(): ReactElement {
       if (seq !== refreshSeq.current) return;
       setSpaces(nextSpaces ?? []);
       // A space gone meanwhile (removed on disk): the line goes back to Personal.
-      if (space !== PERSONAL_SPACE && !(nextSpaces ?? []).some((each) => each.id === space)) {
+      const shown = spaceRef.current;
+      if (shown !== PERSONAL_SPACE && !(nextSpaces ?? []).some((each) => each.id === shown))
         setSpaceState(PERSONAL_SPACE);
-        return;
-      }
+      const nextSidebar =
+        nextSidebars?.[
+          (nextSpaces ?? []).some((each) => each.id === shown) ? shown : PERSONAL_SPACE
+        ] ?? null;
       const thens = refreshThens.current;
       refreshThens.current = [];
       setTrash(nextTrash);
@@ -765,10 +783,10 @@ export function App(): ReactElement {
       setLists(nextLists);
       setView(nextView);
       setSprint(listId === FOCUS_ID ? nextView : nextSprint);
-      setSidebarView(nextSidebar);
+      setSidebars(nextSidebars ?? {});
       for (const each of thens) each();
     },
-    [listId, motion, space],
+    [listId, motion],
   );
 
   useEffect(() => {
@@ -787,42 +805,26 @@ export function App(): ReactElement {
 
   const spacesRef = useRef(spaces);
   spacesRef.current = spaces;
-  /** The space's lists under the line (SPACE-03's switch slides them). */
-  const spaceStage = useRef<HTMLDivElement>(null);
   /** SPACE-03 (Proposed): the list last opened in each space, opened again when switching back. */
   const lastInSpace = useRef(new Map<string, string>());
   /**
-   * SPACE-03: switches the sidebar to a space. The new space's sidebar is read first, so its rows
-   * arrive together: the old ones leave as a copy sliding away while the new slide in from the
-   * other side (the direction from the spaces' order). `pop`: a letter's click pops the tile.
+   * SPACE-03 (D-190 Q21): switches the sidebar to a space at once: every space's sidebar is
+   * already here, so nothing is asked for and nothing refreshes; the new rows slide in briefly
+   * from the side of the spaces' order (no leaving copy). `pop`: a letter's click pops the tile.
+   * A space made a moment ago (not yet in the kept sidebars) is read first.
    */
   const switchSpace = useCallback(async (id: string, pop = false): Promise<void> => {
     const from = spaceRef.current;
     if (pop) setTilePop((count) => count + 1);
     if (id === from) return;
-    const next = await window.flintMain.sidebar(id);
-    if (!next) return;
-    const order = spacesRef.current.map((each) => each.id);
-    const dx = order.indexOf(id) >= order.indexOf(from) ? 12 : -12;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // A copy still leaving from an earlier switch goes now (a hidden window may hold its timers).
-    for (const old of spaceStage.current?.querySelectorAll(':scope > .space-body.out') ?? [])
-      old.remove();
-    const body = spaceStage.current?.querySelector<HTMLElement>(':scope > .space-body:not(.out)');
-    if (body && !reduce) {
-      const copy = body.cloneNode(true) as HTMLElement;
-      copy.classList.remove('in');
-      copy.classList.add('out');
-      copy.setAttribute('aria-hidden', 'true');
-      copy.inert = true;
-      copy.style.setProperty('--dx', `${-dx}px`);
-      copy.addEventListener('animationend', () => copy.remove(), { once: true });
-      // A hidden or covered window may not run animations: the copy goes after its 180 ms anyway.
-      window.setTimeout(() => copy.remove(), 260);
-      spaceStage.current?.appendChild(copy);
+    if (!sidebarsRef.current[id]) {
+      const all = await window.flintMain.sidebars();
+      if (!all?.[id]) return;
+      setSidebars(all);
     }
+    const order = spacesRef.current.map((each) => each.id);
+    const dx = order.indexOf(id) >= order.indexOf(from) ? 8 : -8;
     setSidebarFocus(null);
-    setSidebarView(next);
     setSpaceSlide((now) => ({ key: (now?.key ?? 0) + 1, dx }));
     setSpaceState(id);
   }, []);
@@ -856,12 +858,14 @@ export function App(): ReactElement {
       }
       setTilePop((count) => count + 1);
       showToast(outcome.label, true);
-      if (list.id === listIdRef.current) void switchSpace(target);
+      // An open list takes the line along: the sidebar follows it into its new space (and back
+      // on Undo, D-190 Q21).
     },
-    [showToast, switchSpace],
+    [showToast],
   );
-  // Only when the open list changes (a manual switch must not snap back at the next refresh); a
-  // list that only now appears in `lists` (just made) is followed once it does.
+  // Only when the open list, or the space it is in, changes: a manual switch must not snap back at
+  // the next refresh, but an Undo or Redo that moves the open list to another space takes the line
+  // along (D-190 Q21). A list that only now appears in `lists` (just made) is followed once it does.
   const followed = useRef<string | null>(null);
   // A new open list (Today and back to the same list too) is followed again.
   useEffect(() => {
@@ -871,10 +875,12 @@ export function App(): ReactElement {
     const open = lists.find((list) => list.id === listId);
     // SPACE-01: a picture or file added now goes to the open list's space (none for Today, Focus).
     setAttachTarget(open ? open.id : null);
-    if (!open || followed.current === listId) return;
-    followed.current = listId;
-    if (open.inbox || open.quick) return;
+    if (!open) return;
     const its = open.space ?? PERSONAL_SPACE;
+    const key = `${listId}|${its}`;
+    if (followed.current === key) return;
+    followed.current = key;
+    if (open.inbox || open.quick) return;
     lastInSpace.current.set(its, open.id);
     if (its !== spaceRef.current) void switchSpace(its);
   }, [listId, lists, switchSpace]);
@@ -5888,9 +5894,9 @@ export function App(): ReactElement {
               </>
             );
             const current = spaces.find((each) => each.id === space);
-            // SPACE-01: with only Personal, "Lists" as always; with a second space, the line and
-            // the switcher (mockup 18 concept 1).
-            return spaces.length > 1 && current ? (
+            // SPACE-01 (D-190 Q21): the line and the switcher always (mockup 18 concept 1), so
+            // spaces are found; "Lists" only for the moment before the spaces have loaded.
+            return current ? (
               <>
                 <div
                   className="space-line"
@@ -5913,7 +5919,7 @@ export function App(): ReactElement {
               </div>
             );
           })()}
-          <div className="space-stage" ref={spaceStage}>
+          <div className="space-stage">
             <div
               className={spaceSlide ? 'space-body in' : 'space-body'}
               key={spaceSlide?.key ?? 0}

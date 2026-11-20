@@ -1,9 +1,10 @@
 /**
- * The space's letter (SPACE-03, D-189 Q4; docs/09 §8): on a row from a space other than Personal,
- * outside the sidebar (Today's chips, reminder cards, the `##` menu, mini's picker). Hover (250 ms)
- * shows the space's name; with `onSwitch` (the main window) it also says "Click to switch to …",
- * and a click presses the letter in and switches the sidebar there (the rest of the chip still
- * opens the list, D-93). In its own module so mini mode and the capture popup can use it.
+ * The space's letter (SPACE-03, D-189 Q4; docs/09 §8) on a row from a space other than Personal,
+ * outside the sidebar (Today's chips, reminder cards, Up next, Trash, the `##` menu, mini's
+ * picker), and the tooltip it shares with Today's list chip (D-190 Q21): one style, always one
+ * short line, after 250 ms of hover ("Open Groceries", "Switch to Home"). With `onSwitch` (the
+ * main window) a click presses the letter in and switches the sidebar to that space; the rest of
+ * the chip still opens the list (D-93). In its own module so mini mode and the popup can use it.
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,34 +15,56 @@ export function spaceLetter(name: string): string {
   return first.toLocaleUpperCase();
 }
 
+/**
+ * D-190 Q21: the tooltip of the clickable list chip and of the letter: shown 250 ms after the
+ * pointer arrives, centred 8 px above the element, one line. `show(element)` / `hide()`.
+ */
+export function useHoverTip(label: string): {
+  readonly show: (element: Element) => void;
+  readonly hide: () => void;
+  readonly tip: ReactElement | null;
+} {
+  const [at, setAt] = useState<DOMRect | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const hide = useCallback(() => {
+    window.clearTimeout(timer.current);
+    setAt(null);
+  }, []);
+  const show = useCallback((element: Element) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setAt(element.getBoundingClientRect()), 250);
+  }, []);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const tip = at
+    ? createPortal(
+        <span
+          className="space-tip"
+          role="tooltip"
+          style={{ left: at.left + at.width / 2, top: at.top - 8 }}
+        >
+          {label}
+        </span>,
+        document.body,
+      )
+    : null;
+  return { show, hide, tip };
+}
+
 export function SpaceLetter(props: {
   readonly space: { readonly id: string; readonly name: string };
   readonly onSwitch?: ((id: string) => void) | undefined;
 }): ReactElement {
   const { space, onSwitch } = props;
-  const [tip, setTip] = useState<DOMRect | null>(null);
   const [pressed, setPressed] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  const self = useRef<HTMLSpanElement>(null);
-  const hide = useCallback(() => {
-    window.clearTimeout(timer.current);
-    setTip(null);
-  }, []);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const { show, hide, tip } = useHoverTip(onSwitch ? `Switch to ${space.name}` : space.name);
   return (
     <>
       <span
-        ref={self}
         className={`mm${onSwitch ? ' switch' : ''}${pressed ? ' press' : ''}`}
         data-space={space.id}
-        aria-label={onSwitch ? `${space.name}: click to switch to it` : space.name}
+        aria-label={onSwitch ? `Switch to ${space.name}` : space.name}
         role={onSwitch ? 'button' : undefined}
-        onMouseEnter={() => {
-          window.clearTimeout(timer.current);
-          timer.current = window.setTimeout(() => {
-            if (self.current) setTip(self.current.getBoundingClientRect());
-          }, 250);
-        }}
+        onMouseEnter={(event) => show(event.currentTarget)}
         onMouseLeave={hide}
         onMouseDown={(event) => {
           if (onSwitch) event.stopPropagation();
@@ -59,18 +82,7 @@ export function SpaceLetter(props: {
       >
         {spaceLetter(space.name)}
       </span>
-      {tip &&
-        createPortal(
-          <span
-            className="space-tip"
-            role="tooltip"
-            style={{ left: tip.left + tip.width / 2, top: tip.top - 8 }}
-          >
-            <span>{space.name}</span>
-            {onSwitch && <span className="k">Click to switch to {space.name}</span>}
-          </span>,
-          document.body,
-        )}
+      {tip}
     </>
   );
 }

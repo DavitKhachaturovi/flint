@@ -20,7 +20,7 @@ import {
 import type { Ghost } from './ghosts.js';
 import { parseCapture, type ListInfo } from '@flint/core/shorthand';
 import { usePresence } from './presence.js';
-import { SpaceLetter } from './SpaceLetter.js';
+import { SpaceLetter, useHoverTip } from './SpaceLetter.js';
 
 export interface Point {
   readonly x: number;
@@ -462,24 +462,54 @@ export function Row(
         )}
         {/* TODAY-01 (M6): in Today, the task's home list, subtly, at the end (03 §4). */}
         {!compact && task.home && (!task.done || props.trailing) && (
-          <button
-            type="button"
-            className={task.done ? 'chip home-list done' : 'chip home-list'}
-            title={`Open ${task.home.listName}`}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onHome(task);
-            }}
-          >
-            {/* SPACE-03 (D-189 Q4): a list of another space carries its letter. */}
-            {task.home.space && <SpaceLetter space={task.home.space} onSwitch={props.onSpace} />}
-            {task.home.listName}
-          </button>
+          <HomeChip
+            home={task.home}
+            done={task.done}
+            onOpen={() => props.onHome(task)}
+            onSpace={props.onSpace}
+          />
         )}
         {props.trailing}
       </span>
     </div>
+  );
+}
+
+/**
+ * TODAY-01, D-93: Today's chip of a task's home list (it opens the list), with the space's letter
+ * when the list is in another space (SPACE-03). D-190 Q21: the custom one-line tooltip ("Open
+ * Groceries"), hidden while the pointer is on the letter, which has its own ("Switch to Home").
+ */
+function HomeChip(props: {
+  readonly home: NonNullable<TaskRow['home']>;
+  readonly done: boolean;
+  readonly onOpen: () => void;
+  readonly onSpace?: ((space: string) => void) | undefined;
+}): ReactElement {
+  const { home } = props;
+  const { show, hide, tip } = useHoverTip(`Open ${home.listName}`);
+  return (
+    <button
+      type="button"
+      className={props.done ? 'chip home-list done' : 'chip home-list'}
+      aria-label={`Open ${home.listName}`}
+      onMouseDown={(event) => event.stopPropagation()}
+      onMouseOver={(event) => {
+        if ((event.target as Element).closest('.mm')) hide();
+        else show(event.currentTarget);
+      }}
+      onMouseLeave={hide}
+      onClick={(event) => {
+        event.stopPropagation();
+        hide();
+        props.onOpen();
+      }}
+    >
+      {/* SPACE-03 (D-189 Q4): a list of another space carries its letter. */}
+      {home.space && <SpaceLetter space={home.space} onSwitch={props.onSpace} />}
+      {home.listName}
+      {tip}
+    </button>
   );
 }
 

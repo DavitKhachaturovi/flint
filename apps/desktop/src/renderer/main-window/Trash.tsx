@@ -4,6 +4,7 @@ import { BodyBlock } from './Body.js';
 import { BackIcon, CheckIcon, CloseIcon, ListIcon, NoteIcon, TaskIcon } from './icons.js';
 import { usePresence } from '../ui/presence.js';
 import { durationMs } from '../ui/motion.js';
+import { SpaceLetter } from '../ui/SpaceLetter.js';
 
 /**
  * The Trash view (DATA-02, TASK-06, D-97): what was deleted, by day, newest first, with Restore
@@ -131,6 +132,8 @@ function DeletedRows(props: {
               <ListIcon />
             )}
           </span>
+          {/* SPACE-04 (D-190 Q21): an item from another space: its letter by the icon. */}
+          {item.space && <SpaceLetter space={item.space} />}
           <span className="trash-title">{item.title}</span>
           <span className="trash-meta">
             {item.kind === 'task'

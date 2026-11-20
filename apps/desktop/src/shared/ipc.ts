@@ -48,6 +48,8 @@ export const Channels = {
   mainSidebarAction: 'main:sidebar-action',
   /** Main window → main: the spaces, and a new one "On this PC" (SPACE-01, SPACE-05). */
   mainSpaces: 'main:spaces',
+  /** SPACE-03 (D-190 Q21): every space's sidebar at once (a switch then needs no request). */
+  mainSidebars: 'main:sidebars',
   mainNewSpace: 'main:new-space',
 
   mainChange: 'main:change',
@@ -481,6 +483,8 @@ export interface TrashItem {
   readonly from: string | null;
   /** When it was deleted, `YYYY-MM-DDTHH:MM`. */
   readonly deleted: string;
+  /** SPACE-04 (D-190 Q21): the space it was in when that isn't Personal (the letter by its icon). */
+  readonly space?: { readonly id: string; readonly name: string };
 }
 
 /** TASK-06, D-97: one list's auto-archived completed tasks, in the Trash view's Archived tab. */

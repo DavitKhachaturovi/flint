@@ -695,6 +695,25 @@ export class Workspace {
     };
   }
 
+  /**
+   * SPACE-03 (D-190 Q21): every space's sidebar at once, by space ID (`personal` for the Flint
+   * folder), so the window switches spaces at once, without asking for the new one first.
+   */
+  sidebars(): Record<string, SidebarView> {
+    const today = this.todayView(new Date()).open;
+    const out: Record<string, SidebarView> = {};
+    for (const space of this.allSpaces()) {
+      const sort = this.sortOf(space);
+      out[space ?? PERSONAL] = {
+        sort,
+        collapsed: this.collapsedOf(space),
+        items: arrange(this.sidebarFileOf(space), this.sidebarLists(space), sort),
+        today,
+      };
+    }
+    return out;
+  }
+
   /** AGENT-01: a space's sidebar in its manual order (what agents' positions are about). */
   sidebarManual(space?: string): SidebarView['items'] {
     return arrange(this.sidebarFileOf(space), this.sidebarLists(space), 'manual');
@@ -2610,7 +2629,9 @@ export class Workspace {
       for (const entry of await readTrash(this.folderOf(space))) found.push({ space, entry });
     found.sort((a, b) => b.entry.at.getTime() - a.entry.at.getTime());
     for (const { space, entry } of found) {
-      const spaceName = space === undefined ? null : (this.others.get(space)?.name ?? null);
+      // D-190 Q21: a space's item carries its space (the letter by its icon), not extra text.
+      const state = space === undefined ? undefined : this.others.get(space);
+      const inSpace = state ? { space: { id: state.id, name: state.name } } : {};
       const id = this.trashKey(space, entry.name);
       const when = formatLocalDateTime(fromDate(entry.at)).slice(0, 16);
       if (entry.kind === 'task') {
@@ -2630,16 +2651,18 @@ export class Workspace {
           id,
           kind: 'task',
           title: taskLabel(titlePlain(task.line.title.trim()), getBody(task)),
-          from: spaceName ? (from ? `${from} · ${spaceName}` : spaceName) : from,
+          from,
           deleted: when,
+          ...inSpace,
         });
       } else {
         deleted.push({
           id,
           kind: /^mode:\s*note\s*$/m.test(entry.text) ? 'note' : 'list',
           title: trashedListName(entry.name),
-          from: spaceName,
+          from: null,
           deleted: when,
+          ...inSpace,
         });
       }
     }

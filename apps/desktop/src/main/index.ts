@@ -1251,6 +1251,9 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.mainSidebar, (event, space: unknown) =>
     owns(event.sender) ? workspace.sidebar(spaceArg(space)) : null,
   );
+  ipcMain.handle(Channels.mainSidebars, (event) =>
+    owns(event.sender) ? workspace.sidebars() : null,
+  );
   // SPACE-01, SPACE-05 (D-190 Q14): the spaces, and a new one "On this PC".
   ipcMain.handle(Channels.mainSpaces, (event) =>
     owns(event.sender)

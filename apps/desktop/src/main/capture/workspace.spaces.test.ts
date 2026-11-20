@@ -171,7 +171,7 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     expect((await workspace.deleteList('gro1', now)).ok).toBe(true);
     const [item] = (await workspace.trashView()).deleted;
     expect(item?.id).toMatch(/^s-home1\|/);
-    expect(item?.from).toBe('Home');
+    expect(item?.space).toEqual({ id: 's-home1', name: 'Home' });
     expect(item?.title).toBe('Groceries');
     // Its file is in the space's own Trash, never Personal's.
     expect((await readdir(join(space, '.flint', 'trash'))).length).toBe(1);
@@ -193,7 +193,8 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     const workspace = await open();
     await workspace.change('gro1', { kind: 'delete', key: 't7g7' }, now);
     const [item] = (await workspace.trashView()).deleted;
-    expect(item?.from).toBe('Groceries · Home');
+    expect(item?.from).toBe('Groceries');
+    expect(item?.space).toEqual({ id: 's-home1', name: 'Home' });
     expect((await readdir(join(space, '.flint', 'trash'))).length).toBe(1);
     await workspace.restoreFromTrash(item?.id ?? '', now);
     expect(await readFile(join(space, 'Groceries.md'), 'utf8')).toContain('eggs');

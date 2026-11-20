@@ -69,7 +69,7 @@ test.beforeAll(async () => {
     window.showInactive();
   });
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Errands' }),
   ).toBeVisible();
 });
 
@@ -80,10 +80,11 @@ test.afterAll(async () => {
 
 const switcherName = () => main.locator('.space-btn .space-name');
 
-test('only Personal: the sidebar is as it always was (SPACE-01)', async () => {
-  await expect(main.locator('.lists-label')).toBeVisible();
-  await expect(main.locator('.space-line')).toHaveCount(0);
-  await expect(main.locator('.space-btn')).toHaveCount(0);
+test('only Personal: the switcher shows anyway, so spaces are found (SPACE-01, D-190 Q21)', async () => {
+  await expect(main.locator('.space-line')).toBeVisible();
+  await expect(switcherName()).toHaveText('Personal');
+  await expect(main.locator('.lists-label')).toHaveCount(0);
+  await expect(main.locator('.space-head .add-list')).toBeVisible();
 });
 
 test('New space from Ctrl+Shift+S: its folder, the line and the switcher appear (SPACE-03, SPACE-05)', async () => {
@@ -107,7 +108,7 @@ test('New space from Ctrl+Shift+S: its folder, the line and the switcher appear 
   expect(json.id).toMatch(/^s-[a-z0-9]+$/);
   // Personal's lists are not under the line now.
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Errands' }),
   ).toHaveCount(0);
 });
 
@@ -119,7 +120,7 @@ test('a list made in a space lives in its folder (SPACE-02)', async () => {
   await name.fill('Groceries');
   await name.press('Enter');
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Groceries' }),
   ).toBeVisible();
   await expect
     .poll(() => readFile(join(flint, 'Spaces', 'Home', 'Groceries.md'), 'utf8').catch(() => ''))
@@ -133,16 +134,16 @@ test('1–9 in the space menu switch the sidebar; Today and Inbox stay above the
   await expect(main.locator('.space-menu')).toHaveCount(0);
   await expect(switcherName()).toHaveText('Personal');
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Errands' }),
   ).toBeVisible();
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Groceries' }),
   ).toHaveCount(0);
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Today' }),
   ).toBeVisible();
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Inbox' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Inbox' }),
   ).toBeVisible();
 });
 
@@ -150,7 +151,7 @@ test('Today’s chip of a space’s list carries its letter; its click switches 
   const groceries = join(flint, 'Spaces', 'Home', 'Groceries.md');
   const text = await readFile(groceries, 'utf8');
   await writeFile(groceries, `${text.trimEnd()}\n- [ ] Eggs [pinned:: true] [id:: eg01]\n`);
-  await main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }).click();
+  await main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Today' }).click();
   const chip = main.locator('.chip.home-list', { hasText: 'Groceries' });
   await expect(chip).toBeVisible();
   const letter = chip.locator('.mm');
@@ -160,7 +161,7 @@ test('Today’s chip of a space’s list carries its letter; its click switches 
   // The page stays on Today: its chip is still there, the list didn't open.
   await expect(chip).toBeVisible();
   await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Groceries' }),
+    main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Groceries' }),
   ).toBeVisible();
 });
 
@@ -168,34 +169,42 @@ test('a list of another space opened from Today switches the line to its space (
   await main.keyboard.press('Control+Shift+S');
   await main.keyboard.press('1');
   await expect(switcherName()).toHaveText('Personal');
-  await main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Today' }).click();
+  await main.locator('.space-body .nav, .sidebar > .nav', { hasText: 'Today' }).click();
   await main
     .locator('.chip.home-list', { hasText: 'Groceries' })
     .click({ position: { x: 40, y: 6 } });
   await expect(switcherName()).toHaveText('Home');
 });
 
-test('Move to space: a list goes into another space from its menu; Undo brings it back (SPACE-07)', async () => {
+test('Move to space: the open list goes into another space, the line follows; Undo takes both back (SPACE-07, D-190 Q21)', async () => {
   await main.keyboard.press('Control+Shift+S');
   await main.keyboard.press('1');
   await expect(switcherName()).toHaveText('Personal');
-  await main
-    .locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' })
-    .click({ button: 'right' });
+  const errands = main.locator('.space-body .nav', { hasText: 'Errands' });
+  await errands.click();
+  await errands.click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Move to space', { exact: true }).hover();
   await main.locator('.fl-submenu').getByText('Home').click();
-  await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
-  ).toHaveCount(0);
+  // The open list takes the line along to its new space.
+  await expect(switcherName()).toHaveText('Home');
+  await expect(errands).toBeVisible();
   await expect
     .poll(() => readFile(join(flint, 'Spaces', 'Home', 'Errands.md'), 'utf8').catch(() => ''))
     .toContain('Post the letter');
-  // Undo (Ctrl+Z) moves it back into Personal.
+  // Undo (Ctrl+Z) moves it back into Personal, and the line follows it back.
   await main.keyboard.press('Control+Z');
-  await expect(
-    main.locator('.space-body:not(.out) .nav, .sidebar > .nav', { hasText: 'Errands' }),
-  ).toBeVisible();
+  await expect(switcherName()).toHaveText('Personal');
+  await expect(errands).toBeVisible();
   await expect
     .poll(() => readFile(join(flint, 'Errands.md'), 'utf8').catch(() => ''))
     .toContain('Post the letter');
+});
+
+test('the letter’s and the chip’s tooltips: one short line each (D-190 Q21)', async () => {
+  await main.locator('.sidebar > .nav', { hasText: 'Today' }).click();
+  const chip = main.locator('.chip.home-list', { hasText: 'Groceries' });
+  await chip.locator('.mm').hover();
+  await expect(main.locator('.space-tip')).toHaveText('Switch to Home');
+  await chip.hover({ position: { x: 60, y: 6 } });
+  await expect(main.locator('.space-tip')).toHaveText('Open Groceries');
 });

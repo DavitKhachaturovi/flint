@@ -474,6 +474,10 @@ export const main = {
   sidebarAction(action: SidebarAction, space?: string): Promise<SidebarOutcome | null> {
     return invoke(Channels.mainSidebarAction, action, space) as Promise<SidebarOutcome | null>;
   },
+  /** SPACE-03 (D-190 Q21): every space's sidebar by space ID (`personal` for the Flint folder). */
+  sidebars(): Promise<Readonly<Record<string, SidebarView>> | null> {
+    return invoke(Channels.mainSidebars) as Promise<Readonly<Record<string, SidebarView>> | null>;
+  },
   /** SPACE-01: the spaces, Personal first. */
   spaces(): Promise<readonly SpaceView[] | null> {
     return invoke(Channels.mainSpaces) as Promise<readonly SpaceView[] | null>;

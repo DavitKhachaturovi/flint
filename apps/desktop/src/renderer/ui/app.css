@@ -4781,6 +4781,11 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-muted);
 }
 
+/* SPACE-04 (D-190 Q21): an item from another space: its letter right by the icon (6 px). */
+.trash-row .mm {
+  margin-left: -4px;
+}
+
 .trash-title {
   min-width: 0;
   overflow: hidden;
@@ -9379,39 +9384,26 @@ body[data-tour-step='5'] .main .row .pin-hover {
 .space-head .sync-button {
   flex: 0 0 auto;
 }
-/* The space's lists: a switch slides the old ones 12 px away and the new ones in from the other side. */
+/* The space's lists. D-190 Q21: a switch is instant; only the new rows slide in briefly from the
+   side of the spaces' order (no leaving copy). */
 .space-stage {
   position: relative;
   display: flex;
   flex-direction: column;
 }
-/* The sidebar's own row gap (3 px), so the wrapper changes nothing with only Personal. */
+/* The sidebar's own row gap (3 px), so the wrapper changes nothing. */
 .space-body {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 .space-body.in {
-  animation: space-body-in var(--fl-dur-page) cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-.space-body.out {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  pointer-events: none;
-  animation: space-body-out 180ms ease forwards;
+  animation: space-body-in var(--fl-dur-state) cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 @keyframes space-body-in {
   from {
     opacity: 0;
-    transform: translateX(var(--dx, 12px));
-  }
-}
-@keyframes space-body-out {
-  to {
-    opacity: 0;
-    transform: translateX(var(--dx, -12px));
+    transform: translateX(var(--dx, 8px));
   }
 }
 .empty-space {
@@ -9556,10 +9548,15 @@ body[data-tour-step='5'] .main .row .pin-hover {
 .mm.switch {
   cursor: pointer;
 }
+/* D-190 Q21: the list chip's quiet hover, never the strong white fill. */
 .mm.switch:hover {
-  background: var(--fl-strong-bg);
-  color: var(--fl-strong-fg);
-  box-shadow: var(--fl-shadow-strong-tile);
+  background: var(--fl-ground-hover);
+  box-shadow: inset 0 0 0 1px var(--fl-edge-float);
+}
+/* D-190 Q21: a capital centred on its own height in the square, at every size. */
+.mm,
+.stile {
+  text-box: trim-both cap alphabetic;
 }
 .mm.press {
   animation: space-letter-press var(--fl-dur-state) var(--fl-ease-press);
