@@ -124,6 +124,12 @@ export interface LocalSide {
    * the next one, moments later, takes it, so a merge never lands under unsaved typing.
    */
   busy?(listId: string): boolean;
+  /**
+   * SPACE-07 (D-190): a list that lives outside the synced folder here (in another space). It
+   * never syncs on this PC, whatever the mode or choice: never downloaded, written or trashed
+   * here; a list synced before is only forgotten (Drive and the other devices keep it).
+   */
+  elsewhere?(listId: string): boolean;
   read(listId: string): Promise<string | null>;
   /** Writes a list or note (creating it as `name`, or a free variant, when new); returns its name. */
   write(listId: string, text: string, name: string): Promise<string>;

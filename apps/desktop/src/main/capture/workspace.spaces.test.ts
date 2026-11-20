@@ -387,6 +387,36 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     await readFile(join(space, 'attachments', 'c.png'));
   });
 
+  it('SPACE-07: personal sync never reaches a space’s list; a refused move is known first; Undo/Redo out of Personal are marked', async () => {
+    await writeFile(join(folder, 'Errands.md'), `${header('err1')}- [ ] milk [id:: t1a1]\n`);
+    await writeFile(join(folder, 'Groceries.md'), header('gro9'));
+    await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    const workspace = await open();
+    expect(workspace.syncPath('err1')).toBe(join(folder, 'Errands.md'));
+    expect(workspace.syncPath('gro1')).toBeNull();
+    expect(workspace.inOtherSpace('gro1')).toBe(true);
+    expect(workspace.inOtherSpace('err1')).toBe(false);
+    expect(workspace.moveToSpaceProblem('gro9', 's-home1')).toBe('Home has a list named Groceries');
+    expect(workspace.moveToSpaceProblem('inbox', 's-home1')).toBe('Inbox stays in Personal');
+    expect(workspace.moveToSpaceProblem('err1', 's-home1')).toBeNull();
+    // Into Home: its Undo brings it back (not out of Personal), the Redo takes it out again.
+    await workspace.moveToSpace('err1', 's-home1', now);
+    expect(workspace.inOtherSpace('err1')).toBe(true);
+    expect(workspace.syncPath('err1')).toBeNull();
+    expect(workspace.leavesPersonal('undo')).toBeUndefined();
+    await workspace.undoLast(now);
+    expect(workspace.syncPath('err1')).toBe(join(folder, 'Errands.md'));
+    expect(workspace.leavesPersonal('redo')).toBe('err1');
+    // A space's list moved into Personal: its Undo takes it out of Personal.
+    expect(workspace.moveToSpaceProblem('gro1', PERSONAL)).toBe(
+      'Personal has a list named Groceries',
+    );
+    await writeFile(join(folder, 'Spaces', 'Home', 'Repairs.md'), header('rep1'));
+    await workspace.fileChanged(join(folder, 'Spaces', 'Home', 'Repairs.md'));
+    expect((await workspace.moveToSpace('rep1', PERSONAL, now)).ok).toBe(true);
+    expect(workspace.leavesPersonal('undo')).toBe('rep1');
+  });
+
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {
     const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
     const workspace = await open();

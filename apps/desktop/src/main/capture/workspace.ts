@@ -283,6 +283,11 @@ const SNOOZE_MS = 10 * 60_000;
 interface UndoEntry {
   readonly label: string;
   readonly run: (now: Date) => Promise<UndoEntry | null>;
+  /**
+   * SPACE-07 (D-190): running it takes this list out of Personal (Move to space's Undo or Redo):
+   * personal sync stops for it first, outside the workspace's queue (`leavesPersonal`).
+   */
+  readonly leavesPersonal?: string;
 }
 
 /** What an operation step also does to files: a created list, a deleted task's trash file. */
@@ -1781,26 +1786,46 @@ export class Workspace {
     }
   }
 
+  /**
+   * SPACE-07: why Move to space would refuse this move (null: it would move it). Asked before
+   * personal sync is stopped for the list, so a refused move leaves its syncing as it was.
+   */
+  moveToSpaceProblem(id: string, target: string): string | null {
+    const list = this.find(id);
+    if (!list) return 'That list is gone';
+    if (list.entry.id === INBOX_ID) return 'Inbox stays in Personal';
+    if (this.isQuick(list)) return 'Keep it as a note first';
+    if (list.entry.id === null) return 'Edit it once in Flint first, so it has its own ID';
+    const to = this.spaceKey(target);
+    if (target !== PERSONAL && to === undefined) return 'That space is gone';
+    if (to === list.entry.space) return null;
+    const spaceName = to === undefined ? 'Personal' : (this.others.get(to)?.name ?? 'the space');
+    if (this.sameName(list.entry.name, list, to ?? PERSONAL))
+      return `${spaceName} has a list named ${list.entry.name}`;
+    return null;
+  }
+
   moveToSpace(id: string, target: string, now: Date): Promise<ListOutcome> {
     return this.serial(async () => {
       void now;
+      const problem = this.moveToSpaceProblem(id, target);
+      if (problem !== null) return { ok: false, problem };
       const list = this.find(id);
       if (!list) return { ok: false, problem: 'That list is gone' };
-      if (list.entry.id === INBOX_ID) return { ok: false, problem: 'Inbox stays in Personal' };
-      if (this.isQuick(list)) return { ok: false, problem: 'Keep it as a note first' };
-      if (list.entry.id === null)
-        return { ok: false, problem: 'Edit it once in Flint first, so it has its own ID' };
       const to = this.spaceKey(target);
-      if (target !== PERSONAL && to === undefined)
-        return { ok: false, problem: 'That space is gone' };
       const from = list.entry.space;
       if (to === from) return { ok: true, listId: id, label: '' };
       const spaceName = to === undefined ? 'Personal' : (this.others.get(to)?.name ?? 'the space');
-      if (this.sameName(list.entry.name, list, to))
-        return { ok: false, problem: `${spaceName} has a list named ${list.entry.name}` };
       await this.carryAttachments(serializeDocument(list.file.document), from, to);
       const move = async (loaded: Loaded, space: string | undefined): Promise<void> => {
         const path = join(this.folderOf(space), basename(loaded.entry.path));
+        // Never onto another file (rename replaces it on Windows): a file of that name that the
+        // name check missed (not a list, made meanwhile) stops the move instead.
+        const taken = await stat(path).then(
+          () => true,
+          () => false,
+        );
+        if (taken) throw new Error(`a file named ${basename(path)} is already there`);
         await rename(loaded.entry.path, path);
         const { space: _old, ...rest } = loaded.entry;
         void _old;
@@ -1811,10 +1836,14 @@ export class Workspace {
       const label = `Moved to ${spaceName}`;
       const step = (back: string | undefined, forth: string | undefined): UndoEntry => ({
         label,
+        // Moving it back to `back` takes it out of Personal: sync stops for it first (SPACE-07).
+        ...(forth === undefined && back !== undefined && { leavesPersonal: id }),
         run: async () => {
           const current = this.find(id);
           if (!current || current.entry.space !== forth) return null;
-          if (this.sameName(current.entry.name, current, back)) return null;
+          // The space it goes back to was removed meanwhile: refused (never Personal's folder).
+          if (back !== undefined && this.spaceKey(back) === undefined) return null;
+          if (this.sameName(current.entry.name, current, back ?? PERSONAL)) return null;
           await move(current, back);
           return step(forth, back);
         },
@@ -3311,6 +3340,14 @@ export class Workspace {
   }
 
   /** Undoes the newest change made in the main window; resolves to what was undone. */
+  /**
+   * SPACE-07: the list the next Undo (or Redo) would take out of Personal, if it is a Move to
+   * space step that does; the caller stops personal sync for it first.
+   */
+  leavesPersonal(which: 'undo' | 'redo'): string | undefined {
+    return (which === 'undo' ? this.undoStack : this.redoStack).at(-1)?.leavesPersonal;
+  }
+
   undoLast(now: Date): Promise<string | null> {
     return this.serial(() => this.step(this.undoStack, this.redoStack, now));
   }
@@ -3811,7 +3848,20 @@ export class Workspace {
 
   /** SYNC-01: a list's file, by ID. */
   syncPath(id: string): string | null {
-    return this.find(id)?.file.path ?? null;
+    // SPACE-07 (D-190): personal sync reads, writes and renames Personal's lists only.
+    const list = this.find(id);
+    return list && list.entry.space === undefined ? list.file.path : null;
+  }
+
+  /** SPACE-07: a list living in a space other than Personal (personal sync never touches it). */
+  inOtherSpace(id: string): boolean {
+    return this.lists.some(
+      ({ entry }) =>
+        entry.space !== undefined &&
+        // Its own ID differing settles it without the lookup (sync asks this per list, per round).
+        (entry.id === null || entry.id === id || id.startsWith('file:')) &&
+        this.listId(entry) === id,
+    );
   }
 
   private find(id: string): Loaded | undefined {

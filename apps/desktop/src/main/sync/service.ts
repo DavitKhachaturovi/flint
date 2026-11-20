@@ -366,6 +366,59 @@ export class SyncService {
     await this.options.store.writeState(this.state);
   }
 
+  /** Stop syncing a list or group (here, or everywhere), saved; false when not connected. */
+  private async stopNow(id: string, everywhere: boolean): Promise<boolean> {
+    if (!this.engine) return false;
+    const groups = await this.options.groups();
+    this.engine.stop(
+      [id],
+      everywhere,
+      (group) => groups.find((each) => each.id === group)?.lists ?? [],
+    );
+    // Stopped here: no longer counted as synced at once.
+    for (const each of [id, ...(groups.find((group) => group.id === id)?.lists ?? [])]) {
+      if (!everywhere) delete this.state.items[each];
+    }
+    await this.save();
+    this.emit();
+    return true;
+  }
+
+  /**
+   * SPACE-07 (D-190): before a list's file leaves Personal (Move to space), syncing stops for it on
+   * this PC, so the next round never reads it as deleted (Drive and the other devices keep it).
+   * Resolves once no round that may have read it before is still running (one already under way
+   * finishes first: it must not read or write the file mid-move) and the stop is saved; it starts
+   * no round of its own (the caller asks for one after the move, without waiting). Saved again
+   * after that round: its own state write may have begun before the stop and landed after it, and
+   * a crash then would bring the list back as synced and missing (the review of preview 3).
+   */
+  async stopHereBeforeMove(id: string): Promise<boolean> {
+    if (!this.engine) return false;
+    // Whether it synced here before: a move that then doesn't happen starts it again.
+    const groups = await this.options.groups();
+    const was = this.engine.wanted(id, (list) =>
+      groups.filter((group) => group.lists.includes(list)).map((group) => group.id),
+    );
+    if (!(await this.stopNow(id, false))) return false;
+    const running = this.running;
+    if (running) {
+      await running.catch(() => undefined);
+      await this.save();
+    }
+    return was;
+  }
+
+  /**
+   * SPACE-07: after a move (or its Undo or Redo) for which `stopHereBeforeMove` stopped syncing:
+   * a list still in Personal (the move refused, or something else undone) syncs again if it did
+   * before; a list that left only gets the round that tells Drive. Neither is waited for.
+   */
+  afterMove(id: string, wasSynced: boolean, stillHere: boolean): void {
+    if (stillHere && wasSynced) void this.act({ kind: 'start', id });
+    else void this.request();
+  }
+
   async act(action: SyncAction): Promise<void> {
     switch (action.kind) {
       case 'connect':
@@ -390,22 +443,7 @@ export class SyncService {
         return this.request();
       }
       case 'stop': {
-        if (!this.engine) return;
-        const groups = await this.options.groups();
-        this.engine.stop(
-          [action.id],
-          action.everywhere,
-          (id) => groups.find((group) => group.id === id)?.lists ?? [],
-        );
-        // Stopped here: no longer counted as synced at once.
-        for (const id of [
-          action.id,
-          ...(groups.find((group) => group.id === action.id)?.lists ?? []),
-        ]) {
-          if (!action.everywhere) delete this.state.items[id];
-        }
-        await this.save();
-        this.emit();
+        if (!(await this.stopNow(action.id, action.everywhere))) return;
         return this.request();
       }
       case 'dismiss-notice':

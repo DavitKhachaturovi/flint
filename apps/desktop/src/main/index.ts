@@ -1004,9 +1004,23 @@ async function start(): Promise<void> {
     target: string,
     now: Date,
   ): Promise<ListOutcome> => {
-    if (sync && target !== 'personal' && workspace.spaceOfList(id) === 'personal')
-      await sync.act({ kind: 'stop', id, everywhere: false });
-    return workspace.moveToSpace(id, target, now);
+    // Only a move that will happen stops syncing (a refused one leaves it as it was, review of
+    // preview 3). Stopped and saved first, waiting only for a round already running (never
+    // starting one: preview 3 found the move waiting for a whole Drive round); the round that tells
+    // Drive runs after the move, unawaited.
+    const leaving =
+      sync &&
+      target !== 'personal' &&
+      workspace.spaceOfList(id) === 'personal' &&
+      workspace.moveToSpaceProblem(id, target) === null;
+    if (!leaving) return workspace.moveToSpace(id, target, now);
+    const wasSynced = await sync.stopHereBeforeMove(id);
+    try {
+      return await workspace.moveToSpace(id, target, now);
+    } finally {
+      // Refused or failed after the stop: it syncs again as before (the review of preview 3).
+      sync.afterMove(id, wasSynced, workspace.syncPath(id) !== null);
+    }
   };
   ipcMain.handle(Channels.mainListAction, (event, action: unknown) => {
     if (!owns(event.sender) || typeof action !== 'object' || action === null) return null;
@@ -1309,9 +1323,29 @@ async function start(): Promise<void> {
   ipcMain.handle(Channels.mainReserveId, (event) =>
     owns(event.sender) ? workspace.reserveId() : null,
   );
+  /**
+   * SPACE-07 (D-190): an Undo or Redo of Move to space that takes a list out of Personal stops
+   * personal sync for it first, as the move itself does (outside the workspace's queue: a sync
+   * round already running may need it).
+   */
+  const undoOrRedo = async (which: 'undo' | 'redo'): Promise<string | null> => {
+    const leaving = sync ? workspace.leavesPersonal(which) : undefined;
+    const now = new Date();
+    const run = (): Promise<string | null> =>
+      which === 'undo' ? workspace.undoLast(now) : workspace.redoLast(now);
+    if (!leaving || !sync) return run();
+    const wasSynced = await sync.stopHereBeforeMove(leaving);
+    try {
+      return await run();
+    } finally {
+      // Something else was undone meanwhile, or the step was refused: the list is still in
+      // Personal and syncs again as before (the review of preview 3).
+      sync.afterMove(leaving, wasSynced, workspace.syncPath(leaving) !== null);
+    }
+  };
   ipcMain.handle(Channels.mainUndo, (event) =>
     owns(event.sender)
-      ? workspace.undoLast(new Date()).catch((error: unknown) => {
+      ? undoOrRedo('undo').catch((error: unknown) => {
           log(`undo failed: ${String(error)}`);
           return null;
         })
@@ -1320,7 +1354,7 @@ async function start(): Promise<void> {
 
   ipcMain.handle(Channels.mainRedo, (event) =>
     owns(event.sender)
-      ? workspace.redoLast(new Date()).catch((error: unknown) => {
+      ? undoOrRedo('redo').catch((error: unknown) => {
           log(`redo failed: ${String(error)}`);
           return null;
         })

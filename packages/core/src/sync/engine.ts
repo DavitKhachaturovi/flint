@@ -270,6 +270,8 @@ export class SyncEngine {
   /** Whether a list (or group) syncs on this PC under the current choice. */
   wanted(id: string, groupOf: (listId: string) => readonly string[]): boolean {
     if (this.state.mode === null || this.state.stopped.includes(id)) return false;
+    // SPACE-07: a list in another space never syncs here (only forgotten, never trashed).
+    if (this.local.elsewhere?.(id)) return false;
     if (this.state.mode === 'everything') return true;
     if (this.state.chosen.includes(id)) return true;
     return groupOf(id).some(

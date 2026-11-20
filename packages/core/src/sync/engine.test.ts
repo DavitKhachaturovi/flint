@@ -24,6 +24,12 @@ class Pc implements LocalSide {
   readonly bases = new Map<string, string>();
   clock = Date.UTC(2026, 2, 10, 9, 0);
   readonly engine: SyncEngine;
+  /** SPACE-07: lists living in another space on this PC. */
+  readonly away = new Set<string>();
+
+  elsewhere(id: string): boolean {
+    return this.away.has(id);
+  }
 
   constructor(device: string, drive: FakeDrive, mode: SyncMode = 'everything') {
     this.device = device;
@@ -276,6 +282,27 @@ describe('SyncEngine (SYNC-01, D-161)', () => {
     await work.sync();
     expect(work.text('groc')).toBe(groceries);
     expect(drive.contents().get('Groceries')).toContain('Oat milk, eggs');
+  });
+
+  it('SPACE-07: a synced list now in another space is forgotten here, never trashed or rewritten, in Everything mode too', async () => {
+    const { drive, laptop, work } = await twoPcs();
+    // The list's file left the synced folder for a space on this PC, without "stop syncing" first
+    // (a Redo, a crash, Everything turned on later): the engine sees it missing, but elsewhere.
+    const moved = work.lists.get('groc');
+    work.lists.delete('groc');
+    work.away.add('groc');
+    await work.sync();
+    expect(drive.contents().get('Groceries')).toBe(groceries);
+    expect(work.engine.state.items['groc']).toBeUndefined();
+    // Edited on the other PC: never downloaded here (not into the space, not as a new copy).
+    laptop.edit('groc', (text) => text.replace('Oat milk', 'Oat milk, eggs'));
+    await laptop.sync();
+    await work.sync();
+    expect(work.lists.has('groc')).toBe(false);
+    expect(work.trash).toEqual([]);
+    expect(laptop.trash).toEqual([]);
+    expect(laptop.text('groc')).toContain('Oat milk, eggs');
+    expect(moved?.text).toBe(groceries);
   });
 
   it('also remove from Drive: every PC keeps its copy, stops, and says so', async () => {

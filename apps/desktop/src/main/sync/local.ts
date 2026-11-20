@@ -62,6 +62,11 @@ export class WorkspaceSide implements LocalSide {
     return this.options.busy(listId);
   }
 
+  /** SPACE-07 (D-190): a list in another space never syncs (personal sync is Personal's). */
+  elsewhere(listId: string): boolean {
+    return this.workspace.inOtherSpace(listId);
+  }
+
   items(): Promise<LocalItem[]> {
     return Promise.resolve(
       this.workspace.syncEntries().map((entry) => ({
@@ -117,6 +122,8 @@ export class WorkspaceSide implements LocalSide {
   }
 
   async trashList(listId: string): Promise<void> {
+    // Only a Personal list: sync never deletes a list in another space (SPACE-07).
+    if (!this.workspace.syncPath(listId)) return;
     await this.workspace.deleteList(listId, new Date(this.now()));
   }
 
