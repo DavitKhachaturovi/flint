@@ -29,7 +29,11 @@ export function SpaceTile(props: {
   const glyph = size === 'xl' ? 19 : size === 'menu' ? 15 : 13;
   return (
     <span className={`stile ${size}${props.pop ? ' tpop' : ''}`} aria-hidden="true">
-      {space.kind === 'personal' ? <PersonIcon size={glyph} /> : spaceLetter(space.name)}
+      {space.kind === 'personal' ? (
+        <PersonIcon size={glyph} />
+      ) : (
+        <span className="cap">{spaceLetter(space.name)}</span>
+      )}
     </span>
   );
 }

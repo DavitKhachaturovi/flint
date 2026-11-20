@@ -80,7 +80,7 @@ export function SpaceLetter(props: {
         }}
         onAnimationEnd={() => setPressed(false)}
       >
-        {spaceLetter(space.name)}
+        <span className="cap">{spaceLetter(space.name)}</span>
       </span>
       {tip}
     </>

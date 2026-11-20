@@ -4781,9 +4781,15 @@ body[data-tour-step='5'] .main .row .pin-hover {
   color: var(--fl-text-muted);
 }
 
-/* SPACE-04 (D-190 Q21): an item from another space: its letter right by the icon (6 px). */
+/* SPACE-04 (D-190 Q21): an item from another space: its letter right by the icon (6 px), the
+   icon's own size (26 px), the capital 12 px (centred as measured: no nudge at this size). */
 .trash-row .mm {
+  --cap: 0px;
+  width: 26px;
+  height: 26px;
   margin-left: -4px;
+  border-radius: var(--fl-radius-tile);
+  font-size: 12px;
 }
 
 .trash-title {
@@ -9553,10 +9559,24 @@ body[data-tour-step='5'] .main .row .pin-hover {
   background: var(--fl-ground-hover);
   box-shadow: inset 0 0 0 1px var(--fl-edge-float);
 }
-/* D-190 Q21: a capital centred on its own height in the square, at every size. */
-.mm,
+/* D-190 Q21: the capital a hair above the square's centre at every size (measured in Chromium
+   with Onest: 0.13 px high; text snaps to whole pixels, so the nudge is a transform). */
+.mm .cap,
+.stile .cap {
+  display: inline-block;
+  transform: translateY(var(--cap, 0px));
+}
+.mm {
+  --cap: 0.4px;
+}
 .stile {
-  text-box: trim-both cap alphabetic;
+  --cap: 0.9px;
+}
+.stile.menu {
+  --cap: -0.6px;
+}
+.stile.xl {
+  --cap: 0.4px;
 }
 .mm.press {
   animation: space-letter-press var(--fl-dur-state) var(--fl-ease-press);
