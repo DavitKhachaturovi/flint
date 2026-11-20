@@ -543,8 +543,10 @@ function Timeline(props: {
   readonly folds: boolean;
   readonly onOpen: (reminder: TodayReminder) => void;
   readonly onMove: (reminder: TodayReminder, minutes: number) => void;
+  readonly spaceFor?: ((listId: string) => SpaceRef | undefined) | undefined;
+  readonly onSpace?: ((space: string) => void) | undefined;
 }): ReactElement {
-  const { reminders, now, folds, onOpen, onMove } = props;
+  const { reminders, now, folds, onOpen, onMove, spaceFor, onSpace } = props;
   const [drag, setDrag] = useState<TimelineDrag | null>(null);
   const dragRef = useRef(drag);
   dragRef.current = drag;
@@ -770,10 +772,28 @@ function Timeline(props: {
               }}
             >
               <span className="timeline-dot" />
-              <span className="timeline-text">
-                {moving ? clock(moving.minutes) : shownAt !== null ? clock(shownAt) : reminder.time}{' '}
-                · {reminder.title}
-              </span>
+              {(() => {
+                const shown = moving
+                  ? clock(moving.minutes)
+                  : shownAt !== null
+                    ? clock(shownAt)
+                    : reminder.time;
+                // SPACE-03 (09 §8): a reminder in another space's list: its letter before the title.
+                const space = spaceFor?.(reminder.listId);
+                if (!space)
+                  return (
+                    <span className="timeline-text">
+                      {shown} · {reminder.title}
+                    </span>
+                  );
+                return (
+                  <>
+                    <span className="timeline-time">{shown} ·</span>
+                    <SpaceLetter space={space} onSwitch={onSpace} />
+                    <span className="timeline-text">{reminder.title}</span>
+                  </>
+                );
+              })()}
             </button>
           );
         })}
@@ -820,8 +840,9 @@ function Entries(props: {
   readonly kind: 'done' | 'captured';
   readonly onOpen: (entry: TodayEntry) => void;
   readonly spaceFor?: ((listId: string) => SpaceRef | undefined) | undefined;
+  readonly onSpace?: ((space: string) => void) | undefined;
 }): ReactElement {
-  const { entries: items, kind, onOpen, spaceFor } = props;
+  const { entries: items, kind, onOpen, spaceFor, onSpace } = props;
   const { entries, gone } = usePresence(items, (entry) => entry.key);
   return (
     <div className="today-entries">
@@ -847,7 +868,7 @@ function Entries(props: {
             {kind === 'captured' &&
               (() => {
                 const space = spaceFor?.(item.listId);
-                return space ? <SpaceLetter space={space} /> : null;
+                return space ? <SpaceLetter space={space} onSwitch={onSpace} /> : null;
               })()}
             {kind === 'captured' ? `${item.listName} · ${item.time}` : item.time}
           </span>
@@ -869,10 +890,12 @@ export function TodayColumn(props: {
   readonly onOpen: (key: string, listId: string) => void;
   readonly onMoveReminder: (reminder: TodayReminder, minutes: number) => void;
   readonly onSortInbox: () => void;
-  /** SPACE-03: a list's space when it isn't Personal (Captured today's letter). */
+  /** SPACE-03: a list's space when it isn't Personal (the Timeline's and Captured today's letter). */
   readonly spaceFor?: (listId: string) => SpaceRef | undefined;
+  /** SPACE-03: the letter's click switches the sidebar to its space. */
+  readonly onSpace?: (space: string) => void;
 }): ReactElement | null {
-  const { extras, stacked, onOpen, onMoveReminder, onSortInbox, spaceFor } = props;
+  const { extras, stacked, onOpen, onMoveReminder, onSortInbox, spaceFor, onSpace } = props;
   const now = useNow(1000);
   const column = useRef<HTMLElement>(null);
   useScrollsWhenTaller(column);
@@ -885,6 +908,8 @@ export function TodayColumn(props: {
       folds={stacked}
       onOpen={(reminder) => onOpen(reminder.key, reminder.listId)}
       onMove={onMoveReminder}
+      spaceFor={spaceFor}
+      onSpace={onSpace}
     />,
   );
   sections.push(
@@ -908,6 +933,7 @@ export function TodayColumn(props: {
       <Entries
         entries={extras.captured}
         kind="captured"
+        onSpace={onSpace}
         onOpen={(entry) => onOpen(entry.key, entry.listId)}
         spaceFor={spaceFor}
       />

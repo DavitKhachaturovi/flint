@@ -4875,6 +4875,7 @@ export function App(): ReactElement {
         id: `go:${list.id}`,
         label: list.name,
         detail: list.mode === 'note' ? 'Note' : undefined,
+        space: spaceFor(list.id),
         run: go(list.id),
       })),
       ...groups.map((group) => ({
@@ -5369,6 +5370,7 @@ export function App(): ReactElement {
           detail: hit.detail ? `${hit.listName} · ${hit.detail}` : hit.listName,
           indices: hit.indices,
           quiet: hit.done === true,
+          space: spaceFor(hit.listId),
           run: () => {
             if (hit.key) reveal(hit.listId, hit.key);
           },
@@ -5379,6 +5381,7 @@ export function App(): ReactElement {
           label: hit.text,
           detail: hit.listName,
           indices: hit.indices,
+          space: spaceFor(hit.listId),
           run: () => {
             setLineTarget({
               list: hit.listId,
@@ -5411,13 +5414,14 @@ export function App(): ReactElement {
         detail: `Archived · ${hit.listName}`,
         indices: hit.indices,
         quiet: true,
+        space: spaceFor(hit.listId),
         run: () => {
           openList(TRASH_ID);
           setTrashTab({ tab: 'archived', at: Date.now() });
         },
       };
     },
-    [reveal, openList],
+    [reveal, openList, spaceFor],
   );
   // D-92, D-93: Today has its own column; the selected task's details take its place.
   const todayWide = panelShown && view?.id === TODAY_ID && !pageTask;
@@ -6570,6 +6574,7 @@ export function App(): ReactElement {
                         onMoveReminder={moveReminder}
                         onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
                         spaceFor={spaceFor}
+                        onSpace={switchFromLetter}
                       />
                     )}
 
@@ -6717,6 +6722,7 @@ export function App(): ReactElement {
                   onMoveReminder={moveReminder}
                   onSortInbox={() => startTriage(view.today?.inbox.id ?? 'inbox')}
                   spaceFor={spaceFor}
+                  onSpace={switchFromLetter}
                 />
               )}
             </div>

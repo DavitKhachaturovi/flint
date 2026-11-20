@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { fuzzyMatch } from '../../shared/fuzzy.js';
 import { BackIcon, SearchIcon } from './icons.js';
+import { SpaceLetter } from '../ui/SpaceLetter.js';
 import type { SearchHit } from '../../shared/ipc.js';
 
 /**
@@ -36,6 +37,8 @@ export interface PaletteItem {
   readonly indices?: readonly number[];
   /** Completed or deleted: shown quieter. */
   readonly quiet?: boolean;
+  /** SPACE-03 (D-189 Q4): in another space: its letter on the right (hover: the space's name). */
+  readonly space?: { readonly id: string; readonly name: string } | undefined;
   readonly run?: () => void;
   /** A second step: its items, under a breadcrumb. */
   readonly step?: () => PaletteStep;
@@ -366,6 +369,7 @@ export function Palette(props: {
                   >
                     <span className="palette-text">{highlighted(item.label, item.indices)}</span>
                     {item.detail && <span className="palette-detail">{item.detail}</span>}
+                    {item.space && <SpaceLetter space={item.space} />}
                     {item.step && <span className="palette-more">›</span>}
                     {item.hint && <span className="keycap">{item.hint}</span>}
                   </div>

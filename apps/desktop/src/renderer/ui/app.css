@@ -4438,9 +4438,17 @@ body[data-tour-step='5'] .main .row .pin-hover {
 }
 
 .timeline-event.past .timeline-text,
-.timeline-event.done .timeline-text {
+.timeline-event.done .timeline-text,
+.timeline-event.past .timeline-time,
+.timeline-event.done .timeline-time {
   text-decoration: line-through;
   text-decoration-color: var(--fl-edge-chip);
+}
+
+/* SPACE-03: with a space's letter between them, the time keeps its width. */
+.timeline-time {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .timeline-event.past .timeline-dot {
@@ -5914,6 +5922,11 @@ body[data-tour-step='5'] .main .row .pin-hover {
   white-space: nowrap;
   font-size: 13.5px;
   color: var(--fl-text-body);
+}
+
+/* SPACE-03: the space's letter keeps to the right, after the detail or in its place. */
+.palette-item > .mm {
+  margin-left: auto;
 }
 
 .palette-item.quiet .palette-text {

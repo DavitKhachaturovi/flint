@@ -226,6 +226,41 @@ test('`##` in the composer: a space’s list carries its letter, the highlighted
   expect(await readFile(join(flint, 'Groceries.md'), 'utf8')).not.toContain('Butter');
 });
 
+test('the letter on a Timeline event and on search results; the event’s letter switches without opening (SPACE-03)', async () => {
+  const groceries = join(flint, 'Spaces', 'Home', 'Groceries.md');
+  const text = await readFile(groceries, 'utf8');
+  await writeFile(
+    groceries,
+    `${text.trimEnd()}\n- [ ] Pick up the parcel [reminder:: 2026-03-10T15:00] [id:: pp01]\n`,
+  );
+  await main.keyboard.press('Control+Shift+S');
+  await main.keyboard.press('1');
+  await expect(switcherName()).toHaveText('Personal');
+  await main.locator('.sidebar > .nav', { hasText: 'Today' }).click();
+  const event = main.locator('.timeline-event', { hasText: 'Pick up the parcel' });
+  await expect(event.locator('.mm')).toHaveText('H');
+  await expect(event.locator('.timeline-time')).toContainText('15:00');
+  await event.locator('.mm').click();
+  await expect(switcherName()).toHaveText('Home');
+  // Still Today: the letter switched the sidebar, the task didn't open.
+  await expect(event).toBeVisible();
+
+  const palette = main.locator('.palette[aria-label="Search or run a command"]');
+  await main.keyboard.press('Control+k');
+  await expect(palette.locator('.palette-field')).toBeFocused();
+  await main.keyboard.type('parcel');
+  const hit = palette.locator('.palette-item', { hasText: 'Pick up the parcel' });
+  await expect(hit.locator('.mm')).toHaveText('H');
+  // Personal's lists carry none.
+  await palette.locator('.palette-field').fill('errands');
+  await expect(palette.locator('.palette-item', { hasText: 'Errands' }).first()).toBeVisible();
+  await expect(palette.locator('.palette-item', { hasText: 'Errands' }).locator('.mm')).toHaveCount(
+    0,
+  );
+  await main.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+});
+
 test('the letter’s and the chip’s tooltips: one short line each (D-190 Q21)', async () => {
   await main.locator('.sidebar > .nav', { hasText: 'Today' }).click();
   const chip = main.locator('.chip.home-list', { hasText: 'Groceries' });

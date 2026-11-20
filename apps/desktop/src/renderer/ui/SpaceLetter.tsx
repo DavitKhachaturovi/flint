@@ -67,6 +67,10 @@ export function SpaceLetter(props: {
         onMouseDown={(event) => {
           if (onSwitch) event.stopPropagation();
         }}
+        // A press on the letter starts no drag of what holds it (a Timeline event, a row).
+        onPointerDown={(event) => {
+          if (onSwitch) event.stopPropagation();
+        }}
         onClick={(event) => {
           if (!onSwitch) return;
           // The rest of the chip opens the list (D-93); the letter switches the sidebar.
