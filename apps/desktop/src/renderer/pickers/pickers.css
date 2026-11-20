@@ -109,6 +109,15 @@
   white-space: nowrap;
 }
 
+.fl-picker-space {
+  font-size: var(--fl-size-meta);
+  color: var(--fl-text-muted);
+}
+
+.fl-picker-row:not(.active) .fl-picker-space {
+  display: none;
+}
+
 .fl-picker-hint {
   font-family: var(--fl-font-mono);
   font-size: var(--fl-size-meta);

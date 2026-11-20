@@ -611,12 +611,14 @@ export function MiniApp(): ReactElement {
   }, [safeSelected]);
 
   const listId = tab === 'today' ? TODAY_ID : shownList;
-  const add = async (text: string, chooseNewList: boolean): Promise<void> => {
+  const add = async (text: string, chooseNewList: boolean, picked?: string): Promise<void> => {
     const outcome = await window.flintMain.change(listId, {
       kind: 'add',
       text,
       where: 'top',
       ...(chooseNewList && { chooseNewList }),
+      // SPACE-04: the list picked in the `##` menu.
+      ...(picked && { listId: picked }),
     });
     if (!outcome?.key) return;
     // Today's tasks are made in Inbox, pinned: that is no other place to tell about.

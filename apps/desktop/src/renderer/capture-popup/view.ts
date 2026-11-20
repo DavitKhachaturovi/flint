@@ -2,6 +2,7 @@ import { knownLinks } from '../../shared/link-patterns.js';
 import type { CaptureBlock, CaptureParse, ListInfo, Token, TokenKind } from '@flint/core/shorthand';
 import type { AttachmentChip } from '../../shared/ipc.js';
 import { enableAutoPair } from '../auto-pair.js';
+import { spaceLetterElement } from '../ui/space-letter.js';
 
 /**
  * What the popup shows for the parsed text (CAP-04, CAP-05, D-25, D-29): chips, the `##` menu, the
@@ -178,6 +179,12 @@ export function renderSuggestions(
     const tile = element('span', 'tile');
     tile.innerHTML = ICONS.hash;
     row.append(tile, element('span', 'name', list.name));
+    // SPACE-04 (D-189 Q2, Q4): a list in another space: its letter at the right; the row the
+    // keyboard is on also spells the space's name, so it is known before Enter that it is shared.
+    if (list.space) {
+      if (index === selected) row.append(element('span', 'space-name-hint', list.space.name));
+      row.append(spaceLetterElement(list.space));
+    }
     row.addEventListener('mousedown', (event) => event.preventDefault());
     row.addEventListener('click', () => choose(list));
     return row;

@@ -14,6 +14,7 @@ import {
   fencedBlock,
   listToken,
   listTokenAt,
+  normalizeListName,
   parseCapture,
   suggestLists,
   type ListInfo,
@@ -45,6 +46,7 @@ import { highlightLines } from '../highlight/highlight.js';
 import { enableAutoPair } from '../auto-pair.js';
 import { useInertText, type InertText } from '../main-window/inert-text.js';
 import { attachTarget } from '../attach-target.js';
+import { SpaceLetter } from './SpaceLetter.js';
 
 let seq = 0;
 
@@ -65,6 +67,8 @@ export function listInfos(lists: readonly ListSummary[]): ListInfo[] {
     name: list.name,
     mode: list.mode,
     ...(list.recentRank === undefined ? {} : { recentRank: list.recentRank }),
+    // SPACE-04: a list in another space (its letter in the `##` menu).
+    ...(list.space && list.spaceName ? { space: { id: list.space, name: list.spaceName } } : {}),
   }));
 }
 
@@ -76,8 +80,12 @@ export function Composer(props: {
   readonly listId: string;
   readonly lists: readonly ListSummary[];
   readonly inputRef: RefObject<HTMLInputElement | null>;
-  /** `chooseNewList`: the close-match card was flipped to a new list (Tab, D-25). */
-  readonly onAdd: (text: string, chooseNewList: boolean) => Promise<void>;
+  /**
+   * `chooseNewList`: the close-match card was flipped to a new list (Tab, D-25). `listId`: the
+   * list picked in the `##` menu while the title still names it (SPACE-04: another space's list
+   * of a name Personal has too).
+   */
+  readonly onAdd: (text: string, chooseNewList: boolean, listId?: string) => Promise<void>;
   /** D-92: Today's "Add a task to today…". */
   readonly placeholder?: string;
   /**
@@ -146,6 +154,8 @@ export function Composer(props: {
     return true;
   };
   const byButton = useRef(false);
+  /** SPACE-04: the list last picked in the `##` menu or the close-match card. */
+  const chosen = useRef<ListInfo | null>(null);
   const submit = (): void => {
     const typed = text.escaped();
     if (typed.trim() === '') return;
@@ -163,6 +173,14 @@ export function Composer(props: {
     ];
     const body = parts.length > 0 ? `\n${parts.join('\n\n')}` : '';
     const newList = parsed?.target.kind === 'new' && chooseNewFor !== null;
+    // SPACE-04: the picked list, while the `##` token still names it (the main process checks too).
+    const picked =
+      chosen.current &&
+      (parsed?.target.kind === 'existing' || parsed?.target.kind === 'close-match') &&
+      normalizeListName(parsed.target.list.name) === normalizeListName(chosen.current.name)
+        ? chosen.current.id
+        : undefined;
+    chosen.current = null;
     text.reset('', false);
     setNotes(null);
     setPasted([]);
@@ -170,7 +188,7 @@ export function Composer(props: {
     setCardAcceptedFor(null);
     setMenuAcceptedFor(null);
     inputRef.current?.focus();
-    void onAdd(typed + body, newList);
+    void onAdd(typed + body, newList, picked);
   };
   // UI-09: auto-closing brackets and quotes in the composer.
   useEffect(() => (inputRef.current ? enableAutoPair(inputRef.current) : undefined), [inputRef]);
@@ -230,6 +248,7 @@ export function Composer(props: {
     const at = start + spelled.length;
     setCaret(at);
     window.requestAnimationFrame(() => inputRef.current?.setSelectionRange(at, at));
+    chosen.current = list;
     return spelled;
   };
   const acceptSuggestion = (list: ListInfo | undefined): void => {
@@ -403,7 +422,13 @@ export function Composer(props: {
               <span className="composer-suggestion-tile">
                 <HashIcon size={13} />
               </span>
-              <span>{list.name}</span>
+              <span className="composer-suggestion-name">{list.name}</span>
+              {/* SPACE-04 (D-189 Q2, Q4): another space's list: its letter; the row the keyboard
+                  is on also spells the space's name. */}
+              {list.space && index === highlight && (
+                <span className="space-name-hint">{list.space.name}</span>
+              )}
+              {list.space && <SpaceLetter space={list.space} />}
             </li>
           ))}
         </ul>

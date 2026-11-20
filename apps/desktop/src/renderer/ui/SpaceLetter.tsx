@@ -9,11 +9,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 
-/** A space's letter: the first letter of its name, upper case. */
-export function spaceLetter(name: string): string {
-  const first = [...name.trim()][0] ?? '?';
-  return first.toLocaleUpperCase();
-}
+import { spaceLetter } from './space-letter.js';
+
+export { spaceLetter };
 
 /**
  * D-190 Q21: the tooltip of the clickable list chip and of the letter: shown 250 ms after the

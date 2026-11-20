@@ -2047,12 +2047,14 @@ export function App(): ReactElement {
   );
 
   const addFromComposer = useCallback(
-    async (text: string, chooseNewList: boolean): Promise<void> => {
+    async (text: string, chooseNewList: boolean, listId?: string): Promise<void> => {
       const outcome = await change({
         kind: 'add',
         text,
         where: 'top',
         ...(chooseNewList && { chooseNewList }),
+        // SPACE-04: the list picked in the `##` menu (another space's of a name Personal has too).
+        ...(listId && { listId }),
       });
       if (!outcome?.key) return;
       frontAdd();

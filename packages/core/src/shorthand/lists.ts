@@ -5,6 +5,12 @@ export interface ListInfo {
   readonly mode: 'tasks' | 'note';
   /** Most-recently-used rank (0 = last capture or move target); absent if never used (D-25). */
   readonly recentRank?: number;
+  /**
+   * SPACE-04 (D-189 Q2): the space it is in when that isn't the personal one (its letter in the
+   * `##` menu and the pickers). Lists come Personal's first, so an exact name both have is
+   * Personal's (the chosen list's ID travels with a capture to reach the other).
+   */
+  readonly space?: { readonly id: string; readonly name: string };
 }
 
 /** Where a `##name` token sends the capture (D-25). */

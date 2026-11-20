@@ -200,6 +200,32 @@ test('Move to space: the open list goes into another space, the line follows; Un
     .toContain('Post the letter');
 });
 
+test('`##` in the composer: a space’s list carries its letter, the highlighted row names the space, and the task lands there (SPACE-04)', async () => {
+  // Personal has a Groceries too: by name alone, Personal's would win.
+  await writeFile(join(flint, 'Groceries.md'), '---\nflint: 1\nid: gro9\nmode: tasks\n---\n');
+  await main.locator('.sidebar > .nav', { hasText: 'Inbox' }).click();
+  const input = main.locator('.composer-input');
+  await input.click();
+  await input.pressSequentially('Butter ##Groc');
+  const rows = main.locator('.composer-suggestion', { hasText: 'Groceries' });
+  await expect(rows).toHaveCount(2);
+  await expect(rows.locator('.mm')).toHaveCount(1);
+  await expect(rows.locator('.mm')).toHaveText('H');
+  const all = main.locator('.composer-suggestion');
+  const at = await all.evaluateAll((items) => items.findIndex((item) => item.querySelector('.mm')));
+  for (let step = 0; step <= at; step++) await input.press('ArrowDown');
+  const highlighted = main.locator('.composer-suggestion[aria-selected="true"]');
+  await expect(highlighted.locator('.mm')).toHaveCount(1);
+  await expect(highlighted.locator('.space-name-hint')).toHaveText('Home');
+  await input.press('Enter');
+  await expect(main.locator('.composer-suggestions')).toHaveCount(0);
+  await input.press('Enter');
+  await expect
+    .poll(() => readFile(join(flint, 'Spaces', 'Home', 'Groceries.md'), 'utf8'))
+    .toContain('Butter');
+  expect(await readFile(join(flint, 'Groceries.md'), 'utf8')).not.toContain('Butter');
+});
+
 test('the letter’s and the chip’s tooltips: one short line each (D-190 Q21)', async () => {
   await main.locator('.sidebar > .nav', { hasText: 'Today' }).click();
   const chip = main.locator('.chip.home-list', { hasText: 'Groceries' });

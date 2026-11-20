@@ -359,6 +359,8 @@ export interface PopupSubmit {
   readonly keyAt: number;
   /** Tab on the close-match card: create the typed list instead (D-25). */
   readonly chooseNewList: boolean;
+  /** SPACE-04 (D-189 Q2): the list picked in the `##` menu (it wins while `##` still names it). */
+  readonly listId?: string;
 }
 
 export interface PopupSubmitAck {
@@ -400,6 +402,8 @@ export interface ListSummary {
   readonly made?: number;
   /** SPACE-01 (D-190 Q20): the space it is in; none for the personal space. */
   readonly space?: string;
+  /** SPACE-04: that space's name (the letter in the `##` menu and the pickers). */
+  readonly spaceName?: string;
 }
 
 /** SPACE-01, SPACE-03: a space as the windows see it (Personal first, then the others by name). */
@@ -817,6 +821,8 @@ export type ListChange =
       readonly id?: string;
       /** D-25, D-87: Tab on the close-match card: create the typed list instead. */
       readonly chooseNewList?: boolean;
+      /** SPACE-04 (D-189 Q2): the list picked in the `##` menu (it wins while `##` names it). */
+      readonly listId?: string;
     }
   | { readonly kind: 'edit'; readonly key: string; readonly text: string }
   /** TASK-05, D-49: a task's body, as typed in its plain field. */

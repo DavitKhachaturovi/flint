@@ -218,6 +218,12 @@ export interface CaptureRequest {
   readonly chooseNewList: boolean;
   /** Pasted images waiting in app data (CAP-06), saved into `attachments/` with the task. */
   readonly attachments?: readonly { readonly file: string; readonly extension: string }[];
+  /**
+   * SPACE-04 (D-189 Q2): the list picked in the `##` menu: when the `##` name is still that list's,
+   * the capture goes to it, even where another space has a list of that name (by name alone,
+   * Personal's wins).
+   */
+  readonly listId?: string;
 }
 
 /** A list created by a capture, so `Created list <name> · Undo` can undo it (CAP-05). */
@@ -928,7 +934,10 @@ export class Workspace {
         ...(info.recentRank === undefined ? {} : { recentRank: info.recentRank }),
         ...(quick && { quick }),
         ...(info.mode === 'note' && loaded && { made: this.madeAt(loaded) }),
-        ...(loaded?.entry.space !== undefined && { space: loaded.entry.space }),
+        ...(loaded?.entry.space !== undefined && {
+          space: loaded.entry.space,
+          spaceName: this.others.get(loaded.entry.space)?.name ?? '',
+        }),
       };
     });
   }
@@ -1475,6 +1484,7 @@ export class Workspace {
       const made = this.lists.find(({ entry }) => normalizeListName(entry.name) === wanted);
       if (made) target = made;
       else {
+        // SPACE-04 (D-189): a new list, as from `##`, is made in Personal.
         if (listNameProblem(name)) return null;
         target = await this.createList(name);
         created = true;
@@ -1482,6 +1492,16 @@ export class Workspace {
     } else target = this.find(to.list);
     if (!target || target === list || target.entry.mode === 'note' || target.file.readOnly)
       return null;
+    // SPACE-07: into another space's list, its pictures and files go along.
+    if (target.entry.space !== list.entry.space) {
+      const moving = findTask(list.file.document, key);
+      if (moving)
+        await this.carryAttachments(
+          serializeDocument({ ...list.file.document, blocks: [moving.task] }),
+          list.entry.space,
+          target.entry.space,
+        );
+    }
     const op = moveTasksToList(
       new Map([
         [list.file.path, list.file.document],
@@ -1728,6 +1748,39 @@ export class Workspace {
    * and it shows at the end of that space's sidebar. One undo step moves it back. Inbox and quick
    * notes stay Personal's; a name the target space already has is refused, never overwritten.
    */
+  /**
+   * SPACE-07: the pictures and files a text links, copied from one space's `attachments/` into
+   * another's so they travel with it (the originals stay: other lists may use them; a file of that
+   * name already there is kept).
+   */
+  private async carryAttachments(
+    text: string,
+    from: string | undefined,
+    to: string | undefined,
+  ): Promise<void> {
+    if (from === to) return;
+    const fromFolder = this.folderOf(from);
+    const toFolder = this.folderOf(to);
+    for (const match of text.matchAll(/attachments\/([^\s)"'<>\]]+)/g)) {
+      let name: string;
+      try {
+        name = decodeURIComponent(match[1] ?? '');
+      } catch {
+        continue;
+      }
+      if (name === '' || name !== basename(name)) continue;
+      const source = join(fromFolder, 'attachments', name);
+      const copy = join(toFolder, 'attachments', name);
+      const present = await stat(copy).then(
+        () => true,
+        () => false,
+      );
+      if (present) continue;
+      await mkdir(join(toFolder, 'attachments'), { recursive: true });
+      await copyFile(source, copy).catch(() => undefined);
+    }
+  }
+
   moveToSpace(id: string, target: string, now: Date): Promise<ListOutcome> {
     return this.serial(async () => {
       void now;
@@ -1745,28 +1798,7 @@ export class Workspace {
       const spaceName = to === undefined ? 'Personal' : (this.others.get(to)?.name ?? 'the space');
       if (this.sameName(list.entry.name, list, to))
         return { ok: false, problem: `${spaceName} has a list named ${list.entry.name}` };
-      // The pictures and files it links, copied along (the originals stay: other lists may use them).
-      const text = serializeDocument(list.file.document);
-      const fromFolder = this.folderOf(from);
-      const toFolder = this.folderOf(to);
-      for (const match of text.matchAll(/attachments\/([^\s)"'<>\]]+)/g)) {
-        let name: string;
-        try {
-          name = decodeURIComponent(match[1] ?? '');
-        } catch {
-          continue;
-        }
-        if (name === '' || name !== basename(name)) continue;
-        const source = join(fromFolder, 'attachments', name);
-        const copy = join(toFolder, 'attachments', name);
-        const present = await stat(copy).then(
-          () => true,
-          () => false,
-        );
-        if (present) continue;
-        await mkdir(join(toFolder, 'attachments'), { recursive: true });
-        await copyFile(source, copy).catch(() => undefined);
-      }
+      await this.carryAttachments(serializeDocument(list.file.document), from, to);
       const move = async (loaded: Loaded, space: string | undefined): Promise<void> => {
         const path = join(this.folderOf(space), basename(loaded.entry.path));
         await rename(loaded.entry.path, path);
@@ -1901,11 +1933,20 @@ export class Workspace {
     )
       throw new Error('agents never make or guess a list from ##');
     if (parsed.target.kind === 'new') {
+      // SPACE-04 (D-189): a new list from `##` is always made in Personal.
       target = await this.createList(parsed.target.name);
       created = true;
     } else if (parsed.target.kind === 'existing' || parsed.target.kind === 'close-match') {
-      target = this.find(parsed.target.list.id) ?? list;
+      // SPACE-04: the list picked in the composer's `##` menu wins while `##` still names it.
+      target =
+        this.chosenOr(change.listId, parsed.target.list.name) ??
+        this.find(parsed.target.list.id) ??
+        list;
     }
+    // SPACE-07: a picture pasted in the composer was saved in the open list's space; sent by `##`
+    // to another space's list, it goes along.
+    if (target.entry.space !== list.entry.space)
+      await this.carryAttachments(parsed.body, list.entry.space, target.entry.space);
     // Below the task being edited; at the top if it has gone meanwhile (moved by `##`, deleted).
     const where: Where =
       target === list &&
@@ -3611,17 +3652,29 @@ export class Workspace {
 
   listInfos(): ListInfo[] {
     const recent = this.recent;
-    const infos = this.lists.map(({ entry }) => {
-      const id = this.listId(entry);
-      const rank = recent.indexOf(id);
-      return {
-        id,
-        name: entry.id === INBOX_ID ? 'Inbox' : entry.name,
-        mode: entry.mode === 'note' ? 'note' : 'tasks',
-        ...(rank >= 0 ? { recentRank: rank } : {}),
-      } satisfies ListInfo;
-    });
-    return infos.sort((a, b) => Number(b.id === INBOX_ID) - Number(a.id === INBOX_ID));
+    // SPACE-04: Inbox, then Personal's lists, then each space's (by space): an exact `##` name two
+    // spaces share resolves to Personal's (D-189 Q2), whatever order the files were loaded in.
+    const order = (entry: ListEntry): number =>
+      entry.id === INBOX_ID && entry.space === undefined
+        ? 0
+        : entry.space === undefined
+          ? 1
+          : 2 + [...this.others.keys()].indexOf(entry.space);
+    const infos = [...this.lists]
+      .sort((a, b) => order(a.entry) - order(b.entry))
+      .map(({ entry }) => {
+        const id = this.listId(entry);
+        const rank = recent.indexOf(id);
+        const state = entry.space === undefined ? undefined : this.others.get(entry.space);
+        return {
+          id,
+          name: entry.id === INBOX_ID ? 'Inbox' : entry.name,
+          mode: entry.mode === 'note' ? 'note' : 'tasks',
+          ...(rank >= 0 ? { recentRank: rank } : {}),
+          ...(state ? { space: { id: state.id, name: state.name } } : {}),
+        } satisfies ListInfo;
+      });
+    return infos;
   }
 
   /**
@@ -3765,6 +3818,18 @@ export class Workspace {
     return this.lists.find(({ entry }) => this.listId(entry) === id);
   }
 
+  /**
+   * SPACE-04 (D-189 Q2): the task list picked in a `##` menu (`listId`), when the `##` name still
+   * names it (the same name ignoring case and separators); otherwise none, and the name decides.
+   */
+  private chosenOr(listId: string | undefined, name: string): Loaded | undefined {
+    if (!listId) return undefined;
+    const chosen = this.find(listId);
+    if (!chosen || chosen.entry.mode === 'note' || chosen.file.readOnly) return undefined;
+    const its = chosen.entry.id === INBOX_ID ? 'Inbox' : chosen.entry.name;
+    return normalizeListName(its) === normalizeListName(name) ? chosen : undefined;
+  }
+
   private get inbox(): Loaded {
     const inbox = this.find(INBOX_ID);
     if (!inbox) throw new Error('the Flint folder has no Inbox');
@@ -3792,19 +3857,24 @@ export class Workspace {
       target = await this.createList(parsed.target.name);
       createdList = { path: target.entry.path, name: target.entry.name, taskId: id };
     } else if (parsed.target.kind === 'existing' || parsed.target.kind === 'close-match') {
-      target = this.find(parsed.target.list.id) ?? this.inbox;
+      target =
+        this.chosenOr(request.listId, parsed.target.list.name) ??
+        this.find(parsed.target.list.id) ??
+        this.inbox;
     } else {
       // Inbox; notes and unusable names never win a `##` token, so they land here too.
       target = this.inbox;
     }
 
-    // MEDIA-02: images go to `attachments/` and are linked relatively, so the folder can move.
+    // MEDIA-02: images go to `attachments/` and are linked relatively, so the folder can move;
+    // SPACE-01: the target list's space's `attachments/`, so they travel with it.
     const links: string[] = [];
     if (attachments.length > 0) {
-      await mkdir(join(this.folder, 'attachments'), { recursive: true });
+      const folder = this.folderOf(target.entry.space);
+      await mkdir(join(folder, 'attachments'), { recursive: true });
       for (const [index, attachment] of attachments.entries()) {
         const name = `${stamp(now)}-${id}${index > 0 ? `-${index + 1}` : ''}.${attachment.extension}`;
-        await copyFile(attachment.file, join(this.folder, 'attachments', name));
+        await copyFile(attachment.file, join(folder, 'attachments', name));
         links.push(`![](attachments/${name})`);
       }
     }

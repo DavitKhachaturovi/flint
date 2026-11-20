@@ -14,6 +14,7 @@ import {
 } from '@flint/core/time';
 import { closeMenu, followAnchor, type MenuOptions } from '../menu/menu.js';
 import { floatingArea } from '../ui/floating-area.js';
+import { spaceLetterElement } from '../ui/space-letter.js';
 
 /**
  * The pickers of the composer and the capture popup (CAP-11, D-57; 09 §8): priority, list, and
@@ -448,7 +449,17 @@ export function openListPicker(
     };
     // Stable: the rest keep the picker's order (most recently used, then the sidebar's).
     const found = [...matched].sort((a, b) => rank(a) - rank(b));
-    const rows = found.map((list) => makeRow(list.name, null, () => choose({ list }), listIcon()));
+    const rows = found.map((list) => {
+      const row = makeRow(list.name, null, () => choose({ list }), listIcon());
+      // SPACE-04 (D-189 Q4): another space's list: its letter; the highlighted row also spells
+      // the space's name (pickers.css shows it only there).
+      if (list.space)
+        row.button.append(
+          element('span', 'fl-picker-space', list.space.name),
+          spaceLetterElement(list.space),
+        );
+      return row;
+    });
     const taken = lists.some((list) => normalizeListName(list.name) === normalizeListName(typed));
     if (options.newList !== false && typed !== '' && !taken && isValidListName(typed))
       rows.push(makeRow(`New list "${typed}"`, null, () => choose({ newList: typed }), listIcon()));

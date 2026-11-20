@@ -314,6 +314,79 @@ describe('spaces in the workspace (SPACE-01, D-190 Q20)', () => {
     });
   });
 
+  it('SPACE-04: `##` picked in the menu reaches a space’s list of a name Personal has too; by name alone Personal’s wins', async () => {
+    await writeFile(join(folder, 'Groceries.md'), header('gro9'));
+    const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    const workspace = await open();
+    const infos = workspace.listInfos();
+    expect(infos.find((info) => info.id === 'gro1')?.space).toEqual({
+      id: 's-home1',
+      name: 'Home',
+    });
+    expect(infos.find((info) => info.id === 'gro9')?.space).toBeUndefined();
+    // The capture popup.
+    await workspace.capture(
+      { text: 'eggs ##Groceries', chooseNewList: false, listId: 'gro1' },
+      now,
+    );
+    expect(await readFile(join(space, 'Groceries.md'), 'utf8')).toContain('eggs');
+    await workspace.capture({ text: 'milk ##Groceries', chooseNewList: false }, now);
+    expect(await readFile(join(folder, 'Groceries.md'), 'utf8')).toContain('milk');
+    // The composer.
+    await workspace.change(
+      'inbox',
+      { kind: 'add', text: 'bread ##Groceries', where: 'top', listId: 'gro1' },
+      now,
+    );
+    expect(await readFile(join(space, 'Groceries.md'), 'utf8')).toContain('bread');
+    // A picked list the title no longer names is ignored (the name wins).
+    await workspace.change(
+      'inbox',
+      { kind: 'add', text: 'tea ##Groceries', where: 'top', listId: 'inbox' },
+      now,
+    );
+    expect(await readFile(join(folder, 'Groceries.md'), 'utf8')).toContain('tea');
+  });
+
+  it('SPACE-04 (D-189): `##New` typed even in a space’s list makes the list in Personal', async () => {
+    await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
+    const workspace = await open();
+    const outcome = await workspace.change(
+      'gro1',
+      { kind: 'add', text: 'drill ##Hardware', where: 'top', chooseNewList: true },
+      now,
+    );
+    expect(outcome?.listName).toBe('Hardware');
+    expect(await readFile(join(folder, 'Hardware.md'), 'utf8')).toContain('drill');
+    expect(workspace.spaceOfList(outcome?.listId ?? '')).toBe(PERSONAL);
+  });
+
+  it('SPACE-07: a task moved or sent by `##` into another space’s list takes its pictures along', async () => {
+    await mkdir(join(folder, 'attachments'), { recursive: true });
+    await writeFile(join(folder, 'attachments', 'a.png'), 'png');
+    await writeFile(join(folder, 'attachments', 'b.png'), 'png');
+    await writeFile(
+      join(folder, 'Errands.md'),
+      `${header('err1')}- [ ] Fix tap [id:: ft01]\n    ![](attachments/a.png)\n- [ ] Other [id:: ot01]\n    ![](attachments/b.png)\n`,
+    );
+    const space = await seedSpace('Home', 's-home1', { Repairs: header('rep1') });
+    const workspace = await open();
+    await workspace.change('err1', { kind: 'moveTo', key: 'ft01', to: { list: 'rep1' } }, now);
+    expect(await readFile(join(space, 'Repairs.md'), 'utf8')).toContain('Fix tap');
+    await readFile(join(space, 'attachments', 'a.png'));
+    // Only the moved task's pictures; the originals stay.
+    expect(await readdir(join(space, 'attachments'))).toEqual(['a.png']);
+    await readFile(join(folder, 'attachments', 'a.png'));
+    // A picture pasted in the composer (saved in the open list's space), sent by `##`.
+    await writeFile(join(folder, 'attachments', 'c.png'), 'png');
+    await workspace.change(
+      'err1',
+      { kind: 'add', text: 'Leak ##Repairs\n![](attachments/c.png)', where: 'top' },
+      now,
+    );
+    await readFile(join(space, 'attachments', 'c.png'));
+  });
+
   it('the watcher’s paths: a new list in a space and a new space appear', async () => {
     const space = await seedSpace('Home', 's-home1', { Groceries: header('gro1') });
     const workspace = await open();

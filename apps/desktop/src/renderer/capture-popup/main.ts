@@ -8,6 +8,7 @@ import {
   listToken,
   listTokenAt,
   parseCapture,
+  normalizeListName,
   shiftRanges,
   suggestLists,
   type CaptureBlock,
@@ -87,6 +88,12 @@ let menuAcceptedFor: string | null = null;
 let cardAcceptedFor: string | null = null;
 let suggestions: ListInfo[] = [];
 let selected = -1;
+/**
+ * SPACE-04 (D-189 Q2): the list picked in the `##` menu: its ID goes with the capture while the
+ * `##` name still names it, so a list of another space is reached even where Personal has one of
+ * the same name (by name alone, Personal's wins).
+ */
+let chosen: ListInfo | null = null;
 let parsed: CaptureParse = parseCapture('', { now: new Date(), lists });
 /**
  * D-45: stretches of the title that came from a selection or a paste. They are plain text: their
@@ -196,6 +203,7 @@ function chooseList(list: ListInfo): void {
   const token = tokenAtCaret();
   if (!token) return;
   input.setRangeText(`##${listToken(list.name)}`, token.start, token.end, 'end');
+  chosen = list;
   changed(true);
 }
 
@@ -387,8 +395,24 @@ function submit(): void {
   // The title as the parser must read it: selected and pasted text escaped (D-45).
   const text = composeCapture(parsedTitle(), current.blocks);
   const chooseNewList = chooseNewFor !== null && parsed.target.kind === 'new';
+  // SPACE-04: the picked list, while the `##` token still names it (the main process checks too).
+  const picked =
+    chosen &&
+    (parsed.target.kind === 'existing' || parsed.target.kind === 'close-match') &&
+    normalizeListName(parsed.target.list.name) === normalizeListName(chosen.name)
+      ? chosen.id
+      : null;
+  chosen = null;
   void attaching
-    .then(() => window.flintPopup.submit({ text, keyAt, chooseNewList, draft: current }))
+    .then(() =>
+      window.flintPopup.submit({
+        text,
+        keyAt,
+        chooseNewList,
+        draft: current,
+        ...(picked ? { listId: picked } : {}),
+      }),
+    )
     .then((ack) => {
       // D-27: the popup empties once the main process has the capture; the saved draft is
       // cleared only after the write is confirmed. D-156: only of what was sent: typed or pasted
