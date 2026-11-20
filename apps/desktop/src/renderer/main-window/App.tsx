@@ -88,6 +88,7 @@ import {
 import { CloudIcon, FocusIcon, MoreIcon, SettingsIcon as GearIcon } from './icons.js';
 import { FOCUS_ID, type FocusAction } from '../../shared/focus.js';
 import { NewSpaceDialog, PERSONAL_SPACE, SpaceHead, SpaceMenu } from './Spaces.js';
+import { flyToSwitcher, land } from './space-flight.js';
 import { attachTarget, setAttachTarget } from '../attach-target.js';
 import { createPortal } from 'react-dom';
 import type { SpaceView } from '../../shared/ipc.js';
@@ -846,20 +847,24 @@ export function App(): ReactElement {
    */
   const moveListToSpace = useCallback(
     async (list: ListSummary, target: string): Promise<void> => {
+      // 09 §8: the row's copy flies to the switcher's tile while the move is made (D-75).
+      const flight = flyToSwitcher(list.id);
       const outcome = await window.flintMain.listAction({
         kind: 'moveToSpace',
         id: list.id,
         space: target,
       });
-      if (!outcome) return;
-      if (!outcome.ok) {
-        showToast(outcome.problem, false);
+      if (!outcome?.ok) {
+        flight.cancel();
+        if (outcome) showToast(outcome.problem, false);
         return;
       }
-      setTilePop((count) => count + 1);
       showToast(outcome.label, true);
       // An open list takes the line along: the sidebar follows it into its new space (and back
-      // on Undo, D-190 Q21).
+      // on Undo, D-190 Q21). Landed, the tile pops and the row lights up where it arrived.
+      await flight.landed;
+      setTilePop((count) => count + 1);
+      land(list.id);
     },
     [showToast],
   );

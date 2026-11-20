@@ -163,6 +163,16 @@ async function launch(): Promise<{ app: ElectronApplication; main: Page }> {
       'base64',
     ),
   );
+  // SPACE-01: a second space, for the space menu, the switch and Move to space's flight.
+  await mkdir(join(flint, 'Spaces', 'Home', '.flint'), { recursive: true });
+  await writeFile(
+    join(flint, 'Spaces', 'Home', '.flint', 'space.json'),
+    JSON.stringify({ flint: 1, id: 's-home1', name: 'Home' }),
+  );
+  await writeFile(
+    join(flint, 'Spaces', 'Home', 'Repairs.md'),
+    '---\nflint: 1\nid: repairs\nmode: tasks\n---\n- [ ] Fix the tap [id:: r1]\n',
+  );
   await writeFile(
     join(flint, '.flint', 'sidebar.json'),
     JSON.stringify({
@@ -646,6 +656,35 @@ test('the motion census: every action moves, or is instant by a decision (UI-10,
     await main.keyboard.press('Control+k');
     await main.keyboard.type('snapshots');
     await main.keyboard.press('Enter');
+  });
+
+  // Spaces (SPACE-01, SPACE-03, SPACE-07; 09 §8).
+  const switcher = main.locator('.space-btn .space-name');
+  await step(main, 'The space menu opens (Ctrl+Shift+S)', 'motion', async () => {
+    await main.keyboard.press('Control+Shift+S');
+    await expect(main.locator('.space-menu')).toBeVisible();
+  });
+  await step(
+    main,
+    'Switch space (2: the new rows slide in, the switcher rises)',
+    'motion',
+    async () => {
+      await main.keyboard.press('2');
+      await expect(switcher).toHaveText('Home');
+    },
+  );
+  await main.keyboard.press('Control+Shift+S');
+  await main.keyboard.press('1');
+  await expect(switcher).toHaveText('Personal');
+  await nav('Work').click({ button: 'right' });
+  await main.locator('.fl-menu').getByText('Move to space', { exact: true }).hover();
+  await step(main, 'Move to space (the row flies to the switcher’s tile)', 'motion', async () => {
+    await main.locator('.fl-submenu').getByText('Home').click();
+    await expect(main.locator('.sidebar .nav[data-key="work"]')).toHaveCount(0);
+  });
+  await step(main, 'Undo the move (the row is back)', 'motion', async () => {
+    await main.keyboard.press('Control+z');
+    await expect(main.locator('.sidebar .nav[data-key="work"]')).toHaveCount(1);
   });
 
   // The other windows.

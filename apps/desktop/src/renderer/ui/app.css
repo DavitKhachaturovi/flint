@@ -9621,6 +9621,18 @@ body[data-tour-step='5'] .main .row .pin-hover {
   margin-right: 6px;
   vertical-align: -3px;
 }
+/* SPACE-07 (09 §8): the moved row's copy, lifted, on its way to the switcher's tile. */
+.nav.space-flight {
+  position: fixed;
+  z-index: 95;
+  margin: 0;
+  box-sizing: border-box;
+  pointer-events: none;
+  transform-origin: center;
+  background: var(--fl-ground-float);
+  box-shadow: var(--fl-shadow-float);
+  color: var(--fl-text-primary);
+}
 .space-tip {
   position: fixed;
   z-index: 90;

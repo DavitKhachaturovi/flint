@@ -184,7 +184,23 @@ test('Move to space: the open list goes into another space, the line follows; Un
   await errands.click();
   await errands.click({ button: 'right' });
   await main.locator('.fl-menu').getByText('Move to space', { exact: true }).hover();
+  // 09 §8: a copy of the row flies to the switcher's tile (recorded as it starts).
+  await main.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { __flights: string[] }).__flights = seen;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args: Parameters<Element['animate']>) {
+      if (this.classList.contains('space-flight')) seen.push(this.textContent ?? '');
+      return animate.apply(this, args);
+    };
+  });
   await main.locator('.fl-submenu').getByText('Home').click();
+  await expect
+    .poll(() => main.evaluate(() => (window as unknown as { __flights: string[] }).__flights))
+    .toEqual([expect.stringContaining('Errands')]);
+  // The flight's copy goes once it lands.
+  await expect(main.locator('.space-flight')).toHaveCount(0);
   // The open list takes the line along to its new space.
   await expect(switcherName()).toHaveText('Home');
   await expect(errands).toBeVisible();
