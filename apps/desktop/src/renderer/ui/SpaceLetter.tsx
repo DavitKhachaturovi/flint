@@ -82,7 +82,13 @@ export function SpaceLetter(props: {
         }}
         onAnimationEnd={() => setPressed(false)}
       >
-        <span className="cap">{spaceLetter(space.name)}</span>
+        {/* Spaces preview 3: drawn as SVG text, so the capital keeps its place in the square
+            wherever the row puts it (HTML text snapped apart from the square, up to 1 px high). */}
+        <svg className="cap-svg" aria-hidden="true">
+          <text x="50%" y="50%">
+            {spaceLetter(space.name)}
+          </text>
+        </svg>
       </span>
       {tip}
     </>

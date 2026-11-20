@@ -304,9 +304,17 @@ button:focus-visible {
   line-height: 1;
   color: var(--fl-text-primary);
 }
-.mm .cap {
-  display: inline-block;
-  transform: translateY(0.4px);
+/* As app.css: the capital as SVG text, half Onest's cap height below the centre less a hair. */
+.mm .cap-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.mm .cap-svg text {
+  fill: currentColor;
+  text-anchor: middle;
+  transform: translateY(calc(0.359375em - 0.15px));
 }
 
 .tile svg {

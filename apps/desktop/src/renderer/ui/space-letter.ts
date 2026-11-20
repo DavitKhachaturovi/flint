@@ -20,9 +20,15 @@ export function spaceLetterElement(space: {
   square.dataset['space'] = space.id;
   square.title = space.name;
   square.setAttribute('aria-label', space.name);
-  const cap = document.createElement('span');
-  cap.className = 'cap';
-  cap.textContent = spaceLetter(space.name);
-  square.append(cap);
+  // As SpaceLetter.tsx: the capital as SVG text, placed geometrically in the square.
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'cap-svg');
+  svg.setAttribute('aria-hidden', 'true');
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', '50%');
+  text.setAttribute('y', '50%');
+  text.textContent = spaceLetter(space.name);
+  svg.append(text);
+  square.append(svg);
   return square;
 }

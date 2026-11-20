@@ -2052,14 +2052,14 @@ export function App(): ReactElement {
   );
 
   const addFromComposer = useCallback(
-    async (text: string, chooseNewList: boolean, listId?: string): Promise<void> => {
+    async (text: string, chooseNewList: boolean, picked?: string): Promise<void> => {
       const outcome = await change({
         kind: 'add',
         text,
         where: 'top',
         ...(chooseNewList && { chooseNewList }),
         // SPACE-04: the list picked in the `##` menu (another space's of a name Personal has too).
-        ...(listId && { listId }),
+        ...(picked && { listId: picked }),
       });
       if (!outcome?.key) return;
       frontAdd();
@@ -3876,8 +3876,10 @@ export function App(): ReactElement {
     const head = target.closest<HTMLElement>('.nav-group-head');
     const nav = head ? null : target.closest<HTMLElement>('.nav[data-key]');
     const items = sidebarView?.items ?? [];
+    // SPACE-01 (D-190 Q21): the lists and groups are the space's, under the switcher.
+    const rows = aside.querySelector<HTMLElement>('.space-body') ?? aside;
     const topUnits = (): DragUnit[] =>
-      [...aside.children].flatMap((element): DragUnit[] => {
+      [...rows.children].flatMap((element): DragUnit[] => {
         const key = element.matches('.nav-group')
           ? element.querySelector<HTMLElement>('.nav-group-head')?.dataset['key']
           : element.matches('.nav[data-key]')
@@ -3917,7 +3919,7 @@ export function App(): ReactElement {
       readonly open: boolean;
     }
     const spots: Spot[] = [];
-    for (const element of aside.children) {
+    for (const element of rows.children) {
       if (element.matches('.nav[data-key]')) {
         const key = (element as HTMLElement).dataset['key'] ?? '';
         if (key !== inbox?.id && key !== TODAY_ID && key !== FOCUS_ID && key !== TRASH_ID)

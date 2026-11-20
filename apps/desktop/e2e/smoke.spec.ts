@@ -1429,7 +1429,7 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   // D-79: with the group picked in the sidebar, Alt+↑/↓ moves the group; Ctrl+Z puts it back.
   const order = (): Promise<string[]> =>
     main
-      .locator('.sidebar > .nav-group:not(.flip-ghost), .sidebar > .nav:not(.flip-ghost)')
+      .locator('.space-body > .nav-group:not(.flip-ghost), .space-body > .nav:not(.flip-ghost)')
       .evaluateAll((items) =>
         items.map((item) =>
           (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),
@@ -1474,7 +1474,7 @@ test('sidebar groups, the sort menu and Alt+↑/↓ by keyboard focus (LIST-05, 
   await main.locator('.fl-menu').getByText('Delete group').click();
   await expect(main.locator('.toast')).toContainText('Deleted group House · its lists stay');
   await expect(head).toHaveCount(1);
-  await expect(main.locator('.sidebar > .nav', { hasText: 'Garage' })).toHaveCount(1);
+  await expect(main.locator('.space-body > .nav', { hasText: 'Garage' })).toHaveCount(1);
 });
 
 test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK-01, LIST-05, D-54, D-78)', async () => {
@@ -1563,7 +1563,7 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   const headBox = await head.boundingBox();
   if (!headBox) throw new Error('no group header');
   {
-    const list = await main.locator('.sidebar > .nav', { hasText: 'Drag' }).boundingBox();
+    const list = await main.locator('.space-body > .nav', { hasText: 'Drag' }).boundingBox();
     if (!list) throw new Error('no list to drag');
     const x = list.x + list.width * 0.6;
     await main.mouse.move(x, list.y + list.height / 2);
@@ -1578,7 +1578,7 @@ test('drag to reorder: tasks, subtasks, sidebar lists into a group, groups (TASK
   // The whole group dragged down one place (new groups start at the top, D-80).
   const order = (): Promise<string[]> =>
     main
-      .locator('.sidebar > .nav-group:not(.flip-ghost), .sidebar > .nav:not(.flip-ghost)')
+      .locator('.space-body > .nav-group:not(.flip-ghost), .space-body > .nav:not(.flip-ghost)')
       .evaluateAll((items) =>
         items.map((item) =>
           (item.querySelector('.group-name, .nav-name')?.textContent ?? '').trim(),

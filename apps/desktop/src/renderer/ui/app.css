@@ -4802,7 +4802,6 @@ body[data-tour-step='5'] .main .row .pin-hover {
 /* SPACE-04 (D-190 Q21): an item from another space: its letter right by the icon (6 px), the
    icon's own size (26 px), the capital 12 px (centred as measured: no nudge at this size). */
 .trash-row .mm {
-  --cap: 0px;
   width: 26px;
   height: 26px;
   margin-left: -4px;
@@ -9584,13 +9583,23 @@ body[data-tour-step='5'] .main .row .pin-hover {
 }
 /* D-190 Q21: the capital a hair above the square's centre at every size (measured in Chromium
    with Onest: 0.13 px high; text snaps to whole pixels, so the nudge is a transform). */
-.mm .cap,
 .stile .cap {
   display: inline-block;
   transform: translateY(var(--cap, 0px));
 }
-.mm {
-  --cap: 0.4px;
+/* Spaces preview 3: the letter's capital is SVG text, its baseline half Onest's cap height
+   (0.71875 em) below the square's centre less a hair, so it holds its place wherever the square
+   lands (HTML text snapped apart from the square and read up to 1 px high in task rows). */
+.mm .cap-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.mm .cap-svg text {
+  fill: currentColor;
+  text-anchor: middle;
+  transform: translateY(calc(0.359375em - 0.15px));
 }
 .stile {
   --cap: 0.9px;
