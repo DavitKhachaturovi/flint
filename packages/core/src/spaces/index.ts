@@ -79,3 +79,18 @@ export {
   type SpaceArchiveProblem,
   type SpaceMetaName,
 } from './space-archive.js';
+export { sha256 } from './sha256.js';
+export {
+  FILES_LIMITS,
+  FILES_MAX_BYTES,
+  FilesArchiveError,
+  attachmentEntry,
+  isAttachmentName,
+  mergeFiles,
+  pruneFiles,
+  readFilesArchive,
+  writeFilesArchive,
+  type FilesArchive,
+  type FilesProblem,
+  type SpaceAttachment,
+} from './files-archive.js';
