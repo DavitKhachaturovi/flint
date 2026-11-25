@@ -49,3 +49,13 @@ export {
   type MineFile,
   type MineRead,
 } from './mine-file.js';
+export {
+  SpaceStoreError,
+  type SpaceFileRef,
+  type SpaceMember,
+  type SpaceRevision,
+  type SpaceStore,
+  type SpaceStoreProblem,
+} from './store.js';
+export { FakeSpaceStore } from './fake-store.js';
+export { WRITE_TRIES, writeSafely, type Merge3, type Written } from './write-safely.js';
