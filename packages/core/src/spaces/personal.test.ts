@@ -137,6 +137,20 @@ describe('the personal-field split (SPACE-09)', () => {
     );
   });
 
+  it('spaces around a field at the line’s end come back exactly (found by CI’s longer fuzz run)', () => {
+    const text =
+      '---\nflint: 1\nmode: tasks\n---\n- [ ] [PINNED:: TRUE] [Vec::new][id:: abcd]  fix  [reminder:: 2026-10-30]\n';
+    const doc = parseDocument(text);
+    const { shared, mine } = splitPersonal(doc);
+    const theirs = serializeDocument(shared);
+    expect(theirs.split('\n').at(-2)).toBe('- [ ] [Vec::new][id:: abcd]  fix ');
+    const local = applyPersonal(parseDocument(theirs), mine);
+    expect(serializeDocument(splitPersonal(local).shared)).toBe(theirs);
+    expect(serializeDocument(splitPersonal(parseDocument(serializeDocument(local))).shared)).toBe(
+      theirs,
+    );
+  });
+
   it('a tab before your field stays a tab in the shared copy', () => {
     const theirs = header + '- [ ]\tTask\t[id:: ab01]\n';
     const { mine } = splitPersonal(parseDocument(header + '- [ ] x [pinned:: true] [id:: ab01]\n'));

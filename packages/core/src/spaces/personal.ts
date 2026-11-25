@@ -126,8 +126,10 @@ const MAX_PLACES = 4;
 /**
  * `text` without one field (`[key:: value]` or `(key::value)`, not escaped, outside code spans,
  * keys and values in any case, `pinned` also as `today`) and the gap by it: one candidate per place
- * the field's text occurs, for the caller to keep the one that reads back right. The gap before it
- * is kept as it was (a tab stays a tab); none is left at the line's end.
+ * the field's text occurs, for the caller to keep the one that reads back right. The field goes with
+ * the space after it, or at the end of a line with the space before it: the mirror of how
+ * `applyLine` puts fields in (`[field] ` before another field, ` [field]` at the end), so whatever
+ * was around them (a tab, two spaces, a trailing space) comes back exactly.
  */
 function cuts(text: string, key: PersonalKey, field: RawField): string[] {
   const keys = key === 'pinned' ? ['pinned', 'today', field.key] : [field.key];
@@ -146,7 +148,8 @@ function cuts(text: string, key: PersonalKey, field: RawField): string[] {
     const start = match.index + before.length + spaceBefore.length;
     if (rangeContaining(start, code)) continue;
     const end = match.index + whole.length;
-    const keep = spaceBefore !== '' && spaceAfter !== '' && end < text.length ? spaceBefore : '';
+    // With the space after it; without one, with the space before it.
+    const keep = spaceAfter !== '' ? spaceBefore : '';
     out.push(text.slice(0, match.index) + before + keep + text.slice(end));
   }
   return out;
@@ -213,7 +216,8 @@ function applyLine(node: TaskNode, personal: PersonalFields): TaskNode {
     ...[...new Set(places)]
       .sort((a, b) => a - b)
       .map((at) => `${text.slice(0, at)}${added} ${text.slice(at)}`),
-    `${text.replace(/[ \t]+$/, '')} ${added}`,
+    // At the end, before any trailing whitespace (kept as it was).
+    `${text.replace(/[ \t]+$/, '')} ${added}${/[ \t]+$/.exec(text)?.[0] ?? ''}`,
   ];
   for (const candidate of candidates) {
     const line = readsAs(candidate, expected);
