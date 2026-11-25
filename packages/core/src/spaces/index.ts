@@ -59,3 +59,23 @@ export {
 } from './store.js';
 export { FakeSpaceStore } from './fake-store.js';
 export { WRITE_TRIES, writeSafely, type Merge3, type Written } from './write-safely.js';
+export {
+  crc32,
+  readZip,
+  writeZip,
+  ZipError,
+  type ZipCodec,
+  type ZipEntry,
+  type ZipLimits,
+  type ZipProblem,
+} from './zip.js';
+export {
+  SPACE_ARCHIVE_LIMITS,
+  SPACE_META,
+  SpaceArchiveError,
+  readSpaceArchive,
+  writeSpaceArchive,
+  type SpaceArchive,
+  type SpaceArchiveProblem,
+  type SpaceMetaName,
+} from './space-archive.js';
