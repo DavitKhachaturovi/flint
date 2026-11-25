@@ -69,6 +69,7 @@ export function writeZip(
   entries: readonly ZipEntry[],
   codec: Pick<ZipCodec, 'deflate'>,
 ): Uint8Array {
+  if (entries.length >= 0xffff) throw new ZipError('too-many');
   const parts: Uint8Array[] = [];
   const central: Uint8Array[] = [];
   let offset = 0;
@@ -160,8 +161,10 @@ export function readZip(bytes: Uint8Array, codec: ZipCodec, limits: ZipLimits): 
   const names = new Set<string>();
   let total = 0;
   let at = centralAt;
+  const centralEnd = centralAt + centralSize;
   for (let index = 0; index < count; index++) {
-    if (at + 46 > endAt || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('corrupt');
+    if (at + 46 > centralEnd || view.getUint32(at, true) !== 0x02014b50)
+      throw new ZipError('corrupt');
     const flags = view.getUint16(at + 8, true);
     const method = view.getUint16(at + 10, true);
     const nameLength = view.getUint16(at + 28, true);
@@ -172,6 +175,11 @@ export function readZip(bytes: Uint8Array, codec: ZipCodec, limits: ZipLimits): 
     const packed = view.getUint32(at + 20, true);
     const size = view.getUint32(at + 24, true);
     if (packed === 0xffffffff || size === 0xffffffff) throw new ZipError('unsupported');
+    // A deflated entry is never larger than what it holds (Flint stores it otherwise): padding
+    // can't make unpacking slow (the Q11 review's H1).
+    if (method === 8 && packed > size) throw new ZipError('corrupt', 'a padded entry');
+    if (at + 46 + nameLength + extraLength + commentLength > centralEnd)
+      throw new ZipError('corrupt');
     let name: string;
     try {
       name = strictUtf8(bytes.subarray(at + 46, at + 46 + nameLength));
@@ -192,12 +200,32 @@ export function readZip(bytes: Uint8Array, codec: ZipCodec, limits: ZipLimits): 
     });
     at += 46 + nameLength + extraLength + commentLength;
   }
-  return headers.map((header) => {
+  // Each entry's bytes its own: no two entries share or overlap (one body unpacked many times).
+  const ranges: [number, number][] = [];
+  for (const header of headers) {
     const local = header.localAt;
     if (local + 30 > centralAt || view.getUint32(local, true) !== 0x04034b50)
       throw new ZipError('corrupt');
-    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+    const localName = view.getUint16(local + 26, true);
+    const start = local + 30 + localName + view.getUint16(local + 28, true);
     if (start + header.packed > centralAt) throw new ZipError('corrupt');
+    // The local header names the same entry as the directory (tools may read either).
+    let named: string;
+    try {
+      named = strictUtf8(bytes.subarray(local + 30, local + 30 + localName));
+    } catch {
+      throw new ZipError('corrupt');
+    }
+    if (named !== header.name) throw new ZipError('corrupt', 'headers disagree');
+    ranges.push([local, start + header.packed]);
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  for (let index = 1; index < ranges.length; index++)
+    if ((ranges[index]?.[0] ?? 0) < (ranges[index - 1]?.[1] ?? 0))
+      throw new ZipError('corrupt', 'overlapping entries');
+  return headers.map((header) => {
+    const local = header.localAt;
+    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     const body = bytes.subarray(start, start + header.packed);
     let data: Uint8Array;
     if (header.method === 0) {

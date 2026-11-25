@@ -100,9 +100,10 @@ describe('the space zip (D-190 Q8, Q11)', () => {
           for (const [at, value] of changes) if (at < damaged.length) damaged[at] = value;
           try {
             const read = readZip(damaged, codec, limits);
-            // Read: then only entries whose bytes passed their CRC.
+            // Read: then each entry is one of the originals, byte for byte (a change that got
+            // through touched nothing that matters, a version field, say).
             for (const entry of read)
-              expect(entry.data.length).toBeLessThanOrEqual(limits.maxTotal);
+              expect(entries).toContainEqual({ name: entry.name, data: entry.data });
           } catch (error) {
             expect(error).toBeInstanceOf(ZipError);
           }

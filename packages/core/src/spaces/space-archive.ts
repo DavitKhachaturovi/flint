@@ -7,7 +7,7 @@
  * (no folders, no `..`, no absolute paths, nothing starting with a dot, no two names Windows would
  * see as one); text in UTF-8; `space.json` present. A file failing any check isn't applied at all.
  */
-import { isValidListName } from '../shorthand/lists.js';
+import { isSafeFileName, nameTaken } from './untrusted-names.js';
 import { encodeUtf8 } from '../sync/utf8.js';
 import { readZip, strictUtf8, writeZip, ZipError, type ZipCodec, type ZipProblem } from './zip.js';
 
@@ -49,12 +49,10 @@ const isMeta = (name: string): name is SpaceMetaName =>
 function listName(entry: string): string | null {
   if (!entry.endsWith('.md')) return null;
   const name = entry.slice(0, -3);
-  if (!isValidListName(name) || name.startsWith('.') || name.trim() !== name) return null;
+  // The file's name and the list's (no trailing space or dot before `.md` either).
+  if (!isSafeFileName(entry) || !isSafeFileName(name)) return null;
   return name;
 }
-
-/** How Windows compares file names: one key for names that would be the same file. */
-const fileKey = (name: string): string => name.normalize('NFC').toLowerCase();
 
 /** A `.flintspace`'s content, checked (Q11). Throws `SpaceArchiveError`. */
 export function readSpaceArchive(bytes: Uint8Array, codec: ZipCodec): SpaceArchive {
@@ -67,7 +65,7 @@ export function readSpaceArchive(bytes: Uint8Array, codec: ZipCodec): SpaceArchi
   }
   const lists = new Map<string, string>();
   const meta = new Map<SpaceMetaName, string>();
-  const seen = new Set<string>();
+  const taken = nameTaken();
   for (const entry of entries) {
     let text: string;
     try {
@@ -81,9 +79,7 @@ export function readSpaceArchive(bytes: Uint8Array, codec: ZipCodec): SpaceArchi
     }
     const name = listName(entry.name);
     if (name === null) throw new SpaceArchiveError('bad-name', entry.name);
-    const key = fileKey(name);
-    if (seen.has(key)) throw new SpaceArchiveError('name-clash', entry.name);
-    seen.add(key);
+    if (taken(name)) throw new SpaceArchiveError('name-clash', entry.name);
     lists.set(name, text);
   }
   if (!meta.has('space.json')) throw new SpaceArchiveError('no-space-json');
@@ -104,8 +100,17 @@ export function writeSpaceArchive(
       .sort()
       .map((name) => ({ name: `${name}.md`, data: encodeUtf8(archive.lists.get(name) ?? '') })),
   ];
-  for (const entry of entries)
-    if (!isMeta(entry.name) && listName(entry.name) === null)
-      throw new SpaceArchiveError('bad-name', entry.name);
+  // Never a file the other members would refuse (the Q11 review's L4).
+  const taken = nameTaken();
+  let total = 0;
+  for (const entry of entries) {
+    total += entry.data.length;
+    if (isMeta(entry.name)) continue;
+    const name = listName(entry.name);
+    if (name === null) throw new SpaceArchiveError('bad-name', entry.name);
+    if (taken(name)) throw new SpaceArchiveError('name-clash', entry.name);
+  }
+  if (entries.length > SPACE_ARCHIVE_LIMITS.maxEntries) throw new SpaceArchiveError('too-many');
+  if (total > SPACE_ARCHIVE_LIMITS.maxTotal) throw new SpaceArchiveError('too-big');
   return writeZip(entries, codec);
 }

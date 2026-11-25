@@ -76,6 +76,13 @@ const KINDS: Readonly<Record<string, FileKind>> = {
       '.dll',
       '.sh',
       '.py',
+      // D-190 Q11's review: types Explorer reads just by showing a folder (a remote icon path
+      // can send the Windows sign-in without a click), kept out as spaces keep them out.
+      '.library-ms',
+      '.search-ms',
+      '.searchconnector-ms',
+      '.website',
+      '.settingcontent-ms',
     ].map((ext) => [ext, 'blocked']),
   ),
 };

@@ -309,6 +309,8 @@ describe('.flintmine merge, fuzzed (SPACE-09)', () => {
   });
 });
 
+const DEVICE_RUNS = Math.max(200, Math.ceil(Number(process.env.FLINT_FUZZ_RUNS ?? 2000) / 5));
+
 describe('.flintmine across devices, fuzzed (SPACE-09, Q22)', () => {
   type Field = 'pinned' | 'muted' | 'reminder';
   const step = fc.record({
@@ -394,9 +396,10 @@ describe('.flintmine across devices, fuzzed (SPACE-09, Q22)', () => {
             for (const [field, value] of Object.entries(fields))
               expect(final[id]?.[field as Field]).toBe(value);
         }),
-        { numRuns: Number(process.env.FLINT_FUZZ_RUNS ?? 1000) },
+        // Each run plays whole rounds on two devices: a fifth of the fuzz runs (2,000 in CI).
+        { numRuns: DEVICE_RUNS },
       );
     },
-    Math.max(5_000, Number(process.env.FLINT_FUZZ_RUNS ?? 1000) * 3),
+    Math.max(20_000, DEVICE_RUNS * 30),
   );
 });

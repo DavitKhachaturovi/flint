@@ -10,7 +10,7 @@
  * no `..`, nothing starting with a dot, no reserved names), no two files share a name, and the
  * limits hold. Written attachments get Mark-of-the-Web in the app (`Zone.Identifier`, ZoneId=3).
  */
-import { isValidListName } from '../shorthand/lists.js';
+import { isSafeAttachmentName, isSafeLabel, windowsKeys } from './untrusted-names.js';
 import { encodeUtf8 } from '../sync/utf8.js';
 import { sha256 } from './sha256.js';
 import { readZip, strictUtf8, writeZip, ZipError, type ZipCodec, type ZipProblem } from './zip.js';
@@ -50,10 +50,11 @@ const HASH = /^[0-9a-f]{64}$/;
 
 /** Whether this is a plain attachment file name Flint would write in `attachments/`. */
 export function isAttachmentName(name: string): boolean {
-  return isValidListName(name) && !name.startsWith('.') && name.trim() === name;
+  return isSafeAttachmentName(name);
 }
 
-const fileKey = (name: string): string => name.normalize('NFC').toLowerCase();
+/** One key per file Windows would see: its upper-case form (how NTFS compares). */
+const fileKey = (name: string): string => windowsKeys(name)[0] ?? name;
 
 function readIndex(text: string): Map<string, SpaceAttachment> {
   let data: unknown;
@@ -78,9 +79,11 @@ function readIndex(text: string): Map<string, SpaceAttachment> {
       throw new FilesArchiveError('bad-name', String(name));
     if (typeof size !== 'number' || !Number.isInteger(size) || size < 0)
       throw new FilesArchiveError('bad-index', hash);
-    if (typeof addedBy !== 'string') throw new FilesArchiveError('bad-index', hash);
-    if (names.has(fileKey(name))) throw new FilesArchiveError('name-clash', name);
-    names.add(fileKey(name));
+    if (typeof addedBy !== 'string' || !isSafeLabel(addedBy))
+      throw new FilesArchiveError('bad-index', hash);
+    if (windowsKeys(name).some((key) => names.has(key)))
+      throw new FilesArchiveError('name-clash', name);
+    for (const key of windowsKeys(name)) names.add(key);
     out.set(hash, { name, size, addedBy });
   }
   return out;
@@ -138,10 +141,17 @@ export function writeFilesArchive(
     SpaceAttachment
   >;
   let total = 0;
+  // Never a file the other members would refuse (the Q11 review's L4).
+  if (hashes.length >= FILES_LIMITS.maxEntries) throw new FilesArchiveError('too-many');
+  const names = new Set<string>();
   for (const hash of hashes) {
     const entry = archive.index.get(hash);
     const data = archive.data.get(hash);
     if (!entry || !data) throw new FilesArchiveError('missing', hash);
+    if (!isAttachmentName(entry.name)) throw new FilesArchiveError('bad-name', entry.name);
+    if (windowsKeys(entry.name).some((key) => names.has(key)))
+      throw new FilesArchiveError('name-clash', entry.name);
+    for (const key of windowsKeys(entry.name)) names.add(key);
     total += data.length;
     files[hash] = { name: entry.name, size: data.length, addedBy: entry.addedBy };
   }
@@ -195,8 +205,10 @@ export function mergeFiles(a: FilesArchive, b: FilesArchive): FilesArchive {
 export function pruneFiles(archive: FilesArchive, linked: ReadonlySet<string>): FilesArchive {
   const index = new Map<string, SpaceAttachment>();
   const data = new Map<string, Uint8Array>();
+  // Linked in any case or Unicode form: Windows opens the same file for either.
+  const keys = new Set([...linked].map(fileKey));
   for (const [hash, entry] of archive.index) {
-    if (!linked.has(entry.name)) continue;
+    if (!keys.has(fileKey(entry.name))) continue;
     const bytes = archive.data.get(hash);
     if (!bytes) continue;
     index.set(hash, entry);

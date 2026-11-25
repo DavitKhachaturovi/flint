@@ -94,3 +94,11 @@ export {
   type FilesProblem,
   type SpaceAttachment,
 } from './files-archive.js';
+export {
+  NEVER_FROM_OTHERS,
+  isSafeAttachmentName,
+  isSafeFileName,
+  isSafeLabel,
+  nameTaken,
+  windowsKeys,
+} from './untrusted-names.js';
