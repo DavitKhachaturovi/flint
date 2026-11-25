@@ -102,3 +102,4 @@ export {
   nameTaken,
   windowsKeys,
 } from './untrusted-names.js';
+export { mergeSpaceLists, spaceMerge3, type SpaceListsMerge } from './space-merge.js';
