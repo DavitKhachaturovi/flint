@@ -103,3 +103,10 @@ export {
   windowsKeys,
 } from './untrusted-names.js';
 export { mergeSpaceLists, spaceMerge3, type SpaceListsMerge } from './space-merge.js';
+export {
+  spaceRound,
+  type LocalSpace,
+  type SpaceBase,
+  type SpaceRoundOptions,
+  type SpaceRoundReport,
+} from './space-sync.js';
