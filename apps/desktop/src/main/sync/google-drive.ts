@@ -503,6 +503,127 @@ export class GoogleDrive implements Drive {
     );
     return file.headRevisionId ?? file.md5Checksum ?? '';
   }
+
+  // ── The space store's calls (S2, D-190 Q9; `main/spaces/google-store.ts` adapts them). ──
+
+  /** A space file's revision, size and time (Drive's clock); throws a 404 `DriveError` when gone. */
+  async spaceFacts(fileId: string): Promise<SpaceFacts> {
+    const file = await this.json<ApiFile>(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=${FILE_FIELDS}`,
+    );
+    return facts(file);
+  }
+
+  /** Writes a space file whole and returns its new facts. */
+  async uploadSpaceFile(fileId: string, content: Uint8Array, device: string): Promise<SpaceFacts> {
+    return facts(
+      await this.upload(
+        'PATCH',
+        `/${encodeURIComponent(fileId)}`,
+        { appProperties: { device } },
+        content,
+      ),
+    );
+  }
+
+  /** A new file in the spaces folder, marked as Flint's. */
+  async createSpaceFile(
+    folderId: string,
+    name: string,
+    mimeType: string,
+    marks: Readonly<Record<string, string>>,
+    content: Uint8Array,
+  ): Promise<SpaceFacts> {
+    return facts(
+      await this.upload(
+        'POST',
+        '',
+        { name, parents: [folderId], mimeType, appProperties: marks },
+        content,
+      ),
+    );
+  }
+
+  /** A file's stored revisions, oldest first (Drive keeps a binary file's for 30 days). */
+  async revisions(
+    fileId: string,
+  ): Promise<{ readonly id: string; readonly modifiedTime: number }[]> {
+    const out: { id: string; modifiedTime: number }[] = [];
+    let page: string | undefined;
+    do {
+      const params = new URLSearchParams({
+        fields: 'nextPageToken,revisions(id,modifiedTime)',
+        pageSize: '200',
+        ...(page ? { pageToken: page } : {}),
+      });
+      const body = await this.json<{
+        revisions?: { id: string; modifiedTime?: string }[];
+        nextPageToken?: string;
+      }>(`${DRIVE_API}/files/${encodeURIComponent(fileId)}/revisions?${params.toString()}`);
+      for (const revision of body.revisions ?? [])
+        out.push({
+          id: revision.id,
+          modifiedTime: revision.modifiedTime ? Date.parse(revision.modifiedTime) : 0,
+        });
+      page = body.nextPageToken;
+    } while (page);
+    return out;
+  }
+
+  /** One stored revision's bytes. */
+  async readRevision(fileId: string, revisionId: string): Promise<Uint8Array> {
+    const response = await this.request(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}/revisions/${encodeURIComponent(revisionId)}?alt=media`,
+    );
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  /** Who has access to a file Flint made. */
+  async permissions(
+    fileId: string,
+  ): Promise<
+    { readonly id: string; readonly email: string; readonly name: string; readonly role: string }[]
+  > {
+    const body = await this.json<{
+      permissions?: { id: string; emailAddress?: string; displayName?: string; role?: string }[];
+    }>(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?fields=permissions(id,emailAddress,displayName,role)`,
+    );
+    return (body.permissions ?? []).map((permission) => ({
+      id: permission.id,
+      email: permission.emailAddress ?? '',
+      name: permission.displayName ?? permission.emailAddress ?? '',
+      role: permission.role ?? '',
+    }));
+  }
+
+  /** Takes one person's access away (the file stays with its owner). */
+  async removePermission(fileId: string, permissionId: string): Promise<void> {
+    await this.request(
+      `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(permissionId)}`,
+      { method: 'DELETE' },
+    );
+  }
+}
+
+/** A space file's facts, as the space store reports them. */
+export interface SpaceFacts {
+  readonly id: string;
+  readonly revision: string;
+  readonly size: number;
+  readonly modifiedTime: number;
+  readonly trashed: boolean;
+}
+
+function facts(file: ApiFile): SpaceFacts {
+  return {
+    id: file.id,
+    // Drive's head revision names a stored revision (the write-gap check lists them, D-190 Q9).
+    revision: file.headRevisionId ?? file.md5Checksum ?? '',
+    size: Number(file.size ?? 0),
+    modifiedTime: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
+    trashed: file.trashed === true,
+  };
 }
 
 /** An invite to an address with no Google account: Drive shared nothing (SPACE-05, R-S1). */
