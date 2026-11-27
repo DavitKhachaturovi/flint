@@ -85,7 +85,9 @@ export function mergeSpaceLists(
     }
     versions.push({
       listId: id,
-      base: was?.text ?? null,
+      // Deleted on one side and edited on the other: the edit wins and the whole list comes back,
+      // as in personal sync (merged without a base, so its tasks don't read as deleted there).
+      base: ours && their ? (was?.text ?? null) : null,
       mine: ours?.text ?? null,
       theirs: their?.text ?? null,
     });

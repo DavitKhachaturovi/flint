@@ -21,13 +21,15 @@ const spaceJson = '{"flint":1,"id":"s-home1","name":"Home"}';
 class Folder implements LocalSpace {
   readonly files = new Map<string, string>();
   readonly trashed: string[] = [];
+  readonly trashedTasks: string[] = [];
+  readonly metaFiles = new Map<SpaceMetaName, string>([['space.json', spaceJson]]);
   editing: { name: string; text: string } | null = null;
 
   lists(): Promise<ReadonlyMap<string, string>> {
     return Promise.resolve(new Map(this.files));
   }
   meta(): Promise<ReadonlyMap<SpaceMetaName, string>> {
-    return Promise.resolve(new Map([['space.json', spaceJson]]));
+    return Promise.resolve(new Map(this.metaFiles));
   }
   changedSince(name: string, text: string): Promise<boolean> {
     if (this.editing?.name === name) {
@@ -40,8 +42,13 @@ class Folder implements LocalSpace {
     this.files.set(name, text);
     return Promise.resolve();
   }
+  create(name: string, text: string): Promise<void> {
+    if (this.files.has(name)) return Promise.reject(new Error(`${name} exists`));
+    this.files.set(name, text);
+    return Promise.resolve();
+  }
   rename(from: string, to: string): Promise<void> {
-    if (this.files.has(to)) throw new Error(`${to} is taken`);
+    if (this.files.has(to)) return Promise.reject(new Error(`${to} is taken`));
     const text = this.files.get(from);
     this.files.delete(from);
     if (text !== undefined) this.files.set(to, text);
@@ -50,6 +57,14 @@ class Folder implements LocalSpace {
   trash(name: string): Promise<void> {
     this.files.delete(name);
     this.trashed.push(name);
+    return Promise.resolve();
+  }
+  trashTask(_name: string, block: string): Promise<void> {
+    this.trashedTasks.push(block);
+    return Promise.resolve();
+  }
+  writeMeta(name: SpaceMetaName, text: string): Promise<void> {
+    this.metaFiles.set(name, text);
     return Promise.resolve();
   }
 }
@@ -166,6 +181,106 @@ describe('a space’s sync round (SPACE-02, D-190)', () => {
   });
 });
 
+describe('the sync round’s review findings (SPACE-02, D-190)', () => {
+  const text = (folder: Folder): string => [...folder.files.values()].join('\n');
+
+  it('H1: two members make a list of one name: both lists live on, nothing is lost or trashed', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('Shopping', list('aaa1', '- [ ] Alex thing [id:: al01]\n'));
+    sam.folder.files.set('Shopping', list('zzz1', '- [ ] Sam thing [id:: sm01]\n'));
+    await alex.round();
+    for (let n = 0; n < 3; n++) {
+      await sam.round();
+      await alex.round();
+    }
+    for (const folder of [alex.folder, sam.folder]) {
+      expect(text(folder)).toContain('Alex thing');
+      expect(text(folder)).toContain('Sam thing');
+      expect(folder.trashed).toEqual([]);
+    }
+  });
+
+  it('H2, H3: a rename plus a new list of the old name (and typing meanwhile): the renamed list and the typing are kept', async () => {
+    const { alex, sam } = await members();
+    // Alex renames Groceries to "Groceries old" and starts a fresh Groceries.
+    const old = alex.folder.files.get('Groceries') ?? '';
+    alex.folder.files.delete('Groceries');
+    alex.folder.files.set('Groceries old', old);
+    alex.folder.files.set('Groceries', list('gro2', '- [ ] Fresh [id:: fr01]\n'));
+    await alex.round();
+    // Sam types into Groceries during his round.
+    sam.folder.editing = {
+      name: 'Groceries',
+      text: list(
+        'gro1',
+        '- [ ] Eggs [id:: eg01]\n- [ ] Milk [id:: mi01]\n- [ ] Typed [id:: ty01]\n',
+      ),
+    };
+    for (let n = 0; n < 3; n++) {
+      await sam.round();
+      await alex.round();
+    }
+    for (const folder of [alex.folder, sam.folder]) {
+      expect(text(folder)).toContain('Typed');
+      expect(text(folder)).toContain('Fresh');
+      expect(text(folder)).toContain('Eggs');
+      expect(folder.trashed).toEqual([]);
+    }
+    expect([...sam.folder.files.keys()].sort()).toEqual(['Groceries', 'Groceries old']);
+  });
+
+  it('H4: swapping two lists’ names replaces neither; the swap comes across', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('Repairs', list('rep1', '- [ ] Fix the tap [id:: ft01]\n'));
+    await alex.round();
+    await sam.round();
+    const groceries = alex.folder.files.get('Groceries') ?? '';
+    const repairs = alex.folder.files.get('Repairs') ?? '';
+    alex.folder.files.set('Groceries', repairs);
+    alex.folder.files.set('Repairs', groceries);
+    await alex.round();
+    const report = await sam.round();
+    expect(report.renamed.length).toBeGreaterThan(0);
+    expect(sam.folder.files.get('Groceries')).toContain('Fix the tap');
+    expect(sam.folder.files.get('Repairs')).toContain('Eggs');
+    expect([...sam.folder.files.keys()].some((name) => name.startsWith('~flint-moving'))).toBe(
+      false,
+    );
+  });
+
+  it('H5, M1: two files with one list ID, or a task list with unsaved tasks: the round refuses before uploading', async () => {
+    const { cloud, id, alex } = await members();
+    const before = cloud.content(id);
+    alex.folder.files.set('Groceries copy', alex.folder.files.get('Groceries') ?? '');
+    await expect(alex.round()).rejects.toMatchObject({ problem: 'duplicate-id' });
+    alex.folder.files.delete('Groceries copy');
+    alex.folder.files.set('Notes', list('not1', '- [ ] Call [pinned:: true]\n'));
+    await expect(alex.round()).rejects.toMatchObject({ problem: 'unsaved' });
+    expect(cloud.content(id)).toEqual(before);
+  });
+
+  it('H6: the space renamed by one member stays renamed for everyone', async () => {
+    const { alex, sam } = await members();
+    alex.folder.metaFiles.set('space.json', '{"flint":1,"id":"s-home1","name":"Our home"}');
+    await alex.round();
+    await sam.round();
+    await sam.round();
+    await alex.round();
+    expect(sam.folder.metaFiles.get('space.json')).toContain('Our home');
+    expect(alex.folder.metaFiles.get('space.json')).toContain('Our home');
+  });
+
+  it('M2: a task another member deleted goes to Trash here', async () => {
+    const { alex, sam } = await members();
+    sam.folder.files.set('Groceries', list('gro1', '- [ ] Eggs [id:: eg01]\n'));
+    await sam.round();
+    const report = await alex.round();
+    expect(report.trashedTasks).toEqual([['Groceries', 'mi01']]);
+    expect(alex.folder.trashedTasks).toEqual(['- [ ] Milk [id:: mi01]']);
+    expect(alex.folder.files.get('Groceries')).not.toContain('Milk');
+  });
+});
+
 describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
   type Step =
     | { kind: 'add'; who: number; where: number }
@@ -173,6 +288,10 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
     | { kind: 'pin'; who: number }
     | { kind: 'list'; who: number }
     | { kind: 'rename'; who: number }
+    | { kind: 'same'; who: number }
+    | { kind: 'swap'; who: number }
+    | { kind: 'delete'; who: number }
+    | { kind: 'meta'; who: number }
     | { kind: 'round'; who: number; typing: boolean };
   const step: fc.Arbitrary<Step> = fc.oneof(
     fc.record({ kind: fc.constant('add' as const), who: fc.nat(2), where: fc.nat(3) }),
@@ -180,6 +299,10 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
     fc.record({ kind: fc.constant('pin' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('list' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('rename' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('same' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('swap' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('delete' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('meta' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('round' as const), who: fc.nat(2), typing: fc.boolean() }),
   );
 
@@ -210,6 +333,8 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
         const people = [alex, sam, nino];
         const added = new Set(['eg01', 'mi01']);
         const pinned: Set<string>[] = [new Set(), new Set(), new Set()];
+        /** Lists someone deleted (their tasks may rightly be gone): by list ID. */
+        const deletedLists = new Set<string>();
         let n = 0;
         for (const s of steps) {
           const who = people[s.who];
@@ -239,6 +364,31 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
           } else if (s.kind === 'list') {
             const listId = `l${n++}`;
             files.set(`List ${listId}`, list(listId, ''));
+          } else if (s.kind === 'same') {
+            // Lists of one name made on several sides (the merge tells them apart).
+            if (files.has('Shared')) continue;
+            const listId = `s${n++}`;
+            files.set('Shared', list(listId, ''));
+          } else if (s.kind === 'swap') {
+            const [first, second] = names;
+            if (!first || !second) continue;
+            const a = files.get(first) ?? '';
+            files.set(first, files.get(second) ?? '');
+            files.set(second, a);
+          } else if (s.kind === 'delete') {
+            const name = names[0];
+            if (!name) continue;
+            const listId = /\nid: ([^\n]+)\n/.exec(files.get(name) ?? '')?.[1];
+            if (listId) deletedLists.add(listId);
+            // The member's own pins went with the file they deleted.
+            for (const match of (files.get(name) ?? '').matchAll(/\[id:: ([a-z0-9]+)\]/g))
+              pinned[s.who]?.delete(match[1] ?? '');
+            files.delete(name);
+          } else if (s.kind === 'meta') {
+            who.folder.metaFiles.set(
+              'space.json',
+              `{"flint":1,"id":"s-home1","name":"Home ${n++}"}`,
+            );
           } else if (s.kind === 'rename') {
             const name = names[0];
             if (!name || files.has(`${name} renamed`)) continue;
@@ -270,14 +420,32 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
             .join('\n---\n');
         expect(sharedOf(sam.folder)).toBe(sharedOf(alex.folder));
         expect(sharedOf(nino.folder)).toBe(sharedOf(alex.folder));
+        expect(sam.folder.metaFiles).toEqual(alex.folder.metaFiles);
+        expect(nino.folder.metaFiles).toEqual(alex.folder.metaFiles);
+        // Nothing to Trash, and no temporary name left, unless someone deleted something.
+        if (deletedLists.size === 0)
+          for (const person of people) expect(person.folder.trashed).toEqual([]);
+        for (const person of people)
+          expect(
+            [...person.folder.files.keys()].some((name) => name.startsWith('~flint-moving')),
+          ).toBe(false);
         const cloudText = [
           ...readSpaceArchive(cloud.content(id) ?? new Uint8Array(), codec).lists.values(),
         ].join('\n');
         expect(cloudText).not.toContain('pinned');
         const everything = [...alex.folder.files.values()].join('\n');
-        for (const task of added) expect(everything).toContain(`[id:: ${task}]`);
+        // Every task anyone added is here, unless it was in a list someone deleted.
+        const trashedText = people.flatMap((person) => person.folder.trashedTasks).join('\n');
+        for (const task of added)
+          if (deletedLists.size === 0) expect(everything).toContain(`[id:: ${task}]`);
+          else if (!everything.includes(`[id:: ${task}]`))
+            expect(deletedLists.size).toBeGreaterThan(0);
+        if (deletedLists.size === 0) expect(trashedText).toBe('');
+        // Pins stay their member's own. (A list someone deleted goes to a member's Trash with that
+        // member's pins in it, restorable there, even if another's edit brings the list back.)
         people.forEach((person, index) => {
           const text = [...person.folder.files.values()].join('\n');
+          if (person.folder.trashed.length > 0) return;
           for (const task of pinned[index] ?? [])
             if (text.includes(`[id:: ${task}]`))
               expect(text).toContain(`[pinned:: true] [id:: ${task}]`);

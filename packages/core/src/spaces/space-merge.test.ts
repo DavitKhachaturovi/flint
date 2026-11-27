@@ -82,7 +82,11 @@ describe('merging a space (SPACE-02, D-190)', () => {
       ],
     ]);
     const kept = mergeSpaceLists(base, mine, edited, context('ALEX-PC'));
-    expect(kept.lists.get('Groceries')).toContain('Tea');
+    // The whole list comes back, as personal sync's rule has it, not only the task added.
+    expect(kept.lists.get('Groceries')).toBe(
+      list('gro1', '- [ ] Eggs [id:: eg01]\n- [ ] Milk [id:: mi01]\n- [ ] Tea [id:: te01]\n'),
+    );
+    expect(kept.trashed).toEqual([]);
   });
 
   it('a rename on one side is taken; two new lists of one name are told apart the same way on both sides', () => {
