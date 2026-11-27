@@ -118,10 +118,10 @@ class Base implements SpaceBase {
   content: Uint8Array | null = null;
   carried: string | null = null;
   frozen = false;
-  readCarried(): Promise<string | null> {
+  readState(): Promise<string | null> {
     return Promise.resolve(this.carried);
   }
-  writeCarried(text: string): Promise<void> {
+  writeState(text: string): Promise<void> {
     if (this.frozen) return Promise.resolve();
     this.carried = text;
     return Promise.resolve();
@@ -469,11 +469,51 @@ describe('the sync round’s second review (SPACE-02, D-190)', () => {
   });
 });
 
+describe('the sync round’s third review (SPACE-02, D-190)', () => {
+  it('R1: a pin cleared while a round left the list alone stays cleared', async () => {
+    const { alex } = await members();
+    alex.folder.files.set(
+      'Groceries',
+      list('gro1', '- [ ] Eggs [pinned:: true] [id:: eg01]\n- [ ] Milk [id:: mi01]\n'),
+    );
+    await alex.round();
+    // Alex unpins Eggs during the next round (the list is left for the round after).
+    alex.folder.editing = {
+      name: 'Groceries',
+      text: list('gro1', '- [ ] Eggs [id:: eg01]\n- [ ] Milk [id:: mi01]\n'),
+    };
+    await alex.round();
+    await alex.round();
+    await alex.round();
+    expect(alex.folder.files.get('Groceries')).toBe(
+      list('gro1', '- [ ] Eggs [id:: eg01]\n- [ ] Milk [id:: mi01]\n'),
+    );
+  });
+
+  it('R3: a list named like a temporary name never makes others undo renames', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('~flint-moving Notes', list('not1', '- [ ] x [id:: xx01]\n'));
+    await alex.round();
+    await sam.round();
+    // Sam renames Groceries; it stays renamed for both.
+    const text = sam.folder.files.get('Groceries') ?? '';
+    sam.folder.files.delete('Groceries');
+    sam.folder.files.set('Food', text);
+    for (let n = 0; n < 2; n++) {
+      await sam.round();
+      await alex.round();
+    }
+    for (const folder of [alex.folder, sam.folder])
+      expect([...folder.files.keys()].sort()).toEqual(['Food', 'Notes']);
+  });
+});
+
 describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
   type Step =
     | { kind: 'add'; who: number; where: number }
     | { kind: 'done'; who: number }
     | { kind: 'pin'; who: number }
+    | { kind: 'unpin'; who: number }
     | { kind: 'list'; who: number }
     | { kind: 'rename'; who: number }
     | { kind: 'same'; who: number }
@@ -487,6 +527,7 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
     fc.record({ kind: fc.constant('add' as const), who: fc.nat(2), where: fc.nat(3) }),
     fc.record({ kind: fc.constant('done' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('pin' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('unpin' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('list' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('rename' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('same' as const), who: fc.nat(2) }),
@@ -555,6 +596,14 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
               name,
               text.replace(`[id:: ${match[2]}]`, `[pinned:: true] [id:: ${match[2]}]`),
             );
+          } else if (s.kind === 'unpin') {
+            const name = names.find((each) => (files.get(each) ?? '').includes('[pinned:: true]'));
+            if (!name) continue;
+            const text = files.get(name) ?? '';
+            const match = /\[pinned:: true\] \[id:: ([a-z0-9]+)\]/.exec(text);
+            if (!match) continue;
+            pinned[s.who]?.delete(match[1] ?? '');
+            files.set(name, text.replace(match[0], `[id:: ${match[1]}]`));
           } else if (s.kind === 'list') {
             const listId = `l${n++}`;
             files.set(`List ${listId}`, list(listId, ''));
@@ -658,6 +707,9 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
         // member's pins in it, restorable there, even if another's edit brings the list back.)
         people.forEach((person, index) => {
           const text = [...person.folder.files.values()].join('\n');
+          // Any pin here is one this member set and didn't clear (never another's, never back).
+          for (const match of text.matchAll(/\[pinned:: true\] \[id:: ([a-z0-9]+)\]/g))
+            expect(pinned[index]?.has(match[1] ?? '')).toBe(true);
           if (person.folder.trashed.length > 0) return;
           for (const task of pinned[index] ?? [])
             if (text.includes(`[id:: ${task}]`))

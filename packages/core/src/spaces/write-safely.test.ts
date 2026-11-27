@@ -154,3 +154,46 @@ describe('writing a space file safely (D-190 Q9)', () => {
     );
   });
 });
+
+describe('a write whose gap check didn’t run (the sync round’s third review, R2)', () => {
+  it('the next run finds what that write replaced and merges it back', async () => {
+    const { cloud, alex, sam, id, base } = await setup(false);
+    const pending: { value: import('./write-safely.js').PendingWrite | null } = { value: null };
+    const journal = {
+      read: () => Promise.resolve(pending.value),
+      write: (value: import('./write-safely.js').PendingWrite | null) => {
+        pending.value = value;
+        return Promise.resolve();
+      },
+    };
+    // Alex's write lands in Sam's gap; Sam's connection drops right after his own write.
+    cloud.beforeWrite = () => {
+      cloud.beforeWrite = null;
+      cloud.writeNow(id, text(new Set(['start', 'alex tea'])));
+    };
+    const revisions = sam.revisions.bind(sam);
+    let offline = true;
+    const flaky = {
+      ...sam,
+      conditionalWrites: false,
+      revisions: (fileId: string) => {
+        if (offline) {
+          offline = false;
+          return Promise.reject(new SpaceStoreError('offline'));
+        }
+        return revisions(fileId);
+      },
+    };
+    await expect(
+      writeSafely(flaky, id, base, text(new Set(['start', 'sam milk'])), merge, { journal }),
+    ).rejects.toMatchObject({ problem: 'offline' });
+    expect(pending.value).not.toBeNull();
+    expect(lines(cloud.content(id) ?? null).has('alex tea')).toBe(false);
+    // Back online: the next run (nothing new of Sam's) merges Alex's replaced write back.
+    const now = text(new Set(['start', 'sam milk']));
+    await writeSafely(flaky, id, now, now, merge, { journal });
+    expect(lines(cloud.content(id) ?? null)).toEqual(new Set(['start', 'sam milk', 'alex tea']));
+    expect(pending.value).toBeNull();
+    void alex;
+  });
+});

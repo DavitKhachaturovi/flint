@@ -33,6 +33,7 @@ import { ID_PATTERN } from '../format/fields.js';
 import type { ListsMergeContext } from '../sync/merge.js';
 import { applyPersonal, splitPersonal, type PersonalFields } from './personal.js';
 import {
+  MOVING_PREFIX,
   readSpaceArchive,
   writeSpaceArchive,
   type SpaceArchive,
@@ -41,11 +42,10 @@ import {
 import { listIdOf, spaceMerge3 } from './space-merge.js';
 import type { SpaceStore } from './store.js';
 import { windowsKeys } from './untrusted-names.js';
-import { writeSafely } from './write-safely.js';
+import { writeSafely, type PendingWrite } from './write-safely.js';
 import type { ZipCodec } from './zip.js';
 
-/** The prefix of a list's temporary name while names are swapped (a crash may leave one). */
-export const MOVING_PREFIX = '~flint-moving ';
+export { MOVING_PREFIX } from './space-archive.js';
 
 /** A space's folder on this device, as the round sees it. */
 export interface LocalSpace {
@@ -74,13 +74,23 @@ export interface LocalSpace {
   writeMeta(name: SpaceMetaName, text: string): Promise<void>;
 }
 
-/** What a round keeps between rounds: the merge base, and your fields still to put in place. */
+/** What a round keeps between rounds (local only): the merge base and the round's state. */
 export interface SpaceBase {
   read(): Promise<Uint8Array | null>;
   write(content: Uint8Array): Promise<void>;
-  /** Your fields on tasks a round couldn't put in place yet (JSON, local only). */
-  readCarried(): Promise<string | null>;
-  writeCarried(text: string): Promise<void>;
+  /**
+   * The round's state as JSON: your fields on tasks it couldn't put in place yet, whether a round
+   * stopped half-way through renames, and a write whose gap check didn't run.
+   */
+  readState(): Promise<string | null>;
+  writeState(text: string): Promise<void>;
+}
+
+interface RoundState {
+  carried: Map<string, PersonalFields>;
+  /** A round set lists aside under temporary names and may not have finished. */
+  moving: boolean;
+  pending: PendingWrite | null;
 }
 
 export interface SpaceRoundReport {
@@ -127,30 +137,38 @@ function taskBlock(document: FlintDocument, key: string): string | null {
   return null;
 }
 
-/** Your fields as `carried` keeps them: their text, put back as written. */
-function writeCarried(fields: ReadonlyMap<string, PersonalFields>): string {
+/** The round's state as kept: your fields as their text, put back as written. */
+function writeState(state: RoundState): string {
   const out: Record<string, Record<string, string>> = {};
-  for (const [id, each] of fields) {
+  for (const [id, each] of state.carried) {
     const entry: Record<string, string> = {};
     if (each.reminder) entry['reminder'] = each.reminder.raw?.value ?? '';
     if (each.muted) entry['muted'] = each.muted.raw?.value ?? 'true';
     if (each.pinned) entry['pinned'] = each.pinned.raw?.value ?? 'true';
     out[id] = entry;
   }
-  return JSON.stringify(out);
+  return JSON.stringify({ carried: out, moving: state.moving, pending: state.pending });
 }
 
-function readCarried(text: string | null): Map<string, PersonalFields> {
+function readState(text: string | null): RoundState {
   const out = new Map<string, PersonalFields>();
-  if (text === null) return out;
+  const state: RoundState = { carried: out, moving: false, pending: null };
+  if (text === null) return state;
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    return out;
+    return state;
   }
-  if (typeof data !== 'object' || data === null) return out;
-  for (const [id, value] of Object.entries(data as Record<string, unknown>)) {
+  if (typeof data !== 'object' || data === null) return state;
+  const record = data as Record<string, unknown>;
+  state.moving = record['moving'] === true;
+  const pending = record['pending'] as Record<string, unknown> | null | undefined;
+  if (pending && typeof pending['revision'] === 'string' && typeof pending['hash'] === 'string')
+    state.pending = { revision: pending['revision'], hash: pending['hash'] };
+  const carried = record['carried'];
+  if (typeof carried !== 'object' || carried === null) return state;
+  for (const [id, value] of Object.entries(carried as Record<string, unknown>)) {
     if (!ID_PATTERN.test(id) || typeof value !== 'object' || value === null) continue;
     // Read back through the format's own reader, so the fields are exactly what a line holds.
     const entry = value as Record<string, unknown>;
@@ -168,7 +186,7 @@ function readCarried(text: string | null): Map<string, PersonalFields> {
         ...(pinned && { pinned }),
       });
   }
-  return out;
+  return state;
 }
 
 export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRoundReport> {
@@ -183,7 +201,15 @@ export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRound
   // 1. This side's space, your fields kept apart; refused while IDs are doubled or unsaved.
   const localById = new Map<string, { name: string; text: string }>();
   const sharedById = new Map<string, string>();
-  const mine = readCarried(await base.readCarried());
+  const state = readState(await base.readState());
+  const saveState = (): Promise<void> => base.writeState(writeState(state));
+  // Carried fields only for tasks no local list holds: a local file is the truth for its tasks
+  // (a pin cleared there stays cleared).
+  const mine = new Map<string, PersonalFields>();
+  const localTasks = new Set<string>();
+  for (const text of lists.values())
+    for (const { task } of allTasks(parseDocument(text))) localTasks.add(task.key);
+  for (const [task, fields] of state.carried) if (!localTasks.has(task)) mine.set(task, fields);
   for (const [name, text] of lists) {
     const id = listIdOf(name, text);
     if (localById.has(id))
@@ -198,8 +224,9 @@ export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRound
     for (const [task, fields] of split.mine) mine.set(task, fields);
     sharedById.set(id, serializeDocument(split.shared));
   }
-  // The names going up: after a round stopped half-way through renames, the base's.
-  const recovering = [...lists.keys()].some((name) => name.startsWith(MOVING_PREFIX));
+  // The names going up: after a round stopped half-way through renames (its state says so, not
+  // a file's name), the base's.
+  const recovering = state.moving;
   const upNames = new Map<string, string>();
   const upTaken = new Set<string>();
   const order = [...localById].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
@@ -226,7 +253,15 @@ export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRound
   const ours = writeSpaceArchive({ lists: shared, meta: metaBefore }, codec);
 
   // 2. Up, merged with the provider's.
-  const written = await writeSafely(store, fileId, before, ours, spaceMerge3(codec, context));
+  const written = await writeSafely(store, fileId, before, ours, spaceMerge3(codec, context), {
+    journal: {
+      read: () => Promise.resolve(state.pending),
+      write: (pending) => {
+        state.pending = pending;
+        return saveState();
+      },
+    },
+  });
   const merged = readSpaceArchive(written.content, codec);
   const mergedById = new Map<string, { name: string; text: string }>();
   for (const [name, text] of merged.lists) mergedById.set(listIdOf(name, text), { name, text });
@@ -314,6 +349,10 @@ export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRound
       const aside = holder.get(nameKey(cycle.to)) ?? '';
       const from = where.get(aside) ?? '';
       const temporary = `${MOVING_PREFIX}${from}`.slice(0, 200);
+      if (!state.moving) {
+        state.moving = true;
+        await saveState();
+      }
       if (heldByOther(temporary, aside) || !(await move(aside, temporary))) {
         skip(aside, from);
         pending.splice(
@@ -407,9 +446,16 @@ export async function spaceRound(options: SpaceRoundOptions): Promise<SpaceRound
     if (kept !== undefined) baseMeta.set(name, kept);
   }
   await base.write(writeSpaceArchive({ lists: baseLists, meta: baseMeta }, codec));
-  const carried = new Map<string, PersonalFields>();
+  const kept = new Set<string>();
+  for (const id of skipped) {
+    const here = localById.get(id);
+    if (here) for (const { task } of allTasks(parseDocument(here.text))) kept.add(task.key);
+  }
+  state.carried = new Map();
   for (const [task, fields] of mine)
-    if (mergedTasks.has(task) && !placed.has(task)) carried.set(task, fields);
-  await base.writeCarried(writeCarried(carried));
+    if (mergedTasks.has(task) && !placed.has(task) && !kept.has(task))
+      state.carried.set(task, fields);
+  state.moving = [...where.values()].some((name) => name.startsWith(MOVING_PREFIX));
+  await saveState();
   return { uploaded: written.wrote, ...report };
 }

@@ -13,6 +13,12 @@ import { readZip, strictUtf8, writeZip, ZipError, type ZipCodec, type ZipProblem
 
 export const SPACE_ARCHIVE_LIMITS = { maxEntries: 10_000, maxTotal: 20 * 1024 * 1024 } as const;
 
+/**
+ * The prefix of a list's temporary name while a sync round swaps names (`space-sync.ts`): never a
+ * list's name in a space's file (a round uploads such a list under its real name).
+ */
+export const MOVING_PREFIX = '~flint-moving ';
+
 /** The bookkeeping files a `.flintspace` may hold. */
 export const SPACE_META = [
   'space.json',
@@ -50,7 +56,8 @@ function listName(entry: string): string | null {
   if (!entry.endsWith('.md')) return null;
   const name = entry.slice(0, -3);
   // The file's name and the list's (no trailing space or dot before `.md` either).
-  if (!isSafeFileName(entry) || !isSafeFileName(name)) return null;
+  if (!isSafeFileName(entry) || !isSafeFileName(name) || name.startsWith(MOVING_PREFIX))
+    return null;
   return name;
 }
 

@@ -62,6 +62,7 @@ describe('.flintspace (D-190 Q8, Q11)', () => {
       'notes.txt',
       'a\\b.md',
       'x:y.md',
+      '~flint-moving Notes.md',
     ])
       expect([name, problem(archiveWith(name))]).toEqual([name, 'bad-name']);
   });
