@@ -24,11 +24,37 @@ class Folder implements LocalSpace {
   readonly trashedTasks: string[] = [];
   readonly metaFiles = new Map<SpaceMetaName, string>([['space.json', spaceJson]]);
   editing: { name: string; text: string } | null = null;
+  /** Throws ("the PC stopped") before the rename after this many. */
+  crashAfterRenames: number | null = null;
+  /** The PC stops before the local change after this many (any kind). */
+  crashAfterOps: number | null = null;
+  /** Whether this change is dropped: the PC stopped (now or before). */
+  private stopped(): boolean {
+    if (this.crashAfterOps !== null) {
+      if (this.crashAfterOps === 0) {
+        this.crashAfterOps = null;
+        this.frozen = true;
+        this.onCrash?.();
+      } else this.crashAfterOps--;
+    }
+    return this.frozen;
+  }
+  /** A bookkeeping edit made during the round (seen from the second `meta()`). */
+  metaDuringRound: string | null = null;
+  /** After a crash: every change is dropped, as if the process had ended. */
+  frozen = false;
+  onCrash: (() => void) | null = null;
+  private metaReads = 0;
 
   lists(): Promise<ReadonlyMap<string, string>> {
     return Promise.resolve(new Map(this.files));
   }
   meta(): Promise<ReadonlyMap<SpaceMetaName, string>> {
+    this.metaReads++;
+    if (this.metaReads === 2 && this.metaDuringRound !== null) {
+      this.metaFiles.set('space.json', this.metaDuringRound);
+      this.metaDuringRound = null;
+    }
     return Promise.resolve(new Map(this.metaFiles));
   }
   changedSince(name: string, text: string): Promise<boolean> {
@@ -39,22 +65,40 @@ class Folder implements LocalSpace {
     return Promise.resolve(this.files.get(name) !== text);
   }
   write(name: string, text: string): Promise<void> {
+    if (this.stopped()) return Promise.resolve();
     this.files.set(name, text);
     return Promise.resolve();
   }
+  /** Windows: names compared without case. */
+  private taken(name: string, except?: string): boolean {
+    return [...this.files.keys()].some(
+      (key) => key !== except && key.toUpperCase() === name.toUpperCase(),
+    );
+  }
   create(name: string, text: string): Promise<void> {
-    if (this.files.has(name)) return Promise.reject(new Error(`${name} exists`));
+    if (this.stopped()) return Promise.resolve();
+    if (this.taken(name)) return Promise.reject(new Error(`${name} exists`));
     this.files.set(name, text);
     return Promise.resolve();
   }
   rename(from: string, to: string): Promise<void> {
-    if (this.files.has(to)) return Promise.reject(new Error(`${to} is taken`));
+    if (this.crashAfterRenames !== null) {
+      if (this.crashAfterRenames === 0) {
+        // The PC stops here: nothing after this lands, the base included.
+        this.crashAfterRenames = null;
+        this.frozen = true;
+        this.onCrash?.();
+      } else this.crashAfterRenames--;
+    }
+    if (this.stopped()) return Promise.resolve();
+    if (this.taken(to, from)) return Promise.reject(new Error(`${to} is taken`));
     const text = this.files.get(from);
     this.files.delete(from);
     if (text !== undefined) this.files.set(to, text);
     return Promise.resolve();
   }
   trash(name: string): Promise<void> {
+    if (this.stopped()) return Promise.resolve();
     this.files.delete(name);
     this.trashed.push(name);
     return Promise.resolve();
@@ -64,6 +108,7 @@ class Folder implements LocalSpace {
     return Promise.resolve();
   }
   writeMeta(name: SpaceMetaName, text: string): Promise<void> {
+    if (this.stopped()) return Promise.resolve();
     this.metaFiles.set(name, text);
     return Promise.resolve();
   }
@@ -71,10 +116,21 @@ class Folder implements LocalSpace {
 
 class Base implements SpaceBase {
   content: Uint8Array | null = null;
+  carried: string | null = null;
+  frozen = false;
+  readCarried(): Promise<string | null> {
+    return Promise.resolve(this.carried);
+  }
+  writeCarried(text: string): Promise<void> {
+    if (this.frozen) return Promise.resolve();
+    this.carried = text;
+    return Promise.resolve();
+  }
   read(): Promise<Uint8Array | null> {
     return Promise.resolve(this.content);
   }
   write(content: Uint8Array): Promise<void> {
+    if (this.frozen) return Promise.resolve();
     this.content = content;
     return Promise.resolve();
   }
@@ -281,6 +337,138 @@ describe('the sync round’s review findings (SPACE-02, D-190)', () => {
   });
 });
 
+describe('the sync round’s second review (SPACE-02, D-190)', () => {
+  const all = (folder: Folder): string => [...folder.files.values()].join('\n');
+  const moving = (folder: Folder): boolean =>
+    [...folder.files.keys()].some((name) => name.startsWith('~flint-moving'));
+  const settle = async (...people: { round: () => Promise<unknown> }[]) => {
+    for (let pass = 0; pass < 3; pass++) for (const who of people) await who.round();
+  };
+
+  it('N1: a PC stopping half-way through a swap loses nothing, and no temporary name spreads', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('Repairs', list('rep1', '- [ ] Fix the tap [id:: ft01]\n'));
+    await alex.round();
+    await sam.round();
+    const groceries = alex.folder.files.get('Groceries') ?? '';
+    alex.folder.files.set('Groceries', alex.folder.files.get('Repairs') ?? '');
+    alex.folder.files.set('Repairs', groceries);
+    await alex.round();
+    // Sam's PC stops after setting one aside and moving the other in.
+    sam.folder.crashAfterRenames = 2;
+    sam.folder.onCrash = () => {
+      sam.base.frozen = true;
+    };
+    await sam.round();
+    expect(moving(sam.folder)).toBe(true);
+    // Flint starts again.
+    sam.folder.frozen = false;
+    sam.base.frozen = false;
+    await settle(sam, alex);
+    for (const folder of [alex.folder, sam.folder]) {
+      expect(moving(folder)).toBe(false);
+      expect(folder.files.get('Groceries')).toContain('Fix the tap');
+      expect(folder.files.get('Repairs')).toContain('Eggs');
+      expect(folder.trashed).toEqual([]);
+    }
+  });
+
+  it('N2: a rename chain waiting on a list being edited leaves no temporary name', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('B', list('idb1', '- [ ] b [id:: bb01]\n'));
+    alex.folder.files.set('C', list('idc1', '- [ ] c [id:: cc01]\n'));
+    await alex.round();
+    await sam.round();
+    // Alex: C → D, B → C, Groceries → B.
+    const [g, b, c] = ['Groceries', 'B', 'C'].map((name) => alex.folder.files.get(name) ?? '');
+    alex.folder.files.delete('Groceries');
+    alex.folder.files.set('D', c ?? '');
+    alex.folder.files.set('C', b ?? '');
+    alex.folder.files.set('B', g ?? '');
+    await alex.round();
+    sam.folder.editing = {
+      name: 'C',
+      text: list('idc1', '- [ ] c [id:: cc01]\n- [ ] typed [id:: ty01]\n'),
+    };
+    await sam.round();
+    expect(moving(sam.folder)).toBe(false);
+    await settle(sam, alex);
+    for (const folder of [alex.folder, sam.folder]) {
+      expect(moving(folder)).toBe(false);
+      expect([...folder.files.keys()].sort()).toEqual(['B', 'C', 'D']);
+      expect(all(folder)).toContain('typed');
+      expect(folder.files.get('D')).toContain('cc01');
+    }
+  });
+
+  it('N3: the space renamed here during a round stays renamed', async () => {
+    const { alex, sam } = await members();
+    sam.folder.metaDuringRound = '{"flint":1,"id":"s-home1","name":"Mid round"}';
+    await sam.round();
+    expect(sam.folder.metaFiles.get('space.json')).toContain('Mid round');
+    await settle(sam, alex);
+    expect(alex.folder.metaFiles.get('space.json')).toContain('Mid round');
+    expect(sam.folder.metaFiles.get('space.json')).toContain('Mid round');
+  });
+
+  it('N4: a pinned task another member moves into a list being edited here keeps its pin', async () => {
+    const { alex, sam } = await members();
+    alex.folder.files.set('Repairs', list('rep1', '- [ ] Fix the tap [id:: ft01]\n'));
+    await alex.round();
+    await sam.round();
+    sam.folder.files.set(
+      'Groceries',
+      list('gro1', '- [ ] Eggs [pinned:: true] [id:: eg01]\n- [ ] Milk [id:: mi01]\n'),
+    );
+    // Alex moves Eggs into Repairs.
+    alex.folder.files.set('Groceries', list('gro1', '- [ ] Milk [id:: mi01]\n'));
+    alex.folder.files.set(
+      'Repairs',
+      list('rep1', '- [ ] Fix the tap [id:: ft01]\n- [ ] Eggs [id:: eg01]\n'),
+    );
+    await alex.round();
+    sam.folder.editing = {
+      name: 'Repairs',
+      text: list('rep1', '- [ ] Fix the tap [id:: ft01]\n- [ ] Typed [id:: ty01]\n'),
+    };
+    await sam.round();
+    await settle(sam, alex);
+    expect(sam.folder.files.get('Repairs')).toContain('Eggs [pinned:: true] [id:: eg01]');
+    expect(sam.folder.files.get('Repairs')).toContain('Typed');
+    expect(alex.folder.files.get('Repairs')).not.toContain('pinned');
+  });
+
+  it('N5: a list ID that isn’t Flint’s form is never used as a name or path', async () => {
+    const { listIdOf } = await import('./space-merge.js');
+    expect(listIdOf('Evil', list('a\\..\\..\\Desktop\\x', ''))).toBe('file:Evil');
+    expect(listIdOf('Fine', list('gro1', ''))).toBe('gro1');
+  });
+
+  it('N6: a rename that only changes case comes across (Windows sees one name)', async () => {
+    const { alex, sam } = await members();
+    const text = alex.folder.files.get('Groceries') ?? '';
+    alex.folder.files.delete('Groceries');
+    alex.folder.files.set('groceries', text);
+    await alex.round();
+    await sam.round();
+    expect([...sam.folder.files.keys()]).toEqual(['groceries']);
+  });
+
+  it('N7: a note’s checkbox without an ID, ticked by another member, isn’t put in Trash', async () => {
+    const { alex, sam } = await members();
+    const note = (box: string) =>
+      `---\nflint: 1\nid: not1\nmode: note\n---\n- [${box}] Call the bank\n`;
+    alex.folder.files.set('Plans', note(' '));
+    await alex.round();
+    await sam.round();
+    alex.folder.files.set('Plans', note('x'));
+    await alex.round();
+    const report = await sam.round();
+    expect(report.trashedTasks).toEqual([]);
+    expect(sam.folder.files.get('Plans')).toBe(note('x'));
+  });
+});
+
 describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
   type Step =
     | { kind: 'add'; who: number; where: number }
@@ -292,6 +480,8 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
     | { kind: 'swap'; who: number }
     | { kind: 'delete'; who: number }
     | { kind: 'meta'; who: number }
+    | { kind: 'move'; who: number }
+    | { kind: 'crash'; who: number; after: number }
     | { kind: 'round'; who: number; typing: boolean };
   const step: fc.Arbitrary<Step> = fc.oneof(
     fc.record({ kind: fc.constant('add' as const), who: fc.nat(2), where: fc.nat(3) }),
@@ -303,6 +493,8 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
     fc.record({ kind: fc.constant('swap' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('delete' as const), who: fc.nat(2) }),
     fc.record({ kind: fc.constant('meta' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('move' as const), who: fc.nat(2) }),
+    fc.record({ kind: fc.constant('crash' as const), who: fc.nat(2), after: fc.nat(4) }),
     fc.record({ kind: fc.constant('round' as const), who: fc.nat(2), typing: fc.boolean() }),
   );
 
@@ -335,6 +527,8 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
         const pinned: Set<string>[] = [new Set(), new Set(), new Set()];
         /** Lists someone deleted (their tasks may rightly be gone): by list ID. */
         const deletedLists = new Set<string>();
+        /** Tasks that were in a file someone deleted. */
+        const excused = new Set<string>();
         let n = 0;
         for (const s of steps) {
           const who = people[s.who];
@@ -380,10 +574,31 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
             if (!name) continue;
             const listId = /\nid: ([^\n]+)\n/.exec(files.get(name) ?? '')?.[1];
             if (listId) deletedLists.add(listId);
+            for (const match of (files.get(name) ?? '').matchAll(/\[id:: ([a-z0-9]+)\]/g))
+              excused.add(match[1] ?? '');
             // The member's own pins went with the file they deleted.
             for (const match of (files.get(name) ?? '').matchAll(/\[id:: ([a-z0-9]+)\]/g))
               pinned[s.who]?.delete(match[1] ?? '');
             files.delete(name);
+          } else if (s.kind === 'move') {
+            // The first task of the first list moved to the end of the second.
+            const [from, to] = names;
+            if (!from || !to) continue;
+            const source = files.get(from) ?? '';
+            const line = /^- \[[ x]\] [^\n]*\n/m.exec(source)?.[0];
+            if (!line) continue;
+            files.set(from, source.replace(line, ''));
+            files.set(to, `${files.get(to) ?? ''}${line}`);
+          } else if (s.kind === 'crash') {
+            // The PC stops part-way through applying a round, then Flint starts again.
+            who.folder.crashAfterOps = s.after;
+            who.folder.onCrash = () => {
+              who.base.frozen = true;
+            };
+            await who.round();
+            who.folder.crashAfterOps = null;
+            who.folder.frozen = false;
+            who.base.frozen = false;
           } else if (s.kind === 'meta') {
             who.folder.metaFiles.set(
               'space.json',
@@ -437,9 +652,7 @@ describe('a space’s sync rounds, fuzzed (SPACE-02, D-190)', () => {
         // Every task anyone added is here, unless it was in a list someone deleted.
         const trashedText = people.flatMap((person) => person.folder.trashedTasks).join('\n');
         for (const task of added)
-          if (deletedLists.size === 0) expect(everything).toContain(`[id:: ${task}]`);
-          else if (!everything.includes(`[id:: ${task}]`))
-            expect(deletedLists.size).toBeGreaterThan(0);
+          if (!excused.has(task)) expect(everything).toContain(`[id:: ${task}]`);
         if (deletedLists.size === 0) expect(trashedText).toBe('');
         // Pins stay their member's own. (A list someone deleted goes to a member's Trash with that
         // member's pins in it, restorable there, even if another's edit brings the list back.)

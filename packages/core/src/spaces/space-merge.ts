@@ -8,6 +8,7 @@
  * end up with one name are told apart ("Groceries 2"), the same on every device.
  */
 import { parseDocument } from '../format/document.js';
+import { ID_PATTERN } from '../format/fields.js';
 import {
   mergeLists,
   type ListsMergeContext,
@@ -43,10 +44,19 @@ interface Entry {
 }
 
 /** Each list by its ID (`file:<name>` for one without, which Flint never writes in a space). */
+/**
+ * The list's ID as lists are matched: its frontmatter `id` when it has Flint's form (it comes from
+ * other people's files, D-190 Q11), else `file:<name>`.
+ */
+export function listIdOf(name: string, text: string): string {
+  const id = parseDocument(text).frontmatter?.id;
+  return id !== null && id !== undefined && ID_PATTERN.test(id) ? id : `file:${name}`;
+}
+
 function byId(lists: ReadonlyMap<string, string> | null): Map<string, Entry> {
   const out = new Map<string, Entry>();
   for (const [name, text] of lists ?? []) {
-    const id = parseDocument(text).frontmatter?.id ?? `file:${name}`;
+    const id = listIdOf(name, text);
     if (!out.has(id)) out.set(id, { name, text });
   }
   return out;
